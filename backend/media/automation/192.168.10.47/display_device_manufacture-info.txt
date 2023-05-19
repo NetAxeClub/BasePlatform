@@ -1,0 +1,4 @@
+
+Slot  Sub  Serial-number          Manu-date
+- - - - - - - - - - - - - - - - - - - - - -
+0     -    4E21A0158922           2021-10-25

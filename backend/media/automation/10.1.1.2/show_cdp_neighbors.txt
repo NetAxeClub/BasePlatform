@@ -1,0 +1,18 @@
+CORE-SW#show cdp  neighbors
+Capability Codes: R - Router, T - Trans Bridge, B - Source Route Bridge
+                  S - Switch, H - Host, I - IGMP, r - Repeater, P - Phone
+
+Device ID            Local Intrfce         Holdtme   Capability    Platform   Port ID
+switch2.cisco.com
+                    Gig 0/20              156           R S I               Gig 0/0
+switch1.cisco.com
+                    Gig 0/20              145           R S I               Gig 0/0
+wcl-2500            Gig 0/2               168             H       AIR-CT2504Gig 0/0/1
+R6.cisco.com        Gig 0/20              179            R B                Gig 0/0
+R4.cisco.com        Gig 0/20              165            R B                Gig 0/0
+R5.cisco.com        Gig 0/20              142            R B                Gig 0/0
+R2.cisco.com        Gig 0/20              146            R B                Gig 0/0
+R3.cisco.com        Gig 0/20              139            R B                Gig 0/0
+R1.cisco.com        Gig 0/20              173            R B                Gig 0/0
+ici-store.www.cisco.com
+                    Gig 0/24              155           R B S     CISCO2911/Gig 0/1

@@ -1,0 +1,209 @@
+
+GigabitEthernet0/0/5 has 1 neighbor(s):
+
+Neighbor index :1
+Chassis type   :MAC address 
+Chassis ID     :7085-c27f-0839 
+Port ID type   :MAC address 
+Port ID        :7085-c27f-0839
+Expired time   :3113s
+
+
+Auto-negotiation supported    :Yes 
+Auto-negotiation enabled      :Yes
+OperMau   :speed(Unknown)/duplex(Unknown)
+
+MED Device information             
+Device class   :EndPoint Class I
+
+GigabitEthernet0/0/10 has 1 neighbor(s):
+
+Neighbor index :1
+Chassis type   :MAC address 
+Chassis ID     :7085-c288-7847 
+Port ID type   :MAC address 
+Port ID        :7085-c288-7847
+Expired time   :3245s
+
+
+Auto-negotiation supported    :Yes 
+Auto-negotiation enabled      :Yes
+OperMau   :speed(Unknown)/duplex(Unknown)
+
+MED Device information             
+Device class   :EndPoint Class I
+
+GigabitEthernet0/0/13 has 1 neighbor(s):
+
+Neighbor index :1
+Chassis type   :MAC address 
+Chassis ID     :0025-b3d0-ea8f 
+Port ID type   :MAC address 
+Port ID        :0025-b3d0-ea8f
+Expired time   :3254s
+
+
+Auto-negotiation supported    :Yes 
+Auto-negotiation enabled      :Yes
+OperMau   :speed(Unknown)/duplex(Unknown)
+
+MED Device information             
+Device class   :EndPoint Class I
+
+GigabitEthernet0/0/21 has 1 neighbor(s):
+
+Neighbor index :1
+Chassis type   :MAC address 
+Chassis ID     :0418-d6c0-8d12 
+Port ID type   :MAC address 
+Port ID        :0418-d6c0-8d12
+Port description    :eth0
+System name         :UAP-AC-LR
+System description  :UAP-AC-LR, 6.2.35.14043
+Management address type  :ipv4
+Management address value :192.168.10.223
+OID  :  
+Management address type  :ipv6
+Management address value :FE80::618:D6FF:FEC0:8D12
+OID  :  
+Expired time   :115s
+
+
+MED Device information             
+Device class   :Network Connectivity
+SoftwareRev       :4.4.153
+
+GigabitEthernet0/0/22 has 1 neighbor(s):
+
+Neighbor index :1
+Chassis type   :MAC address 
+Chassis ID     :a849-4d4e-49a0 
+Port ID type   :Interface name 
+Port ID        :GigabitEthernet0/0/0
+Port description    :HUAWEI, AP Series, GigabitEthernet0/0/0 Interface
+System name         :ici-huawei-ap
+System description  :Huawei AP6150DN Huawei Versatile Routing Platform Software  VRP (R) software,Version 5.170 (AP6150DN V200R008C10SPC700) Copyright (C) 2011-2018 Huawei Technologies Co., Ltd
+System capabilities supported   :wlanAccessPoint 
+System capabilities enabled     :wlanAccessPoint 
+Management address type  :ipv4
+Management address value :11.11.11.11
+OID  :0.6.15.43.6.1.4.1.2011.5.25.41.1.2.1.1.1.  
+Expired time   :107s
+
+Port VLAN ID(PVID)  :100
+VLAN name of VLAN  1:VLAN1
+
+Auto-negotiation supported    :Yes 
+Auto-negotiation enabled      :Yes
+OperMau   :speed(1000)/duplex(Full)
+
+Power port class            :PD 
+PSE power supported         :No 
+PSE power enabled           :No 
+PSE pairs control ability   :No 
+Power pairs                 :Signal 
+Port power classification   :Class4
+Power type                  :Type 2 PD 
+Power source                :PSE 
+Power priority              :Low 
+PD requested power value    :25.5(w) 
+PSE allocated power value   :0.0(w)
+
+Link aggregation supported:Yes 
+Link aggregation enabled :No 
+Aggregation port ID      :0
+
+Maximum frame Size       :1800
+
+GigabitEthernet0/0/24 has 4 neighbor(s):
+
+Neighbor index :1
+Chassis type   :MAC address 
+Chassis ID     :6887-c6ac-7a80 
+Port ID type   :Interface name 
+Port ID        :Gi0/0/1.26
+Port description    :GigabitEthernet0/0/1.26
+System name         :CN-ZY-MC-RT-cp1111.ici.com
+System description  :Cisco IOS Software [Fuji], ISR Software (ARMV8EB_LINUX_IOSD-UNIVERSALK9_IAS-M), Version 16.9.7, RELEASE SOFTWARE (fc1)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2021 by Cisco Systems, Inc.
+Compiled Wed 10-Feb-21 08:19 by mcpre
+System capabilities supported   :bridge router 
+System capabilities enabled     :router 
+Management address type  :ipv4
+Management address value :192.168.26.1
+OID  :  
+Management address type  :ipv6
+Management address value :2001:470:2A1B:10::1
+OID  :  
+Expired time   :102s
+
+
+
+Neighbor index :2
+Chassis type   :MAC address 
+Chassis ID     :6887-c6ac-7a80 
+Port ID type   :Interface name 
+Port ID        :Gi0/0/1.100
+Port description    :Server
+System name         :CN-ZY-MC-RT-cp1111.ici.com
+System description  :Cisco IOS Software [Fuji], ISR Software (ARMV8EB_LINUX_IOSD-UNIVERSALK9_IAS-M), Version 16.9.7, RELEASE SOFTWARE (fc1)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2021 by Cisco Systems, Inc.
+Compiled Wed 10-Feb-21 08:19 by mcpre
+System capabilities supported   :bridge router 
+System capabilities enabled     :router 
+Management address type  :ipv4
+Management address value :192.168.100.254
+OID  :  
+Management address type  :ipv6
+Management address value :2001:470:2A1B:10::1
+OID  :  
+Expired time   :99s
+
+
+
+Neighbor index :3
+Chassis type   :MAC address 
+Chassis ID     :6887-c6ac-7a80 
+Port ID type   :Interface name 
+Port ID        :Gi0/0/1.10
+Port description    :GigabitEthernet0/0/1.10
+System name         :CN-ZY-MC-RT-cp1111.ici.com
+System description  :Cisco IOS Software [Fuji], ISR Software (ARMV8EB_LINUX_IOSD-UNIVERSALK9_IAS-M), Version 16.9.7, RELEASE SOFTWARE (fc1)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2021 by Cisco Systems, Inc.
+Compiled Wed 10-Feb-21 08:19 by mcpre
+System capabilities supported   :bridge router 
+System capabilities enabled     :router 
+Management address type  :ipv4
+Management address value :192.168.10.1
+OID  :  
+Management address type  :ipv6
+Management address value :2001:470:2A1B:10::1
+OID  :  
+Expired time   :100s
+
+
+
+Neighbor index :4
+Chassis type   :MAC address 
+Chassis ID     :6887-c6ac-7a80 
+Port ID type   :Interface name 
+Port ID        :Gi0/0/1
+Port description    :GigabitEthernet0/0/1
+System name         :CN-ZY-MC-RT-cp1111.ici.com
+System description  :Cisco IOS Software [Fuji], ISR Software (ARMV8EB_LINUX_IOSD-UNIVERSALK9_IAS-M), Version 16.9.7, RELEASE SOFTWARE (fc1)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2021 by Cisco Systems, Inc.
+Compiled Wed 10-Feb-21 08:19 by mcpre
+System capabilities supported   :bridge router 
+System capabilities enabled     :router 
+Management address type  :ipv4
+Management address value :172.16.101.254
+OID  :  
+Management address type  :ipv6
+Management address value :2001:470:2A1B:10::1
+OID  :  
+Expired time   :97s
+

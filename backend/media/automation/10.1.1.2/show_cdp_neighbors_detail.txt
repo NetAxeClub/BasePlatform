@@ -1,0 +1,186 @@
+CORE-SW#
+CORE-SW#
+CORE-SW#
+CORE-SW#show cdp  neighbors  detail
+-------------------------
+Device ID: switch2.cisco.com
+Entry address(es):
+  IP address: 172.16.1.218
+Platform: Cisco ,  Capabilities: Router Switch IGMP
+Interface: GigabitEthernet0/20,  Port ID (outgoing port): GigabitEthernet0/0
+Holdtime : 158 sec
+
+Version :
+Cisco IOS Software, vios_l2 Software (vios_l2-ADVENTERPRISEK9-M), Experimental Version 15.2(20200924:215240) [sweickge-sep24-2020-l2iol-release 135]
+Copyright (c) 1986-2020 by Cisco Systems, Inc.
+Compiled Tue 29-Sep-20 11:53 by sweickge
+
+advertisement version: 2
+VTP Management Domain: ''
+Duplex: full
+Management address(es):
+  IP address: 172.16.1.218
+
+-------------------------
+Device ID: switch1.cisco.com
+Entry address(es):
+  IP address: 172.16.1.217
+Platform: Cisco ,  Capabilities: Router Switch IGMP
+Interface: GigabitEthernet0/20,  Port ID (outgoing port): GigabitEthernet0/0
+Holdtime : 141 sec
+
+Version :
+Cisco IOS Software, vios_l2 Software (vios_l2-ADVENTERPRISEK9-M), Experimental Version 15.2(20200924:215240) [sweickge-sep24-2020-l2iol-release 135]
+Copyright (c) 1986-2020 by Cisco Systems, Inc.
+Compiled Tue 29-Sep-20 11:53 by sweickge
+
+advertisement version: 2
+VTP Management Domain: ''
+Duplex: full
+Management address(es):
+  IP address: 172.16.1.217
+
+-------------------------
+Device ID: wcl-2500
+Entry address(es):
+  IP address: 172.16.1.100
+  IPv6 address: UNKNOWN  (link-local)
+Platform: AIR-CT2504-K9,  Capabilities: Host
+Interface: GigabitEthernet0/2,  Port ID (outgoing port): GigabitEthernet0/0/1
+Holdtime : 125 sec
+
+Version :
+Manufacturer's Name: Cisco Systems Inc.  Product Name: Cisco Controller  Product Version: 8.5.131.0  RTOS Version: Erro  Bootloader Version: 1.0.20  Build Type: DATA + WPS
+
+advertisement version: 2
+Duplex: full
+Management address(es):
+
+-------------------------
+Device ID: R6.cisco.com
+Entry address(es):
+  IP address: 172.16.1.216
+Platform: Cisco ,  Capabilities: Router Source-Route-Bridge
+Interface: GigabitEthernet0/20,  Port ID (outgoing port): GigabitEthernet0/0
+Holdtime : 179 sec
+
+Version :
+Cisco IOS Software, IOSv Software (VIOS-ADVENTERPRISEK9-M), Version 15.9(3)M4, RELEASE SOFTWARE (fc3)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2021 by Cisco Systems, Inc.
+Compiled Wed 04-Aug-21 08:13 by mcpre
+
+advertisement version: 2
+Management address(es):
+  IP address: 172.16.1.216
+
+-------------------------
+Device ID: R4.cisco.com
+Entry address(es):
+  IP address: 172.16.1.214
+Platform: Cisco ,  Capabilities: Router Source-Route-Bridge
+Interface: GigabitEthernet0/20,  Port ID (outgoing port): GigabitEthernet0/0
+Holdtime : 175 sec
+
+Version :
+Cisco IOS Software, IOSv Software (VIOS-ADVENTERPRISEK9-M), Version 15.9(3)M4, RELEASE SOFTWARE (fc3)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2021 by Cisco Systems, Inc.
+Compiled Wed 04-Aug-21 08:13 by mcpre
+
+advertisement version: 2
+Management address(es):
+  IP address: 172.16.1.214
+
+-------------------------
+Device ID: R5.cisco.com
+Entry address(es):
+  IP address: 172.16.1.215
+Platform: Cisco ,  Capabilities: Router Source-Route-Bridge
+Interface: GigabitEthernet0/20,  Port ID (outgoing port): GigabitEthernet0/0
+Holdtime : 129 sec
+
+Version :
+Cisco IOS Software, IOSv Software (VIOS-ADVENTERPRISEK9-M), Version 15.9(3)M4, RELEASE SOFTWARE (fc3)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2021 by Cisco Systems, Inc.
+Compiled Wed 04-Aug-21 08:13 by mcpre
+
+advertisement version: 2
+Management address(es):
+  IP address: 172.16.1.215
+
+-------------------------
+Device ID: R2.cisco.com
+Entry address(es):
+  IP address: 172.16.1.212
+Platform: Cisco ,  Capabilities: Router Source-Route-Bridge
+Interface: GigabitEthernet0/20,  Port ID (outgoing port): GigabitEthernet0/0
+Holdtime : 158 sec
+
+Version :
+Cisco IOS Software, IOSv Software (VIOS-ADVENTERPRISEK9-M), Version 15.9(3)M4, RELEASE SOFTWARE (fc3)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2021 by Cisco Systems, Inc.
+Compiled Wed 04-Aug-21 08:13 by mcpre
+
+advertisement version: 2
+Management address(es):
+  IP address: 172.16.1.212
+
+-------------------------
+Device ID: R3.cisco.com
+Entry address(es):
+  IP address: 172.16.1.213
+Platform: Cisco ,  Capabilities: Router Source-Route-Bridge
+Interface: GigabitEthernet0/20,  Port ID (outgoing port): GigabitEthernet0/0
+Holdtime : 167 sec
+
+Version :
+Cisco IOS Software, IOSv Software (VIOS-ADVENTERPRISEK9-M), Version 15.9(3)M4, RELEASE SOFTWARE (fc3)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2021 by Cisco Systems, Inc.
+Compiled Wed 04-Aug-21 08:13 by mcpre
+
+advertisement version: 2
+Management address(es):
+  IP address: 172.16.1.213
+
+-------------------------
+Device ID: R1.cisco.com
+Entry address(es):
+  IP address: 172.16.1.211
+Platform: Cisco ,  Capabilities: Router Source-Route-Bridge
+Interface: GigabitEthernet0/20,  Port ID (outgoing port): GigabitEthernet0/0
+Holdtime : 152 sec
+
+Version :
+Cisco IOS Software, IOSv Software (VIOS-ADVENTERPRISEK9-M), Version 15.9(3)M4, RELEASE SOFTWARE (fc3)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2021 by Cisco Systems, Inc.
+Compiled Wed 04-Aug-21 08:13 by mcpre
+
+advertisement version: 2
+Management address(es):
+  IP address: 172.16.1.211
+
+-------------------------
+Device ID: ici-store.www.cisco.com
+Entry address(es):
+  IP address: 39.155.182.116
+Platform: Cisco CISCO2911/K9,  Capabilities: Router Source-Route-Bridge Switch
+Interface: GigabitEthernet0/24,  Port ID (outgoing port): GigabitEthernet0/1
+Holdtime : 168 sec
+
+Version :
+Cisco IOS Software, C2900 Software (C2900-UNIVERSALK9-M), Version 15.7(3)M5, RELEASE SOFTWARE (fc1)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2019 by Cisco Systems, Inc.
+Compiled Fri 27-Sep-19 05:10 by prod_rel_team
+
+advertisement version: 2
+VTP Management Domain: ''
+Duplex: full
+Management address(es):
+  IP address: 39.155.182.116
+

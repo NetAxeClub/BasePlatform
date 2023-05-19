@@ -1,0 +1,493 @@
+Building configuration...
+
+  
+  
+Current configuration : 14638 bytes
+!
+! Last configuration change at 16:39:31 peking Tue Sep 13 2022 by ivan
+! NVRAM config last updated at 16:39:32 peking Tue Sep 13 2022 by ivan
+!
+version 15.7
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname ici-store
+!
+boot-start-marker
+boot system flash0:c2900-universalk9-mz.SPA.157-3.M5.bin
+boot-end-marker
+!
+!
+enable password 123.com
+!
+aaa new-model
+!
+!
+aaa authentication login default local
+aaa authentication login console none
+aaa authentication login sslvpn local
+aaa authentication login noise line none
+aaa authorization exec default local 
+!
+!
+!
+!
+!
+!
+aaa session-id common
+clock timezone peking 8 0
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+
+
+!
+!
+ip dhcp pool vlan10
+ network 172.16.1.0 255.255.255.0
+ default-router 172.16.1.1 
+ dns-server 114.114.114.114 
+!
+ip dhcp pool vlan100
+ network 192.168.100.0 255.255.255.0
+ default-router 192.168.100.254 
+ dns-server 114.114.114.114 
+!
+ip dhcp pool vlan30
+ network 192.168.30.0 255.255.255.0
+ default-router 192.168.30.254 
+ dns-server 114.114.114.114 192.168.100.100 
+!
+!
+!
+ip domain name www.cisco.com
+ip name-server 114.114.114.114
+ip cef
+no ipv6 cef
+!
+!
+flow record flow_record
+ match ipv4 source address
+ match ipv4 destination address
+ match ipv4 protocol
+ match transport source-port
+ match transport destination-port
+ match ipv4 tos
+ match interface input
+ collect interface output
+ collect counter packets long
+!
+!
+flow exporter flow_export
+ destination 192.168.10.80
+ transport udp 2055
+ template data timeout 60
+!
+!
+flow monitor flow_monitor
+ exporter flow_export
+ cache timeout active 60
+ record flow_record
+!
+multilink bundle-name authenticated
+!
+!
+!
+!
+crypto pki trustpoint TP-self-signed-1643346749
+ enrollment selfsigned
+ subject-name cn=IOS-Self-Signed-Certificate-1643346749
+ revocation-check none
+ rsakeypair TP-self-signed-1643346749
+!
+!
+crypto pki certificate chain TP-self-signed-1643346749
+ certificate self-signed 01
+  3082022B 30820194 A0030201 02020101 300D0609 2A864886 F70D0101 05050030 
+  31312F30 2D060355 04031326 494F532D 53656C66 2D536967 6E65642D 43657274 
+  69666963 6174652D 31363433 33343637 3439301E 170D3232 30373035 30383335 
+  32385A17 0D333030 31303130 30303030 305A3031 312F302D 06035504 03132649 
+  4F532D53 656C662D 5369676E 65642D43 65727469 66696361 74652D31 36343333 
+  34363734 3930819F 300D0609 2A864886 F70D0101 01050003 818D0030 81890281 
+  8100BE2A 6770A30D 0A0DEFEF C98FA190 1ED66E17 D6FDB3E0 76558052 4EBE375A 
+  77F04901 658A1950 90105AC2 BB01C810 A39922DF 209D80B3 97D0CB7E 0B1F8E89 
+  A3EA0CBC E0212987 A2C37FE3 782A4AD7 64D5ECA1 7CC7D976 8B6DCE64 814EF086 
+  0C531837 1E667D06 6D3A04EB D91E936D AB22B902 EC5CD11A CD3991BB D3828076 
+  2C110203 010001A3 53305130 0F060355 1D130101 FF040530 030101FF 301F0603 
+  551D2304 18301680 144EB912 80962390 E40B2351 FF5F096D EEF15B4E 87301D06 
+  03551D0E 04160414 4EB91280 962390E4 0B2351FF 5F096DEE F15B4E87 300D0609 
+  2A864886 F70D0101 05050003 81810030 74C1526F 4122A74F 6E408D31 A25CE1E2 
+  3C219DC7 C621F40F 881EE9D4 49E1E208 D1D60B31 40C4D5EA 71E9E5BB 5A491559 
+  499E9276 5E895E20 83B5DEB4 C96A5D3E E992ED13 A5F5E01A C1DC3F52 3D53143B 
+  C75AE8DD 2E03722D DE59EFAD A0F440F9 0DADD714 4EBB6C18 D55C6734 23264853 
+  567902AA C2C4438E F887A69E E25987
+  	quit
+license udi pid CISCO2911/K9 sn FGL201810NJ
+license accept end user agreement
+license boot module c2900 technology-package datak9
+!
+!
+
+!
+!
+!
+!
+! 
+!
+crypto vpn anyconnect flash0:/webvpn/anyconnect-win-4.5.00058-webdeploy-k9.pkg sequence 1
+!
+!
+!
+!
+!
+!
+!
+!
+!
+interface Loopback0
+ ip address 2.2.2.2 255.255.255.255
+ ip router isis 10
+!
+interface Tunnel102
+ description --- DMVPN To Remote Site ---
+ ip address 10.1.1.2 255.255.255.0
+ ip router isis 10
+ tunnel source GigabitEthernet0/0
+ tunnel destination 120.246.114.2
+!
+interface Embedded-Service-Engine0/0
+ no ip address
+ shutdown
+!
+interface GigabitEthernet0/0
+ ip address 39.155.182.116 255.255.255.224
+ ip flow monitor flow_monitor input
+ ip flow monitor flow_monitor output
+ ip nat outside
+ ip virtual-reassembly in
+ duplex auto
+ speed auto
+!
+interface GigabitEthernet0/1
+ no ip address
+ duplex auto
+ speed auto
+!
+interface GigabitEthernet0/1.10
+ encapsulation dot1Q 10
+ ip address 172.16.1.1 255.255.255.0
+ ip router isis 10
+ ip flow monitor flow_monitor input
+ ip flow monitor flow_monitor output
+ ip nat inside
+ ip virtual-reassembly in
+!
+interface GigabitEthernet0/1.12
+ encapsulation dot1Q 12
+ ip address 192.168.12.254 255.255.255.0
+ ip router isis 10
+!
+interface GigabitEthernet0/1.100
+ encapsulation dot1Q 100
+ ip address 192.168.100.254 255.255.255.0
+ ip nat inside
+ ip virtual-reassembly in
+ shutdown
+!
+interface GigabitEthernet0/1.300
+ encapsulation dot1Q 30
+ ip address 192.168.30.254 255.255.255.0
+ ip router isis 10
+ ip nat inside
+ ip virtual-reassembly in
+!
+interface GigabitEthernet0/2
+ no ip address
+ duplex auto
+ speed auto
+!
+interface Serial0/0/0
+ no ip address
+ shutdown
+ clock rate 2000000
+!
+!
+router ospf 110
+ router-id 2.2.2.2
+ network 10.1.1.2 0.0.0.0 area 0
+ network 172.16.1.0 0.0.0.255 area 0
+ network 192.168.12.0 0.0.0.255 area 0
+ network 192.168.30.0 0.0.0.255 area 0
+!
+router isis 10
+ net 49.0000.0000.0002.00
+ is-type level-2-only
+ metric-style wide
+ fast-flood 10
+ log-adjacency-changes all
+!
+router bgp 200
+ bgp router-id 2.2.2.2
+ bgp log-neighbor-changes
+ neighbor 1.1.1.1 remote-as 100
+ neighbor 1.1.1.1 ebgp-multihop 255
+ neighbor 10.1.1.1 remote-as 100
+ neighbor 120.246.114.2 remote-as 100
+ neighbor 120.246.114.2 ebgp-multihop 255
+ !
+ address-family ipv4
+  bgp suppress-inactive
+  network 2.2.2.2 mask 255.255.255.255
+  network 172.16.1.0 mask 255.255.255.0
+  network 192.168.12.0
+  network 192.168.30.0
+  neighbor 1.1.1.1 activate
+  neighbor 10.1.1.1 activate
+  neighbor 120.246.114.2 activate
+ exit-address-family
+!
+ip local pool vpn 192.168.12.100 192.168.12.200
+ip forward-protocol nd
+!
+ip http server
+no ip http secure-server
+!
+ip nat inside source list nat interface GigabitEthernet0/0 overload
+ip route 0.0.0.0 0.0.0.0 39.155.182.97
+ip route 192.168.12.0 255.255.255.0 Null0
+ip route 192.168.17.0 255.255.255.0 10.1.1.1
+ip ssh version 2
+!
+ip access-list standard nat
+ permit 192.168.100.0 0.0.0.255 log
+ permit 172.16.1.0 0.0.0.255
+ permit 192.168.30.0 0.0.0.255
+!
+logging facility local4
+logging source-interface GigabitEthernet0/1.10
+logging host 192.168.10.80
+logging host 192.168.10.26 transport udp port 5004
+ipv6 ioam timestamp
+!
+!
+snmp-server community shijiangepwd RW
+snmp-server trap-source Tunnel102
+snmp-server enable traps snmp authentication linkdown linkup coldstart warmstart
+snmp-server enable traps vrrp
+snmp-server enable traps pfr
+snmp-server enable traps flowmon
+snmp-server enable traps transceiver all
+snmp-server enable traps ds1
+snmp-server enable traps call-home message-send-fail server-fail
+snmp-server enable traps tty
+snmp-server enable traps eigrp
+snmp-server enable traps ospf state-change
+snmp-server enable traps ospf errors
+snmp-server enable traps ospf retransmit
+snmp-server enable traps ospf lsa
+snmp-server enable traps ospf cisco-specific state-change nssa-trans-change
+snmp-server enable traps ospf cisco-specific state-change shamlink interface
+snmp-server enable traps ospf cisco-specific state-change shamlink neighbor
+snmp-server enable traps ospf cisco-specific errors
+snmp-server enable traps ospf cisco-specific retransmit
+snmp-server enable traps ospf cisco-specific lsa
+snmp-server enable traps license
+snmp-server enable traps envmon
+snmp-server enable traps flash insertion removal low-space
+snmp-server enable traps auth-framework sec-violation auth-fail
+snmp-server enable traps c3g
+snmp-server enable traps LTE
+snmp-server enable traps ds3
+snmp-server enable traps adslline
+snmp-server enable traps vdsl2line
+snmp-server enable traps icsudsu
+snmp-server enable traps isdn call-information
+snmp-server enable traps isdn layer2
+snmp-server enable traps isdn chan-not-avail
+snmp-server enable traps isdn ietf
+snmp-server enable traps ds0-busyout
+snmp-server enable traps ds1-loopback
+snmp-server enable traps energywise
+snmp-server enable traps mac-notification
+snmp-server enable traps trustsec-sxp conn-srcaddr-err msg-parse-err conn-config-err binding-err conn-up conn-down binding-expn-fail oper-nodeid-change binding-conflict
+snmp-server enable traps bgp cbgp2
+snmp-server enable traps isis
+snmp-server enable traps ospfv3 state-change
+snmp-server enable traps ospfv3 errors
+snmp-server enable traps bfd
+snmp-server enable traps aaa_server
+snmp-server enable traps atm subif
+snmp-server enable traps cef resource-failure peer-state-change peer-fib-state-change inconsistency
+snmp-server enable traps memory bufferpeak
+snmp-server enable traps cnpd
+snmp-server enable traps config-copy
+snmp-server enable traps config
+snmp-server enable traps config-ctid
+snmp-server enable traps entity-ext
+snmp-server enable traps entity
+snmp-server enable traps fru-ctrl
+snmp-server enable traps resource-policy
+snmp-server enable traps event-manager
+snmp-server enable traps frame-relay multilink bundle-mismatch
+snmp-server enable traps frame-relay
+snmp-server enable traps frame-relay subif
+snmp-server enable traps hsrp
+snmp-server enable traps ipmulticast
+snmp-server enable traps mempool
+snmp-server enable traps msdp
+snmp-server enable traps mvpn
+snmp-server enable traps nhrp nhs
+snmp-server enable traps nhrp nhc
+snmp-server enable traps nhrp nhp
+snmp-server enable traps nhrp quota-exceeded
+snmp-server enable traps pim neighbor-change rp-mapping-change invalid-pim-message
+snmp-server enable traps pppoe
+snmp-server enable traps cpu threshold
+snmp-server enable traps rsvp
+snmp-server enable traps syslog
+snmp-server enable traps l2tun session
+snmp-server enable traps l2tun pseudowire status
+snmp-server enable traps vtp
+snmp-server enable traps waas 
+snmp-server enable traps pki
+snmp-server enable traps ethernet cfm cc mep-up mep-down cross-connect loop config
+snmp-server enable traps ethernet cfm crosscheck mep-missing mep-unknown service-up
+snmp-server enable traps ethernet evc status create delete
+snmp-server enable traps bstun
+snmp-server enable traps dlsw
+snmp-server enable traps ipsla
+snmp-server enable traps stun
+snmp-server enable traps mpls traffic-eng
+snmp-server enable traps mpls fast-reroute protected
+snmp-server enable traps mpls rfc ldp
+snmp-server enable traps mpls ldp
+snmp-server enable traps pw vc
+snmp-server enable traps lisp
+snmp-server enable traps ipmobile
+snmp-server enable traps snasw alert isr topology cp-cp port link dlus
+snmp-server enable traps gdoi gm-start-registration
+snmp-server enable traps gdoi gm-registration-complete
+snmp-server enable traps gdoi gm-re-register
+snmp-server enable traps gdoi gm-rekey-rcvd
+snmp-server enable traps gdoi gm-rekey-fail
+snmp-server enable traps gdoi ks-rekey-pushed
+snmp-server enable traps gdoi gm-incomplete-cfg
+snmp-server enable traps gdoi ks-no-rsa-keys
+snmp-server enable traps gdoi ks-new-registration
+snmp-server enable traps gdoi ks-reg-complete
+snmp-server enable traps gdoi ks-role-change
+snmp-server enable traps gdoi ks-gm-deleted
+snmp-server enable traps gdoi ks-peer-reachable
+snmp-server enable traps gdoi ks-peer-unreachable
+snmp-server enable traps firewall serverstatus
+snmp-server enable traps ike policy add
+snmp-server enable traps ike policy delete
+snmp-server enable traps ike tunnel start
+snmp-server enable traps ike tunnel stop
+snmp-server enable traps ipsec cryptomap add
+snmp-server enable traps ipsec cryptomap delete
+snmp-server enable traps ipsec cryptomap attach
+snmp-server enable traps ipsec cryptomap detach
+snmp-server enable traps ipsec tunnel start
+snmp-server enable traps ipsec tunnel stop
+snmp-server enable traps ipsec too-many-sas
+snmp-server enable traps rf
+snmp-server enable traps bulkstat collection transfer
+snmp-server enable traps vrfmib vrf-up vrf-down vnet-trunk-up vnet-trunk-down
+snmp-server enable traps ethernet cfm alarm
+snmp-server enable traps mpls vpn
+snmp-server host 192.168.10.25 version 2c shijiangepwd 
+snmp ifmib trap throttle
+access-list 10 permit 192.168.0.0 0.0.255.255
+access-list 10 permit 172.16.1.0 0.0.0.255
+!
+!
+!
+control-plane
+!
+banner login ^CCC
+               International communication instrument co., LTD
+                    #                               #
+                   ###                             ###
+                   ###                             ###
+                   ###                             ###
+            #      ###      #               #      ###      #
+           ###     ###     ###             ###     ###     ###
+    #      ###     ###     ###      #      ###     ###     ###      #
+   ###     ###     ###     ###     ###     ###     ###     ###     ###
+   ###     ###     ###     ###     ###     ###     ###     ###     ###
+   ###     ###     ###     ###     ###     ###     ###     ###     ###
+    #       #      ###      #       #       #      ###      #       # 
+                   ###                             ###
+                   ###                             ###
+                    #                               # 
+
+            #######   ###    #######       #######      #####
+          #########   ###   ###    ##    #########    #########
+         ###          ###    ####       ###          ###     ###
+         ###          ###      ###      ###          ###     ###
+         ###          ###       ####    ###          ###     ###
+          #########   ###   ##    ###    #########    #########
+            #######   ###    #######       #######      #####
+^C
+!
+line con 0
+line aux 0
+line 2
+ no activation-character
+ no exec
+ transport preferred none
+ transport output lat pad telnet rlogin lapb-ta mop udptn v120 ssh
+ stopbits 1
+line vty 0 4
+ access-class 10 in
+ transport input ssh
+!
+scheduler allocate 20000 1000
+ntp source GigabitEthernet0/0
+ntp master
+ntp server ntp.ntsc.ac.cn
+!
+!
+webvpn gateway sslvpn
+ ip interface GigabitEthernet0/0 port 4433
+ ssl trustpoint TP-self-signed-1643346749
+ inservice
+ !
+webvpn context sslvpn
+ title "Welcome ICI ssl vpn"
+ secondary-color white
+ title-color #669999
+ text-color black
+ login-message "ICI"
+ aaa authentication list sslvpn
+ gateway sslvpn
+ !
+ ssl authenticate verify all
+ inservice
+ !
+ policy group ICI
+   functions svc-enabled
+   svc address-pool "vpn" netmask 255.255.255.0
+   svc keep-client-installed
+   svc split include 172.16.1.0 255.255.255.0
+   svc split include 192.168.100.0 255.255.255.0
+   svc split include 192.168.10.0 255.255.255.0
+   svc split include 192.168.30.0 255.255.255.0
+ default-group-policy ICI
+!
+end

@@ -1,0 +1,787 @@
+[2022-11-04 22:05:56][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2022-11-04 22:05:58][django.request.log_response():224] [WARNING] Not Found: /
+[2022-11-04 22:05:58][django.channels.server.log_action():149] [WARNING] HTTP GET / 404 [0.03, 127.0.0.1:57500]
+[2022-11-04 22:05:58][django.request.log_response():224] [WARNING] Not Found: /favicon.ico
+[2022-11-04 22:05:58][django.channels.server.log_action():149] [WARNING] HTTP GET /favicon.ico 404 [0.01, 127.0.0.1:57500]
+[2022-11-04 22:06:07][django.request.log_response():224] [WARNING] Bad Request: /api/int_utilization/
+[2022-11-04 22:06:07][django.channels.server.log_action():151] [WARNING] HTTP GET /api/int_utilization/ 400 [0.14, 127.0.0.1:57500]
+[2022-11-04 22:06:07][django.channels.server.log_action():141] [INFO] HTTP GET /static/rest_framework/css/bootstrap.min.css 200 [0.01, 127.0.0.1:57500]
+[2022-11-04 22:06:07][django.channels.server.log_action():141] [INFO] HTTP GET /static/rest_framework/css/bootstrap-tweaks.css 200 [0.01, 127.0.0.1:57501]
+[2022-11-04 22:06:07][django.channels.server.log_action():141] [INFO] HTTP GET /static/rest_framework/css/prettify.css 200 [0.01, 127.0.0.1:57530]
+[2022-11-04 22:06:07][django.channels.server.log_action():141] [INFO] HTTP GET /static/rest_framework/css/default.css 200 [0.01, 127.0.0.1:57531]
+[2022-11-04 22:06:07][django.channels.server.log_action():141] [INFO] HTTP GET /static/rest_framework/js/jquery-3.5.1.min.js 200 [0.01, 127.0.0.1:57532]
+[2022-11-04 22:06:07][django.channels.server.log_action():141] [INFO] HTTP GET /static/rest_framework/js/ajax-form.js 200 [0.01, 127.0.0.1:57533]
+[2022-11-04 22:06:07][django.channels.server.log_action():141] [INFO] HTTP GET /static/rest_framework/js/csrf.js 200 [0.01, 127.0.0.1:57500]
+[2022-11-04 22:06:07][django.channels.server.log_action():141] [INFO] HTTP GET /static/rest_framework/js/bootstrap.min.js 200 [0.01, 127.0.0.1:57501]
+[2022-11-04 22:06:07][django.channels.server.log_action():141] [INFO] HTTP GET /static/rest_framework/js/prettify-min.js 200 [0.01, 127.0.0.1:57530]
+[2022-11-04 22:06:07][django.channels.server.log_action():141] [INFO] HTTP GET /static/rest_framework/js/default.js 200 [0.01, 127.0.0.1:57531]
+[2022-11-04 22:06:07][django.channels.server.log_action():141] [INFO] HTTP GET /static/rest_framework/img/grid.png 200 [0.01, 127.0.0.1:57532]
+[2022-11-04 22:06:09][django.channels.server.log_action():141] [INFO] HTTP GET /api-auth/login/?next=/api/int_utilization/ 200 [0.05, 127.0.0.1:57532]
+[2022-11-04 22:06:10][django.channels.server.log_action():141] [INFO] HTTP POST /api-auth/login/ 200 [0.12, 127.0.0.1:57532]
+[2022-11-04 22:06:22][django.channels.server.log_action():147] [INFO] HTTP POST /api-auth/login/ 302 [0.27, 127.0.0.1:57532]
+[2022-11-04 22:06:22][django.request.log_response():224] [WARNING] Bad Request: /api/int_utilization/
+[2022-11-04 22:06:22][django.channels.server.log_action():151] [WARNING] HTTP GET /api/int_utilization/ 400 [0.03, 127.0.0.1:57532]
+[2022-11-04 22:06:36][django.channels.server.log_action():141] [INFO] HTTP GET /api-auth/login/?next=/api/int_utilization/ 200 [0.05, 127.0.0.1:57532]
+[2022-11-08 09:22:23][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/netboost/urls.py changed, reloading.
+[2022-11-08 09:22:25][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2022-11-08 09:29:18][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/config_center/config_parse/config_parse.py changed, reloading.
+[2022-11-08 09:29:19][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2022-11-08 09:29:28][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/config_center/config_parse/config_parse.py changed, reloading.
+[2022-11-08 09:29:29][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2022-11-08 09:33:44][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/config_center/models.py changed, reloading.
+[2022-11-08 09:33:45][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2022-11-08 09:36:23][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/config_center/views.py changed, reloading.
+[2022-11-08 09:36:24][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2022-11-08 09:42:21][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/config_center/views.py changed, reloading.
+[2022-11-08 09:42:22][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2022-11-08 10:06:16][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/config_center/urls.py changed, reloading.
+[2022-11-08 10:06:17][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2022-11-08 10:10:59][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/config_center/views.py changed, reloading.
+[2022-11-08 10:11:00][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-02-21 11:21:54][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-02-21 11:23:46][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-02-21 11:24:57][django.channels.server.log_action():147] [INFO] HTTP GET /api/asset/cmdb_idc 301 [0.02, 127.0.0.1:57184]
+[2023-02-21 11:24:57][django.request.log_response():224] [WARNING] Bad Request: /api/asset/cmdb_idc/
+[2023-02-21 11:24:57][django.channels.server.log_action():151] [WARNING] HTTP GET /api/asset/cmdb_idc/ 400 [0.10, 127.0.0.1:57184]
+[2023-02-21 11:25:14][django.channels.server.log_action():147] [INFO] HTTP GET /api/asset/cmdb_idc 301 [0.00, 127.0.0.1:57184]
+[2023-02-21 11:25:14][django.request.log_response():224] [WARNING] Bad Request: /api/asset/cmdb_idc/
+[2023-02-21 11:25:14][django.channels.server.log_action():151] [WARNING] HTTP GET /api/asset/cmdb_idc/ 400 [0.06, 127.0.0.1:57184]
+[2023-02-21 14:28:22][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-02-21 14:28:40][django.channels.server.log_action():147] [INFO] HTTP GET /api/asset/cmdb_idc 301 [0.01, 127.0.0.1:62690]
+[2023-02-21 14:28:40][django.request.log_response():224] [WARNING] Bad Request: /api/asset/cmdb_idc/
+[2023-02-21 14:28:40][django.channels.server.log_action():151] [WARNING] HTTP GET /api/asset/cmdb_idc/ 400 [0.11, 127.0.0.1:62690]
+[2023-02-21 14:30:13][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/utils/custom/exception.py changed, reloading.
+[2023-02-21 14:30:15][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-02-21 14:30:18][django.channels.server.log_action():147] [INFO] HTTP GET /api/asset/cmdb_idc 301 [0.00, 127.0.0.1:63515]
+[2023-02-21 14:30:19][django.request.log_response():224] [WARNING] Bad Request: /api/asset/cmdb_idc/
+[2023-02-21 14:30:19][django.channels.server.log_action():151] [WARNING] HTTP GET /api/asset/cmdb_idc/ 400 [0.11, 127.0.0.1:63515]
+[2023-02-21 14:30:25][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/utils/custom/exception.py changed, reloading.
+[2023-02-21 14:30:27][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-02-21 14:30:36][django.channels.server.log_action():147] [INFO] HTTP GET /api/asset/cmdb_idc 301 [0.00, 127.0.0.1:63670]
+[2023-02-21 14:30:36][django.request.log_response():224] [WARNING] Bad Request: /api/asset/cmdb_idc/
+[2023-02-21 14:30:36][django.channels.server.log_action():151] [WARNING] HTTP GET /api/asset/cmdb_idc/ 400 [0.12, 127.0.0.1:63670]
+[2023-02-21 14:41:00][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/users/models.py changed, reloading.
+[2023-02-21 14:41:02][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-02-21 14:43:21][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/users/models.py changed, reloading.
+[2023-02-21 14:43:23][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-02-21 14:53:44][django.channels.server.log_action():147] [INFO] HTTP GET /api/asset/cmdb_idc 301 [0.01, 127.0.0.1:59147]
+[2023-02-21 14:53:44][django.request.log_response():224] [WARNING] Bad Request: /api/asset/cmdb_idc/
+[2023-02-21 14:53:44][django.channels.server.log_action():151] [WARNING] HTTP GET /api/asset/cmdb_idc/ 400 [0.12, 127.0.0.1:59147]
+[2023-02-21 14:53:54][django.channels.server.log_action():141] [INFO] HTTP POST /api/token/ 200 [0.11, 127.0.0.1:59147]
+[2023-02-21 14:54:02][django.channels.server.log_action():147] [INFO] HTTP GET /api/asset/cmdb_idc 301 [0.00, 127.0.0.1:59147]
+[2023-02-21 14:54:02][django.channels.server.log_action():141] [INFO] HTTP GET /api/asset/cmdb_idc/ 200 [0.07, 127.0.0.1:59147]
+[2023-02-21 15:52:28][django.channels.server.log_action():141] [INFO] HTTP POST /api/token/ 200 [0.11, 127.0.0.1:56292]
+[2023-02-21 15:58:55][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/users/models.py changed, reloading.
+[2023-02-21 15:58:58][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-02-21 15:59:15][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/users/models.py changed, reloading.
+[2023-02-21 15:59:17][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-02-21 15:59:25][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/users/models.py changed, reloading.
+[2023-02-21 15:59:27][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-02-21 16:00:20][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/users/models.py changed, reloading.
+[2023-02-21 16:00:22][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-02-21 16:01:34][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/users/models.py changed, reloading.
+[2023-02-21 16:01:36][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-02-21 16:01:55][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/users/models.py changed, reloading.
+[2023-02-21 16:01:56][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-02-21 16:02:13][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/users/models.py changed, reloading.
+[2023-02-21 16:02:14][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-02-21 16:03:02][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/netboost/settings.py changed, reloading.
+[2023-02-21 16:03:04][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-02-21 16:03:21][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/netboost/settings.py changed, reloading.
+[2023-02-21 16:03:23][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-02-21 16:18:42][django.channels.server.log_action():141] [INFO] HTTP POST /api/token/ 200 [0.18, 127.0.0.1:53637]
+[2023-02-21 16:57:14][django.channels.server.log_action():141] [INFO] HTTP POST /api/token/ 200 [0.10, 127.0.0.1:56919]
+[2023-02-22 09:19:34][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-02-22 09:19:47][django.channels.server.log_action():141] [INFO] HTTP POST /api/token/ 200 [0.18, 127.0.0.1:59979]
+[2023-02-27 16:05:02][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-02-27 16:05:04][django.request.log_response():224] [WARNING] Not Found: /
+[2023-02-27 16:05:04][django.channels.server.log_action():149] [WARNING] HTTP GET / 404 [0.01, 127.0.0.1:49728]
+[2023-02-27 16:05:04][django.request.log_response():224] [WARNING] Not Found: /favicon.ico
+[2023-02-27 16:05:04][django.channels.server.log_action():149] [WARNING] HTTP GET /favicon.ico 404 [0.00, 127.0.0.1:49728]
+[2023-02-27 16:05:12][django.channels.server.log_action():147] [INFO] HTTP GET /admin 301 [0.00, 127.0.0.1:49728]
+[2023-02-27 16:05:13][django.channels.server.log_action():147] [INFO] HTTP GET /admin/ 302 [0.15, 127.0.0.1:49728]
+[2023-02-27 16:05:13][django.channels.server.log_action():141] [INFO] HTTP GET /admin/login/?next=/admin/ 200 [0.12, 127.0.0.1:49728]
+[2023-02-27 16:05:13][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/css/base.css 200 [0.00, 127.0.0.1:49728]
+[2023-02-27 16:05:13][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/css/nav_sidebar.css 200 [0.00, 127.0.0.1:49729]
+[2023-02-27 16:05:13][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/css/login.css 200 [0.01, 127.0.0.1:49799]
+[2023-02-27 16:05:13][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/css/responsive.css 200 [0.00, 127.0.0.1:49801]
+[2023-02-27 16:05:13][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/css/fonts.css 200 [0.00, 127.0.0.1:49801]
+[2023-02-27 16:05:13][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/js/nav_sidebar.js 200 [0.00, 127.0.0.1:49801]
+[2023-02-27 16:05:13][django.channels.server.log_action():141] [INFO] HTTP GET /captcha/image/bb2ba07bc63383ec4cb7a020f1870fb25d790331/ 200 [0.04, 127.0.0.1:49801]
+[2023-02-27 16:05:13][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/fonts/Roboto-Regular-webfont.woff 200 [0.00, 127.0.0.1:49801]
+[2023-02-27 16:05:13][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/fonts/Roboto-Light-webfont.woff 200 [0.01, 127.0.0.1:49799]
+[2023-02-27 16:05:18][django.channels.server.log_action():141] [INFO] HTTP POST /admin/login/?next=/admin/ 200 [0.24, 127.0.0.1:49799]
+[2023-02-27 16:05:19][django.channels.server.log_action():141] [INFO] HTTP GET /captcha/image/fb4edf8ec5c5a269916e1c5a51b462d7269b11af/ 200 [0.04, 127.0.0.1:49799]
+[2023-02-27 16:05:19][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/fonts/Roboto-Bold-webfont.woff 200 [0.02, 127.0.0.1:49799]
+[2023-02-27 16:05:24][django.channels.server.log_action():141] [INFO] HTTP POST /admin/login/?next=/admin/ 200 [0.25, 127.0.0.1:49799]
+[2023-02-27 16:05:24][django.channels.server.log_action():141] [INFO] HTTP GET /captcha/image/77e5b08172bf9e17ffa25f5d41bc0186909e0cbd/ 200 [0.03, 127.0.0.1:49799]
+[2023-02-27 16:05:40][django.channels.server.log_action():141] [INFO] HTTP POST /admin/login/?next=/admin/ 200 [0.19, 127.0.0.1:49799]
+[2023-02-27 16:05:40][django.channels.server.log_action():141] [INFO] HTTP GET /captcha/image/a816e99405f10007766a8e7504caf203e9ebe2f1/ 200 [0.04, 127.0.0.1:49799]
+[2023-02-27 16:05:44][django.channels.server.log_action():147] [INFO] HTTP GET /admin/ 302 [0.03, 127.0.0.1:49799]
+[2023-02-27 16:05:44][django.channels.server.log_action():141] [INFO] HTTP GET /admin/login/?next=/admin/ 200 [0.13, 127.0.0.1:49799]
+[2023-02-27 16:05:44][django.channels.server.log_action():141] [INFO] HTTP GET /captcha/image/40630e6df4211dff8c0c9400825a4ac56d3204d6/ 200 [0.03, 127.0.0.1:49799]
+[2023-02-27 16:06:10][django.channels.server.log_action():141] [INFO] HTTP GET /admin/login/?next=/admin/ 200 [0.12, 127.0.0.1:49799]
+[2023-02-27 16:06:10][django.channels.server.log_action():141] [INFO] HTTP GET /captcha/image/b452b75f381956190d4e69a3b066a6dfc2d145b6/ 200 [0.06, 127.0.0.1:49799]
+[2023-02-27 16:06:20][django.channels.server.log_action():147] [INFO] HTTP POST /admin/login/?next=/admin/ 302 [0.27, 127.0.0.1:49799]
+[2023-02-27 16:06:20][django.channels.server.log_action():141] [INFO] HTTP GET /admin/ 200 [0.08, 127.0.0.1:49799]
+[2023-02-27 16:06:20][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/css/dashboard.css 200 [0.00, 127.0.0.1:49799]
+[2023-02-27 16:06:20][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/img/icon-addlink.svg 200 [0.01, 127.0.0.1:49799]
+[2023-02-27 16:06:20][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/img/icon-changelink.svg 200 [0.01, 127.0.0.1:50366]
+[2023-02-27 16:06:20][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/img/icon-deletelink.svg 200 [0.00, 127.0.0.1:50367]
+[2023-02-27 16:06:24][django.channels.server.log_action():141] [INFO] HTTP GET /admin/asset/networkdevice/ 200 [0.20, 127.0.0.1:50367]
+[2023-02-27 16:06:24][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/css/changelists.css 200 [0.00, 127.0.0.1:50367]
+[2023-02-27 16:06:24][django.channels.server.log_action():141] [INFO] HTTP GET /admin/jsi18n/ 200 [0.04, 127.0.0.1:50366]
+[2023-02-27 16:06:24][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/js/vendor/jquery/jquery.js 200 [0.04, 127.0.0.1:49799]
+[2023-02-27 16:06:24][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/js/jquery.init.js 200 [0.04, 127.0.0.1:50407]
+[2023-02-27 16:06:24][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/js/core.js 200 [0.04, 127.0.0.1:50408]
+[2023-02-27 16:06:24][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/js/admin/RelatedObjectLookups.js 200 [0.04, 127.0.0.1:50409]
+[2023-02-27 16:06:24][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/js/actions.js 200 [0.04, 127.0.0.1:50367]
+[2023-02-27 16:06:24][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/js/urlify.js 200 [0.01, 127.0.0.1:50366]
+[2023-02-27 16:06:24][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/js/prepopulate.js 200 [0.01, 127.0.0.1:49799]
+[2023-02-27 16:06:24][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/js/vendor/xregexp/xregexp.js 200 [0.01, 127.0.0.1:50407]
+[2023-02-27 16:06:24][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/img/search.svg 200 [0.00, 127.0.0.1:50407]
+[2023-02-27 16:06:24][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/img/tooltag-add.svg 200 [0.00, 127.0.0.1:50407]
+[2023-02-27 16:06:27][django.channels.server.log_action():141] [INFO] HTTP GET /admin/asset/networkdevice/1/change/ 200 [0.30, 127.0.0.1:50407]
+[2023-02-27 16:06:27][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/css/forms.css 200 [0.00, 127.0.0.1:50407]
+[2023-02-27 16:06:27][django.channels.server.log_action():141] [INFO] HTTP GET /admin/jsi18n/ 200 [0.05, 127.0.0.1:50366]
+[2023-02-27 16:06:27][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/js/calendar.js 200 [0.05, 127.0.0.1:49799]
+[2023-02-27 16:06:27][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/js/admin/DateTimeShortcuts.js 200 [0.05, 127.0.0.1:50367]
+[2023-02-27 16:06:27][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/css/widgets.css 200 [0.05, 127.0.0.1:50407]
+[2023-02-27 16:06:27][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/js/prepopulate_init.js 200 [0.00, 127.0.0.1:50367]
+[2023-02-27 16:06:27][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/js/change_form.js 200 [0.00, 127.0.0.1:50407]
+[2023-02-27 16:06:27][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/img/icon-calendar.svg 200 [0.01, 127.0.0.1:50407]
+[2023-02-27 16:06:29][django.channels.server.log_action():141] [INFO] HTTP GET /admin/asset/networkdevice/1/history/ 200 [0.12, 127.0.0.1:50407]
+[2023-02-27 16:06:31][django.channels.server.log_action():141] [INFO] HTTP GET /admin/asset/networkdevice/1/change/ 200 [0.29, 127.0.0.1:50407]
+[2023-02-27 16:06:35][django.channels.server.log_action():141] [INFO] HTTP GET /admin/asset/networkdevice/1/history/ 200 [0.12, 127.0.0.1:50407]
+[2023-02-27 16:06:41][django.channels.server.log_action():141] [INFO] HTTP GET /admin/asset/networkdevice/ 200 [0.14, 127.0.0.1:50407]
+[2023-02-27 16:06:41][django.channels.server.log_action():141] [INFO] HTTP GET /admin/jsi18n/ 200 [0.03, 127.0.0.1:50407]
+[2023-02-27 16:06:42][django.channels.server.log_action():141] [INFO] HTTP GET /admin/asset/networkdevice/1/change/ 200 [0.30, 127.0.0.1:50407]
+[2023-02-27 16:06:42][django.channels.server.log_action():141] [INFO] HTTP GET /admin/jsi18n/ 200 [0.04, 127.0.0.1:50407]
+[2023-02-27 16:06:53][django.channels.server.log_action():141] [INFO] HTTP POST /admin/asset/networkdevice/1/change/ 200 [0.50, 127.0.0.1:50407]
+[2023-02-27 16:06:53][django.channels.server.log_action():141] [INFO] HTTP GET /admin/jsi18n/ 200 [0.03, 127.0.0.1:50407]
+[2023-02-27 16:06:59][django.channels.server.log_action():147] [INFO] HTTP POST /admin/asset/networkdevice/1/change/ 302 [0.38, 127.0.0.1:50407]
+[2023-02-27 16:06:59][django.channels.server.log_action():141] [INFO] HTTP GET /admin/asset/networkdevice/ 200 [0.13, 127.0.0.1:50407]
+[2023-02-27 16:06:59][django.channels.server.log_action():141] [INFO] HTTP GET /admin/jsi18n/ 200 [0.04, 127.0.0.1:50407]
+[2023-02-27 16:06:59][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/img/icon-yes.svg 200 [0.00, 127.0.0.1:50407]
+[2023-02-27 16:07:01][django.channels.server.log_action():141] [INFO] HTTP GET /admin/asset/networkdevice/1/change/ 200 [0.30, 127.0.0.1:50407]
+[2023-02-27 16:07:01][django.channels.server.log_action():141] [INFO] HTTP GET /admin/jsi18n/ 200 [0.04, 127.0.0.1:50407]
+[2023-02-27 16:07:02][django.channels.server.log_action():141] [INFO] HTTP GET /admin/asset/networkdevice/1/history/ 200 [0.12, 127.0.0.1:50407]
+[2023-02-27 16:08:38][django.channels.server.log_action():141] [INFO] HTTP GET /admin/ 200 [0.12, 127.0.0.1:51572]
+[2023-03-02 13:15:32][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-03 10:14:34][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-03 10:14:37][django.request.log_response():224] [WARNING] Not Found: /
+[2023-03-03 10:14:37][django.channels.server.log_action():149] [WARNING] HTTP GET / 404 [0.01, 127.0.0.1:51551]
+[2023-03-03 10:14:41][django.channels.server.log_action():141] [INFO] HTTP GET /admin/ 200 [0.21, 127.0.0.1:51551]
+[2023-03-03 10:14:41][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/css/base.css 200 [0.00, 127.0.0.1:51551]
+[2023-03-03 10:14:41][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/fonts/Roboto-Light-webfont.woff 200 [0.00, 127.0.0.1:51551]
+[2023-03-03 10:14:41][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/fonts/Roboto-Bold-webfont.woff 200 [0.00, 127.0.0.1:51552]
+[2023-03-03 10:14:41][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/fonts/Roboto-Regular-webfont.woff 200 [0.00, 127.0.0.1:51610]
+[2023-03-22 17:20:14][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-22 17:20:31][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/netboost/settings.py changed, reloading.
+[2023-03-22 17:20:33][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-22 17:20:35][django.request.log_response():224] [WARNING] Not Found: /
+[2023-03-22 17:20:35][django.channels.server.log_action():149] [WARNING] HTTP GET / 404 [0.01, 127.0.0.1:62124]
+[2023-03-22 17:20:39][django.request.log_response():224] [WARNING] Not Found: /api
+[2023-03-22 17:20:39][django.channels.server.log_action():149] [WARNING] HTTP GET /api 404 [0.02, 127.0.0.1:62124]
+[2023-03-22 17:20:45][django.channels.server.log_action():147] [INFO] HTTP GET /api/asset 301 [0.00, 127.0.0.1:62124]
+[2023-03-22 17:20:45][django.channels.server.log_action():141] [INFO] HTTP GET /api/asset/ 200 [0.12, 127.0.0.1:62124]
+[2023-03-22 17:20:45][django.channels.server.log_action():141] [INFO] HTTP GET /static/rest_framework/css/bootstrap.min.css 200 [0.00, 127.0.0.1:62124]
+[2023-03-22 17:20:45][django.channels.server.log_action():141] [INFO] HTTP GET /static/rest_framework/css/bootstrap-tweaks.css 200 [0.00, 127.0.0.1:62125]
+[2023-03-22 17:20:45][django.channels.server.log_action():141] [INFO] HTTP GET /static/rest_framework/css/prettify.css 200 [0.01, 127.0.0.1:62195]
+[2023-03-22 17:20:45][django.channels.server.log_action():141] [INFO] HTTP GET /static/rest_framework/css/default.css 200 [0.01, 127.0.0.1:62196]
+[2023-03-22 17:20:45][django.channels.server.log_action():141] [INFO] HTTP GET /static/rest_framework/js/jquery-3.5.1.min.js 200 [0.01, 127.0.0.1:62197]
+[2023-03-22 17:20:45][django.channels.server.log_action():141] [INFO] HTTP GET /static/rest_framework/js/ajax-form.js 200 [0.01, 127.0.0.1:62198]
+[2023-03-22 17:20:45][django.channels.server.log_action():141] [INFO] HTTP GET /static/rest_framework/js/csrf.js 200 [0.00, 127.0.0.1:62125]
+[2023-03-22 17:20:45][django.channels.server.log_action():141] [INFO] HTTP GET /static/rest_framework/js/bootstrap.min.js 200 [0.01, 127.0.0.1:62124]
+[2023-03-22 17:20:45][django.channels.server.log_action():141] [INFO] HTTP GET /static/rest_framework/js/prettify-min.js 200 [0.01, 127.0.0.1:62195]
+[2023-03-22 17:20:45][django.channels.server.log_action():141] [INFO] HTTP GET /static/rest_framework/js/default.js 200 [0.01, 127.0.0.1:62196]
+[2023-03-22 17:20:45][django.channels.server.log_action():141] [INFO] HTTP GET /static/rest_framework/img/grid.png 200 [0.00, 127.0.0.1:62196]
+[2023-03-22 17:20:46][django.request.log_response():224] [WARNING] Bad Request: /api/asset/cmdb_idc/
+[2023-03-22 17:20:46][django.channels.server.log_action():151] [WARNING] HTTP GET /api/asset/cmdb_idc/ 400 [0.04, 127.0.0.1:62196]
+[2023-03-22 17:20:46][django.channels.server.log_action():141] [INFO] HTTP GET /static/rest_framework/fonts/glyphicons-halflings-regular.woff2 200 [0.00, 127.0.0.1:62196]
+[2023-03-22 17:23:44][django.request.log_response():224] [WARNING] Bad Request: /api/asset/cmdb_idc/
+[2023-03-22 17:23:44][django.channels.server.log_action():151] [WARNING] HTTP GET /api/asset/cmdb_idc/ 400 [0.06, 127.0.0.1:63409]
+[2023-03-22 17:24:04][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/asset/views.py changed, reloading.
+[2023-03-22 17:24:05][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-22 17:24:31][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/asset/views.py changed, reloading.
+[2023-03-22 17:24:32][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-22 17:24:36][django.channels.server.log_action():141] [INFO] HTTP GET /api/asset/cmdb_idc/ 200 [0.19, 127.0.0.1:63758]
+[2023-03-22 17:25:48][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/asset/views.py changed, reloading.
+[2023-03-22 17:25:49][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-22 17:25:56][django.channels.server.log_action():141] [INFO] HTTP GET /api/asset/cmdb_idc/ 200 [0.19, 127.0.0.1:64301]
+[2023-03-22 17:25:57][django.channels.server.log_action():141] [INFO] HTTP GET /api/asset/cmdb_idc/ 200 [0.08, 127.0.0.1:64301]
+[2023-03-22 17:26:17][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/asset/views.py changed, reloading.
+[2023-03-22 17:26:18][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-22 17:26:29][django.request.log_response():224] [ERROR] Internal Server Error: /api/asset/cmdb_idc_model/
+Traceback (most recent call last):
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/core/handlers/exception.py", line 47, in inner
+    response = get_response(request)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/core/handlers/base.py", line 204, in _get_response
+    response = response.render()
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/template/response.py", line 105, in render
+    self.content = self.rendered_content
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/response.py", line 70, in rendered_content
+    ret = renderer.render(self.data, accepted_media_type, context)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/renderers.py", line 724, in render
+    context = self.get_context(data, accepted_media_type, renderer_context)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/renderers.py", line 702, in get_context
+    'filter_form': self.get_filter_form(data, view, request),
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/renderers.py", line 634, in get_filter_form
+    html = backend().to_html(request, queryset, view)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django_filters/rest_framework/backends.py", line 81, in to_html
+    template = loader.get_template(self.template)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/template/loader.py", line 19, in get_template
+    raise TemplateDoesNotExist(template_name, chain=chain)
+django.template.exceptions.TemplateDoesNotExist: django_filters/rest_framework/form.html
+[2023-03-22 17:26:29][django.channels.server.log_action():154] [ERROR] HTTP GET /api/asset/cmdb_idc_model/ 500 [0.19, 127.0.0.1:64530]
+[2023-03-22 17:26:39][django.request.log_response():224] [WARNING] Not Found: /api/asset/cmdb_id/
+[2023-03-22 17:26:39][django.channels.server.log_action():149] [WARNING] HTTP GET /api/asset/cmdb_id/ 404 [0.03, 127.0.0.1:64530]
+[2023-03-22 17:26:43][django.channels.server.log_action():141] [INFO] HTTP GET /api/asset/cmdb_idc/ 200 [0.13, 127.0.0.1:64530]
+[2023-03-22 17:26:52][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/asset/views.py changed, reloading.
+[2023-03-22 17:26:53][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-22 17:27:03][django.request.log_response():224] [ERROR] Internal Server Error: /api/asset/cmdb_netzone/
+Traceback (most recent call last):
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/core/handlers/exception.py", line 47, in inner
+    response = get_response(request)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/core/handlers/base.py", line 204, in _get_response
+    response = response.render()
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/template/response.py", line 105, in render
+    self.content = self.rendered_content
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/response.py", line 70, in rendered_content
+    ret = renderer.render(self.data, accepted_media_type, context)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/renderers.py", line 724, in render
+    context = self.get_context(data, accepted_media_type, renderer_context)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/renderers.py", line 702, in get_context
+    'filter_form': self.get_filter_form(data, view, request),
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/renderers.py", line 634, in get_filter_form
+    html = backend().to_html(request, queryset, view)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django_filters/rest_framework/backends.py", line 81, in to_html
+    template = loader.get_template(self.template)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/template/loader.py", line 19, in get_template
+    raise TemplateDoesNotExist(template_name, chain=chain)
+django.template.exceptions.TemplateDoesNotExist: django_filters/rest_framework/form.html
+[2023-03-22 17:27:03][django.channels.server.log_action():154] [ERROR] HTTP GET /api/asset/cmdb_netzone/ 500 [0.19, 127.0.0.1:64763]
+[2023-03-22 17:27:23][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/asset/views.py changed, reloading.
+[2023-03-22 17:27:24][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-22 17:27:28][django.request.log_response():224] [ERROR] Internal Server Error: /api/asset/cmdb_netzone/
+Traceback (most recent call last):
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/core/handlers/exception.py", line 47, in inner
+    response = get_response(request)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/core/handlers/base.py", line 204, in _get_response
+    response = response.render()
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/template/response.py", line 105, in render
+    self.content = self.rendered_content
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/response.py", line 70, in rendered_content
+    ret = renderer.render(self.data, accepted_media_type, context)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/renderers.py", line 724, in render
+    context = self.get_context(data, accepted_media_type, renderer_context)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/renderers.py", line 702, in get_context
+    'filter_form': self.get_filter_form(data, view, request),
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/renderers.py", line 634, in get_filter_form
+    html = backend().to_html(request, queryset, view)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django_filters/rest_framework/backends.py", line 81, in to_html
+    template = loader.get_template(self.template)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/template/loader.py", line 19, in get_template
+    raise TemplateDoesNotExist(template_name, chain=chain)
+django.template.exceptions.TemplateDoesNotExist: django_filters/rest_framework/form.html
+[2023-03-22 17:27:28][django.channels.server.log_action():154] [ERROR] HTTP GET /api/asset/cmdb_netzone/ 500 [0.20, 127.0.0.1:64932]
+[2023-03-22 17:27:29][django.request.log_response():224] [ERROR] Internal Server Error: /api/asset/cmdb_netzone/
+Traceback (most recent call last):
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/core/handlers/exception.py", line 47, in inner
+    response = get_response(request)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/core/handlers/base.py", line 204, in _get_response
+    response = response.render()
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/template/response.py", line 105, in render
+    self.content = self.rendered_content
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/response.py", line 70, in rendered_content
+    ret = renderer.render(self.data, accepted_media_type, context)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/renderers.py", line 724, in render
+    context = self.get_context(data, accepted_media_type, renderer_context)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/renderers.py", line 702, in get_context
+    'filter_form': self.get_filter_form(data, view, request),
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/renderers.py", line 634, in get_filter_form
+    html = backend().to_html(request, queryset, view)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django_filters/rest_framework/backends.py", line 81, in to_html
+    template = loader.get_template(self.template)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/template/loader.py", line 19, in get_template
+    raise TemplateDoesNotExist(template_name, chain=chain)
+django.template.exceptions.TemplateDoesNotExist: django_filters/rest_framework/form.html
+[2023-03-22 17:27:29][django.channels.server.log_action():154] [ERROR] HTTP GET /api/asset/cmdb_netzone/ 500 [0.12, 127.0.0.1:64932]
+[2023-03-22 17:27:36][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/asset/views.py changed, reloading.
+[2023-03-22 17:27:37][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-22 17:27:42][django.request.log_response():224] [ERROR] Internal Server Error: /api/asset/cmdb_netzone/
+Traceback (most recent call last):
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/core/handlers/exception.py", line 47, in inner
+    response = get_response(request)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/core/handlers/base.py", line 204, in _get_response
+    response = response.render()
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/template/response.py", line 105, in render
+    self.content = self.rendered_content
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/response.py", line 70, in rendered_content
+    ret = renderer.render(self.data, accepted_media_type, context)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/renderers.py", line 724, in render
+    context = self.get_context(data, accepted_media_type, renderer_context)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/renderers.py", line 702, in get_context
+    'filter_form': self.get_filter_form(data, view, request),
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/renderers.py", line 634, in get_filter_form
+    html = backend().to_html(request, queryset, view)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django_filters/rest_framework/backends.py", line 81, in to_html
+    template = loader.get_template(self.template)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/template/loader.py", line 19, in get_template
+    raise TemplateDoesNotExist(template_name, chain=chain)
+django.template.exceptions.TemplateDoesNotExist: django_filters/rest_framework/form.html
+[2023-03-22 17:27:42][django.channels.server.log_action():154] [ERROR] HTTP GET /api/asset/cmdb_netzone/ 500 [0.21, 127.0.0.1:65039]
+[2023-03-22 17:28:15][django.channels.server.log_action():141] [INFO] HTTP GET /api/asset/cmdb_idc/ 200 [0.14, 127.0.0.1:65039]
+[2023-03-22 17:28:46][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/asset/views.py changed, reloading.
+[2023-03-22 17:28:47][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-22 17:28:59][django.channels.server.log_action():141] [INFO] HTTP GET /api/asset/cmdb_netzone/ 200 [0.19, 127.0.0.1:49185]
+[2023-03-22 17:29:37][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/asset/views.py changed, reloading.
+[2023-03-22 17:29:38][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-22 17:29:41][django.channels.server.log_action():141] [INFO] HTTP GET /api/asset/cmdb_netzone/ 200 [0.15, 127.0.0.1:49468]
+[2023-03-22 17:30:13][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/asset/views.py changed, reloading.
+[2023-03-22 17:30:14][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-22 17:30:19][django.channels.server.log_action():141] [INFO] HTTP GET /api/asset/cmdb_idc_model/ 200 [0.20, 127.0.0.1:49731]
+[2023-03-22 17:31:24][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/asset/views.py changed, reloading.
+[2023-03-22 17:31:25][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-22 17:31:28][django.channels.server.log_action():141] [INFO] HTTP GET /api/asset/cmdb_idc_model/ 200 [0.20, 127.0.0.1:50211]
+[2023-03-22 17:31:54][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/asset/views.py changed, reloading.
+[2023-03-22 17:31:55][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-22 17:31:58][django.channels.server.log_action():141] [INFO] HTTP GET /api/asset/cmdb_rack/ 200 [0.20, 127.0.0.1:50412]
+[2023-03-22 17:32:14][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/asset/views.py changed, reloading.
+[2023-03-22 17:32:15][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-22 17:32:21][django.channels.server.log_action():141] [INFO] HTTP GET /api/asset/cmdb_account/ 200 [0.21, 127.0.0.1:50572]
+[2023-03-22 17:33:09][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/asset/views.py changed, reloading.
+[2023-03-22 17:33:10][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-22 17:33:14][django.request.log_response():224] [ERROR] Internal Server Error: /api/asset/asset_networkdevice/
+Traceback (most recent call last):
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/core/handlers/exception.py", line 47, in inner
+    response = get_response(request)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/core/handlers/base.py", line 204, in _get_response
+    response = response.render()
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/template/response.py", line 105, in render
+    self.content = self.rendered_content
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/response.py", line 70, in rendered_content
+    ret = renderer.render(self.data, accepted_media_type, context)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/renderers.py", line 724, in render
+    context = self.get_context(data, accepted_media_type, renderer_context)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/renderers.py", line 702, in get_context
+    'filter_form': self.get_filter_form(data, view, request),
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/renderers.py", line 634, in get_filter_form
+    html = backend().to_html(request, queryset, view)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django_filters/rest_framework/backends.py", line 81, in to_html
+    template = loader.get_template(self.template)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/template/loader.py", line 19, in get_template
+    raise TemplateDoesNotExist(template_name, chain=chain)
+django.template.exceptions.TemplateDoesNotExist: django_filters/rest_framework/form.html
+[2023-03-22 17:33:14][django.channels.server.log_action():154] [ERROR] HTTP GET /api/asset/asset_networkdevice/ 500 [0.42, 127.0.0.1:50926]
+[2023-03-22 17:39:45][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/netboost/settings.py changed, reloading.
+[2023-03-22 17:39:46][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-22 17:39:55][django.channels.server.log_action():141] [INFO] HTTP GET /api/asset/cmdb_idc/ 200 [0.19, 127.0.0.1:53758]
+[2023-03-22 17:41:11][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/api/tools/custom_viewset_base.py changed, reloading.
+[2023-03-22 17:41:12][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-22 17:41:20][django.request.log_response():224] [ERROR] Internal Server Error: /api/asset/asset_networkdevice/
+Traceback (most recent call last):
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/core/handlers/exception.py", line 47, in inner
+    response = get_response(request)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/core/handlers/base.py", line 204, in _get_response
+    response = response.render()
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/template/response.py", line 105, in render
+    self.content = self.rendered_content
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/response.py", line 70, in rendered_content
+    ret = renderer.render(self.data, accepted_media_type, context)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/renderers.py", line 724, in render
+    context = self.get_context(data, accepted_media_type, renderer_context)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/renderers.py", line 702, in get_context
+    'filter_form': self.get_filter_form(data, view, request),
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/renderers.py", line 634, in get_filter_form
+    html = backend().to_html(request, queryset, view)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django_filters/rest_framework/backends.py", line 81, in to_html
+    template = loader.get_template(self.template)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/template/loader.py", line 19, in get_template
+    raise TemplateDoesNotExist(template_name, chain=chain)
+django.template.exceptions.TemplateDoesNotExist: django_filters/rest_framework/form.html
+[2023-03-22 17:41:20][django.channels.server.log_action():154] [ERROR] HTTP GET /api/asset/asset_networkdevice/ 500 [0.41, 127.0.0.1:54324]
+[2023-03-22 17:42:02][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/asset/views.py changed, reloading.
+[2023-03-22 17:42:03][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-22 17:43:35][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/asset/views.py changed, reloading.
+[2023-03-22 17:43:36][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-22 17:43:40][django.request.log_response():224] [ERROR] Internal Server Error: /api/asset/asset_networkdevice/
+Traceback (most recent call last):
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/core/handlers/exception.py", line 47, in inner
+    response = get_response(request)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/core/handlers/base.py", line 204, in _get_response
+    response = response.render()
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/template/response.py", line 105, in render
+    self.content = self.rendered_content
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/response.py", line 70, in rendered_content
+    ret = renderer.render(self.data, accepted_media_type, context)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/renderers.py", line 724, in render
+    context = self.get_context(data, accepted_media_type, renderer_context)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/renderers.py", line 702, in get_context
+    'filter_form': self.get_filter_form(data, view, request),
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/rest_framework/renderers.py", line 634, in get_filter_form
+    html = backend().to_html(request, queryset, view)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django_filters/rest_framework/backends.py", line 81, in to_html
+    template = loader.get_template(self.template)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/template/loader.py", line 19, in get_template
+    raise TemplateDoesNotExist(template_name, chain=chain)
+django.template.exceptions.TemplateDoesNotExist: django_filters/rest_framework/form.html
+[2023-03-22 17:43:40][django.channels.server.log_action():154] [ERROR] HTTP GET /api/asset/asset_networkdevice/ 500 [0.43, 127.0.0.1:55337]
+[2023-03-22 17:44:33][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/asset/views.py changed, reloading.
+[2023-03-22 17:44:34][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-22 17:44:37][django.channels.server.log_action():141] [INFO] HTTP GET /api/asset/asset_networkdevice/ 200 [0.44, 127.0.0.1:55729]
+[2023-03-23 10:27:55][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-23 10:28:24][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/users/views/user.py changed, reloading.
+[2023-03-23 10:28:25][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-23 10:28:28][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-23 10:41:40][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/apps/topology/tasks.py changed, reloading.
+[2023-03-23 10:41:41][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-03-23 10:44:52][django.channels.server.log_action():147] [INFO] HTTP GET /api/asset/cmdb_idc 301 [0.00, 127.0.0.1:58296]
+[2023-03-23 10:44:52][django.channels.server.log_action():141] [INFO] HTTP GET /api/asset/cmdb_idc/ 200 [0.14, 127.0.0.1:58296]
+[2023-03-23 10:44:56][django.channels.server.log_action():147] [INFO] HTTP GET /api/asset/cmdb_idc 301 [0.00, 127.0.0.1:58296]
+[2023-03-23 10:44:56][django.channels.server.log_action():141] [INFO] HTTP GET /api/asset/cmdb_idc/ 200 [0.05, 127.0.0.1:58296]
+[2023-03-23 10:45:45][django.request.log_response():224] [ERROR] Internal Server Error: /api/asset/cmdb_idc
+Traceback (most recent call last):
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/core/handlers/exception.py", line 47, in inner
+    response = get_response(request)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/utils/deprecation.py", line 116, in __call__
+    response = self.process_request(request)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/middleware/common.py", line 54, in process_request
+    path = self.get_full_path_with_slash(request)
+  File "/Users/lijiamin/PycharmProjects/net-axe/netaxe/venv/lib/python3.9/site-packages/django/middleware/common.py", line 88, in get_full_path_with_slash
+    raise RuntimeError(
+RuntimeError: You called this URL via POST, but the URL doesn't end in a slash and you have APPEND_SLASH set. Django can't redirect to the slash URL while maintaining POST data. Change your form to point to 127.0.0.1:8000/api/asset/cmdb_idc/ (note the trailing slash), or set APPEND_SLASH=False in your Django settings.
+[2023-03-23 10:45:45][django.channels.server.log_action():154] [ERROR] HTTP POST /api/asset/cmdb_idc 500 [0.03, 127.0.0.1:58296]
+[2023-03-23 10:45:52][django.channels.server.log_action():141] [INFO] HTTP POST /api/asset/cmdb_idc/ 201 [0.08, 127.0.0.1:58296]
+[2023-03-23 10:46:17][django.channels.server.log_action():141] [INFO] HTTP GET /api/asset/cmdb_idc/ 200 [0.05, 127.0.0.1:58296]
+[2023-03-23 10:46:30][django.channels.server.log_action():141] [INFO] HTTP GET /api/asset/cmdb_idc/ 200 [0.04, 127.0.0.1:58296]
+[2023-05-16 15:00:57][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-05-16 15:19:05][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-05-16 15:19:08][django.request.log_response():224] [WARNING] Not Found: /
+[2023-05-16 15:19:08][django.channels.server.log_action():149] [WARNING] HTTP GET / 404 [0.01, 127.0.0.1:58735]
+[2023-05-16 15:19:17][django.channels.server.log_action():147] [INFO] HTTP GET /admin 301 [0.00, 127.0.0.1:58735]
+[2023-05-16 15:19:17][django.channels.server.log_action():147] [INFO] HTTP GET /admin/ 302 [0.14, 127.0.0.1:58735]
+[2023-05-16 15:19:18][django.channels.server.log_action():141] [INFO] HTTP GET /admin/login/?next=/admin/ 200 [0.07, 127.0.0.1:58735]
+[2023-05-16 15:19:18][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/css/base.css 200 [0.00, 127.0.0.1:58735]
+[2023-05-16 15:19:18][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/css/nav_sidebar.css 200 [0.01, 127.0.0.1:58736]
+[2023-05-16 15:19:18][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/css/login.css 200 [0.01, 127.0.0.1:58820]
+[2023-05-16 15:19:18][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/css/responsive.css 200 [0.01, 127.0.0.1:58821]
+[2023-05-16 15:19:18][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/css/fonts.css 200 [0.00, 127.0.0.1:58820]
+[2023-05-16 15:19:18][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/js/nav_sidebar.js 200 [0.00, 127.0.0.1:58820]
+[2023-05-16 15:19:18][django.channels.server.log_action():141] [INFO] HTTP GET /captcha/image/c4ab33d5562ef5691f93f658faa6bbcd3e35e75a/ 200 [0.04, 127.0.0.1:58820]
+[2023-05-16 15:19:18][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/fonts/Roboto-Regular-webfont.woff 200 [0.00, 127.0.0.1:58820]
+[2023-05-16 15:19:18][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/fonts/Roboto-Light-webfont.woff 200 [0.00, 127.0.0.1:58821]
+[2023-05-16 15:19:22][django.channels.server.log_action():141] [INFO] HTTP POST /admin/login/?next=/admin/ 200 [0.18, 127.0.0.1:58821]
+[2023-05-16 15:19:22][django.channels.server.log_action():141] [INFO] HTTP GET /captcha/image/c69b947c0f9e97cdd150ec95b1b97ef1bd0dac94/ 200 [0.03, 127.0.0.1:58821]
+[2023-05-16 15:19:22][django.channels.server.log_action():141] [INFO] HTTP GET /static/admin/fonts/Roboto-Bold-webfont.woff 200 [0.01, 127.0.0.1:58820]
+[2023-05-16 15:19:29][django.channels.server.log_action():141] [INFO] HTTP POST /admin/login/?next=/admin/ 200 [0.19, 127.0.0.1:58820]
+[2023-05-16 15:19:29][django.channels.server.log_action():141] [INFO] HTTP GET /captcha/image/de39f5bb24e64c26da613fdcc69050322ec7a0f9/ 200 [0.04, 127.0.0.1:58820]
+[2023-05-16 15:19:42][django.channels.server.log_action():141] [INFO] HTTP POST /admin/login/?next=/admin/ 200 [0.19, 127.0.0.1:58820]
+[2023-05-16 15:19:42][django.channels.server.log_action():141] [INFO] HTTP GET /captcha/image/e2ad7dc60fe515a5495f90fd6facaa0a39482c36/ 200 [0.04, 127.0.0.1:58820]
+[2023-05-16 15:20:18][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/netboost/__init__.py changed, reloading.
+[2023-05-16 15:20:19][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-05-16 15:20:54][django.channels.server.log_action():141] [INFO] HTTP POST /admin/login/?next=/admin/ 200 [0.29, 127.0.0.1:59550]
+[2023-05-16 15:20:54][django.channels.server.log_action():141] [INFO] HTTP GET /captcha/image/36ad76ed9044e2e3ac18651fd3a4127e334e39cf/ 200 [0.05, 127.0.0.1:59550]
+[2023-05-16 15:20:57][django.channels.server.log_action():141] [INFO] HTTP POST /admin/login/?next=/admin/ 200 [0.18, 127.0.0.1:59550]
+[2023-05-16 15:20:57][django.channels.server.log_action():141] [INFO] HTTP GET /captcha/image/b4a6d88b86295809cf4a64931f3ddf413cfd323b/ 200 [0.05, 127.0.0.1:59550]
+[2023-05-16 15:21:00][django.channels.server.log_action():141] [INFO] HTTP POST /admin/login/?next=/admin/ 200 [0.18, 127.0.0.1:59550]
+[2023-05-16 15:21:00][django.channels.server.log_action():141] [INFO] HTTP GET /captcha/image/cded4b6b272cb464024afd742f243f641f70af8d/ 200 [0.04, 127.0.0.1:59550]
+[2023-05-16 15:21:05][django.channels.server.log_action():141] [INFO] HTTP POST /admin/login/?next=/admin/ 200 [0.13, 127.0.0.1:59550]
+[2023-05-16 15:21:05][django.channels.server.log_action():141] [INFO] HTTP GET /captcha/image/776148d7669003c2287a76a10e39dcd4338baa86/ 200 [0.03, 127.0.0.1:59550]
+[2023-05-16 15:21:28][django.channels.server.log_action():147] [INFO] HTTP GET /admin/ 302 [0.03, 127.0.0.1:59550]
+[2023-05-16 15:21:28][django.channels.server.log_action():141] [INFO] HTTP GET /admin/login/?next=/admin/ 200 [0.07, 127.0.0.1:59550]
+[2023-05-16 15:21:28][django.channels.server.log_action():141] [INFO] HTTP GET /captcha/image/622b50725e981709aa0a6fbdfa2df0dbf2e2139e/ 200 [0.05, 127.0.0.1:59550]
+[2023-05-16 15:21:45][django.channels.server.log_action():141] [INFO] HTTP POST /admin/login/?next=/admin/ 200 [0.18, 127.0.0.1:59550]
+[2023-05-16 15:21:45][django.channels.server.log_action():141] [INFO] HTTP GET /captcha/image/c865c73e60e89e9fd19351ccbecaefbfdd161d85/ 200 [0.03, 127.0.0.1:59550]
+[2023-05-16 15:21:53][django.channels.server.log_action():141] [INFO] HTTP POST /admin/login/?next=/admin/ 200 [0.19, 127.0.0.1:59550]
+[2023-05-16 15:21:53][django.channels.server.log_action():141] [INFO] HTTP GET /captcha/image/7e81a9548547da55bf43b8e60517b670a02c2ca5/ 200 [0.04, 127.0.0.1:59550]
+[2023-05-16 15:27:49][django.request.log_response():224] [WARNING] Not Found: /
+[2023-05-16 15:27:49][django.channels.server.log_action():149] [WARNING] HTTP GET / 404 [0.02, 127.0.0.1:62790]
+[2023-05-16 15:27:55][django.channels.server.log_action():147] [INFO] HTTP GET /admin/ 302 [0.03, 127.0.0.1:62790]
+[2023-05-16 15:27:55][django.channels.server.log_action():141] [INFO] HTTP GET /admin/login/?next=/admin/ 200 [0.07, 127.0.0.1:62790]
+[2023-05-16 15:27:55][django.channels.server.log_action():141] [INFO] HTTP GET /captcha/image/54ed958e09c7dba965200b277d31d787bc10d483/ 200 [0.03, 127.0.0.1:62790]
+[2023-05-16 15:28:45][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/netboost/settings.py changed, reloading.
+[2023-05-16 15:28:47][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-05-16 15:28:49][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/netboost/__init__.py changed, reloading.
+[2023-05-16 15:28:49][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-05-16 15:29:00][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/netboost/__init__.py changed, reloading.
+[2023-05-16 15:44:58][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-05-16 15:48:24][django.request.log_response():224] [WARNING] Not Found: /
+[2023-05-16 15:48:24][django.channels.server.log_action():149] [WARNING] HTTP GET / 404 [0.02, 127.0.0.1:55843]
+[2023-05-16 15:53:10][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/netboost/views.py changed, reloading.
+[2023-05-16 15:53:11][django.utils.autoreload.run_with_reloader():637] [INFO] Watching for file changes with StatReloader
+[2023-05-16 15:53:16][django.channels.server.log_action():147] [INFO] HTTP GET /admin/ 302 [0.12, 127.0.0.1:58905]
+[2023-05-16 15:53:16][django.channels.server.log_action():141] [INFO] HTTP GET /admin/login/?next=/admin/ 200 [0.05, 127.0.0.1:58905]
+[2023-05-16 15:53:16][django.channels.server.log_action():141] [INFO] HTTP GET /captcha/image/539bea5940038828c1b1cb61d968e514e2a16c4f/ 200 [0.08, 127.0.0.1:58905]
+[2023-05-16 15:53:21][django.channels.server.log_action():141] [INFO] HTTP POST /admin/login/?next=/admin/ 200 [0.18, 127.0.0.1:58905]
+[2023-05-16 15:53:21][django.channels.server.log_action():141] [INFO] HTTP GET /captcha/image/f96936b4331e99af9b3999e984ba23cc575f1736/ 200 [0.03, 127.0.0.1:58905]
+[2023-05-16 15:56:24][django.utils.autoreload.trigger_reload():251] [INFO] /Users/lijiamin/PycharmProjects/net-axe/netaxe/netboost/settings.py changed, reloading.
+[2023-05-16 16:00:01,688][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-16 16:00:23,659][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:251][INFO][/Users/lijiamin/PycharmProjects/net-axe/netaxe/netboost/settings.py changed, reloading.]
+[2023-05-16 16:00:24,763][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-16 16:00:27,738][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:251][INFO][/Users/lijiamin/PycharmProjects/net-axe/netaxe/netboost/settings.py changed, reloading.]
+[2023-05-16 16:00:28,678][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-16 16:03:13,123][django-main-thread:6114422784][task_id:django.channels.server][runserver.py:141][INFO][HTTP POST /admin/login/?next=/admin/ 200 [0.25, 127.0.0.1:64004]]
+[2023-05-16 16:03:13,217][django-main-thread:6114422784][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /captcha/image/d16d88a33afef273b4beab4976136d2e9ebaaa95/ 200 [0.04, 127.0.0.1:64004]]
+[2023-05-16 16:03:17,319][django-main-thread:6114422784][task_id:django.channels.server][runserver.py:147][INFO][HTTP GET /admin/ 302 [0.02, 127.0.0.1:64004]]
+[2023-05-16 16:03:17,378][django-main-thread:6114422784][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/login/?next=/admin/ 200 [0.05, 127.0.0.1:64004]]
+[2023-05-16 16:03:17,446][django-main-thread:6114422784][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /captcha/image/de76a7eaef76c21cee8b0cedf5cfe818801688f6/ 200 [0.03, 127.0.0.1:64004]]
+[2023-05-16 16:03:25,922][django-main-thread:6114422784][task_id:django.channels.server][runserver.py:141][INFO][HTTP POST /admin/login/?next=/admin/ 200 [0.11, 127.0.0.1:64004]]
+[2023-05-16 16:03:26,067][django-main-thread:6114422784][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /captcha/image/e8613a68e8a69932606d85728542133d9f4ab85a/ 200 [0.04, 127.0.0.1:64004]]
+[2023-05-16 16:04:43,012][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:251][INFO][/Users/lijiamin/PycharmProjects/net-axe/netaxe/netboost/conf.py changed, reloading.]
+[2023-05-16 16:04:44,143][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-16 16:04:49,638][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-16 16:06:56,479][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:251][INFO][/Users/lijiamin/PycharmProjects/net-axe/netaxe/netboost/__init__.py changed, reloading.]
+[2023-05-16 16:06:57,713][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-16 16:10:06,202][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:251][INFO][/Users/lijiamin/PycharmProjects/net-axe/netaxe/netboost/__init__.py changed, reloading.]
+[2023-05-16 16:10:07,449][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-16 16:52:57,808][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-16 16:55:16,944][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:251][INFO][/Users/lijiamin/PycharmProjects/net-axe/netaxe/netboost/settings.py changed, reloading.]
+[2023-05-16 16:55:18,046][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-16 16:55:22,156][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:251][INFO][/Users/lijiamin/PycharmProjects/net-axe/netaxe/netboost/settings.py changed, reloading.]
+[2023-05-16 16:55:23,139][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-16 16:55:30,118][ThreadPoolExecutor-0_0:6209056768][task_id:django.request][log.py:224][WARNING][Not Found: /]
+[2023-05-16 16:55:30,119][django-main-thread:6192230400][task_id:django.channels.server][runserver.py:149][WARNING][HTTP GET / 404 [0.02, 127.0.0.1:55089]]
+[2023-05-16 16:55:32,708][django-main-thread:6192230400][task_id:django.channels.server][runserver.py:147][INFO][HTTP GET /admin/ 302 [0.10, 127.0.0.1:55089]]
+[2023-05-16 16:55:32,773][django-main-thread:6192230400][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/login/?next=/admin/ 200 [0.05, 127.0.0.1:55089]]
+[2023-05-16 16:55:32,852][django-main-thread:6192230400][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /captcha/image/9b97bdadc6de434af6d349bd19db4efe638c2d78/ 200 [0.04, 127.0.0.1:55089]]
+[2023-05-16 16:55:43,264][django-main-thread:6192230400][task_id:django.channels.server][runserver.py:147][INFO][HTTP GET /admin/ 302 [0.03, 127.0.0.1:55089]]
+[2023-05-16 16:55:43,349][django-main-thread:6192230400][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/login/?next=/admin/ 200 [0.07, 127.0.0.1:55089]]
+[2023-05-16 16:55:43,413][django-main-thread:6192230400][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /captcha/image/c684b2eff7923b106b2b7a8a6d06261980995bd4/ 200 [0.03, 127.0.0.1:55089]]
+[2023-05-16 16:55:45,040][django-main-thread:6192230400][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/login/?next=/admin/ 200 [0.07, 127.0.0.1:55089]]
+[2023-05-16 16:55:45,115][django-main-thread:6192230400][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /captcha/image/77f1cd9f20495ad141376d7aa12688e03b282a5c/ 200 [0.04, 127.0.0.1:55089]]
+[2023-05-16 16:55:53,580][django-main-thread:6192230400][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/login/?next=/admin/ 200 [0.06, 127.0.0.1:55089]]
+[2023-05-16 16:55:53,675][django-main-thread:6192230400][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /captcha/image/bcf1217eb4571bd526a92cb1cd4d1369469947b8/ 200 [0.04, 127.0.0.1:55089]]
+[2023-05-16 16:56:03,883][django-main-thread:6192230400][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/login/?next=/admin/ 200 [0.08, 127.0.0.1:55089]]
+[2023-05-16 16:56:03,968][django-main-thread:6192230400][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /captcha/image/818aa4bbcf3257bc6cf77ce64628477834704305/ 200 [0.03, 127.0.0.1:55089]]
+[2023-05-16 16:57:03,218][django-main-thread:6192230400][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/login/?next=/admin/ 200 [0.07, 127.0.0.1:55089]]
+[2023-05-16 16:57:03,326][django-main-thread:6192230400][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /captcha/image/4eef29d00a34a3f92dc7247ade227c32767e65b3/ 200 [0.05, 127.0.0.1:55089]]
+[2023-05-16 16:57:27,342][django-main-thread:6192230400][task_id:django.channels.server][runserver.py:141][INFO][HTTP POST /admin/login/?next=/admin/ 200 [0.13, 127.0.0.1:55089]]
+[2023-05-16 16:57:27,481][django-main-thread:6192230400][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /captcha/image/0ca7dc1d91ed97bf6e87e0b65566604c7cdb9fb6/ 200 [0.04, 127.0.0.1:55089]]
+[2023-05-16 16:58:11,627][django-main-thread:6192230400][task_id:django.channels.server][runserver.py:141][INFO][HTTP POST /admin/login/?next=/admin/ 200 [0.18, 127.0.0.1:55089]]
+[2023-05-16 16:58:11,733][django-main-thread:6192230400][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /captcha/image/1364a0f3496a71d4d7bae8a7d4bcc9d6030f1c58/ 200 [0.04, 127.0.0.1:55089]]
+[2023-05-16 17:01:29,015][django-main-thread:6192230400][task_id:django.channels.server][runserver.py:141][INFO][HTTP POST /admin/login/?next=/admin/ 200 [0.18, 127.0.0.1:59269]]
+[2023-05-16 17:01:29,157][django-main-thread:6192230400][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /captcha/image/3809525a38b04bfa46f3a88d9009c7e6dc2dfe1a/ 200 [0.04, 127.0.0.1:59269]]
+[2023-05-16 17:01:41,471][django-main-thread:6192230400][task_id:django.channels.server][runserver.py:147][INFO][HTTP POST /admin/login/?next=/admin/ 302 [0.22, 127.0.0.1:59269]]
+[2023-05-16 17:01:41,552][django-main-thread:6192230400][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/ 200 [0.06, 127.0.0.1:59269]]
+[2023-05-16 17:01:41,583][django-main-thread:6192230400][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /static/admin/css/dashboard.css 200 [0.00, 127.0.0.1:59269]]
+[2023-05-16 17:01:41,611][django-main-thread:6192230400][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /static/admin/img/icon-addlink.svg 200 [0.01, 127.0.0.1:59269]]
+[2023-05-16 17:01:41,612][django-main-thread:6192230400][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /static/admin/img/icon-changelink.svg 200 [0.01, 127.0.0.1:59270]]
+[2023-05-16 17:03:58,108][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:251][INFO][/Users/lijiamin/PycharmProjects/net-axe/netaxe/netboost/conf.py changed, reloading.]
+[2023-05-16 17:03:59,224][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-16 17:04:18,139][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:251][INFO][/Users/lijiamin/PycharmProjects/net-axe/netaxe/netboost/conf.py changed, reloading.]
+[2023-05-16 17:04:19,175][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-16 17:04:42,127][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:251][INFO][/Users/lijiamin/PycharmProjects/net-axe/netaxe/netboost/conf.py changed, reloading.]
+[2023-05-16 17:04:43,209][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-16 17:04:53,228][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/asset/idc/ 200 [0.22, 127.0.0.1:60902]]
+[2023-05-16 17:04:53,288][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /static/admin/css/changelists.css 200 [0.01, 127.0.0.1:60902]]
+[2023-05-16 17:04:53,372][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/jsi18n/ 200 [0.09, 127.0.0.1:60904]]
+[2023-05-16 17:04:53,375][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /static/admin/js/vendor/jquery/jquery.js 200 [0.10, 127.0.0.1:60907]]
+[2023-05-16 17:04:53,377][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /static/admin/js/jquery.init.js 200 [0.10, 127.0.0.1:60908]]
+[2023-05-16 17:04:53,379][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /static/admin/js/core.js 200 [0.10, 127.0.0.1:60909]]
+[2023-05-16 17:04:53,381][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /static/admin/js/admin/RelatedObjectLookups.js 200 [0.10, 127.0.0.1:60910]]
+[2023-05-16 17:04:53,382][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /static/admin/js/actions.js 200 [0.09, 127.0.0.1:60902]]
+[2023-05-16 17:04:53,383][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /static/admin/js/urlify.js 200 [0.01, 127.0.0.1:60904]]
+[2023-05-16 17:04:53,385][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /static/admin/js/prepopulate.js 200 [0.01, 127.0.0.1:60907]]
+[2023-05-16 17:04:53,387][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /static/admin/js/vendor/xregexp/xregexp.js 200 [0.01, 127.0.0.1:60908]]
+[2023-05-16 17:04:53,403][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /static/admin/img/tooltag-add.svg 200 [0.00, 127.0.0.1:60908]]
+[2023-05-16 17:04:54,834][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/asset/idc/1/change/ 200 [0.13, 127.0.0.1:60908]]
+[2023-05-16 17:04:54,872][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /static/admin/css/forms.css 200 [0.00, 127.0.0.1:60908]]
+[2023-05-16 17:04:54,953][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/jsi18n/ 200 [0.08, 127.0.0.1:60907]]
+[2023-05-16 17:04:54,956][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /static/admin/js/prepopulate_init.js 200 [0.09, 127.0.0.1:60904]]
+[2023-05-16 17:04:54,958][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /static/admin/css/widgets.css 200 [0.08, 127.0.0.1:60908]]
+[2023-05-16 17:04:54,960][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /static/admin/js/change_form.js 200 [0.00, 127.0.0.1:60904]]
+[2023-05-16 17:04:58,038][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:147][INFO][HTTP POST /admin/asset/idc/1/change/ 302 [0.16, 127.0.0.1:60904]]
+[2023-05-16 17:04:58,175][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/asset/idc/add/ 200 [0.12, 127.0.0.1:60904]]
+[2023-05-16 17:04:58,287][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/jsi18n/ 200 [0.08, 127.0.0.1:60904]]
+[2023-05-16 17:04:58,310][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /static/admin/img/icon-yes.svg 200 [0.00, 127.0.0.1:60904]]
+[2023-05-16 17:05:07,674][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:141][INFO][HTTP POST /admin/asset/idc/add/ 200 [0.20, 127.0.0.1:60904]]
+[2023-05-16 17:05:07,817][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/jsi18n/ 200 [0.09, 127.0.0.1:60904]]
+[2023-05-16 17:05:11,020][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:147][INFO][HTTP POST /admin/asset/idc/add/ 302 [0.16, 127.0.0.1:60904]]
+[2023-05-16 17:05:11,264][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/asset/idc/ 200 [0.17, 127.0.0.1:60904]]
+[2023-05-16 17:05:11,380][django-main-thread:6121533440][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/jsi18n/ 200 [0.09, 127.0.0.1:60904]]
+[2023-05-16 17:12:44,640][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:251][INFO][/Users/lijiamin/PycharmProjects/net-axe/netaxe/netboost/__init__.py changed, reloading.]
+[2023-05-16 17:12:45,891][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-16 17:12:54,057][django-main-thread:6186414080][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/asset/idcmodel/ 200 [0.24, 127.0.0.1:64667]]
+[2023-05-16 17:12:54,208][django-main-thread:6186414080][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/jsi18n/ 200 [0.09, 127.0.0.1:64667]]
+[2023-05-16 17:12:54,211][django-main-thread:6186414080][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /static/admin/img/search.svg 200 [0.09, 127.0.0.1:64668]]
+[2023-05-16 17:12:55,565][django-main-thread:6186414080][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/asset/rack/ 200 [0.15, 127.0.0.1:64668]]
+[2023-05-16 17:12:55,773][django-main-thread:6186414080][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/jsi18n/ 200 [0.10, 127.0.0.1:64668]]
+[2023-05-16 17:12:57,000][django-main-thread:6186414080][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/asset/model/ 200 [0.19, 127.0.0.1:64668]]
+[2023-05-16 17:12:57,154][django-main-thread:6186414080][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/jsi18n/ 200 [0.12, 127.0.0.1:64668]]
+[2023-05-16 17:12:58,340][django-main-thread:6186414080][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/asset/netzone/ 200 [0.18, 127.0.0.1:64668]]
+[2023-05-16 17:12:58,482][django-main-thread:6186414080][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/jsi18n/ 200 [0.10, 127.0.0.1:64668]]
+[2023-05-16 17:13:00,040][django-main-thread:6186414080][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/asset/attribute/ 200 [0.17, 127.0.0.1:64668]]
+[2023-05-16 17:13:00,167][django-main-thread:6186414080][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/jsi18n/ 200 [0.09, 127.0.0.1:64668]]
+[2023-05-16 17:13:01,076][django-main-thread:6186414080][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/asset/framework/ 200 [0.17, 127.0.0.1:64668]]
+[2023-05-16 17:13:01,223][django-main-thread:6186414080][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/jsi18n/ 200 [0.10, 127.0.0.1:64668]]
+[2023-05-16 17:13:05,415][django-main-thread:6186414080][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/automation/collectionplan/ 200 [0.18, 127.0.0.1:64668]]
+[2023-05-16 17:13:05,544][django-main-thread:6186414080][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/jsi18n/ 200 [0.09, 127.0.0.1:64668]]
+[2023-05-16 17:21:57,757][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-16 17:22:04,821][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:251][INFO][/Users/lijiamin/PycharmProjects/net-axe/netaxe/utils/db/mongo_ops.py changed, reloading.]
+[2023-05-16 17:22:05,898][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-16 17:22:35,075][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:251][INFO][/Users/lijiamin/PycharmProjects/net-axe/netaxe/netaxe/urls.py changed, reloading.]
+[2023-05-16 17:22:36,324][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-17 14:24:27,737][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-17 14:24:54,307][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-17 14:25:04,415][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-17 14:25:45,353][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:251][INFO][/Users/lijiamin/PycharmProjects/net-axe/netaxe/netaxe/settings.py changed, reloading.]
+[2023-05-17 14:25:47,968][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-17 14:41:29,798][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-17 14:49:57,238][ThreadPoolExecutor-0_0:6196883456][task_id:django.request][log.py:224][WARNING][Not Found: /]
+[2023-05-17 14:49:57,239][django-main-thread:6180057088][task_id:django.channels.server][runserver.py:149][WARNING][HTTP GET / 404 [0.04, 127.0.0.1:53698]]
+[2023-05-17 14:50:01,845][django-main-thread:6180057088][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/ 200 [0.21, 127.0.0.1:53698]]
+[2023-05-17 14:50:04,544][django-main-thread:6180057088][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/asset/idc/ 200 [0.13, 127.0.0.1:53698]]
+[2023-05-17 14:50:04,658][django-main-thread:6180057088][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /admin/jsi18n/ 200 [0.09, 127.0.0.1:53698]]
+[2023-05-17 14:50:04,662][django-main-thread:6180057088][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /static/admin/js/vendor/jquery/jquery.js 200 [0.09, 127.0.0.1:53699]]
+[2023-05-17 14:50:04,665][django-main-thread:6180057088][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /static/admin/js/vendor/xregexp/xregexp.js 200 [0.09, 127.0.0.1:53761]]
+[2023-05-17 20:22:37,893][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-17 20:29:05,464][ThreadPoolExecutor-0_0:6131560448][task_id:django.request][log.py:224][WARNING][Not Found: /]
+[2023-05-17 20:29:05,466][django-main-thread:6114734080][task_id:django.channels.server][runserver.py:149][WARNING][HTTP GET / 404 [0.03, 127.0.0.1:62063]]
+[2023-05-17 20:29:05,667][ThreadPoolExecutor-0_0:6131560448][task_id:django.request][log.py:224][WARNING][Not Found: /favicon.ico]
+[2023-05-17 20:29:05,675][django-main-thread:6114734080][task_id:django.channels.server][runserver.py:149][WARNING][HTTP GET /favicon.ico 404 [0.01, 127.0.0.1:62063]]
+[2023-05-17 20:30:37,574][ThreadPoolExecutor-0_0:6131560448][task_id:django.request][log.py:224][WARNING][Bad Request: /base_platform/login/]
+[2023-05-17 20:30:37,575][django-main-thread:6114734080][task_id:django.channels.server][runserver.py:151][WARNING][HTTP POST /base_platform/login/ 400 [0.53, 127.0.0.1:63136]]
+[2023-05-17 20:31:02,952][django-main-thread:6114734080][task_id:django.channels.server][runserver.py:141][INFO][HTTP POST /base_platform/login/ 200 [0.44, 127.0.0.1:63430]]
+[2023-05-17 20:31:02,977][ThreadPoolExecutor-0_0:6131560448][task_id:django.request][log.py:224][WARNING][Not Found: /base_platform/rbac/system/menu/web_router/]
+[2023-05-17 20:31:02,978][django-main-thread:6114734080][task_id:django.channels.server][runserver.py:149][WARNING][HTTP GET /base_platform/rbac/system/menu/web_router/?parent__isnull=true 404 [0.01, 127.0.0.1:63442]]
+[2023-05-17 20:34:35,489][django-main-thread:6114734080][task_id:django.channels.server][runserver.py:141][INFO][HTTP POST /base_platform/login/ 200 [0.34, 127.0.0.1:49513]]
+[2023-05-17 20:34:35,520][ThreadPoolExecutor-0_0:6131560448][task_id:django.request][log.py:224][WARNING][Not Found: /base_platform/rbac/system/menu/web_router/]
+[2023-05-17 20:34:35,521][django-main-thread:6114734080][task_id:django.channels.server][runserver.py:149][WARNING][HTTP GET /base_platform/rbac/system/menu/web_router/?parent__isnull=true 404 [0.01, 127.0.0.1:49522]]
+[2023-05-17 20:49:51,800][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:251][INFO][/Users/lijiamin/PycharmProjects/net-axe/backend/netaxe/__init__.py changed, reloading.]
+[2023-05-17 20:49:53,001][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-17 20:56:44,917][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:251][INFO][/Users/lijiamin/PycharmProjects/net-axe/backend/apps/route_backend/views.py changed, reloading.]
+[2023-05-17 20:56:46,078][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-17 20:58:48,198][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:251][INFO][/Users/lijiamin/PycharmProjects/net-axe/backend/apps/system/views/menu.py changed, reloading.]
+[2023-05-17 20:58:49,435][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-18 00:08:10,747][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-18 00:22:18,881][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-18 00:23:38,146][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-18 00:24:24,592][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/cmdb_account/?limit=1000 200 [0.35, 127.0.0.1:62177]]
+[2023-05-18 00:24:24,678][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/asset_networkdevice/?start=0&limit=10&status=0 200 [0.44, 127.0.0.1:62178]]
+[2023-05-18 00:24:24,777][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/cmdb_idc/?limit=1000 200 [0.53, 127.0.0.1:62179]]
+[2023-05-18 00:24:25,084][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/cmdb_vendor/?limit=1000 200 [0.84, 127.0.0.1:62180]]
+[2023-05-18 00:24:25,216][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/cmdb_role/?limit=1000 200 [0.97, 127.0.0.1:62181]]
+[2023-05-18 00:24:25,315][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/cmdb_category/?limit=1000 200 [1.07, 127.0.0.1:62182]]
+[2023-05-18 00:24:25,613][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/automation/collection_plan/?limit=1000 200 [1.01, 127.0.0.1:62193]]
+[2023-05-18 00:24:25,762][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/framework/?limit=1000 200 [1.08, 127.0.0.1:62200]]
+[2023-05-18 00:24:25,949][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/attribute/?limit=1000 200 [1.17, 127.0.0.1:62209]]
+[2023-05-18 00:28:03,894][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/int_utilization/interfaceused/?start=0&limit=10&status=0 200 [0.12, 127.0.0.1:65033]]
+[2023-05-18 00:28:07,265][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/automation/collection_plan/?start=0&limit=10&_=1684340887131 200 [0.12, 127.0.0.1:65071]]
+[2023-05-18 00:28:11,238][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/config_center/fsm_parse?get_tree=1 200 [0.09, 127.0.0.1:65138]]
+[2023-05-18 00:28:12,282][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/config_center/fsm_parse?filename=cisco_ios_show_ip_bgp_neighbors.textfsm 200 [0.10, 127.0.0.1:65164]]
+[2023-05-18 00:28:14,576][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/config_center/fsm_parse?filename=avaya_vsp_show_software.textfsm 200 [0.12, 127.0.0.1:65216]]
+[2023-05-18 00:28:15,189][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/config_center/fsm_parse?filename=ubiquiti_edgeswitch_show_vlan.textfsm 200 [0.08, 127.0.0.1:65221]]
+[2023-05-18 00:28:44,663][ThreadPoolExecutor-0_0:6170914816][task_id:django.request][log.py:224][WARNING][Not Found: /base_platform/config_center/api/ttp_template/]
+[2023-05-18 00:28:44,664][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:149][WARNING][HTTP GET /base_platform/config_center/api/ttp_template/?vendor=H3C 404 [0.01, 127.0.0.1:49217]]
+[2023-05-18 00:28:46,990][ThreadPoolExecutor-0_0:6170914816][task_id:django.request][log.py:224][WARNING][Not Found: /base_platform/config_center/api/config_compliance/]
+[2023-05-18 00:28:46,991][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:149][WARNING][HTTP GET /base_platform/config_center/api/config_compliance/?vendor=H3C 404 [0.00, 127.0.0.1:49248]]
+[2023-05-18 00:28:48,232][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/config_center/compliance_results?get_results=1 200 [0.25, 127.0.0.1:49263]]
+[2023-05-18 00:28:48,290][ThreadPoolExecutor-0_0:6170914816][task_id:django.request][log.py:224][WARNING][Not Found: /base_platform/config_center/api/config_template/]
+[2023-05-18 00:28:48,296][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:149][WARNING][HTTP GET /base_platform/config_center/api/config_template/?vendor=H3C 404 [0.01, 127.0.0.1:49273]]
+[2023-05-18 00:28:49,714][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/config_center/git_config?get_tree=1 200 [0.08, 127.0.0.1:49299]]
+[2023-05-18 00:28:49,870][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/config_center/git_config?get_commit=1 200 [0.24, 127.0.0.1:49300]]
+[2023-05-18 00:28:53,305][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/backend/dispatch_page/ 200 [0.09, 127.0.0.1:49351]]
+[2023-05-18 00:28:55,011][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/backend/periodic_task/?name=&task=&start=0&limit=10&_=1684340934898 200 [0.08, 127.0.0.1:49372]]
+[2023-05-18 00:28:55,092][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/backend/jobCenter/?get_queues=1 200 [0.16, 127.0.0.1:49373]]
+[2023-05-18 00:28:55,189][ThreadPoolExecutor-0_0:6170914816][task_id:django.request][log.py:224][WARNING][Bad Request: /base_platform/backend/jobCenter/]
+[2023-05-18 00:28:55,190][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:151][WARNING][HTTP GET /base_platform/backend/jobCenter/?current_tasks=1 400 [0.26, 127.0.0.1:49374]]
+[2023-05-18 00:28:55,292][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/backend/jobCenter/?crontab_schedules=1 200 [0.36, 127.0.0.1:49376]]
+[2023-05-18 00:28:55,384][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/backend/interval_schedule/?limit=1000 200 [0.45, 127.0.0.1:49377]]
+[2023-05-18 00:28:57,855][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/topology/index/?limit=1000 200 [0.09, 127.0.0.1:49418]]
+[2023-05-18 00:28:57,937][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/topology/topology_icon/?get_tree=1 200 [0.17, 127.0.0.1:49419]]
+[2023-05-18 00:28:58,037][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/cmdb_idc/?limit=1000 200 [0.27, 127.0.0.1:49420]]
+[2023-05-18 00:29:00,866][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/topology/topology_icon/?get_tree=1 200 [0.09, 127.0.0.1:49450]]
+[2023-05-18 00:29:17,495][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/topology/topology_icon/?get_tree=1 200 [0.09, 127.0.0.1:49749]]
+[2023-05-18 00:30:33,469][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/topology/topology_icon/?get_tree=1 200 [0.14, 127.0.0.1:51020]]
+[2023-05-18 00:30:35,849][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/topology/topology_icon/?get_tree=1 200 [0.09, 127.0.0.1:51068]]
+[2023-05-18 00:30:37,659][ThreadPoolExecutor-0_0:6170914816][task_id:django.request][log.py:224][WARNING][Not Found: /base_platform/media/topology/img/load_balancer/load_balancer_mango_medium.png]
+[2023-05-18 00:30:37,661][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:149][WARNING][HTTP GET /base_platform/media/topology/img/load_balancer/load_balancer_mango_medium.png 404 [0.03, 127.0.0.1:51094]]
+[2023-05-18 00:30:37,668][ThreadPoolExecutor-0_0:6170914816][task_id:django.request][log.py:224][WARNING][Not Found: /base_platform/media/topology/img/load_balancer/load_balancer_pool_large.png]
+[2023-05-18 00:30:37,670][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:149][WARNING][HTTP GET /base_platform/media/topology/img/load_balancer/load_balancer_pool_large.png 404 [0.04, 127.0.0.1:51095]]
+[2023-05-18 00:30:37,674][ThreadPoolExecutor-0_0:6170914816][task_id:django.request][log.py:224][WARNING][Not Found: /base_platform/media/topology/img/load_balancer/load_balancer_red_small.png]
+[2023-05-18 00:30:37,675][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:149][WARNING][HTTP GET /base_platform/media/topology/img/load_balancer/load_balancer_red_small.png 404 [0.04, 127.0.0.1:51096]]
+[2023-05-18 00:30:37,679][ThreadPoolExecutor-0_0:6170914816][task_id:django.request][log.py:224][WARNING][Not Found: /base_platform/media/topology/img/load_balancer/load_balancer_pool_small.png]
+[2023-05-18 00:30:37,680][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:149][WARNING][HTTP GET /base_platform/media/topology/img/load_balancer/load_balancer_pool_small.png 404 [0.05, 127.0.0.1:51097]]
+[2023-05-18 00:30:37,684][ThreadPoolExecutor-0_0:6170914816][task_id:django.request][log.py:224][WARNING][Not Found: /base_platform/media/topology/img/load_balancer/load_balancer_red_large.png]
+[2023-05-18 00:30:37,685][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:149][WARNING][HTTP GET /base_platform/media/topology/img/load_balancer/load_balancer_red_large.png 404 [0.05, 127.0.0.1:51098]]
+[2023-05-18 00:30:37,692][ThreadPoolExecutor-0_0:6170914816][task_id:django.request][log.py:224][WARNING][Not Found: /base_platform/media/topology/img/load_balancer/load_balancer_red_medium.png]
+[2023-05-18 00:30:37,693][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:149][WARNING][HTTP GET /base_platform/media/topology/img/load_balancer/load_balancer_red_medium.png 404 [0.06, 127.0.0.1:51099]]
+[2023-05-18 00:30:37,696][ThreadPoolExecutor-0_0:6170914816][task_id:django.request][log.py:224][WARNING][Not Found: /base_platform/media/topology/img/load_balancer/load_balancer_mango_small.png]
+[2023-05-18 00:30:37,697][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:149][WARNING][HTTP GET /base_platform/media/topology/img/load_balancer/load_balancer_mango_small.png 404 [0.03, 127.0.0.1:51102]]
+[2023-05-18 00:30:37,701][ThreadPoolExecutor-0_0:6170914816][task_id:django.request][log.py:224][WARNING][Not Found: /base_platform/media/topology/img/load_balancer/load_balancer_mango_large.png]
+[2023-05-18 00:30:37,701][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:149][WARNING][HTTP GET /base_platform/media/topology/img/load_balancer/load_balancer_mango_large.png 404 [0.03, 127.0.0.1:51105]]
+[2023-05-18 00:30:37,705][ThreadPoolExecutor-0_0:6170914816][task_id:django.request][log.py:224][WARNING][Not Found: /base_platform/media/topology/img/load_balancer/load_balancer_pool_medium.png]
+[2023-05-18 00:30:37,705][django-main-thread:6154088448][task_id:django.channels.server][runserver.py:149][WARNING][HTTP GET /base_platform/media/topology/img/load_balancer/load_balancer_pool_medium.png 404 [0.03, 127.0.0.1:51108]]
+[2023-05-18 00:31:21,543][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:251][INFO][/Users/lijiamin/PycharmProjects/net-axe/backend/netaxe/urls.py changed, reloading.]
+[2023-05-18 00:31:23,031][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-18 00:31:30,794][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/topology/topology_icon/?get_tree=1 200 [0.11, 127.0.0.1:51939]]
+[2023-05-18 00:31:31,792][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/media/topology/img/load_balancer/load_balancer_mango_medium.png 200 [0.09, 127.0.0.1:51959]]
+[2023-05-18 00:31:31,905][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/media/topology/img/load_balancer/load_balancer_pool_large.png 200 [0.20, 127.0.0.1:51960]]
+[2023-05-18 00:31:32,002][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/media/topology/img/load_balancer/load_balancer_red_small.png 200 [0.30, 127.0.0.1:51961]]
+[2023-05-18 00:31:32,125][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/media/topology/img/load_balancer/load_balancer_pool_small.png 200 [0.42, 127.0.0.1:51962]]
+[2023-05-18 00:31:32,236][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/media/topology/img/load_balancer/load_balancer_red_large.png 200 [0.53, 127.0.0.1:51963]]
+[2023-05-18 00:31:32,337][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/media/topology/img/load_balancer/load_balancer_red_medium.png 200 [0.63, 127.0.0.1:51964]]
+[2023-05-18 00:31:32,437][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/media/topology/img/load_balancer/load_balancer_mango_small.png 200 [0.61, 127.0.0.1:51969]]
+[2023-05-18 00:31:32,530][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/media/topology/img/load_balancer/load_balancer_pool_medium.png 200 [0.62, 127.0.0.1:51972]]
+[2023-05-18 00:31:32,617][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/media/topology/img/load_balancer/load_balancer_mango_large.png 200 [0.60, 127.0.0.1:51978]]
+[2023-05-18 00:31:33,590][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/media/topology/img/switches/switch_pool_small.png 200 [0.10, 127.0.0.1:52027]]
+[2023-05-18 00:31:33,676][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/media/topology/img/switches/switch_red_small.png 200 [0.18, 127.0.0.1:52030]]
+[2023-05-18 00:31:33,771][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/media/topology/img/switches/switch_red_large.png 200 [0.28, 127.0.0.1:52031]]
+[2023-05-18 00:31:33,854][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/media/topology/img/switches/switch_pool_large.png 200 [0.36, 127.0.0.1:52032]]
+[2023-05-18 00:31:33,944][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/media/topology/img/switches/switch_red_medium.png 200 [0.45, 127.0.0.1:52033]]
+[2023-05-18 00:31:34,051][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/media/topology/img/switches/switch_mango_medium.png 200 [0.56, 127.0.0.1:52034]]
+[2023-05-18 00:31:34,157][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/media/topology/img/switches/switch_mango_large.png 200 [0.56, 127.0.0.1:52041]]
+[2023-05-18 00:31:34,258][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/media/topology/img/switches/switch_pool_medium.png 200 [0.58, 127.0.0.1:52047]]
+[2023-05-18 00:31:34,376][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/media/topology/img/switches/switch_mango_small.png 200 [0.60, 127.0.0.1:52051]]
+[2023-05-18 00:31:34,577][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/media/topology/img/AC.png 200 [0.11, 127.0.0.1:52066]]
+[2023-05-18 00:32:35,891][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/topology/topology_icon/?get_tree=1 200 [0.12, 127.0.0.1:53028]]
+[2023-05-18 00:32:38,436][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/cmdb_account/?limit=1000 200 [0.10, 127.0.0.1:53070]]
+[2023-05-18 00:32:38,529][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/asset_networkdevice/?start=0&limit=10&status=0 200 [0.19, 127.0.0.1:53071]]
+[2023-05-18 00:32:38,627][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/cmdb_idc/?limit=1000 200 [0.29, 127.0.0.1:53072]]
+[2023-05-18 00:32:38,713][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/cmdb_vendor/?limit=1000 200 [0.37, 127.0.0.1:53073]]
+[2023-05-18 00:32:38,800][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/cmdb_role/?limit=1000 200 [0.46, 127.0.0.1:53074]]
+[2023-05-18 00:32:38,894][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/cmdb_category/?limit=1000 200 [0.55, 127.0.0.1:53075]]
+[2023-05-18 00:32:39,010][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/automation/collection_plan/?limit=1000 200 [0.57, 127.0.0.1:53079]]
+[2023-05-18 00:32:39,127][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/framework/?limit=1000 200 [0.59, 127.0.0.1:53084]]
+[2023-05-18 00:32:39,252][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/attribute/?limit=1000 200 [0.62, 127.0.0.1:53094]]
+[2023-05-18 00:32:40,522][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/cmdb_account/?limit=1000 200 [0.10, 127.0.0.1:53139]]
+[2023-05-18 00:32:40,614][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/asset_networkdevice/?start=0&limit=10&status=0 200 [0.19, 127.0.0.1:53140]]
+[2023-05-18 00:32:40,708][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/cmdb_idc/?limit=1000 200 [0.28, 127.0.0.1:53141]]
+[2023-05-18 00:32:40,806][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/cmdb_vendor/?limit=1000 200 [0.38, 127.0.0.1:53142]]
+[2023-05-18 00:32:40,899][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/cmdb_role/?limit=1000 200 [0.47, 127.0.0.1:53143]]
+[2023-05-18 00:32:40,990][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/cmdb_category/?limit=1000 200 [0.56, 127.0.0.1:53144]]
+[2023-05-18 00:32:41,096][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/automation/collection_plan/?limit=1000 200 [0.57, 127.0.0.1:53150]]
+[2023-05-18 00:32:41,210][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/framework/?limit=1000 200 [0.59, 127.0.0.1:53156]]
+[2023-05-18 00:32:41,310][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/attribute/?limit=1000 200 [0.60, 127.0.0.1:53162]]
+[2023-05-18 00:32:43,356][django-main-thread:6118813696][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/int_utilization/interfaceused/?start=0&limit=10&status=0 200 [0.09, 127.0.0.1:53204]]
+[2023-05-18 17:09:53,966][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-18 17:10:25,921][django-main-thread:6158004224][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/cmdb_account/?limit=1000 200 [0.11, 127.0.0.1:62809]]
+[2023-05-18 17:10:26,002][django-main-thread:6158004224][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/asset_networkdevice/?start=0&limit=10&status=0 200 [0.19, 127.0.0.1:62810]]
+[2023-05-18 17:10:26,095][django-main-thread:6158004224][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/cmdb_idc/?limit=1000 200 [0.28, 127.0.0.1:62811]]
+[2023-05-18 17:10:26,198][django-main-thread:6158004224][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/cmdb_vendor/?limit=1000 200 [0.38, 127.0.0.1:62812]]
+[2023-05-18 17:10:26,285][django-main-thread:6158004224][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/cmdb_role/?limit=1000 200 [0.47, 127.0.0.1:62813]]
+[2023-05-18 17:10:26,364][django-main-thread:6158004224][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/cmdb_category/?limit=1000 200 [0.55, 127.0.0.1:62814]]
+[2023-05-18 17:10:26,449][django-main-thread:6158004224][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/automation/collection_plan/?limit=1000 200 [0.52, 127.0.0.1:62822]]
+[2023-05-18 17:10:26,545][django-main-thread:6158004224][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/framework/?limit=1000 200 [0.54, 127.0.0.1:62826]]
+[2023-05-18 17:10:26,641][django-main-thread:6158004224][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/attribute/?limit=1000 200 [0.54, 127.0.0.1:62836]]
+[2023-05-18 17:10:28,043][django-main-thread:6158004224][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/int_utilization/interfaceused/?start=0&limit=10&status=0 200 [0.09, 127.0.0.1:62861]]
+[2023-05-19 10:57:47,925][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-19 10:57:59,692][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:251][INFO][/Users/lijiamin/PycharmProjects/net-axe/backend/utils/db/mongo_ops.py changed, reloading.]
+[2023-05-19 10:58:00,855][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-19 11:03:59,878][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:251][INFO][/Users/lijiamin/PycharmProjects/net-axe/backend/utils/db/mongo_ops.py changed, reloading.]
+[2023-05-19 11:04:00,945][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-19 11:14:37,687][django-main-thread:6179713024][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/cmdb_account/?limit=1000 200 [0.14, 127.0.0.1:62720]]
+[2023-05-19 11:14:37,821][django-main-thread:6179713024][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/asset_networkdevice/?start=0&limit=10&status=0 200 [0.26, 127.0.0.1:62721]]
+[2023-05-19 11:14:38,013][django-main-thread:6179713024][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/cmdb_idc/?limit=1000 200 [0.45, 127.0.0.1:62722]]
+[2023-05-19 11:14:38,098][django-main-thread:6179713024][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/cmdb_vendor/?limit=1000 200 [0.54, 127.0.0.1:62723]]
+[2023-05-19 11:14:38,200][django-main-thread:6179713024][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/cmdb_role/?limit=1000 200 [0.64, 127.0.0.1:62724]]
+[2023-05-19 11:14:38,277][django-main-thread:6179713024][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/cmdb_category/?limit=1000 200 [0.72, 127.0.0.1:62725]]
+[2023-05-19 11:14:38,361][django-main-thread:6179713024][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/automation/collection_plan/?limit=1000 200 [0.66, 127.0.0.1:62730]]
+[2023-05-19 11:14:38,436][django-main-thread:6179713024][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/framework/?limit=1000 200 [0.60, 127.0.0.1:62734]]
+[2023-05-19 11:14:38,518][django-main-thread:6179713024][task_id:django.channels.server][runserver.py:141][INFO][HTTP GET /base_platform/asset/attribute/?limit=1000 200 [0.49, 127.0.0.1:62738]]
+[2023-05-19 15:13:16,323][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-19 15:16:08,008][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:251][INFO][/Users/lijiamin/PycharmProjects/BasePlatform/backend/confload/confload.py changed, reloading.]
+[2023-05-19 15:16:09,320][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]
+[2023-05-19 15:16:40,704][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:251][INFO][/Users/lijiamin/PycharmProjects/BasePlatform/backend/confload/confload.py changed, reloading.]
+[2023-05-19 15:16:41,860][MainThread:8333302592][task_id:django.utils.autoreload][autoreload.py:637][INFO][Watching for file changes with StatReloader]

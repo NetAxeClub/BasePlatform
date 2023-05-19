@@ -1,0 +1,274 @@
+ici-store#show int
+ici-store#show interfaces
+Embedded-Service-Engine0/0 is administratively down, line protocol is down
+  Hardware is Embedded Service Engine, address is 0000.0000.0000 (bia 0000.0000.0000)
+  MTU 1500 bytes, BW 10000 Kbit/sec, DLY 1000 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation ARPA, loopback not set
+  Keepalive set (10 sec)
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Last input never, output never, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/64/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/40 (size/max)
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     0 packets input, 0 bytes, 0 no buffer
+     Received 0 broadcasts (0 IP multicasts)
+     0 runts, 0 giants, 0 throttles
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 input packets with dribble condition detected
+     0 packets output, 0 bytes, 0 underruns
+     0 output errors, 0 collisions, 0 interface resets
+     0 unknown protocol drops
+     0 babbles, 0 late collision, 0 deferred
+     0 lost carrier, 0 no carrier
+     0 output buffer failures, 0 output buffers swapped out
+GigabitEthernet0/0 is up, line protocol is up
+  Hardware is CN Gigabit Ethernet, address is 0062.ec34.1098 (bia 0062.ec34.1098)
+  Internet address is 39.155.182.116/27
+  MTU 1500 bytes, BW 100000 Kbit/sec, DLY 100 usec,
+     reliability 255/255, txload 34/255, rxload 1/255
+  Encapsulation ARPA, loopback not set
+  Keepalive set (10 sec)
+  Full Duplex, 100Mbps, media type is RJ45
+  output flow-control is XON, input flow-control is XON
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Last input 00:00:00, output 00:00:00, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/75/119/19753 (size/max/drops/flushes); Total output drops: 17929
+  Queueing strategy: fifo
+  Output queue: 0/40 (size/max)
+  5 minute input rate 693000 bits/sec, 836 packets/sec
+  5 minute output rate 13438000 bits/sec, 1901 packets/sec
+     2703401559 packets input, 976164827 bytes, 17903 no buffer
+     Received 6694891 broadcasts (0 IP multicasts)
+     0 runts, 0 giants, 39 throttles
+     141 input errors, 1 CRC, 1 frame, 140 overrun, 0 ignored
+     0 watchdog, 171139 multicast, 0 pause input
+     758594142 packets output, 851309794 bytes, 0 underruns
+     0 output errors, 0 collisions, 0 interface resets
+     2226217 unknown protocol drops
+     0 babbles, 0 late collision, 0 deferred
+     0 lost carrier, 0 no carrier, 6949 pause output
+     0 output buffer failures, 0 output buffers swapped out
+GigabitEthernet0/1 is up, line protocol is up
+  Hardware is CN Gigabit Ethernet, address is 0062.ec34.1099 (bia 0062.ec34.1099)
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec,
+     reliability 255/255, txload 1/255, rxload 3/255
+  Encapsulation 802.1Q Virtual LAN, Vlan ID  1., loopback not set
+  Keepalive set (10 sec)
+  Full Duplex, 1Gbps, media type is RJ45
+  output flow-control is unsupported, input flow-control is unsupported
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Last input 00:00:04, output 00:00:00, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/75/0/5 (size/max/drops/flushes); Total output drops: 203
+  Queueing strategy: fifo
+  Output queue: 0/40 (size/max)
+  5 minute input rate 13130000 bits/sec, 1897 packets/sec
+  5 minute output rate 557000 bits/sec, 833 packets/sec
+     728227230 packets input, 3031255252 bytes, 0 no buffer
+     Received 767850 broadcasts (0 IP multicasts)
+     0 runts, 0 giants, 0 throttles
+     25209 input errors, 0 CRC, 0 frame, 25209 overrun, 0 ignored
+     0 watchdog, 256339 multicast, 0 pause input
+     2668477721 packets output, 3740714584 bytes, 0 underruns
+     0 output errors, 0 collisions, 0 interface resets
+     170967 unknown protocol drops
+     0 babbles, 0 late collision, 0 deferred
+     6 lost carrier, 0 no carrier, 0 pause output
+     0 output buffer failures, 0 output buffers swapped out
+GigabitEthernet0/1.10 is up, line protocol is up
+  Hardware is CN Gigabit Ethernet, address is 0062.ec34.1099 (bia 0062.ec34.1099)
+  Internet address is 172.16.1.1/24
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec,
+     reliability 255/255, txload 1/255, rxload 3/255
+  Encapsulation 802.1Q Virtual LAN, Vlan ID  10.
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Keepalive set (10 sec)
+  Last clearing of "show interface" counters never
+GigabitEthernet0/1.12 is up, line protocol is up
+  Hardware is CN Gigabit Ethernet, address is 0062.ec34.1099 (bia 0062.ec34.1099)
+  Internet address is 192.168.12.254/24
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec,
+     reliability 255/255, txload 1/255, rxload 3/255
+  Encapsulation 802.1Q Virtual LAN, Vlan ID  12.
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Keepalive set (10 sec)
+  Last clearing of "show interface" counters never
+GigabitEthernet0/1.100 is administratively down, line protocol is down
+  Hardware is CN Gigabit Ethernet, address is 0062.ec34.1099 (bia 0062.ec34.1099)
+  Internet address is 192.168.100.254/24
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec,
+     reliability 255/255, txload 1/255, rxload 3/255
+  Encapsulation 802.1Q Virtual LAN, Vlan ID  100.
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Keepalive set (10 sec)
+  Last clearing of "show interface" counters never
+GigabitEthernet0/1.300 is up, line protocol is up
+  Hardware is CN Gigabit Ethernet, address is 0062.ec34.1099 (bia 0062.ec34.1099)
+  Internet address is 192.168.30.254/24
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec,
+     reliability 255/255, txload 1/255, rxload 3/255
+  Encapsulation 802.1Q Virtual LAN, Vlan ID  30.
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Keepalive set (10 sec)
+  Last clearing of "show interface" counters never
+GigabitEthernet0/2 is down, line protocol is down
+  Hardware is CN Gigabit Ethernet, address is 0062.ec34.109a (bia 0062.ec34.109a)
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation ARPA, loopback not set
+  Keepalive set (10 sec)
+  Auto Duplex, Auto Speed, media type is RJ45
+  output flow-control is unsupported, input flow-control is unsupported
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Last input never, output never, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/75/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/40 (size/max)
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     0 packets input, 0 bytes, 0 no buffer
+     Received 0 broadcasts (0 IP multicasts)
+     0 runts, 0 giants, 0 throttles
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 watchdog, 0 multicast, 0 pause input
+     0 packets output, 0 bytes, 0 underruns
+     0 output errors, 0 collisions, 0 interface resets
+     0 unknown protocol drops
+     0 babbles, 0 late collision, 0 deferred
+     0 lost carrier, 0 no carrier, 0 pause output
+     0 output buffer failures, 0 output buffers swapped out
+Serial0/0/0 is administratively down, line protocol is down
+  Hardware is WIC MBRD Serial
+  MTU 1500 bytes, BW 1544 Kbit/sec, DLY 20000 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation HDLC, loopback not set
+  Keepalive set (10 sec)
+  Last input never, output never, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/75/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/40 (size/max)
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     0 packets input, 0 bytes, 0 no buffer
+     Received 0 broadcasts (0 IP multicasts)
+     0 runts, 0 giants, 0 throttles
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored, 0 abort
+     0 packets output, 0 bytes, 0 underruns
+     0 output errors, 0 collisions, 5 interface resets
+     0 unknown protocol drops
+     0 output buffer failures, 0 output buffers swapped out
+     0 carrier transitions
+     DCD=down  DSR=down  DTR=down  RTS=down  CTS=down
+
+Loopback0 is up, line protocol is up
+  Hardware is Loopback
+  Internet address is 2.2.2.2/32
+  MTU 1514 bytes, BW 8000000 Kbit/sec, DLY 5000 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation LOOPBACK, loopback not set
+  Keepalive set (10 sec)
+  Last input 00:00:34, output never, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/75/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/0 (size/max)
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     0 packets input, 0 bytes, 0 no buffer
+     Received 0 broadcasts (0 IP multicasts)
+     0 runts, 0 giants, 0 throttles
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored, 0 abort
+     10641 packets output, 225475 bytes, 0 underruns
+     0 output errors, 0 collisions, 0 interface resets
+     10601 unknown protocol drops
+     0 output buffer failures, 0 output buffers swapped out
+NVI0 is up, line protocol is up
+  Hardware is NVI
+  Interface is unnumbered. Using address of GigabitEthernet0/0 (39.155.182.116)
+  MTU 1514 bytes, BW 56 Kbit/sec, DLY 5000 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation UNKNOWN, loopback not set
+  Keepalive set (10 sec)
+  Last input never, output never, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/75/0/0 (size/max/drops/flushes); Total output drops: 0
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     0 packets input, 0 bytes, 0 no buffer
+     Received 0 broadcasts (0 IP multicasts)
+     0 runts, 0 giants, 0 throttles
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored, 0 abort
+     0 packets output, 0 bytes, 0 underruns
+     0 output errors, 0 collisions, 0 interface resets
+     0 unknown protocol drops
+     0 output buffer failures, 0 output buffers swapped out
+Tunnel102 is up, line protocol is up
+  Hardware is Tunnel
+  Description: --- DMVPN To Remote Site ---
+  Internet address is 10.1.1.2/24
+  MTU 17916 bytes, BW 100 Kbit/sec, DLY 50000 usec,
+     reliability 255/255, txload 255/255, rxload 255/255
+  Encapsulation TUNNEL, loopback not set
+  Keepalive not set
+  Tunnel linestate evaluation up
+  Tunnel source 39.155.182.116 (GigabitEthernet0/0), destination 120.246.114.2
+   Tunnel Subblocks:
+      src-track:
+         Tunnel102 source tracking subblock associated with GigabitEthernet0/0
+          Set of tunnels with source GigabitEthernet0/0, 1 member (includes iterators), on interface <OK>
+  Tunnel protocol/transport GRE/IP
+    Key disabled, sequencing disabled
+    Checksumming of packets disabled
+  Tunnel TTL 255, Fast tunneling enabled
+  Tunnel transport MTU 1476 bytes
+  Tunnel transmit bandwidth 8000 (kbps)
+  Tunnel receive bandwidth 8000 (kbps)
+  Last input 00:00:00, output 00:00:00, output hang never
+  Last clearing of "show interface" counters 8w3d
+  Input queue: 0/75/0/0 (size/max/drops/flushes); Total output drops: 114538
+  Queueing strategy: fifo
+  Output queue: 0/0 (size/max)
+  5 minute input rate 598000 bits/sec, 834 packets/sec
+  5 minute output rate 13207000 bits/sec, 1897 packets/sec
+     2585826624 packets input, 3367909133 bytes, 0 no buffer
+     Received 0 broadcasts (0 IP multicasts)
+     0 runts, 0 giants, 0 throttles
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored, 0 abort
+     660097524 packets output, 716619950 bytes, 0 underruns
+     0 output errors, 0 collisions, 0 interface resets
+     9 unknown protocol drops
+     0 output buffer failures, 0 output buffers swapped out
+Virtual-Access1 is up, line protocol is up
+  Hardware is Virtual Access interface
+  Description: ***Internally created by SSLVPN context sslvpn***
+  Interface is unnumbered. Using address of GigabitEthernet0/0 (39.155.182.116)
+  MTU 1406 bytes, BW 100000 Kbit/sec, DLY 100000 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation SSL
+  SSL vaccess
+  Vaccess status 0x0, loopback not set
+  Keepalive set (10 sec)
+  DTR is pulsed for 5 seconds on reset
+  Last input never, output never, output hang never
+  Last clearing of "show interface" counters 8w3d
+  Input queue: 0/75/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/40 (size/max)
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     5403021 packets input, 389616988 bytes, 0 no buffer
+     Received 0 broadcasts (0 IP multicasts)
+     0 runts, 0 giants, 0 throttles
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored, 0 abort
+     580 packets output, 41714 bytes, 0 underruns
+     0 output errors, 0 collisions, 0 interface resets
+     0 unknown protocol drops
+     0 output buffer failures, 0 output buffers swapped out
+     0 carrier transitions

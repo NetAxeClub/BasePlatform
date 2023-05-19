@@ -1,0 +1,35 @@
+------------------------------------------------
+Local Intf: Gi0/0
+Chassis id: 9ce3.74f7.3e45
+Port id: GigabitEthernet0/0/9
+Port Description: To-HaiZhuoFei-ZeYang-1015-20M-BJYD-20220704
+System Name: Zeyang-chuanshu
+
+System Description:
+S5700-28X-LI-24S-AC
+Huawei Versatile Routing Platform Software
+VRP (R) software, Version 5.160 (S5700 V200R007C00SPC500)
+Copyright (C) 2000-2014 HUAWEI TECH CO., LTD
+
+Time remaining: 102 seconds
+System Capabilities: B
+Enabled Capabilities: B
+Management Addresses:
+    IP: 45.126.114.196
+    OID:
+        0.6.15.43.6.1.4.1.2011.5.25.41.1.2.1.1.1.
+Auto Negotiation - not supported
+Physical media capabilities:
+    1000baseT(FD)
+    1000baseX(FD)
+    100base-TX(FD)
+    100base-TX(HD)
+    100base-T4
+    10base-T(FD)
+    10base-T(HD)
+Media Attachment Unit type: 16
+Vlan ID: 1063
+
+
+Total entries displayed: 1
+

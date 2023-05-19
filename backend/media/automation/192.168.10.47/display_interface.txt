@@ -1,0 +1,1245 @@
+
+GigabitEthernet0/0/1 current state : UP
+Line protocol current state : UP 
+Description:diego-pc
+Switch Port, PVID :   10, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : 2022-09-13 18:00:38 UTC+08:00
+Last physical down time : 2022-09-13 18:00:32 UTC+08:00
+Current system time: 2022-09-13 19:08:05+08:00
+Port Mode: COMMON COPPER
+Speed : 100,    Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : AUTO,   Flow-control: DISABLE
+Last 300 seconds input rate 0 bits/sec, 0 packets/sec
+Last 300 seconds output rate 58240 bits/sec, 18 packets/sec
+Input peak rate 61044928 bits/sec, Record time: 2022-08-26 16:48:11
+Output peak rate 96662232 bits/sec, Record time: 2022-08-22 09:12:04
+
+Input:  4083629 packets, 997228151 bytes
+  Unicast:                    3705563,  Multicast:                      191899
+  Broadcast:                   186167,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  49082512 packets, 23911056385 bytes
+  Unicast:                    6925634,  Multicast:                    36661120
+  Broadcast:                  5495758,  Jumbo:                               0
+  Discard:                     111131,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  :    0%
+    Output bandwidth utilization : 0.06%
+
+GigabitEthernet0/0/2 current state : UP
+Line protocol current state : UP 
+Description:caiwu-pc
+Switch Port, PVID :   10, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : 2022-09-13 14:38:55 UTC+08:00
+Last physical down time : 2022-09-13 14:38:49 UTC+08:00
+Current system time: 2022-09-13 19:08:05+08:00
+Port Mode: COMMON COPPER
+Speed : 1000,   Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : AUTO,   Flow-control: DISABLE
+Last 300 seconds input rate 0 bits/sec, 0 packets/sec
+Last 300 seconds output rate 58240 bits/sec, 18 packets/sec
+Input peak rate 18768392 bits/sec, Record time: 2022-09-01 15:44:34
+Output peak rate 107659664 bits/sec, Record time: 2022-08-19 15:46:04
+
+Input:  5294407 packets, 797897927 bytes
+  Unicast:                    4569420,  Multicast:                      463091
+  Broadcast:                   261896,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  52555530 packets, 29625671318 bytes
+  Unicast:                   10744100,  Multicast:                    36391007
+  Broadcast:                  5420423,  Jumbo:                               0
+  Discard:                     152173,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  :    0%
+    Output bandwidth utilization : 0.01%
+
+GigabitEthernet0/0/3 current state : DOWN
+Line protocol current state : DOWN 
+Description:coco-pc
+Switch Port, PVID :   10, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : 2022-09-13 08:59:01 UTC+08:00
+Last physical down time : 2022-09-13 18:01:05 UTC+08:00
+Current system time: 2022-09-13 19:08:05+08:00
+Port Mode: COMMON COPPER
+Speed : 1000,   Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : AUTO,   Flow-control: DISABLE
+Last 300 seconds input rate 0 bits/sec, 0 packets/sec
+Last 300 seconds output rate 0 bits/sec, 0 packets/sec
+Input peak rate 75673512 bits/sec, Record time: 2022-09-06 14:31:09
+Output peak rate 82982888 bits/sec, Record time: 2022-08-22 09:48:54
+
+Input:  13415963 packets, 2497544111 bytes
+  Unicast:                   12628656,  Multicast:                      626102
+  Broadcast:                   161205,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  45013946 packets, 39672210883 bytes
+  Unicast:                   26168314,  Multicast:                    15876546
+  Broadcast:                  2969086,  Jumbo:                               0
+  Discard:                     175494,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  :    0%
+    Output bandwidth utilization :    0%
+
+GigabitEthernet0/0/4 current state : DOWN
+Line protocol current state : DOWN 
+Description:
+Switch Port, PVID :   10, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : -
+Last physical down time : 2022-08-19 09:58:22 UTC+08:00
+Current system time: 2022-09-13 19:08:05+08:00
+Port Mode: COMMON COPPER
+Speed : 1000,   Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : AUTO,   Flow-control: DISABLE
+Last 300 seconds input rate 0 bits/sec, 0 packets/sec
+Last 300 seconds output rate 0 bits/sec, 0 packets/sec
+Input peak rate 0 bits/sec, Record time: -
+Output peak rate 0 bits/sec, Record time: -
+
+Input:  0 packets, 0 bytes
+  Unicast:                          0,  Multicast:                           0
+  Broadcast:                        0,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  0 packets, 0 bytes
+  Unicast:                          0,  Multicast:                           0
+  Broadcast:                        0,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  :    0%
+    Output bandwidth utilization :    0%
+
+GigabitEthernet0/0/5 current state : UP
+Line protocol current state : UP 
+Description:amanda-pc
+Switch Port, PVID :   10, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : 2022-09-13 18:59:55 UTC+08:00
+Last physical down time : 2022-09-13 18:59:47 UTC+08:00
+Current system time: 2022-09-13 19:08:05+08:00
+Port Mode: COMMON COPPER
+Speed : 1000,   Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : AUTO,   Flow-control: DISABLE
+Last 300 seconds input rate 9392 bits/sec, 7 packets/sec
+Last 300 seconds output rate 84672 bits/sec, 19 packets/sec
+Input peak rate 129627080 bits/sec, Record time: 2022-09-08 09:52:53
+Output peak rate 111785544 bits/sec, Record time: 2022-08-19 12:18:50
+
+Input:  10150810 packets, 1653746666 bytes
+  Unicast:                    8634299,  Multicast:                     1111114
+  Broadcast:                   405397,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  48281121 packets, 27611222742 bytes
+  Unicast:                   12066325,  Multicast:                    31455014
+  Broadcast:                  4759782,  Jumbo:                               0
+  Discard:                     207351,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  :    0%
+    Output bandwidth utilization : 0.01%
+
+GigabitEthernet0/0/6 current state : UP
+Line protocol current state : UP 
+Description:ming-pc
+Switch Port, PVID :   10, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : 2022-09-13 18:02:48 UTC+08:00
+Last physical down time : 2022-09-13 18:02:45 UTC+08:00
+Current system time: 2022-09-13 19:08:05+08:00
+Port Mode: COMMON COPPER
+Speed : 10,     Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : AUTO,   Flow-control: DISABLE
+Last 300 seconds input rate 0 bits/sec, 0 packets/sec
+Last 300 seconds output rate 58240 bits/sec, 18 packets/sec
+Input peak rate 383561784 bits/sec, Record time: 2022-09-02 09:06:47
+Output peak rate 94881032 bits/sec, Record time: 2022-08-19 11:32:07
+
+Input:  11015164 packets, 2112233383 bytes
+  Unicast:                    8741120,  Multicast:                     1763837
+  Broadcast:                   510207,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  55055635 packets, 31999074162 bytes
+  Unicast:                   14793438,  Multicast:                    35090221
+  Broadcast:                  5171976,  Jumbo:                               0
+  Discard:                     160879,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  :    0%
+    Output bandwidth utilization : 0.58%
+
+GigabitEthernet0/0/7 current state : DOWN
+Line protocol current state : DOWN 
+Description:helen-pc
+Switch Port, PVID :   10, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : 2022-09-13 13:11:08 UTC+08:00
+Last physical down time : 2022-09-13 18:00:55 UTC+08:00
+Current system time: 2022-09-13 19:08:05+08:00
+Port Mode: COMMON COPPER
+Speed : 1000,   Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : AUTO,   Flow-control: DISABLE
+Last 300 seconds input rate 0 bits/sec, 0 packets/sec
+Last 300 seconds output rate 0 bits/sec, 0 packets/sec
+Input peak rate 508520448 bits/sec, Record time: 2022-09-07 15:07:39
+Output peak rate 65183288 bits/sec, Record time: 2022-08-19 17:59:55
+
+Input:  9344611 packets, 2006302901 bytes
+  Unicast:                    7344756,  Multicast:                      974537
+  Broadcast:                  1025318,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  35545830 packets, 20155076330 bytes
+  Unicast:                   11586946,  Multicast:                    20829130
+  Broadcast:                  3129754,  Jumbo:                               0
+  Discard:                      81927,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  :    0%
+    Output bandwidth utilization :    0%
+
+GigabitEthernet0/0/8 current state : DOWN
+Line protocol current state : DOWN 
+Description:ivan
+Switch Port, PVID :   10, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : 2022-09-13 18:03:19 UTC+08:00
+Last physical down time : 2022-09-13 18:03:25 UTC+08:00
+Current system time: 2022-09-13 19:08:05+08:00
+Port Mode: COMMON COPPER
+Speed : 1000,   Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : AUTO,   Flow-control: DISABLE
+Last 300 seconds input rate 0 bits/sec, 0 packets/sec
+Last 300 seconds output rate 0 bits/sec, 0 packets/sec
+Input peak rate 705948000 bits/sec, Record time: 2022-09-08 15:59:41
+Output peak rate 218686808 bits/sec, Record time: 2022-09-07 15:13:45
+
+Input:  25705876 packets, 11064545169 bytes
+  Unicast:                   24931562,  Multicast:                      616134
+  Broadcast:                   157975,  Jumbo:                               0
+  Discard:                          0,  Pause:                             205
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  44103678 packets, 38779680272 bytes
+  Unicast:                   29065287,  Multicast:                    12721653
+  Broadcast:                  2316738,  Jumbo:                               0
+  Discard:                        114,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  :    0%
+    Output bandwidth utilization :    0%
+
+GigabitEthernet0/0/9 current state : DOWN
+Line protocol current state : DOWN 
+Description:
+Switch Port, PVID :   10, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : 2022-09-13 18:02:01 UTC+08:00
+Last physical down time : 2022-09-13 18:02:03 UTC+08:00
+Current system time: 2022-09-13 19:08:05+08:00
+Port Mode: COMMON COPPER
+Speed : 1000,   Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : AUTO,   Flow-control: DISABLE
+Last 300 seconds input rate 0 bits/sec, 0 packets/sec
+Last 300 seconds output rate 0 bits/sec, 0 packets/sec
+Input peak rate 44323032 bits/sec, Record time: 2022-08-30 13:31:51
+Output peak rate 113185504 bits/sec, Record time: 2022-09-01 11:23:27
+
+Input:  2934896 packets, 833483700 bytes
+  Unicast:                    2511451,  Multicast:                      336681
+  Broadcast:                    86764,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  16085492 packets, 8985028586 bytes
+  Unicast:                    4674119,  Multicast:                     9686885
+  Broadcast:                  1724488,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  :    0%
+    Output bandwidth utilization :    0%
+
+GigabitEthernet0/0/10 current state : UP
+Line protocol current state : UP 
+Description:justion-pc
+Switch Port, PVID :   10, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : 2022-09-13 08:47:59 UTC+08:00
+Last physical down time : 2022-09-13 08:47:53 UTC+08:00
+Current system time: 2022-09-13 19:08:05+08:00
+Port Mode: COMMON COPPER
+Speed : 1000,   Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : AUTO,   Flow-control: DISABLE
+Last 300 seconds input rate 393224 bits/sec, 528 packets/sec
+Last 300 seconds output rate 10016448 bits/sec, 843 packets/sec
+Input peak rate 38612928 bits/sec, Record time: 2022-09-07 10:20:26
+Output peak rate 100113616 bits/sec, Record time: 2022-08-22 10:42:04
+
+Input:  29382160 packets, 6786002572 bytes
+  Unicast:                   28836760,  Multicast:                      436639
+  Broadcast:                   108761,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  63495915 packets, 52701520487 bytes
+  Unicast:                   39541437,  Multicast:                    20454375
+  Broadcast:                  3500103,  Jumbo:                               0
+  Discard:                    1726523,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  : 0.04%
+    Output bandwidth utilization : 1.00%
+
+GigabitEthernet0/0/11 current state : DOWN
+Line protocol current state : DOWN 
+Description:
+Switch Port, PVID :   10, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : -
+Last physical down time : 2022-08-19 09:58:22 UTC+08:00
+Current system time: 2022-09-13 19:08:05+08:00
+Port Mode: COMMON COPPER
+Speed : 1000,   Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : AUTO,   Flow-control: DISABLE
+Last 300 seconds input rate 0 bits/sec, 0 packets/sec
+Last 300 seconds output rate 0 bits/sec, 0 packets/sec
+Input peak rate 0 bits/sec, Record time: -
+Output peak rate 0 bits/sec, Record time: -
+
+Input:  0 packets, 0 bytes
+  Unicast:                          0,  Multicast:                           0
+  Broadcast:                        0,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  0 packets, 0 bytes
+  Unicast:                          0,  Multicast:                           0
+  Broadcast:                        0,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  :    0%
+    Output bandwidth utilization :    0%
+
+GigabitEthernet0/0/12 current state : DOWN
+Line protocol current state : DOWN 
+Description:
+Switch Port, PVID :   10, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : -
+Last physical down time : 2022-08-19 09:58:22 UTC+08:00
+Current system time: 2022-09-13 19:08:06+08:00
+Port Mode: COMMON COPPER
+Speed : 1000,   Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : AUTO,   Flow-control: DISABLE
+Last 300 seconds input rate 0 bits/sec, 0 packets/sec
+Last 300 seconds output rate 0 bits/sec, 0 packets/sec
+Input peak rate 0 bits/sec, Record time: -
+Output peak rate 0 bits/sec, Record time: -
+
+Input:  0 packets, 0 bytes
+  Unicast:                          0,  Multicast:                           0
+  Broadcast:                        0,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  0 packets, 0 bytes
+  Unicast:                          0,  Multicast:                           0
+  Broadcast:                        0,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  :    0%
+    Output bandwidth utilization :    0%
+
+GigabitEthernet0/0/13 current state : UP
+Line protocol current state : UP 
+Description:morris-pc
+Switch Port, PVID :   10, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : 2022-09-13 08:00:59 UTC+08:00
+Last physical down time : 2022-09-13 08:00:54 UTC+08:00
+Current system time: 2022-09-13 19:08:06+08:00
+Port Mode: COMMON COPPER
+Speed : 1000,   Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : AUTO,   Flow-control: DISABLE
+Last 300 seconds input rate 286952 bits/sec, 27 packets/sec
+Last 300 seconds output rate 71000 bits/sec, 28 packets/sec
+Input peak rate 50996712 bits/sec, Record time: 2022-09-13 14:12:51
+Output peak rate 110322624 bits/sec, Record time: 2022-08-19 16:36:56
+
+Input:  47444924 packets, 43039594460 bytes
+  Unicast:                   46305892,  Multicast:                      950974
+  Broadcast:                   188058,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  69761229 packets, 35944915230 bytes
+  Unicast:                   42566494,  Multicast:                    23147266
+  Broadcast:                  4047469,  Jumbo:                               0
+  Discard:                    1143300,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  : 0.03%
+    Output bandwidth utilization : 0.01%
+
+GigabitEthernet0/0/14 current state : DOWN
+Line protocol current state : DOWN 
+Description:jason-pc
+Switch Port, PVID :   10, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : 2022-09-13 15:59:22 UTC+08:00
+Last physical down time : 2022-09-13 16:31:39 UTC+08:00
+Current system time: 2022-09-13 19:08:06+08:00
+Port Mode: COMMON COPPER
+Speed : 1000,   Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : AUTO,   Flow-control: DISABLE
+Last 300 seconds input rate 0 bits/sec, 0 packets/sec
+Last 300 seconds output rate 0 bits/sec, 0 packets/sec
+Input peak rate 42649696 bits/sec, Record time: 2022-09-13 11:05:50
+Output peak rate 121369344 bits/sec, Record time: 2022-08-19 16:16:02
+
+Input:  10996469 packets, 2028659831 bytes
+  Unicast:                   10919806,  Multicast:                       69306
+  Broadcast:                     7357,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  37517056 packets, 31408954364 bytes
+  Unicast:                   19655129,  Multicast:                    15184600
+  Broadcast:                  2677327,  Jumbo:                               0
+  Discard:                     143686,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  :    0%
+    Output bandwidth utilization :    0%
+
+GigabitEthernet0/0/15 current state : DOWN
+Line protocol current state : DOWN 
+Description:
+Switch Port, PVID :   10, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : -
+Last physical down time : 2022-08-19 09:58:23 UTC+08:00
+Current system time: 2022-09-13 19:08:06+08:00
+Port Mode: COMMON COPPER
+Speed : 1000,   Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : AUTO,   Flow-control: DISABLE
+Last 300 seconds input rate 0 bits/sec, 0 packets/sec
+Last 300 seconds output rate 0 bits/sec, 0 packets/sec
+Input peak rate 0 bits/sec, Record time: -
+Output peak rate 0 bits/sec, Record time: -
+
+Input:  0 packets, 0 bytes
+  Unicast:                          0,  Multicast:                           0
+  Broadcast:                        0,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  0 packets, 0 bytes
+  Unicast:                          0,  Multicast:                           0
+  Broadcast:                        0,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  :    0%
+    Output bandwidth utilization :    0%
+
+GigabitEthernet0/0/16 current state : DOWN
+Line protocol current state : DOWN 
+Description:
+Switch Port, PVID :   10, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : -
+Last physical down time : 2022-08-19 09:58:23 UTC+08:00
+Current system time: 2022-09-13 19:08:06+08:00
+Port Mode: COMMON COPPER
+Speed : 1000,   Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : AUTO,   Flow-control: DISABLE
+Last 300 seconds input rate 0 bits/sec, 0 packets/sec
+Last 300 seconds output rate 0 bits/sec, 0 packets/sec
+Input peak rate 0 bits/sec, Record time: -
+Output peak rate 0 bits/sec, Record time: -
+
+Input:  0 packets, 0 bytes
+  Unicast:                          0,  Multicast:                           0
+  Broadcast:                        0,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  0 packets, 0 bytes
+  Unicast:                          0,  Multicast:                           0
+  Broadcast:                        0,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  :    0%
+    Output bandwidth utilization :    0%
+
+GigabitEthernet0/0/17 current state : UP
+Line protocol current state : UP 
+Description:
+Switch Port, PVID :   10, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : 2022-09-01 10:30:06 UTC+08:00
+Last physical down time : 2022-09-01 10:30:02 UTC+08:00
+Current system time: 2022-09-13 19:08:06+08:00
+Port Mode: COMMON COPPER
+Speed : 100,    Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : AUTO,   Flow-control: DISABLE
+Last 300 seconds input rate 0 bits/sec, 0 packets/sec
+Last 300 seconds output rate 58336 bits/sec, 18 packets/sec
+Input peak rate 301920 bits/sec, Record time: 2022-08-30 13:21:24
+Output peak rate 5521808 bits/sec, Record time: 2022-09-01 09:47:00
+
+Input:  13329 packets, 2115086 bytes
+  Unicast:                      12711,  Multicast:                          42
+  Broadcast:                      576,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  42810344 packets, 15958022883 bytes
+  Unicast:                     268201,  Multicast:                    36859412
+  Broadcast:                  5682731,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  :    0%
+    Output bandwidth utilization : 0.06%
+
+GigabitEthernet0/0/18 current state : UP
+Line protocol current state : UP 
+Description:print
+Switch Port, PVID :   10, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : 2022-08-19 09:59:14 UTC+08:00
+Last physical down time : 2022-08-19 09:58:23 UTC+08:00
+Current system time: 2022-09-13 19:08:06+08:00
+Port Mode: COMMON COPPER
+Speed : 100,    Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : AUTO,   Flow-control: DISABLE
+Last 300 seconds input rate 896 bits/sec, 0 packets/sec
+Last 300 seconds output rate 58600 bits/sec, 18 packets/sec
+Input peak rate 7214696 bits/sec, Record time: 2022-09-06 09:11:36
+Output peak rate 20532224 bits/sec, Record time: 2022-09-09 09:59:05
+
+Input:  2144213 packets, 751212733 bytes
+  Unicast:                    1881373,  Multicast:                      262397
+  Broadcast:                      443,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  43601731 packets, 16193045193 bytes
+  Unicast:                    1320946,  Multicast:                    36597864
+  Broadcast:                  5682921,  Jumbo:                               0
+  Discard:                         72,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  :    0%
+    Output bandwidth utilization : 0.06%
+
+GigabitEthernet0/0/19 current state : UP
+Line protocol current state : UP 
+Description:server
+Switch Port, PVID :    1, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : 2022-08-19 10:04:54 UTC+08:00
+Last physical down time : 2022-08-19 10:02:18 UTC+08:00
+Current system time: 2022-09-13 19:08:06+08:00
+Port Mode: COMMON COPPER
+Speed : 1000,   Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : AUTO,   Flow-control: DISABLE
+Last 300 seconds input rate 3353360 bits/sec, 486 packets/sec
+Last 300 seconds output rate 500336 bits/sec, 288 packets/sec
+Input peak rate 845704424 bits/sec, Record time: 2022-08-25 18:40:51
+Output peak rate 939946592 bits/sec, Record time: 2022-09-07 11:33:46
+
+Input:  758610980 packets, 556422638745 bytes
+  Unicast:                  752372981,  Multicast:                     3233698
+  Broadcast:                  3004301,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  591171729 packets, 340031259641 bytes
+  Unicast:                  548927027,  Multicast:                    36923481
+  Broadcast:                  5321221,  Jumbo:                               0
+  Discard:                         13,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  : 0.34%
+    Output bandwidth utilization : 0.05%
+
+GigabitEthernet0/0/20 current state : UP
+Line protocol current state : UP 
+Description:server-01
+Switch Port, PVID :    1, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : 2022-09-10 14:51:31 UTC+08:00
+Last physical down time : 2022-09-10 14:51:12 UTC+08:00
+Current system time: 2022-09-13 19:08:06+08:00
+Port Mode: COMMON COPPER
+Speed : 1000,   Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : AUTO,   Flow-control: DISABLE
+Last 300 seconds input rate 0 bits/sec, 0 packets/sec
+Last 300 seconds output rate 59888 bits/sec, 19 packets/sec
+Input peak rate 2543208 bits/sec, Record time: 2022-08-19 10:02:21
+Output peak rate 701352 bits/sec, Record time: 2022-09-08 16:56:36
+
+Input:  711 packets, 545971 bytes
+  Unicast:                        607,  Multicast:                           8
+  Broadcast:                       96,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  45265293 packets, 16363229858 bytes
+  Unicast:                     253940,  Multicast:                    37847928
+  Broadcast:                  7163425,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  :    0%
+    Output bandwidth utilization : 0.01%
+
+GigabitEthernet0/0/21 current state : UP
+Line protocol current state : UP 
+Description:unfi
+Switch Port, PVID :   10, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : 2022-09-08 03:02:43 UTC+08:00
+Last physical down time : 2022-09-08 03:02:15 UTC+08:00
+Current system time: 2022-09-13 19:08:06+08:00
+Port Mode: COMMON COPPER
+Speed : 1000,   Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : AUTO,   Flow-control: DISABLE
+Last 300 seconds input rate 1232 bits/sec, 0 packets/sec
+Last 300 seconds output rate 58776 bits/sec, 18 packets/sec
+Input peak rate 152023656 bits/sec, Record time: 2022-09-06 09:51:17
+Output peak rate 114004944 bits/sec, Record time: 2022-09-01 17:44:32
+
+Input:  6860000 packets, 3916965474 bytes
+  Unicast:                    6578196,  Multicast:                      241509
+  Broadcast:                    40271,  Jumbo:                               0
+  Discard:                          0,  Pause:                              23
+  Frames:                           0
+
+  Total Error:                      1
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             1
+  Ignoreds:                         0
+
+Output:  27878432 packets, 16080520735 bytes
+  Unicast:                    7789159,  Multicast:                    17269034
+  Broadcast:                  2820239,  Jumbo:                               0
+  Discard:                     164203,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  :    0%
+    Output bandwidth utilization : 0.01%
+
+GigabitEthernet0/0/22 current state : UP
+Line protocol current state : UP 
+Description:hw-ap
+Switch Port, PVID :   10, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : 2022-08-19 09:59:10 UTC+08:00
+Last physical down time : 2022-08-19 09:58:23 UTC+08:00
+Current system time: 2022-09-13 19:08:06+08:00
+Port Mode: COMMON COPPER
+Speed : 1000,   Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : AUTO,   Flow-control: DISABLE
+Last 300 seconds input rate 927592 bits/sec, 1061 packets/sec
+Last 300 seconds output rate 16632240 bits/sec, 2354 packets/sec
+Input peak rate 113281008 bits/sec, Record time: 2022-09-08 16:37:13
+Output peak rate 116799144 bits/sec, Record time: 2022-08-19 18:58:05
+
+Input:  2080494124 packets, 457807424577 bytes
+  Unicast:                 2051535532,  Multicast:                    27460779
+  Broadcast:                  1497813,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  3687059995 packets, 3197630577591 bytes
+  Unicast:                 3673191840,  Multicast:                     9683690
+  Broadcast:                  4184465,  Jumbo:                               0
+  Discard:                    3172219,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  : 0.09%
+    Output bandwidth utilization : 1.66%
+
+GigabitEthernet0/0/23 current state : UP
+Line protocol current state : UP 
+Description:nas
+Switch Port, PVID :   10, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : 2022-09-13 07:00:58 UTC+08:00
+Last physical down time : 2022-09-13 07:00:54 UTC+08:00
+Current system time: 2022-09-13 19:08:07+08:00
+Port Mode: COMMON COPPER
+Speed : 1000,   Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : AUTO,   Flow-control: DISABLE
+Last 300 seconds input rate 2040 bits/sec, 0 packets/sec
+Last 300 seconds output rate 60000 bits/sec, 18 packets/sec
+Input peak rate 466881000 bits/sec, Record time: 2022-09-07 11:33:46
+Output peak rate 843903648 bits/sec, Record time: 2022-08-25 18:40:51
+
+Input:  10452549 packets, 9707003741 bytes
+  Unicast:                   10426606,  Multicast:                        8917
+  Broadcast:                    17026,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  54658186 packets, 25230439095 bytes
+  Unicast:                   12142553,  Multicast:                    36849387
+  Broadcast:                  5666246,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  :    0%
+    Output bandwidth utilization : 0.01%
+
+GigabitEthernet0/0/24 current state : UP
+Line protocol current state : UP 
+Description:connet C2911
+Switch Port, PVID :    1, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : 2022-08-19 09:59:11 UTC+08:00
+Last physical down time : 2022-08-19 09:58:23 UTC+08:00
+Current system time: 2022-09-13 19:08:07+08:00
+Port Mode: COMMON COPPER
+Speed : 1000,   Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : AUTO,   Flow-control: DISABLE
+Last 300 seconds input rate 23886928 bits/sec, 2781 packets/sec
+Last 300 seconds output rate 1496984 bits/sec, 1408 packets/sec
+Input peak rate 955724440 bits/sec, Record time: 2022-09-07 11:33:46
+Output peak rate 949180848 bits/sec, Record time: 2022-09-07 11:33:47
+
+Input:  3273218523 packets, 3006212167505 bytes
+  Unicast:                 3272113529,  Multicast:                      875037
+  Broadcast:                   229957,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  1832108094 packets, 314923232844 bytes
+  Unicast:                 1787779758,  Multicast:                    37389334
+  Broadcast:                  6939002,  Jumbo:                               0
+  Discard:                          5,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  : 2.39%
+    Output bandwidth utilization : 0.15%
+
+GigabitEthernet0/0/25 current state : DOWN
+Line protocol current state : DOWN 
+Description:
+Switch Port, PVID :    1, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : -
+Last physical down time : 2022-08-19 09:58:24 UTC+08:00
+Current system time: 2022-09-13 19:08:07+08:00
+Port Mode: COMMON FIBER
+Speed : 1000,   Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : -,      Flow-control: DISABLE
+Last 300 seconds input rate 0 bits/sec, 0 packets/sec
+Last 300 seconds output rate 0 bits/sec, 0 packets/sec
+Input peak rate 0 bits/sec, Record time: -
+Output peak rate 0 bits/sec, Record time: -
+
+Input:  0 packets, 0 bytes
+  Unicast:                          0,  Multicast:                           0
+  Broadcast:                        0,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  0 packets, 0 bytes
+  Unicast:                          0,  Multicast:                           0
+  Broadcast:                        0,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  :    0%
+    Output bandwidth utilization :    0%
+
+GigabitEthernet0/0/26 current state : DOWN
+Line protocol current state : DOWN 
+Description:
+Switch Port, PVID :    1, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : -
+Last physical down time : 2022-08-19 09:58:24 UTC+08:00
+Current system time: 2022-09-13 19:08:07+08:00
+Port Mode: COMMON FIBER
+Speed : 1000,   Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : -,      Flow-control: DISABLE
+Last 300 seconds input rate 0 bits/sec, 0 packets/sec
+Last 300 seconds output rate 0 bits/sec, 0 packets/sec
+Input peak rate 0 bits/sec, Record time: -
+Output peak rate 0 bits/sec, Record time: -
+
+Input:  0 packets, 0 bytes
+  Unicast:                          0,  Multicast:                           0
+  Broadcast:                        0,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  0 packets, 0 bytes
+  Unicast:                          0,  Multicast:                           0
+  Broadcast:                        0,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  :    0%
+    Output bandwidth utilization :    0%
+
+GigabitEthernet0/0/27 current state : DOWN
+Line protocol current state : DOWN 
+Description:
+Switch Port, PVID :    1, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : -
+Last physical down time : 2022-08-19 09:58:24 UTC+08:00
+Current system time: 2022-09-13 19:08:07+08:00
+Port Mode: COMMON FIBER
+Speed : 1000,   Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : -,      Flow-control: DISABLE
+Last 300 seconds input rate 0 bits/sec, 0 packets/sec
+Last 300 seconds output rate 0 bits/sec, 0 packets/sec
+Input peak rate 0 bits/sec, Record time: -
+Output peak rate 0 bits/sec, Record time: -
+
+Input:  0 packets, 0 bytes
+  Unicast:                          0,  Multicast:                           0
+  Broadcast:                        0,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  0 packets, 0 bytes
+  Unicast:                          0,  Multicast:                           0
+  Broadcast:                        0,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  :    0%
+    Output bandwidth utilization :    0%
+
+GigabitEthernet0/0/28 current state : DOWN
+Line protocol current state : DOWN 
+Description:
+Switch Port, PVID :    1, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Last physical up time   : -
+Last physical down time : 2022-08-19 09:58:24 UTC+08:00
+Current system time: 2022-09-13 19:08:07+08:00
+Port Mode: COMMON FIBER
+Speed : 1000,   Loopback: NONE
+Duplex: FULL,   Negotiation: ENABLE
+Mdi   : -,      Flow-control: DISABLE
+Last 300 seconds input rate 0 bits/sec, 0 packets/sec
+Last 300 seconds output rate 0 bits/sec, 0 packets/sec
+Input peak rate 0 bits/sec, Record time: -
+Output peak rate 0 bits/sec, Record time: -
+
+Input:  0 packets, 0 bytes
+  Unicast:                          0,  Multicast:                           0
+  Broadcast:                        0,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+  Frames:                           0
+
+  Total Error:                      0
+  CRC:                              0,  Giants:                              0
+  Runts:                            0,  DropEvents:                          0
+  Alignments:                       0,  Symbols:                             0
+  Ignoreds:                         0
+
+Output:  0 packets, 0 bytes
+  Unicast:                          0,  Multicast:                           0
+  Broadcast:                        0,  Jumbo:                               0
+  Discard:                          0,  Pause:                               0
+
+  Total Error:                      0
+  Collisions:                       0,  Late Collisions:                     0
+  Deferreds:                        0  
+  
+    Input bandwidth utilization threshold : 80.00%
+    Output bandwidth utilization threshold: 80.00%
+    Input bandwidth utilization  :    0%
+    Output bandwidth utilization :    0%
+
+NULL0 current state : UP
+Line protocol current state : UP (spoofing)
+Description:
+Route Port,The Maximum Transmit Unit is 1500
+Internet protocol processing : disabled
+Physical is NULL DEV
+Current system time: 2022-09-13 19:08:07+08:00
+    Last 300 seconds input rate 0 bits/sec, 0 packets/sec
+    Last 300 seconds output rate 0 bits/sec, 0 packets/sec
+    Realtime 241 seconds input rate 0 bits/sec, 0 packets/sec
+    Realtime 241 seconds output rate 0 bits/sec, 0 packets/sec
+    Input: 0 packets,0 bytes
+           0 unicast,0 broadcast,0 multicast
+           0 errors,0 unknownprotocol
+    Output:0 packets,0 bytes
+           0 unicast,0 broadcast,0 multicast
+           0 errors
+    Input bandwidth utilization  :    0%
+    Output bandwidth utilization :    0%
+
+Vlanif1 current state : UP
+Line protocol current state : DOWN 
+Description:
+Route Port,The Maximum Transmit Unit is 1500
+Internet protocol processing : disabled
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Current system time: 2022-09-13 19:08:07+08:00
+    Input bandwidth utilization  : --
+    Output bandwidth utilization : --
+
+Vlanif10 current state : UP
+Line protocol current state : UP 
+Last line protocol up time : 2022-08-19 09:59:10 UTC+08:00
+Description:
+Route Port,The Maximum Transmit Unit is 1500
+Internet Address is 192.168.10.47/24 
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 3cc7-869e-b4c6
+Current system time: 2022-09-13 19:08:07+08:00
+    Input bandwidth utilization  : --
+    Output bandwidth utilization : --
