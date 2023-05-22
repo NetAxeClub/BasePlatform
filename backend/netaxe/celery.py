@@ -20,9 +20,9 @@ from kombu import Queue, Exchange
 from celery import Celery, platforms
 from django.conf import settings
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'netboost.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'netaxe.settings')
 
-app = Celery('netboost')
+app = Celery('netaxe')
 
 app.conf.ONCE = {
   'backend': 'celery_once.backends.Redis',

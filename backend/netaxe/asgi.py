@@ -1,5 +1,5 @@
 """
-ASGI config for netboost project.
+ASGI config for netaxe project.
 
 It exposes the ASGI callable as a module-level variable named ``application``.
 

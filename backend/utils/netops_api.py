@@ -19,7 +19,7 @@ from netaxe.settings import BASE_DIR
 logger = logging.getLogger("celery")
 
 USER_CONF = {}
-if os.path.exists("{}/{}/{}".format(BASE_DIR, "netboost", "conf.py")):
+if os.path.exists("{}/{}/{}".format(BASE_DIR, "netaxe", "conf.py")):
     from netaxe.conf import netops_api
 
     USER_CONF = netops_api

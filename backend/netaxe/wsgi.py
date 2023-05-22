@@ -1,5 +1,5 @@
 """
-WSGI config for netboost project.
+WSGI config for netaxe project.
 
 It exposes the WSGI callable as a module-level variable named ``application``.
 
