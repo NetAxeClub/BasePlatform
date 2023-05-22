@@ -41,7 +41,7 @@ function getRoutes() {
   // console.log(layoutStore.state)
   if(navigateID){
      return get({
-    url: baseAddress + WebRouter,
+    url: WebRouter,
     method: 'GET',
     data: { parent__isnull: true, navigate__id: navigateID }
   }).then((res: any) => {
@@ -49,7 +49,7 @@ function getRoutes() {
   })
   }else{
      return get({
-    url: baseAddress + WebRouter,
+    url: WebRouter,
     method: 'GET',
     data: { parent__isnull: true, navigate__id: navigateID }
   }).then((res: any) => {
