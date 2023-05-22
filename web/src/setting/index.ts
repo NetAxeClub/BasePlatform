@@ -16,7 +16,7 @@ interface Setting {
     isShowFullScreen: boolean
   }
 }
-export const projectName = 'NET-AXE'
+export const projectName = '基础平台'
 
 export default Object.assign(
   {
