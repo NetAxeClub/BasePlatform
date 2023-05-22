@@ -29,8 +29,15 @@
     "vue": "^3.2.25",
     "vue-router": "^4.0.10",
     "vuedraggable": "^4.0.3",
+    "vue3-ace-editor": "^2.2.2",
+    "vue3-hljs": "^0.1.4",
+    "vue3-super-flow": "^0.1.5",
     "vuex": "^4.0.2",
-    "xgplayer": "^2.28.0"
+    "xgplayer": "^2.28.0",
+    "xlsx": "^0.18.5",
+    "xterm": "^4.19.0",
+    "xterm-addon-attach": "^0.6.0",
+    "xterm-addon-fit": "^0.5.0"
   },
   "devDependencies": {
     "@types/js-cookie": "^2.2.7",
