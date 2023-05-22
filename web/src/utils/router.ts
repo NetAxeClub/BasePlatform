@@ -10,7 +10,7 @@ import router, { constantRoutes } from '../router'
 import { isExternal, mapTwoLevelRouter, toHump } from '.'
 import LoadingComponent from '../components/loading/index.vue'
 import { baseAddress, WebRouter, WebPermission } from '@/api/url'
-import defaultRouteJson from '../../../default_memu.json'
+import defaultRouteJson from '../../../default_menu.json'
 import { ADMIN_WORK_USER_INFO_KEY, ADMIN_WORK_BUTTON_AUTH, ADMIN_WORK_S_TENANT } from '@/store/keys'
 
 interface OriginRoute {
