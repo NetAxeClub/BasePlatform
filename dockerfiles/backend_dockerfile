@@ -2,6 +2,7 @@ FROM python:3.9.16-slim
 RUN sed -i s@/deb.debian.org/@/mirrors.aliyun.com/@g /etc/apt/sources.list
 
 COPY backend/ /app
+COPY config/ /config
 # 再次切换工作目录为Django主目录
 WORKDIR /app
 
