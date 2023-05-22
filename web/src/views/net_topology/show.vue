@@ -525,7 +525,6 @@
     device_id: '',
   })
   const dblclick_link_model = ref({
-    name: '',
     source: {
       id: '',
       name: '',
