@@ -3,7 +3,6 @@ from __future__ import absolute_import, unicode_literals
 
 import pymysql
 from utils.nacos_register import nacos_init
-from . import settings
 from .celery import app as celery_app
 
 # Fake PyMySQL's version and install as MySQLdb
