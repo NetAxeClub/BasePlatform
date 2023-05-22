@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 DEFAULTS_FILENAME = "../config/defaults.json"
 # 实际运行配置，会覆盖缺省配置
 CONFIG_FILENAME = "../config/config.json"
-MENU_FILENAME = "../default_menu.json"
+MENU_FILENAME = "../web/default_menu.json"
 NAMESPACE = "public"
 
 try:
