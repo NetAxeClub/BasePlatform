@@ -62,7 +62,7 @@ function getRoutes() {
 // 获取menu权限
 function getPermission() {
   return get({
-    url: baseAddress + WebPermission,
+    url:  WebPermission,
     method: 'GET',
     data: { navigate__id: navigateID }
   }).then((res: any) => {

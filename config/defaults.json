@@ -30,7 +30,6 @@
   "drivers": "backend/plugins/drivers/",
   "log_config_filename": "config/log-config.yml",
   "msg_gateway": "http://msggateway.netaxe.svc:8000",
-  "alert_gateway": "alert_gateway",
   "mysql_url": "mysql+mysqlconnector://root:mysql@127.0.0.1:3306",
   "sqlalchemy_mysql_url": "mysql+aiomysql://root:mysql@127.0.0.1:3306/alertgateway"
 }
