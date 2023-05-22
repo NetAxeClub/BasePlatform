@@ -2,7 +2,7 @@
   <div class="logo-wrapper">
     <img v-if="showLogo" class="logo-img" src="../../assets/logo.png" />
     <div v-if="showTitle" :class="[!state.isCollapse || alwaysShow ? 'show-title' : 'close-title']">
-      <span class="logo-title">CMDB</span>
+      <span class="logo-title">基础平台</span>
     </div>
   </div>
 </template>
