@@ -178,7 +178,7 @@ class Config:
         self.__registerDict["groupName"] = groupName
         self.__registerDict["clusterName"] = clusterName
         self.__registerDict["ephemeral"] = ephemeral
-        self.__registerDict["metadata"] = json.dumps(metadata)
+        self.__registerDict["metadata"] = metadata
         self.__registerDict["weight"] = weight
         self.__registerDict["enabled"] = enabled
         self.__registerDict["healthy"] = int(time.time())
