@@ -155,12 +155,6 @@ class Config:
             except Exception as e:
                 logging.exception("配置更新失败:{}".format(str(e)), exc_info=True)
 
-            try:
-                # 获取nacos的prometheus告警规则配置并复写
-                self.get_prometheus_rules()
-            except Exception as e:
-                logging.exception("prometheus告警规则更新失败:{}".format(str(e)), exc_info=True)
-
     def healthyCheck(self):
         t = threading.Thread(target=self.__healthyCheckThreadRun)
         t.start()
@@ -224,23 +218,6 @@ class Config:
                     setattr(self, k, v)
         except Exception as e:
             logging.exception("配置获取失败：dataId=" + self.project_name + "; group=" + group + "; tenant=" + tenant,
-                              exc_info=True)
-
-    # AlertGatewayPrometheusRules  后期应该改成从Prometheus 的 api 接口获取告警规则会更加灵活，如果有的话
-    def get_prometheus_rules(self, group="default", tenant="public"):
-        logging.info("正在获取prometheus告警配置: dataId=" + self.project_name + "; group=" + group + "; tenant=" + tenant)
-        getConfigUrl = "http://" + self.nacos + ":" + str(self.nacos_port) + "/nacos/v1/cs/configs"
-        params = {
-            "dataId": "AlertGatewayPrometheusRules",
-            "group": group,
-            "tenant": tenant
-        }
-        try:
-            res = requests.get(getConfigUrl, params=params)
-            if res.status_code == 200:
-                self.prometheus_rules = yaml.load(res.text, Loader=yaml_loader)
-        except:
-            logging.exception("prometheus告警配置获取失败：dataId=" + self.project_name + "; group=" + group + "; tenant=" + tenant,
                               exc_info=True)
 
     # 发现服务
