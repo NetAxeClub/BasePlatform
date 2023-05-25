@@ -30,7 +30,13 @@
     "vuex": "^4.0.2",
     "xgplayer": "^2.28.0",
     "vue3-ace-editor": "^2.2.2",
-    "d3": "^7.6.1"
+    "d3": "^7.6.1",
+    "xterm": "^4.19.0",
+    "xterm-addon-attach": "^0.6.0",
+    "xterm-addon-fit": "^0.5.0",
+    "v-code-diff": "^0.3.11",
+    "vue3-hljs": "^0.1.4",
+    "vue3-super-flow": "^0.1.5"
   },
   "devDependencies": {
     "@types/js-cookie": "^2.2.7",
