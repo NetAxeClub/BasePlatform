@@ -26,8 +26,8 @@
 </template>
 
 <script lang="ts">
-  import { defineComponent, h, onMounted, ref, Ref } from 'vue'
-  import { get, post, put, delete_fun } from '@/api/http'
+  import { defineComponent, h, onMounted, ref, Ref, unref } from 'vue'
+  import { post } from '@/api/http'
   import { getMenuList } from '@/api/url'
   import {
     TableActionModel,
@@ -43,17 +43,20 @@
   import { DataFormType, ModalDialogType, FormItem } from '@/types/components'
   import { renderInput, renderSwitch, renderTreeSelect } from '@/hooks/form'
   import { isExternal, transformTreeSelect } from '@/utils'
+  import { findRouteByUrl } from '@/store/help'
+  import usePermissionStore from '@/store/modules/permission'
   export default defineComponent({
     name: 'Menu',
     setup() {
-      let id = 0
       let actionModel = 'add'
+      let tempItem: { menuUrl: string } | null = null
       const table = useTable()
       const naiveDialog = useDialog()
       const message = useMessage()
-      const rowKey = useRowKey('web_path')
+      const permissionStore = usePermissionStore()
       const modalDialog = ref<ModalDialogType | null>(null)
       const dataForm = ref<DataFormType | null>(null)
+      const rowKey = useRowKey('menuUrl')
       const tableColumns = useTableColumn(
         [
           {
@@ -62,7 +65,7 @@
           },
           {
             title: '菜单地址',
-            key: 'web_path',
+            key: 'menuUrl',
           },
           {
             title: '菜单图标',
@@ -137,11 +140,10 @@
           align: 'center',
         } as TableColumn
       )
-
       const itemFormOptions = [
         {
           label: '上级菜单',
-          key: 'parent',
+          key: 'parentPath',
           value: ref(null),
           validator: (formItem, message) => {
             if (!formItem.value.value) {
@@ -150,19 +152,18 @@
             }
             return true
           },
-          render: (formItem) => {
-            return renderTreeSelect(
+          render: (formItem) =>
+            renderTreeSelect(
               formItem.value,
-              transformTreeSelect(table.dataList, 'name', 'id'),
+              transformTreeSelect(unref(table.dataList)!, 'name', 'menuUrl'),
               {
                 showPath: true,
               }
-            )
-          }
+            ),
         },
         {
           label: '菜单名称',
-          key: 'name',
+          key: 'menuName',
           required: true,
           value: ref(null),
           render: (formItem) =>
@@ -172,7 +173,7 @@
         },
         {
           label: '菜单地址',
-          key: 'web_path',
+          key: 'menuUrl',
           required: true,
           value: ref(null),
           disabled: ref(false),
@@ -227,77 +228,68 @@
           render: (formItem) => renderSwitch(formItem.value),
         },
       ] as Array<FormItem>
-
       function doRefresh() {
-        get({
+        post({
           url: getMenuList,
-          data: {parent__isnull:true}
-        }).then((res) => {
-          table.handleSuccess(res)
-        }).catch(console.log)
+          data: {},
+        })
+          .then(table.handleSuccess)
+          .catch(console.log)
       }
-
       function onAddItem() {
         actionModel = 'add'
         modalDialog.value?.show().then(() => {
           dataForm.value?.reset()
         })
       }
-
       function onUpdateItem(item: any) {
-        id = item.id
         actionModel = 'edit'
+        tempItem = item
         itemFormOptions.forEach((it) => {
           it.value.value = item[it.key] || null
-          if (it.key === 'web_path' && it.disabled) {
-            if (isExternal(item.web_path)) {
+          if (it.key === 'menuUrl' && it.disabled) {
+            if (isExternal(item.menuUrl)) {
               it.value.value = ''
             }
             ;(it.disabled as Ref<boolean>).value = true
           }
         })
+        const external = itemFormOptions.find((it) => it.key === 'redirect')
+        if (isExternal(item.menuUrl)) {
+          external!.value.value = item.menuUrl
+        }
         modalDialog.value?.show()
       }
-
       function onConfirm() {
         if (actionModel === 'add') {
           if (dataForm.value?.validator()) {
-            post({
-              url: getMenuList,
-              data: dataForm.value.generatorParams(),
-            }).then((res) => {
-              table.handleSuccess(res.data)
-              message.success('新增成功')
-              doRefresh()
-            }).catch(console.log)
+            message.success(
+              '模拟创建菜单成功, 参数为:' + JSON.stringify(dataForm.value?.generatorParams())
+            )
           }
         } else {
           if (dataForm.value?.validator()) {
-            put({
-              url: getMenuList + id + "/",
-              data: dataForm.value?.generatorParams(),
-            }).then((res) => {
-              table.handleSuccess(res.data)
-              message.success('更新成功')
-              doRefresh()
-            }).catch(console.log)
+            const params = dataForm.value?.generatorParams()
+            if (tempItem) {
+              const tempRoute = findRouteByUrl(
+                permissionStore.getPermissionSideBar,
+                tempItem.menuUrl
+              )
+              if (tempRoute && tempRoute.meta && tempRoute.meta.badge) {
+                ;(tempRoute.meta as any).badge = (params as any).badge || ''
+              }
+            }
+            message.success('模拟修改菜单成功, 参数为:' + JSON.stringify(params))
           }
         }
-        modalDialog.value?.close()
       }
-
       function onDeleteItem(item: any) {
         naiveDialog.warning({
           title: '提示',
           content: '是否要删除此数据？',
           positiveText: '删除',
           onPositiveClick: () => {
-            delete_fun({
-                  url: getMenuList + item.id + '/',
-                }).then((res) => {
-                  message.success('删除成功')
-                  doRefresh()
-                })
+            message.success('模拟删除成功，参数为：' + JSON.stringify(item))
           },
         })
       }

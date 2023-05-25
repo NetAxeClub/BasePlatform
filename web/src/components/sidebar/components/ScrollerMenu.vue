@@ -4,7 +4,7 @@
       <n-menu
         mode="vertical"
         :value="defaultPath"
-        :collapsed="state.isCollapse"
+        :collapsed="appConfig.isCollapse"
         :options="menuOptions"
         :default-value="defaultPath"
         :expanded-keys="defaultExpandKeys"
@@ -19,68 +19,60 @@
 </template>
 
 <script lang="ts">
+  import useAppConfigStore from '@/store/modules/app-config'
+  import { DeviceType } from '@/store/types'
   import type { MenuOption } from 'naive-ui'
-  import {
-    defineComponent,
-    onMounted,
-    PropType,
-    reactive,
-    ref,
-    shallowReactive,
-    watch,
-    watchEffect,
-  } from 'vue'
-  import { useRoute, useRouter } from 'vue-router'
-  import { useLayoutStore } from '../../../components/index'
-  import { RouteRecordRawWithHidden } from '../../../types/store'
-  import { isExternal, transfromMenu } from '../../../utils'
+  import { defineComponent, PropType, ref, shallowReactive, watch, watchEffect } from 'vue'
+  import { RouteRecordNormalized, useRoute, useRouter } from 'vue-router'
+  import { isExternal } from '@/utils'
+  import { transfromMenu } from '@/store/help'
 
   export default defineComponent({
     name: 'ScrollerMenu',
     props: {
       routes: {
-        type: Object as PropType<Array<RouteRecordRawWithHidden>>,
+        type: Object as PropType<Array<RouteRecordNormalized>>,
         require: true,
       },
     },
     setup(props) {
-      const store = useLayoutStore()
+      const appConfig = useAppConfigStore()
       const menuOptions = shallowReactive([] as Array<MenuOption>)
       const defaultPath = ref('')
-      const defaultExpandKeys = reactive([] as Array<string>)
+      const defaultExpandKeys = ref<Array<string>>([])
       const currentRoute = useRoute()
       const router = useRouter()
       defaultPath.value = currentRoute.fullPath
       handleExpandPath()
-      onMounted(() => {
-        handleMenu(props.routes)
-      })
-      function handleMenu(routes?: Array<RouteRecordRawWithHidden>) {
+      function handleMenu(routes?: Array<RouteRecordNormalized>) {
         menuOptions.length = 0
         const tempMenus = transfromMenu(routes || [])
         menuOptions.push(...tempMenus)
       }
       function handleExpandPath() {
         const keys = defaultPath.value.split('/')
-        // defaultExpandKeys.length = 0
-        keys.forEach((it) => {
-          if (!defaultExpandKeys.includes('/' + it)) {
-            defaultExpandKeys.push('/' + it)
-          }
-        })
+        const results = keys
+          .filter((it) => !!it)
+          .reduce((pre, cur) => {
+            const lastItem = pre[pre.length - 1]
+            if (!lastItem) {
+              pre.push('/' + cur)
+            } else {
+              pre.push(lastItem + '/' + cur)
+            }
+            return pre
+          }, [] as string[])
+        defaultExpandKeys.value = Array.from(new Set([...defaultExpandKeys.value, ...results]))
       }
       function onMenuClick(key: string) {
         if (isExternal(key)) return
         router.push(key)
-        if (store.state.device === 'mobile') {
-          store.toggleCollapse(true)
+        if (appConfig.deviceType === DeviceType.MOBILE) {
+          appConfig.toggleCollapse(true)
         }
       }
       function onMenuExpandedKeysClick(keys: string[]) {
-        defaultExpandKeys.length = 0
-        keys.forEach((it) => {
-          defaultExpandKeys.push(it)
-        })
+        defaultExpandKeys.value = keys
       }
       watch(
         () => currentRoute.fullPath,
@@ -95,7 +87,7 @@
       return {
         defaultPath,
         defaultExpandKeys,
-        state: store?.state,
+        appConfig,
         menuOptions,
         onMenuClick,
         onMenuExpandedKeysClick,
@@ -116,14 +108,13 @@
     margin-bottom: 5px;
   }
   :deep(.n-menu .n-menu-item::before) {
-    left: 0;
-    right: 0;
-    border-radius: 0;
+    left: 5px;
+    right: 5px;
+    border-radius: 5px;
   }
   :deep(.n-menu .n-menu-item:hover) {
     background-color: var(--item-color-active);
   }
-  @import '../../../assets/styles/variables.scss';
   .scrollbar {
     height: calc(100vh - #{$logoHeight}) !important;
   }

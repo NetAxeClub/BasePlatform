@@ -1,7 +1,6 @@
 import { AxiosResponse } from 'axios'
-import { App } from '@vue/runtime-core'
-import service from './axios.config'
-import router from '@/router'
+import { App } from 'vue'
+import request from './axios.config'
 
 export interface HttpOption {
   url: string
@@ -12,7 +11,7 @@ export interface HttpOption {
   afterRequest?: () => void
 }
 
-export interface Response {
+export interface Response<T = any> {
   totalSize: number | 0
   count: number | 0
   code: number
@@ -31,9 +30,8 @@ export interface Response {
   interval_data: any
 }
 
-function http({ url, data, method, headers, beforeRequest, afterRequest }: HttpOption) {
-  const successHandler = (res: AxiosResponse<Response>) => {
-    // console.log(res)
+function http<T = any>({ url, data, method, headers, beforeRequest, afterRequest }: HttpOption) {
+  const successHandler = (res: AxiosResponse<Response<T>>) => {
     if (res.data.code === 200) {
       return res.data
     }
@@ -50,9 +48,6 @@ function http({ url, data, method, headers, beforeRequest, afterRequest }: HttpO
       // throw new Error(res.data.msg + '请求失败，未知异常')
       return res.data
     }
-    if (res.data.code === undefined) {
-      return res.data
-    }
     if (res.data.code === 400) {
       return res.data
     }
@@ -62,38 +57,28 @@ function http({ url, data, method, headers, beforeRequest, afterRequest }: HttpO
     if (res.data.code === 201) {
       return res.data
     }
-    throw new Error(res.data.message + '请求失败，未知异常')
-    // return res.data
+    throw new Error(res.data.msg || '请求失败，未知异常')
   }
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const failHandler = (error: Response) => {
+  const failHandler = (error: Response<Error>) => {
     afterRequest && afterRequest()
-    // console.log(error)
-    // throw new Error(error.msg || '请求失败，未知异常')
+    throw new Error(error.msg || '请求失败，未知异常')
   }
   beforeRequest && beforeRequest()
   method = method || 'GET'
   const params = Object.assign(typeof data === 'function' ? data() : data || {}, {})
   return method === 'GET'
-    ? service.get(url, { params }).then(successHandler, failHandler)
-    : method === 'POST'
-      ? service.post(url, params, { headers: headers }).then(successHandler, failHandler)
-      : method === 'PUT'
-        ? service.put(url, params, { headers: headers }).then(successHandler, failHandler)
-        : method === 'PATCH'
-          ? service.patch(url, params, { headers: headers }).then(successHandler, failHandler)
-          : service.delete(url, params).then(successHandler, failHandler)
+    ? request.get(url, { params }).then(successHandler, failHandler)
+    : request.post(url, params, { headers: headers }).then(successHandler, failHandler)
 }
 
-export function get({
+export function get<T = any>({
   url,
   data,
   method = 'GET',
   beforeRequest,
   afterRequest,
-}: HttpOption): Promise<Response> {
-  // @ts-ignore
-  return http({
+}: HttpOption): Promise<Response<T>> {
+  return http<T>({
     url,
     method,
     data,
@@ -102,16 +87,15 @@ export function get({
   })
 }
 
-export function post({
+export function post<T = any>({
   url,
   data,
   method = 'POST',
   headers,
   beforeRequest,
   afterRequest,
-}: HttpOption): Promise<Response> {
-  // @ts-ignore
-  return http({
+}: HttpOption): Promise<Response<T>> {
+  return http<T>({
     url,
     method,
     data,
@@ -177,6 +161,7 @@ export function delete_fun({
     afterRequest,
   })
 }
+
 function install(app: App): void {
   app.config.globalProperties.$http = http
 
@@ -189,18 +174,4 @@ export default {
   install,
   get,
   post,
-  put,
-  patch,
-  delete_fun,
-}
-
-declare module '@vue/runtime-core' {
-  // 为 `this.$` 提供类型声明
-  interface ComponentCustomProperties {
-    $get: (options: HttpOption) => Promise<Response>
-    $post: (options: HttpOption) => Promise<Response>
-    $put: (options: HttpOption) => Promise<Response>
-    $patch: (options: HttpOption) => Promise<Response>
-    $delete_fun: (options: HttpOption) => Promise<Response>
-  }
 }

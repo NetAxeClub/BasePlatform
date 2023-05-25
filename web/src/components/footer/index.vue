@@ -1,5 +1,5 @@
 <template>
-  <n-card class="footer-container"> Copyright © {{ projectName }} 2023 </n-card>
+  <n-card class="footer-container"> Copyright © {{ projectName }} 2022 </n-card>
 </template>
 
 <script lang="ts">
@@ -17,7 +17,6 @@
 </script>
 
 <style lang="scss" scoped>
-  @import '../../assets/styles/variables.scss';
   .footer-container {
     height: $footerHeight;
     display: flex;

@@ -3,26 +3,27 @@
     <n-card
       class="vaw-side-bar-wrapper"
       :bordered="false"
-      :style="{ borderRadius: '0px', marginTop: state.layoutMode === 'ttb' ? '48px' : 0 }"
+      :style="{ borderRadius: '0px', marginTop: appConfig.layoutMode === 'ttb' ? '48px' : 0 }"
       :content-style="{ padding: 0 }"
       :class="[
-        !state.isCollapse ? 'open-status' : 'close-status',
-        state.sideBarBgColor === 'image' ? 'sidebar-bg-img' : '',
+        !appConfig.isCollapse ? 'open-status' : 'close-status',
+        appConfig.sideTheme === 'image' ? 'sidebar-bg-img' : '',
       ]"
     >
       <transition name="logo">
         <Logo v-if="showLogo" />
       </transition>
-      <ScrollerMenu :routes="routes" />
+      <ScrollerMenu :routes="permissionStore.getPermissionSideBar" />
       <div class="mobile-shadow"></div>
     </n-card>
   </n-config-provider>
 </template>
 
 <script lang="ts">
+  import useAppConfigStore from '@/store/modules/app-config'
   import { computed, defineComponent } from 'vue'
-  import { useLayoutStore } from '../../components/index'
-  import { SideTheme, ThemeMode } from '../../types/store'
+  import { SideTheme, ThemeMode } from '@/store/types'
+  import usePermissionStore from '@/store/modules/permission'
   export default defineComponent({
     name: 'SideBar',
     props: {
@@ -32,15 +33,13 @@
       },
     },
     setup() {
-      const store = useLayoutStore()
-      const routes = computed(() => {
-        return store?.state.permissionRoutes.filter((it) => !!it.name)
-      })
+      const appConfig = useAppConfigStore()
+      const permissionStore = usePermissionStore()
       const themeOverThemes = computed(() => {
-        if (store?.state.theme === ThemeMode.DARK) {
+        if (appConfig.theme === ThemeMode.DARK) {
           return {}
         }
-        if (store?.state.sideBarBgColor === SideTheme.DARK)
+        if (appConfig.sideTheme === SideTheme.DARK)
           return {
             common: {
               cardColor: '#001428',
@@ -50,10 +49,24 @@
               hoverColor: 'rgba(255, 255, 255, 0.09)',
               itemColorActive: 'rgba(24, 160, 88, 0.4)',
             },
+            Menu: {
+              itemTextColorChildActive: '#ffffff',
+              itemIconColorChildActive: '#ffffff',
+
+              arrowColorChildActive: '#ffffff',
+              arrowColorHover: '#ffffff',
+
+              itemTextColorActive: '#ffffff',
+              itemIconColorActive: '#ffffff',
+
+              itemTextColorHover: '#ffffff',
+              itemIconColorHover: '#ffffff',
+
+              itemColorActive: 'var(--primary-color)',
+            },
           }
-        if (store?.state.sideBarBgColor === SideTheme.WHITE)
-          return { common: { cardColor: '#ffffff' } }
-        if (store?.state.sideBarBgColor === SideTheme.IMAGE)
+        if (appConfig.sideTheme === SideTheme.WHITE) return { common: { cardColor: '#ffffff' } }
+        if (appConfig.sideTheme === SideTheme.IMAGE)
           return {
             common: {
               textColor1: '#bbbbbb',
@@ -65,8 +78,8 @@
         return {}
       })
       return {
-        state: store?.state,
-        routes,
+        appConfig,
+        permissionStore,
         themeOverThemes,
       }
     },
@@ -74,7 +87,6 @@
 </script>
 
 <style scoped lang="scss">
-  @import '../../assets/styles/variables.scss';
   .sidebar-bg-img {
     background-image: url('../../assets/bg_img.webp') !important;
     background-size: cover;

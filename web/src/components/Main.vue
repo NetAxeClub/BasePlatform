@@ -1,27 +1,26 @@
 <template>
-  <router-view v-slot="{ Component }">
-    <transition :name="state.pageAnim + '-transform'" mode="out-in" appear>
-      <keep-alive :include="cachedViews">
-        <component :is="Component" />
+  <router-view v-slot="{ Component, route }">
+    <transition :name="pageAnim + '-transform'" mode="out-in" appear>
+      <keep-alive :include="cachedRouteStore.getCachedRouteName">
+        <component :is="Component" :key="route.fullPath" />
       </keep-alive>
     </transition>
   </router-view>
 </template>
 
 <script lang="ts">
+  import useAppConfigStore from '@/store/modules/app-config'
+  import useCachedRouteStore from '@/store/modules/cached-routes'
   import { defineComponent } from 'vue'
-  import store from '../store'
   export default defineComponent({
     name: 'Main',
-    data() {
+    setup() {
+      const appConfig = useAppConfigStore()
+      const cachedRouteStore = useCachedRouteStore()
       return {
-        state: store.state,
+        pageAnim: appConfig.pageAnim,
+        cachedRouteStore,
       }
-    },
-    computed: {
-      cachedViews() {
-        return (this as any).state.cachedView.map((it: string) => it)
-      },
     },
   })
 </script>

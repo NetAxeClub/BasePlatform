@@ -6,9 +6,8 @@ from django.views import View
 from django.http import JsonResponse, FileResponse, Http404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.views import APIView
-from rest_framework import viewsets, filters
+from rest_framework import filters
 from netaxe.settings import MEDIA_ROOT
-from apps.route_backend.views import LimitSet
 from utils.crypt_pwd import CryptPwd
 from apps.api.tools.custom_pagination import LargeResultsSetPagination
 from apps.api.tools.custom_viewset_base import CustomViewBase
@@ -159,7 +158,7 @@ class AccountList(CustomViewBase):
     """
     queryset = AssetAccount.objects.all().order_by('id')
     serializer_class = AssetAccountSerializer
-    pagination_class = LimitSet
+    pagination_class = LargeResultsSetPagination
     permission_classes = ()
     # 配置搜索功能
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
@@ -182,7 +181,7 @@ class VendorViewSet(CustomViewBase):
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     # 如果要允许对某些字段进行过滤，可以使用filter_fields属性。
     filter_fields = '__all__'
-    pagination_class = LimitSet
+    pagination_class = LargeResultsSetPagination
     # 设置搜索的关键字
     search_fields = '__all__'
 
@@ -200,7 +199,7 @@ class AssetRoleViewSet(CustomViewBase):
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     # 如果要允许对某些字段进行过滤，可以使用filter_fields属性。
     filter_fields = '__all__'
-    pagination_class = LimitSet
+    pagination_class = LargeResultsSetPagination
     # 设置搜索的关键字
     search_fields = '__all__'
 
@@ -216,7 +215,7 @@ class CategoryViewSet(CustomViewBase):
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     # 如果要允许对某些字段进行过滤，可以使用filter_fields属性。
     filter_fields = '__all__'
-    pagination_class = LimitSet
+    pagination_class = LargeResultsSetPagination
     # 设置搜索的关键字
     search_fields = '__all__'
 
@@ -232,7 +231,7 @@ class ModelViewSet(CustomViewBase):
     # 配置搜索功能
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filter_fields = ('vendor', 'name')
-    pagination_class = LimitSet
+    pagination_class = LargeResultsSetPagination
 
 
 class AttributelViewSet(CustomViewBase):
@@ -245,7 +244,7 @@ class AttributelViewSet(CustomViewBase):
     # 配置搜索功能
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filter_fields = '__all__'
-    pagination_class = LimitSet
+    pagination_class = LargeResultsSetPagination
 
 
 class FrameworkViewSet(CustomViewBase):
@@ -258,7 +257,7 @@ class FrameworkViewSet(CustomViewBase):
     # 配置搜索功能
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filter_fields = '__all__'
-    pagination_class = LimitSet
+    pagination_class = LargeResultsSetPagination
 
 
 class NetworkDeviceFilter(django_filters.FilterSet):

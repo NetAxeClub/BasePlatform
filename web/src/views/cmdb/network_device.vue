@@ -218,7 +218,6 @@ import useGet from '@/hooks/useGet'
 import usePut from '@/hooks/usePut'
 import usePatch from '@/hooks/usePatch'
 import { sortColumns } from '@/utils'
-import { useLayoutStore } from '@/components'
 import Cookies from 'js-cookie'
 import router from '@/router'
 
@@ -229,10 +228,7 @@ export default defineComponent({
         const formRef = ref({})
         const term = ref(null)
         const socket = ref(null)
-        const layoutStore = useLayoutStore()
-        const bodyStyle = computed(() => ({
-            width: layoutStore.state.device === 'mobile' ? '80%' : '50%',
-        }))
+        const bodyStyle = '80%'
         const segmented = {
             content: 'soft',
             footer: 'soft',

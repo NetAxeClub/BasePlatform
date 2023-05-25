@@ -12,11 +12,11 @@
     display-directive="show"
   >
     <div :style="{ maxHeight: '60vh', height: contentHeight }">
-<!--      <n-scrollbar class="pl-5 pr-5">-->
+      <n-scrollbar class="pl-5 pr-5">
         <div>
           <slot name="content"></slot>
         </div>
-<!--      </n-scrollbar>-->
+      </n-scrollbar>
     </div>
     <template #footer>
       <div class="flex justify-end">
@@ -31,8 +31,9 @@
 
 <script lang="ts">
   import { computed, defineComponent, nextTick, ref, watchEffect } from 'vue'
-  import { useLayoutStore } from '..'
   import { drag, unDrag } from '@/hooks/useDialogDragger'
+  import useAppConfigStore from '@/store/modules/app-config'
+  import { DeviceType } from '@/store/types'
 
   export default defineComponent({
     name: 'ModalDialog',
@@ -49,10 +50,10 @@
     emits: ['confirm', 'cancel'],
     setup(props, { emit }) {
       const showModal = ref(false)
+      const appConfig = useAppConfigStore()
       const header = ref<HTMLElement | null>()
-      const layoutStore = useLayoutStore()
       const bodyStyle = computed(() => ({
-        width: layoutStore.state.device === 'mobile' ? '80%' : '50%',
+        width: appConfig.deviceType === DeviceType.MOBILE ? '80%' : '50%',
       }))
       const segmented = {
         content: 'soft',

@@ -1,9 +1,8 @@
 import django_filters
 from django_filters.rest_framework import DjangoFilterBackend
 
-from rest_framework import viewsets, permissions, filters, pagination
-
-from apps.route_backend.views import LimitSet
+from rest_framework import filters
+from apps.api.tools.custom_pagination import LargeResultsSetPagination
 from apps.automation.models import CollectionPlan
 from apps.automation.serializers import CollectionPlanSerializer
 from apps.api.tools.custom_viewset_base import CustomViewBase
@@ -34,4 +33,4 @@ class CollectionPlanViewSet(CustomViewBase):
     filter_fields = ('vendor', 'name',)
     # filterset_class = CollectionPlanFilter
     search_fields = ('vendor', 'name',)
-    pagination_class = LimitSet
+    pagination_class = LargeResultsSetPagination

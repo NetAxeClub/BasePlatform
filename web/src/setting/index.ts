@@ -1,38 +1,28 @@
-import { ADMIN_WORK_SETTING_INFO, ADMIN_WORK_S_TENANT } from '@/store/keys'
-const settingInfo = JSON.parse(localStorage.getItem(ADMIN_WORK_SETTING_INFO) || '{}')
-interface Setting {
-  projectName: string
-  theme: 'light' | 'dark'
-  sideTheme: 'dark' | 'white' | 'blue' | 'image'
-  themeColor: string
-  layoutMode: 'ltr' | 'ttb' | 'lcr'
-  sideWidth: number
-  pageAnim: 'fade' | 'opacity' | 'down' | 'scale'
-  isFixedNavBar: boolean
-  actionBar: {
-    isShowSearch: boolean
-    isShowMessage: boolean
-    isShowRefresh: boolean
-    isShowFullScreen: boolean
-  }
-}
+import {
+  AppConfigState,
+  DeviceType,
+  LayoutMode,
+  PageAnim,
+  SideTheme,
+  ThemeMode,
+} from '@/store/types'
+
 export const projectName = '基础平台'
 
-export default Object.assign(
-  {
-    theme: 'light',
-    sideTheme: 'white',
-    themeColor: 'cyan@#18a058',
-    layoutMode: 'ttb',
-    sideWidth: 210,
-    pageAnim: 'opacity',
-    isFixedNavBar: true,
-    actionBar: {
-      isShowSearch: true,
-      isShowMessage: true,
-      isShowRefresh: true,
-      isShowFullScreen: true,
-    },
+export default {
+  theme: ThemeMode.LIGHT,
+  sideTheme: SideTheme.WHITE,
+  themeColor: '#409eff',
+  layoutMode: LayoutMode.LTR,
+  sideWidth: 210,
+  deviceType: DeviceType.PC,
+  pageAnim: PageAnim.OPACITY,
+  isFixedNavBar: true,
+  isCollapse: false,
+  actionBar: {
+    isShowSearch: true,
+    isShowMessage: true,
+    isShowRefresh: true,
+    isShowFullScreen: true,
   },
-  settingInfo,
-) as Setting
+} as AppConfigState

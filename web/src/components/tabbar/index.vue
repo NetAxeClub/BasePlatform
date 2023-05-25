@@ -1,9 +1,6 @@
 <template>
   <div class="vaw-tab-bar-container">
-    <div v-if="showHumburger" class="humburger-wrapper">
-      <Humburger />
-    </div>
-    <div :class="{ 'tab-humburger-wrapper': showHumburger }" class="flex items-center">
+    <div class="flex items-center">
       <n-icon
         class="arrow-wrapper"
         :class="{ 'arrow-wrapper__disabled': leftArrowDisabled }"
@@ -13,22 +10,25 @@
       </n-icon>
       <n-scrollbar ref="scrollbar" :x-scrollable="true" :size="0">
         <n-button
-          v-for="item of state.visitedView"
-          :key="item.fullPath"
-          :type="currentTab === item.fullPath ? 'primary' : 'default'"
-          class="mx-1 rounded-sm tab-item"
+          v-for="item of getVisitedRoutes"
+          :key="item.path"
+          :type="currentTab === item.path ? 'primary' : 'default'"
+          class="tab-item"
+          strong
+          secondary
           style="--n-height: 24px; --n-font-weight: 200"
-          @click.self="itemClick(item.fullPath, $event)"
-          @contextmenu="onContextMenu(item.fullPath, $event)"
+          :data="item.path"
+          @click.self="itemClick(item)"
+          @contextmenu="onContextMenu(item, $event)"
         >
           <span
             style="font-size: 12px; margin-top: 2px"
             class="text-item"
-            @click.self="itemChildClick(item.fullPath, $event)"
+            @click.self="itemClick(item)"
           >
             {{ item.meta ? item.meta.title : item.name }}
           </span>
-          <n-icon v-if="!item.meta?.affix" class="icon-item" @click="iconClick(item.fullPath)">
+          <n-icon v-if="!item.meta?.affix" class="icon-item" @click="removeTab(item)">
             <Close />
           </n-icon>
         </n-button>
@@ -92,21 +92,15 @@
 </template>
 
 <script lang="ts">
-  import store from '../../store'
-  import path from 'path-browserify'
   import { defineComponent, h } from 'vue'
-  import { RouteRecordRawWithHidden } from '../../types/store'
   import { NIcon, NScrollbar } from 'naive-ui'
   import { Close, ChevronBack, Refresh, ArrowBack, ArrowForward, Menu } from '@vicons/ionicons5'
+  import { mapActions, mapState } from 'pinia'
+  import useVisitedRouteStore from '@/store/modules/visited-routes'
+  import { RouteRecordRaw } from 'vue-router'
   export default defineComponent({
     name: 'TabBar',
     components: { Close, ChevronBack, Refresh, ArrowBack, ArrowForward, Menu },
-    props: {
-      showHumburger: {
-        type: Boolean,
-        default: false,
-      },
-    },
     data() {
       return {
         currentTab: this.$route.fullPath,
@@ -118,7 +112,6 @@
         selectRoute: {},
         showLeftMenu: true,
         showRightMenu: true,
-        state: store.state,
         rightArrowDisabled: false,
         leftArrowDisabled: false,
         contextMenuOptions: [
@@ -143,34 +136,25 @@
         ],
       }
     },
+    computed: {
+      ...mapState(useVisitedRouteStore, ['getVisitedRoutes']),
+    },
     watch: {
       $route(newVal) {
-        if (['404', '500', '403', 'not-found', 'Login'].includes(newVal.name)) {
-          this.currentTab = ''
-          return
-        }
-        if (newVal.meta.noShowTabbar) {
-          this.currentTab = ''
-          return
-        }
-        if (newVal.query?.noShowTabbar) {
-          this.currentTab = ''
-          return
-        }
-        if (newVal.name) {
-          store.addVisitedView(newVal).then((route) => {
-            this.currentTab = route.fullPath || ''
-            const scrollbar = this.$refs.scrollbar as InstanceType<typeof NScrollbar>
+        this.currentTab = newVal.fullPath || ''
+        setTimeout(() => {
+          const scrollbar = this.$refs.scrollbar as InstanceType<typeof NScrollbar>
+          const el = document.querySelector(`[data="${this.currentTab}"]`) as HTMLElement
+          el &&
             scrollbar.scrollTo(
               {
-                left: 1000000000,
+                left: el.offsetLeft,
                 debounce: true,
                 behavior: 'smooth',
               } as any,
               0
             )
-          })
-        }
+        }, 0)
       },
       showContextMenu(val) {
         if (val) {
@@ -180,112 +164,31 @@
         }
       },
     },
-    mounted() {
-      this.initRoute()
-    },
     methods: {
-      initRoute() {
-        const affixedRoutes = this.findAffixedRoutes(
-          this.state.permissionRoutes as Array<RouteRecordRawWithHidden>,
-          '/'
-        )
-        affixedRoutes.forEach((it) => {
-          store.addVisitedView(it)
-        })
-        if (['404', '500', '403', 'not-found', 'Login'].includes(this.$route.name as string)) {
-          this.currentTab = ''
-          return
-        }
-        if (this.$route.meta.noShowTabbar) {
-          this.currentTab = ''
-          return
-        }
-        store
-          .addVisitedView({
-            path: this.$route.path,
-            fullPath: this.$route.fullPath,
-            meta: this.$route.meta,
-          } as RouteRecordRawWithHidden)
-          .then((route) => {
-            this.currentTab = route.fullPath as string
-            this.$nextTick(() => {
-              const elements = document.querySelectorAll('.tab-item .text-item')
-              let currentEle: HTMLElement | null = null
-              for (let index = 0; index < elements.length; index++) {
-                const temp = elements[index] as HTMLElement
-                if (temp.innerText === route.meta?.title) {
-                  currentEle = elements[index] as HTMLElement
-                  break
-                }
-              }
-              const scrollbar = this.$refs.scrollbar as InstanceType<typeof NScrollbar>
-              if (currentEle) {
-                scrollbar.scrollTo(
-                  {
-                    left: currentEle?.parentElement?.parentElement?.offsetLeft,
-                    debounce: true,
-                    behavior: 'smooth',
-                  } as any,
-                  0
-                )
-                this.isDisabledArrow()
-              }
-            })
-          })
+      ...mapActions(useVisitedRouteStore, [
+        'removeVisitedRoute',
+        'findLastRoutePath',
+        'closeRightVisitedView',
+        'closeLeftVisitedView',
+        'closeAllVisitedView',
+      ]),
+      itemClick(item: RouteRecordRaw) {
+        this.handleTabClick(item.path || item.path || '/')
       },
-      itemClick(path: string | undefined, e: MouseEvent) {
-        this.handleTabClick(e.target as HTMLElement, path || '/')
-      },
-      itemChildClick(path: string | undefined, e: MouseEvent) {
-        this.handleTabClick(
-          (e.target as HTMLElement).parentElement?.parentElement as HTMLElement,
-          path || '/'
-        )
-      },
-      handleTabClick(el: HTMLElement, path: string) {
-        ;(this.$refs.scrollbar as InstanceType<typeof NScrollbar>).scrollTo(
-          {
-            left: el.offsetLeft,
-            debounce: true,
-            behavior: 'smooth',
-          } as any,
-          0
-        )
+      handleTabClick(path: string) {
         this.$router.push(path)
       },
-      iconClick(fullPath: string | undefined) {
-        this.removeTab(fullPath || '/')
-      },
-      findAffixedRoutes(routes: Array<RouteRecordRawWithHidden>, basePath: string) {
-        const temp = [] as Array<RouteRecordRawWithHidden>
-        routes.forEach((it) => {
-          if (!it.hidden && it.meta && it.meta.affix) {
-            temp.push({
-              name: it.name,
-              fullPath: it.fullPath,
-              path: it.path,
-              meta: it.meta,
-            } as RouteRecordRawWithHidden)
-          }
-          if (it.children && it.children.length > 0) {
-            temp.push(...this.findAffixedRoutes(it.children, path.resolve(basePath, it.path)))
-          }
-        })
-        return temp
-      },
-      isAffix(route: RouteRecordRawWithHidden) {
+      isAffix(route: RouteRecordRaw) {
         return route.meta && route.meta.affix
       },
-      onContextMenu(fullPath: string | undefined, e: MouseEvent) {
-        const tempView = this.state.visitedView.find((it) => it.fullPath === fullPath)
-        if (!tempView) return
+      onContextMenu(item: RouteRecordRaw, e: MouseEvent) {
         const { clientX } = e
         const { x } = this.$el.getBoundingClientRect()
         e.preventDefault()
-        this.selectRoute = tempView
+        this.selectRoute = item
         if (this.selectRoute) {
-          this.showLeftMenu = this.isLeftLast(fullPath || '/')
-          this.showRightMenu = this.isRightLast(fullPath || '/')
+          this.showLeftMenu = this.isLeftLast(item.path || '/')
+          this.showRightMenu = this.isRightLast(item.path || '/')
           const screenWidth = document.body.clientWidth
           this.contextMenuStyle.left =
             (clientX + 130 > screenWidth ? clientX - 130 - x - 15 : clientX - x + 15) + 'px'
@@ -293,26 +196,19 @@
           this.showContextMenu = true
         }
       },
-      removeTab(fullPath: string) {
-        const findItem = this.state.visitedView.find((it) => it.fullPath === fullPath)
-        if (findItem) {
-          store.removeVisitedView(findItem as RouteRecordRawWithHidden).then(() => {
-            if (this.currentTab === fullPath) {
-              this.currentTab =
-                this.state.visitedView[this.state.visitedView.length - 1].fullPath || ''
-              this.$router.push(this.currentTab)
-            }
-          })
-        }
+      removeTab(item: RouteRecordRaw) {
+        this.removeVisitedRoute(item).then((lastPath) => {
+          this.$router.push(lastPath)
+        })
       },
       // context menu actions
       isLeftLast(tempRoute: string) {
-        return this.state.visitedView.findIndex((it) => it.fullPath === tempRoute) === 0
+        return this.getVisitedRoutes.findIndex((it) => it.path === tempRoute) === 0
       },
       isRightLast(tempRoute: string) {
         return (
-          this.state.visitedView.findIndex((it) => it.fullPath === tempRoute) ===
-          this.state.visitedView.length - 1
+          this.getVisitedRoutes.findIndex((it) => it.path === tempRoute) ===
+          this.getVisitedRoutes.length - 1
         )
       },
       onDropDownSelect(key: string) {
@@ -330,29 +226,23 @@
       },
       closeLeft() {
         if (!this.selectRoute) return
-        store.closeLeftVisitedView(this.selectRoute as RouteRecordRawWithHidden).then(() => {
-          if (this.$route.fullPath !== (this.selectRoute as RouteRecordRawWithHidden).fullPath) {
-            this.$router.push(
-              this.state.visitedView[this.state.visitedView.length - 1].fullPath as string
-            )
+        this.closeLeftVisitedView(this.selectRoute as RouteRecordRaw).then(() => {
+          if (this.$route.fullPath !== (this.selectRoute as RouteRecordRaw).path) {
+            this.$router.push(this.findLastRoutePath())
           }
         })
       },
       closeRight() {
         if (!this.selectRoute) return
-        store.closeRightVisitedView(this.selectRoute as RouteRecordRawWithHidden).then(() => {
-          if (this.$route.fullPath !== (this.selectRoute as RouteRecordRawWithHidden).fullPath) {
-            this.$router.push(
-              this.state.visitedView[this.state.visitedView.length - 1].fullPath as string
-            )
+        this.closeRightVisitedView(this.selectRoute as RouteRecordRaw).then(() => {
+          if (this.$route.path !== (this.selectRoute as RouteRecordRaw).path) {
+            this.$router.push(this.findLastRoutePath())
           }
         })
       },
       closeAll() {
-        store.closeAllVisitedView().then(() => {
-          this.$router.push(
-            this.state.visitedView[this.state.visitedView.length - 1].fullPath as string
-          )
+        this.closeAllVisitedView().then(() => {
+          this.$router.push(this.findLastRoutePath())
         })
       },
       closeMenu() {
@@ -397,7 +287,6 @@
 </script>
 
 <style lang="scss" scoped>
-  @import '../../assets/styles/variables.scss';
   .vaw-tab-bar-container {
     position: relative;
     height: $tabHeight;
@@ -466,6 +355,9 @@
           transition: all 0.2s ease-in-out;
         }
       }
+    }
+    .tab-item + .tab-item {
+      margin-left: 10px;
     }
     .arrow-wrapper {
       cursor: pointer;

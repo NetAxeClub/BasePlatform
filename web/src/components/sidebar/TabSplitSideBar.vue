@@ -6,8 +6,8 @@
       :content-style="{ padding: 0 }"
       style="border-radius: 0px"
       :class="[
-        !state.isCollapse ? 'open-status' : 'close-status',
-        state.sideBarBgColor === 'image' ? 'sidebar-bg-img' : '',
+        !appConfig.isCollapse ? 'open-status' : 'close-status',
+        appConfig.sideTheme === 'image' ? 'sidebar-bg-img' : '',
       ]"
     >
       <div class="tab-split-tab-wrapper" :style="{ backgroundColor: bgColor }">
@@ -44,10 +44,13 @@
 
 <script lang="ts">
   import { computed, defineComponent, onMounted, ref, shallowReactive, watch } from 'vue'
-  import { RouteLocationNormalizedLoaded, useRoute, useRouter } from 'vue-router'
-  import { RouteRecordRawWithHidden, SideTheme, SplitTab, ThemeMode } from '../../types/store'
-  import { isExternal, transformSplitTabMenu } from '../../utils'
-  import { useLayoutStore } from '../../components/index'
+  import { RouteLocationNormalizedLoaded, RouteRecordRaw, useRoute, useRouter } from 'vue-router'
+  import { isExternal } from '@/utils'
+  import useAppConfigStore from '@/store/modules/app-config'
+  import { SideTheme, SplitTab, ThemeMode } from '@/store/types'
+  import usePermissionStore from '@/store/modules/permission'
+  import { transformSplitTabMenu } from '@/store/help'
+
   export default defineComponent({
     name: 'TabSplitSideBar',
     props: {
@@ -57,9 +60,10 @@
       },
     },
     setup() {
-      const store = useLayoutStore()
-      const tabs = shallowReactive([] as Array<SplitTab>)
-      const routes = shallowReactive([] as Array<RouteRecordRawWithHidden>)
+      const appConfig = useAppConfigStore()
+      const permissionStore = usePermissionStore()
+      const tabs = shallowReactive<SplitTab[]>([])
+      const routes = shallowReactive<RouteRecordRaw[]>([])
       const route = useRoute()
       const router = useRouter()
       watch(
@@ -70,7 +74,7 @@
       )
       onMounted(() => {
         tabs.length = 0
-        tabs.push(...transformSplitTabMenu(store?.getSplitTabs()))
+        tabs.push(...transformSplitTabMenu(permissionStore.getPermissionSplitTabs))
         doChangeTab(route)
       })
       function doChangeTab(route: RouteLocationNormalizedLoaded) {
@@ -81,7 +85,7 @@
               it.checked.value = true
               if (it.children) {
                 routes.length = 0
-                routes.push(...(it.children as Array<RouteRecordRawWithHidden>))
+                routes.push(...(it.children as Array<RouteRecordRaw>))
               }
             } else {
               it.checked.value = false
@@ -103,21 +107,21 @@
               label: firstItem.meta?.title,
               iconPrefix: firstItem.meta?.iconPrefix,
               icon: firstItem.meta?.icon,
-              fullPath: firstItem.fullPath,
+              fullPath: firstItem.path,
               children: firstItem.children,
               checked: ref(false),
             } as SplitTab)
           } else {
-            if (isExternal(firstItem.fullPath as string)) {
+            if (isExternal(firstItem.path as string)) {
               routes.length = 0
-              routes.push(...(item.children as Array<RouteRecordRawWithHidden>))
-              window.open(firstItem.fullPath)
+              routes.push(...item.children)
+              window.open(firstItem.path)
             } else {
-              router.push(firstItem.fullPath || '/').then((error) => {
+              router.push(firstItem.path || '/').then((error) => {
                 if (error) {
-                  if (firstItem.fullPath === route.path || firstItem.fullPath === route.fullPath) {
+                  if (firstItem.path === route.path || firstItem.path === route.fullPath) {
                     routes.length = 0
-                    routes.push(...(item.children as Array<RouteRecordRawWithHidden>))
+                    item.children && routes.push(...item.children)
                   }
                 }
               })
@@ -126,10 +130,10 @@
         }
       }
       const themeOverThemes = computed(() => {
-        if (store?.state.theme === ThemeMode.DARK) {
+        if (appConfig.theme === ThemeMode.DARK) {
           return {}
         }
-        if (store?.state.sideBarBgColor === SideTheme.DARK)
+        if (appConfig.sideTheme === SideTheme.DARK)
           return {
             common: {
               cardColor: '#001428',
@@ -140,13 +144,13 @@
               itemColorActive: 'rgba(24, 160, 88, 0.4)',
             },
           }
-        if (store?.state.sideBarBgColor === SideTheme.WHITE)
+        if (appConfig.sideTheme === SideTheme.WHITE)
           return {
             common: {
               cardColor: '#ffffff',
             },
           }
-        if (store?.state.sideBarBgColor === SideTheme.IMAGE)
+        if (appConfig.sideTheme === SideTheme.IMAGE)
           return {
             common: {
               textColor1: '#bbbbbb',
@@ -163,23 +167,22 @@
       })
       const contentWrapperStyle = computed(() => {
         return `--select-text-color: ${
-          store?.state.theme === 'light' || store?.state.sideBarBgColor === 'white'
+          appConfig.theme === 'light' || appConfig.sideTheme === 'white'
             ? '#fff'
             : 'var(--text-color)'
         }`
       })
       const bgColor = computed(() => {
-        if (store?.state.theme === ThemeMode.DARK) {
+        if (appConfig.theme === ThemeMode.DARK) {
           return '#000000'
         }
-        if (store?.state.sideBarBgColor === SideTheme.DARK) return '#000000'
-        if (store?.state.sideBarBgColor === SideTheme.BLUE) return '#106dce'
-        if (store?.state.sideBarBgColor === SideTheme.WHITE) return '#f5f5f5'
-        if (store?.state.sideBarBgColor === SideTheme.IMAGE) return 'rgba(255,255,255, 0.1)'
+        if (appConfig.sideTheme === SideTheme.DARK) return '#000000'
+        if (appConfig.sideTheme === SideTheme.WHITE) return '#f5f5f5'
+        if (appConfig.sideTheme === SideTheme.IMAGE) return 'rgba(255,255,255, 0.1)'
         return '#ffffff'
       })
       return {
-        state: store?.state,
+        appConfig,
         tabs,
         routes,
         changeTab,
@@ -193,7 +196,6 @@
 </script>
 
 <style scoped lang="scss">
-  @import '../../assets/styles/variables.scss';
   .sidebar-bg-img {
     background-image: url('../../assets/bg_img.webp') !important;
     background-size: cover;

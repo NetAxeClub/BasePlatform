@@ -1,4 +1,4 @@
-import { h, reactive, Ref, ref, shallowReactive, VNode } from 'vue'
+import { h, reactive, Ref, ref, unref, VNode } from 'vue'
 
 import { DataTableColumn, NButton } from 'naive-ui'
 import { TableFooterType, TableHeaderType } from '@/types/components'
@@ -10,17 +10,17 @@ export interface TableActionModel {
   onClick: () => {}
 }
 
-interface Table {
-  dataList: Array<any>
+interface Table<T = any> {
+  dataList: Ref<T[] | undefined>
   bordered: Ref<Boolean>
-  selectRows: Array<string | number>
+  selectRows: Ref<Array<string | number> | undefined>
   tableLoading: Ref<boolean>
   tableHeaderRef: Ref<TableHeaderType | null>
   tableFooterRef: Ref<TableFooterType | null>
   tableHeight: Ref<number>
-  handleSuccess: (res: any) => Promise<any>
-  handleSelectionChange: (tempSelectRows: Array<any>) => void
-  useTableColumn: (columns: DataTableColumn[], options: DataTableColumn) => Array<any>
+  handleSuccess: (res: any) => Promise<T[]>
+  handleSelectionChange: (tempSelectRows: Array<string | number>) => void
+  useTableColumn: (columns: DataTableColumn[], options: DataTableColumn) => Array<DataTableColumn>
   selectionColumn: { type: 'selection' }
   indexColumn: {
     title: string
@@ -37,13 +37,10 @@ export const useTableHeight = async function (): Promise<number> {
       let tempHeight = 0
       const header = document.getElementById('tableHeaderContainer')
       if (header) {
-        console.log(header.clientHeight)
-
         tempHeight += header.clientHeight
       }
       const footer = document.querySelector('.table-footer-container')
       if (footer) {
-        console.log(footer.clientHeight)
         tempHeight += footer.clientHeight
       }
       tempHeight += 20 + 2 // 加是 table-body 上下 10px的间距 和 1px的border
@@ -52,23 +49,21 @@ export const useTableHeight = async function (): Promise<number> {
   })
 }
 
-export const useTable = function (): Table {
-  const dataList = shallowReactive([]) as Array<any>
-  const selectRows = shallowReactive([]) as Array<any>
+export const useTable = function <T = any>(): Table<T> {
+  const dataList = ref<Array<T>>()
+  const selectRows = ref<Array<string | number>>()
   const tableHeaderRef = ref<TableHeaderType | null>(null)
   const tableFooterRef = ref<TableFooterType | null>(null)
   const tableHeight = ref(200)
   const bordered = ref(false)
   const tableLoading = ref(true)
-  const handleSuccess = ({ results = [] }): Promise<any> => {
+  const handleSuccess = ({ data = [] }: { data: T[] }): Promise<T[]> => {
     tableLoading.value = false
-    dataList.length = 0
-    dataList.push(...results)
-    return Promise.resolve(results)
+    dataList.value = data
+    return Promise.resolve(data)
   }
-  const handleSelectionChange = (tempSelectRows: Array<any>) => {
-    selectRows.length = 0
-    selectRows.push(...tempSelectRows)
+  const handleSelectionChange = (tempSelectRows: Array<string | number>) => {
+    selectRows.value = tempSelectRows
   }
   return {
     dataList,
@@ -114,8 +109,11 @@ export const useRowKey = function (propName: string) {
   }
 }
 
-export const useTableColumn = function (columns: DataTableColumn[], options: DataTableColumn) {
-  return columns.map((it) => Object.assign(it, options))
+export const useTableColumn = function (columns: DataTableColumn[], options?: DataTableColumn) {
+  const tempColumns = ref<DataTableColumn[]>()
+  const tempOpt = options ?? {}
+  tempColumns.value = columns.map((it) => Object.assign({ ...tempOpt }, it))
+  return unref(tempColumns)!
 }
 
 export const useTableIndexColumn = function () {
@@ -141,6 +139,7 @@ export const usePagination = function (callback: () => void) {
     pageSize: 10,
     showSizePicker: true,
     pageCount: 1,
+    Count: 1,
     pageSizes: [10, 20, 30, 40],
     onChange,
     onPageSizeChange,

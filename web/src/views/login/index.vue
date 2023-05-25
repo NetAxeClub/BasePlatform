@@ -1,36 +1,34 @@
 <template>
-  <LoginComponent />
+  <n-config-provider :theme-overrides="themeOverrides" :theme="theme">
+    <LoginComponent />
+  </n-config-provider>
 </template>
 
 <script lang="ts">
-  import { useLayoutStore } from '@/components'
-  import { DeviceType } from '@/types/store'
-  import { computed, defineComponent, onMounted, ref } from 'vue'
+  import useAppConfigStore from '@/store/modules/app-config'
+  import { ThemeMode } from '@/store/types'
+  import { darkTheme } from 'naive-ui'
+  import { computed, defineComponent } from 'vue'
   import LoginComponent from './LoginComponent.vue'
   export default defineComponent({
     name: 'Login',
     components: { LoginComponent },
     setup() {
-      const showAnimation = ref(false)
-      const showArrow = ref(false)
-      const showLoginPage = ref(false)
-      function onNextLogin() {
-        showLoginPage.value = !showLoginPage.value
-      }
-      const layoutStore = useLayoutStore()
-      const isMobile = computed(() => layoutStore.state.device === DeviceType.MOBILE)
-      onMounted(() => {
-        setTimeout(() => (showAnimation.value = true), 500)
-        setTimeout(() => {
-          showArrow.value = true
-        }, 6200)
+      const appConfig = useAppConfigStore()
+      const theme = computed(() => {
+        return appConfig.theme === ThemeMode.DARK ? darkTheme : null
+      })
+      const themeOverrides = computed(() => {
+        return {
+          common: {
+            primaryColor: appConfig.themeColor,
+            primaryColorHover: appConfig.themeColor,
+          },
+        }
       })
       return {
-        isMobile,
-        showAnimation,
-        showArrow,
-        showLoginPage,
-        onNextLogin,
+        theme,
+        themeOverrides,
       }
     },
   })

@@ -3,8 +3,10 @@
     <div class="logo-wrapper">
       <Logo :always-show="true" />
     </div>
-    <div style="flex: 1"></div>
-    <div v-if="state.device !== 'mobile'" class="right-wrapper">
+    <div style="flex: 1; overflow: hidden; padding: 0 10px">
+      <HorizontalScrollerMenu :routes="permissionStore.getPermissionSideBar" />
+    </div>
+    <div v-if="appConfig.deviceType !== 'mobile'" class="right-wrapper">
       <ActionItems />
     </div>
     <div class="avatar-wrapper">
@@ -14,21 +16,23 @@
 </template>
 
 <script lang="ts">
+  import useAppConfigStore from '@/store/modules/app-config'
+  import usePermissionStore from '@/store/modules/permission'
   import { defineComponent } from 'vue'
-  import { useLayoutStore } from '../../components/index'
   export default defineComponent({
     name: 'VAWHeader',
     setup() {
-      const store = useLayoutStore()
+      const appConfig = useAppConfigStore()
+      const permissionStore = usePermissionStore()
       return {
-        state: store?.state,
+        permissionStore,
+        appConfig,
       }
     },
   })
 </script>
 
 <style scoped lang="scss">
-  @import '../../assets/styles/variables.scss';
   .vaw-header-layout {
     height: $logoHeight;
     position: fixed;
@@ -41,7 +45,7 @@
     box-sizing: border-box;
     border-bottom: 1px solid var(--border-color);
     .logo-wrapper {
-      width: $menuWidth;
+      width: calc(#{$menuWidth} / 3 * 2);
     }
     .menu-wrapper {
       flex: 1;

@@ -1,17 +1,42 @@
 import { baseURL } from './axios.config'
 
 export const baseAddress = baseURL
-// 登录
-export const login = baseAddress + '/login/'
 
-// 认证和权限URL
-export const getTableList = baseAddress + '/users/user/'
-export const getRoleList = baseAddress + '/system/role/'
-export const getMenuList = baseAddress + '/system/menu/'
-export const getDepartmentList = baseAddress + '/system/dept/'
-// export const getMenuListByRole = baseAddress + '/system/menu/web_router/'
 export const WebRouter = '/rbac/system/menu/web_router/'
 export const WebPermission = '/rbac/system/menu/web_permission/'
+
+export const getTaskList = baseAddress + '/task_list'
+
+export const test = '/test'
+
+export const login = '/api/login'
+
+export const updateUserInfo = '/updateUser'
+
+export const addUserInfo = '/addUser'
+
+export const getMenuListByRoleId = '/api/getMenusByRoleId'
+
+export const getAllMenuByRoleId = '/api/getAllMenuByRoleId'
+
+export const deleteUserById = '/deleteUserById'
+
+export const getDepartmentList = '/getDepartmentList'
+
+export const addDepartment = '/addDepartment'
+
+export const getRoleList = '/getRoleList'
+
+export const getMenuList = '/getMenuList'
+
+export const getParentMenuList = '/getParentMenuList'
+
+export const getTableList = '/getTableList'
+
+export const getCardList = '/getCardList'
+
+export const getCommentList = '/getCommentList'
+
 // 调度管理
 export const getdispach = baseAddress + '/backend/dispatch_page/'
 // 任务列表
@@ -70,14 +95,3 @@ export const config_template = baseAddress + '/config_center/api/config_template
 export const fsm_parse = baseAddress + '/config_center/fsm_parse'
 export const jinja2_parse = baseAddress + '/config_center/jinja2_parse'
 export const config_center = baseAddress + '/config_center'
-
-// 微服务ipam测试环境
-export const getSubnetTree = baseAddress + '/open_ipam/subnet_tree/'
-export const PostAddressHandel = baseAddress + '/open_ipam/address_handel/'
-// export const getinterval_schedule = baseAddress + '/open_ipam/interval_schedule/'
-export const getSubnetAddress = baseAddress + '/open_ipam/subnet/'
-declare module '@vue/runtime-core' {
-  interface ComponentCustomProperties {
-    $urlPath: Record<string, string>
-  }
-}

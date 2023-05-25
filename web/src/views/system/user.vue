@@ -1,7 +1,31 @@
 <template>
   <div>
     <n-grid :x-gap="10">
-      <n-grid-item :span="40">
+      <n-grid-item :span="5">
+        <n-card
+          class="h-full"
+          :content-style="{ padding: '5px' }"
+          :header-style="{ padding: '5px' }"
+          :segmented="true"
+        >
+          <template #header>
+            <div class="flex items-center">
+              <n-input class="mr-2" v-model:value="pattern" placeholder="搜索" size="small" />
+              <n-switch size="small" v-model:value="expandAllFlag" />
+            </div>
+          </template>
+          <n-tree
+            :expanded-keys="getExpandedKeys"
+            block-line
+            :pattern="pattern"
+            :data="departmentData"
+            selectable
+            :on-update:expanded-keys="onUpdateExpandedKeys"
+            :on-update:selected-keys="onCheckedKeys"
+          />
+        </n-card>
+      </n-grid-item>
+      <n-grid-item :span="19">
         <div>
           <TableBody>
             <template #header>
@@ -34,8 +58,8 @@
 </template>
 
 <script lang="ts">
-  import { get, put, delete_fun } from '@/api/http'
-  import { getTableList, getRoleList } from '@/api/url'
+  import { post } from '@/api/http'
+  import { getTableList } from '@/api/url'
   import { renderTag } from '@/hooks/form'
   import {
     TableActionModel,
@@ -45,80 +69,156 @@
     useTable,
     useTableColumn,
     useTableHeight,
-    } from '@/hooks/table'
-  import { transformSelect } from '@/utils'
-  import { DataTableColumn, useDialog, useMessage, NSelect } from 'naive-ui'
-  import { defineComponent, h, onMounted, ref } from 'vue'
+  } from '@/hooks/table'
+  import { DataTableColumn, NAvatar, useDialog, useMessage } from 'naive-ui'
+  import { defineComponent, h, onMounted, ref, shallowReactive, watch } from 'vue'
   export default defineComponent({
     name: 'UserList',
     setup() {
-      const role = ref([])
       const table = useTable()
-      const message = useMessage()
       const rowKey = useRowKey('id')
       const naiveDialog = useDialog()
+      const message = useMessage()
       const pagination = usePagination(doRefresh)
       const checkedRowKeys = [] as Array<any>
+      const departmentData = [
+        {
+          label: '东部地区',
+          key: 1,
+          children: [
+            {
+              label: '总裁部',
+              key: 11,
+            },
+            {
+              label: '财务部',
+              key: 12,
+            },
+            {
+              label: '技术部',
+              key: 13,
+            },
+            {
+              label: '销售部',
+              key: 14,
+            },
+          ],
+        },
+        {
+          label: '西部地区',
+          key: 2,
+          children: [
+            {
+              label: '总裁部',
+              key: 21,
+            },
+            {
+              label: '财务部',
+              key: 22,
+            },
+            {
+              label: '技术部',
+              key: 23,
+            },
+            {
+              label: '销售部',
+              key: 24,
+            },
+          ],
+        },
+        {
+          label: '南部地区',
+          key: 3,
+          children: [
+            {
+              label: '总裁部',
+              key: 31,
+            },
+            {
+              label: '财务部',
+              key: 32,
+            },
+            {
+              label: '技术部',
+              key: 33,
+            },
+            {
+              label: '销售部',
+              key: 34,
+            },
+          ],
+        },
+        {
+          label: '北部地区',
+          key: 4,
+          children: [
+            {
+              label: '总裁部',
+              key: 41,
+            },
+            {
+              label: '财务部',
+              key: 42,
+            },
+            {
+              label: '技术部',
+              key: 43,
+            },
+            {
+              label: '销售部',
+              key: 44,
+            },
+          ],
+        },
+      ]
       const tableColumns = useTableColumn(
         [
           table.selectionColumn,
           table.indexColumn,
           {
-            title: '用户',
-            key: 'username',
-            width: 120,
-          },
-          {
-            title: '姓名',
-            key: 'nick_name',
-            width: 120,
+            title: '名称',
+            key: 'nickName',
           },
           {
             title: '性别',
             key: 'gender',
             width: 80,
             render: (rowData) => {
-              return h('div', rowData.gender === 1 ? '男' : '女')
+              return h('div', rowData.gender === 0 ? '男' : '女')
             },
           },
           {
-            title: '角色',
-            key: 'role_name',
-            width: 120,
-            render: (rowData, index) => {
-              return h(NSelect, {
-                // 数据问题待优化
-                value: rowData.role[0],
-                options: transformSelect(role.value, 'name', 'id'),
-                onUpdateValue: (val: any) => {
-                  table.dataList[index].role = val
-                  // 用户页面点击更新用户角色
-                  put({
-                      url: getTableList + rowData.id + "/",
-                      data: {"role": [val]},
-                    }).then((res) => {
-                      message.success('提交成功')
-                      doRefresh()
-                    }).catch(console.log)
+            title: '头像',
+            key: 'avatar',
+            render: (rowData: any) => {
+              return h(
+                NAvatar,
+                {
+                  circle: true,
+                  size: 'small',
                 },
-                placeholder: '请选择角色名称',
-              })
+                { default: () => rowData.nickName.substring(0, 1) }
+              )
             },
+          },
+          {
+            title: '地址',
+            key: 'address',
           },
           {
             title: '上次登录时间',
-            key: 'last_login',
-            fixed: 'right',
-            width: 220,
+            key: 'lastLoginTime',
+          },
+          {
+            title: '上次登录IP',
+            key: 'lastLoginIp',
           },
           {
             title: '状态',
-            key: 'is_active',
-            fixed: 'right',
-            width: 80,
+            key: 'status',
             render: (rowData) =>
-              renderTag(!!rowData.is_active ? '正常' : '禁用', {
-                type: !!rowData.is_active ? 'success' : 'error',
+              renderTag(!!rowData.status ? '正常' : '禁用', {
+                type: !!rowData.status ? 'success' : 'error',
                 size: 'small',
               }),
           },
@@ -142,76 +242,81 @@
           align: 'center',
         } as DataTableColumn
       )
-
-      function roleList() {
-        get({
-          url: getRoleList,
-        }).then((res) => {
-          role.value = res.results
-        })
-      }
-
+      const expandAllFlag = ref(false)
       function doRefresh() {
-        get({
+        post({
           url: getTableList,
-        }).then((res) => {
-          table.handleSuccess(res)
-          pagination.setTotalSize((res as any).total)
-        }).catch(console.log)
-      }
-
-      function onRowCheck(rowKeys: Array<any>) {
-        checkedRowKeys.length = 0
-        checkedRowKeys.push(...rowKeys)
-      }
-
-      function onDeleteItem(item: any) {
-        naiveDialog.warning({
-          title: '提示',
-          content: '确定要删除此数据吗？',
-          positiveText: '确定',
-          onPositiveClick: () => {
-            delete_fun({
-                  url: getTableList + item.id + '/',
-                }).then((res) => {
-                  message.success('删除成功')
-                  doRefresh()
-                })
+          data: () => {
+            return {
+              page: pagination.page,
+              pageSize: pagination.pageSize,
+            }
           },
         })
+          .then((res) => {
+            table.handleSuccess(res)
+            pagination.setTotalSize((res as any).totalSize)
+          })
+          .catch(console.log)
       }
-
       function onDeleteItems() {
         naiveDialog.warning({
           title: '提示',
           content: '确定要删除此数据吗？',
           positiveText: '确定',
           onPositiveClick: () => {
-            // delete_fun({
-            //       url: getTableList + '/' + item.id + '/',
-            //     }).then((res) => {
-            //       message.success('删除成功')
-            //       doRefresh()
-            //     })
             message.success('数据模拟删除成功，参数为：' + JSON.stringify(checkedRowKeys))
           },
         })
       }
-
+      function onDeleteItem(item: any) {
+        naiveDialog.warning({
+          title: '提示',
+          content: '确定要删除此数据吗？',
+          positiveText: '确定',
+          onPositiveClick: () => {
+            table.dataList.value!.splice(table.dataList.value!.indexOf(item), 1)
+          },
+        })
+      }
+      function onRowCheck(rowKeys: Array<any>) {
+        checkedRowKeys.length = 0
+        checkedRowKeys.push(...rowKeys)
+      }
+      function onUpdateExpandedKeys(keys: any) {
+        getExpandedKeys.length = 0
+        getExpandedKeys.push(...keys)
+      }
+      function onCheckedKeys(keys: any) {
+        message.success('选中的值为--->' + JSON.stringify(keys))
+      }
+      const getExpandedKeys = shallowReactive([] as Array<number>)
+      watch(
+        () => expandAllFlag.value,
+        (newVal) => {
+          newVal
+            ? getExpandedKeys.push(...departmentData.map((it) => it.key))
+            : (getExpandedKeys.length = 0)
+        }
+      )
       onMounted(async () => {
         table.tableHeight.value = await useTableHeight()
         doRefresh()
-        roleList()
       })
-
       return {
         ...table,
         rowKey,
+        pattern: ref(''),
+        expandAllFlag,
+        departmentData,
         tableColumns,
         pagination,
         onDeleteItem,
         onDeleteItems,
-        onRowCheck
+        onRowCheck,
+        getExpandedKeys,
+        onUpdateExpandedKeys,
+        onCheckedKeys,
       }
     },
   })

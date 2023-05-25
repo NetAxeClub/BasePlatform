@@ -1,4 +1,4 @@
 import { get } from '../api/http'
-export default function useGet() {
+export default function usePost() {
   return get
 }

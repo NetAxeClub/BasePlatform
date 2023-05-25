@@ -13,6 +13,7 @@
       "children": [
             {
               "name": "网络设备",
+              "parentPath": "/cmdb",
               "path": "/cmdb/network_device",
               "web_path": "/cmdb/network_device",
               "meta": {
@@ -24,6 +25,7 @@
               }
             },{
               "name": "接口清单",
+          "parentPath": "/cmdb",
               "path": "/cmdb/interfaceused",
               "web_path": "/cmdb/interfaceused",
               "meta": {

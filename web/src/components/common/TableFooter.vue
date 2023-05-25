@@ -4,13 +4,23 @@
       <n-pagination
         :page="pagination?.page"
         :page-size="pagination?.pageSize"
-        :page-count="pagination?.pageCount"
+        :item-count="pagination?.Count"
         :show-size-picker="pagination?.showSizePicker"
         :page-sizes="pagination?.pageSizes"
         @update:page="onChange"
         @update:page-size="onPageSizeChange"
-      />
-      <n-button v-if="showRefresh" circle class="ml-1" size="small" type="primary" @click="refresh">
+        ><template #prefix="{ itemCount, startIndex }">
+          从第 {{ startIndex }} 项开始, 共 {{ itemCount }} 项
+        </template></n-pagination
+      >
+      <n-button
+        v-if="showRefresh"
+        circle
+        style="margin-left: 10px"
+        size="small"
+        type="primary"
+        @click="refresh"
+      >
         <template #icon>
           <n-icon>
             <RefreshIcon />

@@ -2,24 +2,29 @@
   <div
     class="vaw-main-layout-container scrollbar"
     :class="[
-      !state.isCollapse ? 'main-layout-open-status' : 'main-layout-close-status',
-      state.isFixedNavBar ? 'main-layout_fixed-nav-bar' : 'main-layout',
+      layoutMode === 'ttb'
+        ? 'main-layout-ttb-status'
+        : !appConfig.isCollapse
+        ? 'main-layout-open-status'
+        : 'main-layout-close-status',
+      appConfig.isFixedNavBar ? 'main-layout_fixed-nav-bar' : 'main-layout',
     ]"
   >
     <section
       :class="[
-        !state.isCollapse ? 'nav-bar-open-status' : 'nav-bar-close-status',
-        state.isFixedNavBar ? 'fixed-nav-bar' : '',
+        layoutMode === 'ttb'
+          ? 'nav-bar-ttb-status'
+          : !appConfig.isCollapse
+          ? 'nav-bar-open-status'
+          : 'nav-bar-close-status',
+        appConfig.isFixedNavBar ? 'fixed-nav-bar' : '',
         !showNavBar ? 'tab-bar-top' : '',
       ]"
     >
       <NavBar v-if="showNavBar" />
-      <TabBar :show-humburger="isShowHeader" />
+      <TabBar />
     </section>
-    <div
-      class="main-base-style scrollbar"
-      :class="[state.theme === 'light' ? 'main-base-light-theme' : 'main-base-dark-theme']"
-    >
+    <div class="main-base-style scrollbar" :class="[mainClass]">
       <section class="main-section">
         <Main />
       </section>
@@ -33,10 +38,11 @@
 </template>
 
 <script lang="ts">
+  import useAppConfigStore from '@/store/modules/app-config'
+  import { ThemeMode } from '@/store/types'
   import { useLoadingBar } from 'naive-ui'
   import { computed, defineComponent, onMounted, ref } from 'vue'
-  import { useRouter, useRoute } from 'vue-router'
-  import { useLayoutStore, useTitle } from './index'
+  import { useRouter } from 'vue-router'
   export default defineComponent({
     name: 'MainLayout',
     props: {
@@ -46,19 +52,21 @@
       },
     },
     setup() {
-      const store = useLayoutStore()
+      const appConfig = useAppConfigStore()
       const listenTo1 = ref<HTMLElement | null>(null)
       const listenTo2 = ref<HTMLElement | null>(null)
-      const isShowHeader = computed(() => store?.isShowHeader())
+      const mainClass = computed(() => {
+        return appConfig.theme === ThemeMode.DARK ? 'main-base-dark-theme' : 'main-base-light-theme'
+      })
+      const layoutMode = computed(() => {
+        return appConfig.getLayoutMode
+      })
       const router = useRouter()
-      const route = useRoute()
-      useTitle(route.meta.title as string)
       const loadingBar = useLoadingBar()
       router.beforeEach(() => {
         loadingBar?.start()
       })
       router.afterEach(() => {
-        useTitle(route.meta.title as string)
         loadingBar?.finish()
       })
       onMounted(() => {
@@ -66,19 +74,22 @@
         listenTo2.value = document.querySelector('.vaw-main-layout-container')
       })
       return {
-        state: store?.state,
+        appConfig,
+        mainClass,
+        layoutMode,
         listenTo1,
         listenTo2,
-        isShowHeader,
       }
     },
   })
 </script>
 
 <style lang="scss" scoped>
-  @import '../assets/styles/variables.scss';
   .scrollbar::-webkit-scrollbar {
     width: 0;
+  }
+  .main-layout-ttb-status {
+    margin-left: 0;
   }
   .main-layout-open-status {
     margin-left: $menuWidth;
@@ -91,6 +102,10 @@
   }
   .nav-bar-close-status.fixed-nav-bar {
     width: calc(100% - #{$minMenuWidth});
+  }
+
+  .nav-bar-ttb-status {
+    width: 100%;
   }
 
   .main-layout {

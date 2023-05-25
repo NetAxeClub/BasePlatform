@@ -21,11 +21,9 @@
 </template>
 
 <script lang="ts">
-  import { RouteRecordRawWithHidden } from '@/types/store'
   import { isExternal } from '@/utils'
   import { defineComponent, onMounted, reactive, watch } from 'vue'
-  import { useRoute, useRouter } from 'vue-router'
-  import { useLayoutStore } from '..'
+  import { RouteRecordNormalized, useRoute, useRouter } from 'vue-router'
   import { ChevronDown } from '@vicons/ionicons5'
   interface DropItem {
     label: string
@@ -39,7 +37,6 @@
       const breadcrumbs = reactive([] as Array<DropItem>)
       const route = useRoute()
       const router = useRouter()
-      const store = useLayoutStore()
       function handlePath(path: string) {
         return path.split('/').reduce((pre: string[], cur: string) => {
           if (cur) {
@@ -54,7 +51,7 @@
         }, [])
       }
       function generatorDropdown(
-        routes: Array<RouteRecordRawWithHidden> | undefined,
+        routes: Array<RouteRecordNormalized> | undefined,
         parentPath = '/'
       ) {
         if (!routes) return
@@ -70,7 +67,10 @@
             children: [],
           }
           if (it.children && it.children.length > 0) {
-            tempItem.children = generatorDropdown(it.children, tempItem.key)
+            tempItem.children = generatorDropdown(
+              it.children as RouteRecordNormalized[],
+              tempItem.key
+            )
           } else {
             delete tempItem.children
           }
@@ -79,14 +79,14 @@
         return tempArray
       }
       function findRoute(paths: string[]) {
-        const selectRoutes: Array<RouteRecordRawWithHidden> = []
-        let tempOrigin = store.state.permissionRoutes
+        const selectRoutes: Array<RouteRecordNormalized> = []
+        let tempOrigin = router.getRoutes()
         paths.forEach((it) => {
           const selectRoute = tempOrigin.find((pIt) => pIt.path === it)
           if (selectRoute) {
-            tempOrigin = selectRoute.children as []
+            tempOrigin = selectRoute.children as unknown as RouteRecordNormalized[]
+            selectRoutes.push(selectRoute)
           }
-          selectRoutes.push(selectRoute as RouteRecordRawWithHidden)
         })
         return selectRoutes
       }
@@ -109,7 +109,7 @@
         () => {
           if (
             route.path.startsWith('/redirect') ||
-            ['/login', '/404', '/405', '/403'].includes(route.path)
+            ['/login', '/404', '/405', '/403', '/500'].includes(route.path)
           )
             return
           generatorBreadcrumb()

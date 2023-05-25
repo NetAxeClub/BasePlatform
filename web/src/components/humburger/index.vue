@@ -1,7 +1,7 @@
 <template>
   <span
     class="fold-wrapper iconfont"
-    :class="[state.isCollapse ? 'fold-close-status' : 'fold-open-status']"
+    :class="[appConfig.isCollapse ? 'fold-close-status' : 'fold-open-status']"
     @click="toggleFold"
   >
     <SvgIcon name="expand" />
@@ -9,17 +9,17 @@
 </template>
 
 <script lang="ts">
+  import useAppConfigStore from '@/store/modules/app-config'
   import { defineComponent } from 'vue'
-  import { useLayoutStore } from '../../components/index'
   export default defineComponent({
     name: 'Humburger',
     setup() {
-      const store = useLayoutStore()
+      const appConfig = useAppConfigStore()
       function toggleFold() {
-        store?.toggleCollapse(!store.state.isCollapse)
+        appConfig.toggleCollapse(!appConfig.isCollapse)
       }
       return {
-        state: store?.state,
+        appConfig,
         toggleFold,
       }
     },
@@ -27,7 +27,6 @@
 </script>
 
 <style lang="scss" scoped>
-  @import '../../assets/styles/variables.scss';
   .fold-open-status {
     transform: rotate(180deg);
   }

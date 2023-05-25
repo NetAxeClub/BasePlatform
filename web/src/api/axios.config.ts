@@ -3,8 +3,6 @@ import qs from 'qs'
 import Cookies from 'js-cookie'
 
 export const baseURL = '/base_platform'
-// mock 接口
-// export const baseURL = 'http://localhost:8080/'
 
 export const CONTENT_TYPE = 'Content-Type'
 
@@ -14,13 +12,11 @@ export const APPLICATION_JSON = 'application/json; charset=UTF-8'
 
 export const TEXT_PLAIN = 'text/plain; charset=UTF-8'
 
-// mock 服务封装
 const service = Axios.create({
   // baseURL,
   timeout: 10 * 60 * 1000,
-  withCredentials: false,
 })
-// 在正式发送请求之前进行拦截配置
+
 service.interceptors.request.use(
   (config: { headers: { [x: string]: string; Authorization?: any }; data: any }) => {
     !config.headers && (config.headers = {})
@@ -35,14 +31,13 @@ service.interceptors.request.use(
     }
     return config
   },
-  (error: { response: any }) => {
+  (error) => {
     return Promise.reject(error.response)
   }
 )
-// 在接口返回数据的时候进行一次拦截
+
 service.interceptors.response.use(
   (response: AxiosResponse): AxiosResponse => {
-    // console.log(response)
     if (response.status === 200) {
       return response
     }
@@ -55,7 +50,7 @@ service.interceptors.response.use(
       throw new Error(response.status.toString())
     }
   },
-  (error: any) => {
+  (error) => {
     if (import.meta.env.MODE === 'development') {
       console.log(error)
     }
