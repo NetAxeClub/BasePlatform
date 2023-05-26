@@ -2,7 +2,6 @@ from __future__ import absolute_import, unicode_literals
 
 
 import pymysql
-from utils.nacos_register import nacos_init
 from .celery import app as celery_app
 
 # Fake PyMySQL's version and install as MySQLdb
@@ -11,7 +10,6 @@ pymysql.version_info = (1, 4, 2, "final", 0)
 pymysql.install_as_MySQLdb()
 
 __all__ = ['celery_app']
-nacos_init()
 # if sys.argv[1] not in ["makemigrations", "migrate", "init_asset", "init_collect", "runserver", "createsuperuser",
 #                        "init_system_menu", "shell"]:
 #     # 注册服务
