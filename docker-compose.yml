@@ -17,6 +17,8 @@ services:
       image: registry.cn-hangzhou.aliyuncs.com/netaxe/nginx:1.23.1
       volumes: # 数据卷挂载
         - ./backend-nginx.conf:/etc/nginx/nginx.conf
+      networks:
+        - "netaxe-network"
       ports:
         - "31101:80"
 
