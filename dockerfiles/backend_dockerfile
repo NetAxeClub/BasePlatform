@@ -3,7 +3,7 @@ RUN sed -i s@/deb.debian.org/@/mirrors.aliyun.com/@g /etc/apt/sources.list
 RUN set -ex \
   &&apt-get update\
   &&apt-get install gcc -y\
-  &&apt-get install git -y
+  &&apt-get install git curl -y
 COPY backend/ /app
 COPY config/ /config
 COPY web/default_menu.json /web/default_menu.json
