@@ -13,7 +13,7 @@ web/.vscode/
 web/node_modules
 netaxe/logs
 config/config.json
-backend/logs/
+backend/logs/server.log
 netaxe/__pycahe__
 netaxe/netboost/conf.py
 netaxe/netboost/__pycache__/
