@@ -14,7 +14,7 @@ services:
 
     # nginx代理
     base-nginx:
-      image: nginx:1.23.1
+      image: registry.cn-hangzhou.aliyuncs.com/netaxe/nginx:1.23.1
       volumes: # 数据卷挂载
         - ./backend-nginx.conf:/etc/nginx/nginx.conf
       ports:
