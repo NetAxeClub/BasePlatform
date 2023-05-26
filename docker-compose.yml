@@ -14,7 +14,7 @@ services:
 
     # nginx代理
     base-nginx:
-      image: registry.cn-hangzhou.aliyuncs.com/netaxe/nginx:1.23.1
+      image: registry.cn-hangzhou.aliyuncs.com/netaxe/base-nginx:1.23.1
       build:
         context: .
         dockerfile: ./dockerfiles/nginx_dockerfile
