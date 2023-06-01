@@ -2,7 +2,6 @@ from django.db import models
 import json
 # Create your models here.
 
-
 # 设备信息采集方案
 class CollectionPlan(models.Model):
     VENDOR_CHOICES = (

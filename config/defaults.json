@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "rabbitmq": "amqp://admin:admin@10.254.0.1/",
-  "virtual_host": "/",
+  "virtual_host": "netaxe",
   "url_prefix": "/base_platform",
   "project_name": "BasePlatform",
   "server_ip": "1.1.1.1",

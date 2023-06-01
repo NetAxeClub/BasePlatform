@@ -5,7 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from apps.api.tools.custom_pagination import LargeResultsSetPagination
-from apps.users.models import UserProfile, BgBu
+from apps.users.models import UserProfile, Organization
 from apps.users.serializers import BgBuSerializer
 from apps.system.views.role import RoleSerializer
 from utils.custom.json_response import ErrorResponse, DetailResponse
@@ -221,7 +221,7 @@ class BgBuViewSet(viewsets.ModelViewSet):
     """
     BgBu表---处理  GET POST , 处理 /api/post/<pk>/ GET PUT PATCH DELETE
     """
-    queryset = BgBu.objects.all().order_by('name')
+    queryset = Organization.objects.all().order_by('name')
     serializer_class = BgBuSerializer
     permission_classes = (permissions.IsAuthenticated,)
     # pagination_class = LimitSet

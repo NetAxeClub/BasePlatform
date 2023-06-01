@@ -34,9 +34,9 @@ os.environ.setdefault("DJANGO_ALLOW_ASYNC_UNSAFE", "true")
 
 # Application definition
 INSTALLED_APPS = [
-    "captcha",
+    # "captcha",
     "channels",
-    "guardian",
+    # "guardian",
     "multi_captcha_admin",
     "django.contrib.admin",
     "django.contrib.auth",
@@ -54,9 +54,9 @@ INSTALLED_APPS = [
     "apps.asset.apps.AssetConfig",
     "apps.automation.apps.AutomationConfig",
     "apps.config_center.apps.ConfigCenterConfig",
-    "apps.route_backend.apps.RouteBackendConfig",
+    # "apps.route_backend.apps.RouteBackendConfig",
     "apps.int_utilization.apps.IntUtilizationConfig",
-    'reversion',
+    # 'reversion',
     'import_export',
 
 ]
@@ -79,6 +79,7 @@ DATABASES = {
         'OPTIONS': {
             # 'charset': 'utf8mb4',
             "init_command": "SET default_storage_engine='INNODB'",
+            # "init_command": "SET foreign_key_checks = 0;",
         }
     },
 }
@@ -381,22 +382,22 @@ AUTHENTICATION_BACKENDS = (
 # ================================================= #
 # **************** 验证码配置  ********************* #
 # ================================================= #
-MULTI_CAPTCHA_ADMIN = {
-    "engine": "simple-captcha",
-}
+# MULTI_CAPTCHA_ADMIN = {
+#     "engine": "simple-captcha",
+# }
 # CAPTCHA_IMAGE_SIZE = (160, 60)  # 设置 captcha 图片大小
-CAPTCHA_LENGTH = 4  # 字符个数
-CAPTCHA_TIMEOUT = 1  # 超时(minutes)
-CAPTCHA_OUTPUT_FORMAT = "%(image)s %(text_field)s %(hidden_field)s "
-CAPTCHA_FONT_SIZE = 40  # 字体大小
-CAPTCHA_FOREGROUND_COLOR = "#64DAAA"  # 前景色
-CAPTCHA_BACKGROUND_COLOR = "#F5F7F4"  # 背景色
-CAPTCHA_NOISE_FUNCTIONS = (
-    "captcha.helpers.noise_arcs",  # 线
-    # "captcha.helpers.noise_dots",  # 点
-)
+# CAPTCHA_LENGTH = 4  # 字符个数
+# CAPTCHA_TIMEOUT = 1  # 超时(minutes)
+# CAPTCHA_OUTPUT_FORMAT = "%(image)s %(text_field)s %(hidden_field)s "
+# CAPTCHA_FONT_SIZE = 40  # 字体大小
+# CAPTCHA_FOREGROUND_COLOR = "#64DAAA"  # 前景色
+# CAPTCHA_BACKGROUND_COLOR = "#F5F7F4"  # 背景色
+# CAPTCHA_NOISE_FUNCTIONS = (
+#     "captcha.helpers.noise_arcs",  # 线
+#     # "captcha.helpers.noise_dots",  # 点
+# )
 # CAPTCHA_CHALLENGE_FUNCT = "captcha.helpers.random_char_challenge" #字母验证码
-CAPTCHA_CHALLENGE_FUNCT = "captcha.helpers.math_challenge"  # 加减乘除验证码
+# CAPTCHA_CHALLENGE_FUNCT = "captcha.helpers.math_challenge"  # 加减乘除验证码
 
 # ================================================= #
 # **************** swagger  *********************** #

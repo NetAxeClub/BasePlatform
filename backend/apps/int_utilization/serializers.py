@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import InterfaceUsedNew
+from .models import InterfaceUsed
 
 
 class InterfaceUsedNewSerializer(serializers.ModelSerializer):
@@ -8,5 +8,5 @@ class InterfaceUsedNewSerializer(serializers.ModelSerializer):
     log_time = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', read_only=True)
 
     class Meta:
-        model = InterfaceUsedNew
+        model = InterfaceUsed
         fields = '__all__'

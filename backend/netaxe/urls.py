@@ -44,7 +44,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('admin/login/', views.extend_admin_login),
     re_path(r'^base_platform/media/(?P<path>.*)', serve, {"document_root": settings.MEDIA_ROOT}),
-    re_path(r'^captcha/', include('captcha.urls')),
+    # re_path(r'^captcha/', include('captcha.urls')),
     # path("swagger/",schema_view.with_ui("swagger", cache_timeout=0), name="schema-swagger-ui",),
     re_path('^api-auth/', include('rest_framework.urls', namespace='rest_framework')),
     # 登录
@@ -55,7 +55,7 @@ urlpatterns = [
     path("base_platform/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     # 自定义权限
     path("base_platform/users/", include("apps.users.urls")),
-    path("base_platform/system/", include("apps.system.urls")),
+    # path("base_platform/system/", include("apps.system.urls")),
 
     path(r'base_platform/asset/', include('apps.asset.urls')),
     path(r'base_platform/backend/', include('apps.route_backend.urls')),

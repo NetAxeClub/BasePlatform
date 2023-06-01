@@ -30,7 +30,6 @@ class Topology(models.Model):
         unique=True)
     memo = models.TextField(verbose_name='描述', null=True, blank=True)
 
-
     def __str__(self):
         return self.name
 

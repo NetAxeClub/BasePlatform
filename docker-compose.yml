@@ -9,7 +9,7 @@ services:
           dockerfile: ./dockerfiles/backend_dockerfile
       command: sh start.sh web
       networks:
-          - "netaxe-network"
+          - docker_netaxe
       restart: always
 
     # nginx代理
@@ -19,9 +19,9 @@ services:
         context: .
         dockerfile: ./dockerfiles/nginx_dockerfile
       networks:
-        - "netaxe-network"
+          - docker_netaxe
       ports:
-        - "31101:80"
+        - "31100:80"
 
     # 前端
     base-web:
@@ -30,11 +30,11 @@ services:
         context: .
         dockerfile: ./dockerfiles/web_dockerfile
       ports:
-        - "9904:80"
+        - "32200:80"
       networks:
-        - "netaxe-network"
+          - docker_netaxe
       restart: always
 
 networks:
-  netaxe-network:
-    name: "netaxe-network"
+  docker_netaxe:
+    external: true

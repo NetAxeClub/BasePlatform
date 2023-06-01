@@ -3,7 +3,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 from rest_framework import viewsets, permissions, filters, pagination
 
-from .models import InterfaceUsedNew
+from .models import InterfaceUsed
 from .serializers import InterfaceUsedNewSerializer
 from apps.api.tools.custom_viewset_base import CustomViewBase
 from apps.api.tools.custom_pagination import LargeResultsSetPagination
@@ -15,7 +15,7 @@ class InterfaceUsedFilter(django_filters.FilterSet):
     host_ip = django_filters.CharFilter(lookup_expr='icontains')
 
     class Meta:
-        model = InterfaceUsedNew
+        model = InterfaceUsed
         fields = '__all__'
 
 
@@ -23,7 +23,7 @@ class InterfaceUsedNewViewSet(CustomViewBase):
     """
     接口利用率--处理  GET POST , 处理 /api/post/<pk>/ GET PUT PATCH DELETE
     """
-    queryset = InterfaceUsedNew.objects.all().order_by('-log_time')
+    queryset = InterfaceUsed.objects.all().order_by('-log_time')
     # queryset = InterfaceUsedNewSerializer.setup_eager_loading(queryset)
     serializer_class = InterfaceUsedNewSerializer
     # permission_classes = ()

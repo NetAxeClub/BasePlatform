@@ -12,13 +12,13 @@
 """
 import json
 from rest_framework import serializers
-from .models import BgBu
+from .models import Organization
 
 
 class BgBuSerializer(serializers.ModelSerializer):
-    """bgbu表，用于运营平台数据对应关系"""
+    """组织表"""
 
     class Meta:
-        model = BgBu
+        model = Organization
         fields = ('id', 'name',)
 

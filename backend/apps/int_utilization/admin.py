@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import InterfaceUsedNew
+from .models import InterfaceUsed
 
 # Register your models here.
-admin.site.register(InterfaceUsedNew)
+admin.site.register(InterfaceUsed)

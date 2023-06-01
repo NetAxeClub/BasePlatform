@@ -1,3 +1,4 @@
+import json
 from django.db import models
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.utils import timezone
@@ -421,6 +422,7 @@ class NetworkDevice(models.Model):
     account = models.ManyToManyField('AssetAccount', verbose_name='管理账户', blank=True)
     plan = models.ForeignKey("automation.CollectionPlan", verbose_name='采集方案',
                              blank=True, null=True, related_name='releate_device', on_delete=models.SET_NULL)
+    org = models.ManyToManyField("users.Organization", verbose_name='org', blank=True)
     history = HistoricalRecords()
 
     def __str__(self):
@@ -474,4 +476,193 @@ class AdminRecord(models.Model):
         db_table = 'asset_admin_record'
         verbose_name = '登录管理用户记录表'
         verbose_name_plural = '登录管理用户记录表'
+
+
+# 服务器相关表
+# 服务器厂商
+class ServerVendor(models.Model):
+    """服务器供应商"""
+    name = models.CharField(
+        verbose_name='供应商',
+        max_length=30,
+        null=False,
+        unique=True)
+    alias = models.CharField(
+        verbose_name='别名',
+        max_length=30,
+        null=True, blank=True)
+
+    def __str__(self):
+        return "{}-{}".format(self.name, self.alias)
+
+    class Meta:
+        verbose_name_plural = '服务器供应商'
+        db_table = 'server_vendor'  # 通过db_table自定义数据表名
+        indexes = [models.Index(fields=['name', ])]
+
+
+# 服务器型号
+class ServerModel(models.Model):
+    """
+    服务器硬件型号
+    """
+    name = models.CharField(
+        verbose_name='硬件型号',
+        max_length=30,
+        null=False,
+        unique=True)
+    alias = models.CharField(
+        verbose_name='型号别名',
+        max_length=50,
+        null=True,
+        blank=True
+    )
+    vendor = models.ForeignKey(
+        "ServerVendor",
+        verbose_name='供应商',
+        on_delete=models.CASCADE,
+        blank=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        unique_together = (("name", "vendor"),)
+        verbose_name_plural = '服务器硬件型号表'
+        db_table = 'server_model'  # 通过db_table自定义数据表名
+        indexes = [models.Index(fields=['name', ])]
+
+
+# 服务器表
+class Server(models.Model):
+    """服务器设备"""
+    status_choices = ((0, '在线'), (1, '下线'), (2, '挂牌'), (3, '备用'))
+    sub_asset_type_choice = (
+        (0, '服务器'),
+        (1, '虚拟机'),
+
+    )
+    name = models.CharField(verbose_name='名称', max_length=200, null=False)
+    serial_num = models.CharField(verbose_name='序列号/UUID', max_length=200, null=True, blank=True)
+    manage_ip = models.GenericIPAddressField(verbose_name='管理地址', null=True, blank=True)
+    idc = models.ForeignKey(
+        "Idc",
+        related_name='server_idc',
+        verbose_name='所属机房',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True)
+    vendor = models.ForeignKey(
+        "ServerVendor",
+        verbose_name='供应商',
+        related_name='server_vendor',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True)
+    rack = models.ForeignKey(
+        "Rack",
+        verbose_name='机柜编号',
+        related_name='server_rack',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True)
+    idc_model = models.ForeignKey(
+        "IdcModel",
+        verbose_name='模块',
+        related_name='server_idc_model',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True)
+    u_location = models.CharField(
+        verbose_name='机架',
+        max_length=20,
+        null=True,
+        blank=True,
+        default='')
+    sub_asset_type = models.SmallIntegerField(choices=sub_asset_type_choice, default=0, verbose_name="服务器类型")
+    hosted_on = models.ForeignKey('self', related_name='hosted_on_server',
+                                  blank=True, null=True, verbose_name="宿主机", on_delete=models.SET_NULL)  # 虚拟机专用字段
+    model = models.ForeignKey(
+        "ServerModel",
+        verbose_name='服务器型号',
+        related_name='server_model',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True)
+    cpu_model = models.CharField(max_length=100, blank=True, null=True, verbose_name='CPU型号')
+    cpu_number = models.SmallIntegerField(blank=True, null=True, verbose_name='物理CPU个数')
+    vcpu_number = models.SmallIntegerField(blank=True, null=True, verbose_name='逻辑CPU个数')
+    disk_total = models.CharField(max_length=16, blank=True, null=True, verbose_name='磁盘空间')
+    ram_total = models.CharField(max_length=100, blank=True, null=True, verbose_name='内存容量')
+    kernel = models.CharField(max_length=100, blank=True, null=True, verbose_name='内核版本')
+    system = models.CharField(max_length=100, blank=True, null=True, verbose_name='操作系统')
+    host_vars = models.TextField(blank=True, null=True, verbose_name='主机变量')
+    status = models.PositiveSmallIntegerField(
+        verbose_name='状态', choices=status_choices, default=0)
+    manager_name = models.CharField(verbose_name='归属人', max_length=100, null=True, blank=True)
+    manager_tel = models.CharField(verbose_name='归属人联系方式', max_length=100, null=True, blank=True)
+    purpose = models.CharField(verbose_name='用途', max_length=200, null=True, blank=True)
+    memo = models.TextField(verbose_name='备注', null=True, blank=True)
+
+    def __str__(self):
+        return '%s-%s-%s' % (self.name, self.get_sub_asset_type_display(), self.manage_ip)
+
+    class Meta:
+        verbose_name = '服务器'
+        verbose_name_plural = "服务器"
+        db_table = 'asset_server'
+
+
+# 容器表
+class ContainerService(models.Model):
+    """
+    服务管理  容器管理
+    与Cadvisor API深度整合
+    """
+    id = models.CharField(primary_key=True, verbose_name='id', max_length=200)
+    name = models.CharField(verbose_name='服务名', max_length=500, null=True, blank=True)
+    service = models.CharField(verbose_name='镜像', max_length=500, null=True, blank=True)
+    working_dir = models.CharField(verbose_name='工作路径', max_length=500, null=True, blank=True)
+    config_files = models.CharField(verbose_name='配置文件', max_length=500, null=True, blank=True)
+    project = models.CharField(verbose_name='项目名', max_length=500, null=True, blank=True)
+    creation_time = models.DateTimeField(verbose_name='创建时间', null=True, blank=True)
+    on_server = models.ForeignKey("Server", verbose_name='关联服务器',
+                                  null=True, blank=True,
+                                  on_delete=models.CASCADE, related_name='service_on_server')
+    url_path = models.CharField(verbose_name='URL访问路径', max_length=200, null=True, blank=True)
+
+    def __str__(self):
+        return '%s--%s--%s <sn:%s>' % (self.name, self.working_dir, self.config_files, self.project)
+
+    class Meta:
+        verbose_name = '服务管理'
+        verbose_name_plural = "服务管理"
+        db_table = 'asset_service'
+
+
+# 服务器账户表
+class ServerAccount(models.Model):
+    """
+    服务器和账户关联表
+    """
+    server = models.ForeignKey(
+        "Server",
+        verbose_name='服务器',
+        related_name='to_account',
+        on_delete=models.CASCADE)
+
+    account = models.ForeignKey(
+        "AssetAccount",
+        verbose_name='账户',
+        related_name='to_server',
+        on_delete=models.CASCADE)
+
+    def __str__(self):
+        return 'server:%s account:%s' % (self.server, self.account)
+
+    class Meta:
+        unique_together = (("server", "account"),)
+        verbose_name_plural = '服务器和账户关联表'
+        db_table = 'asset_account2server'  # 通过db_table自定义数据表名
+
 

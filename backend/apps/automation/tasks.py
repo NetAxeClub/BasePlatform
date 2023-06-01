@@ -27,7 +27,7 @@ from django.db import connections
 from datetime import datetime, date
 from netaddr import IPAddress
 from apps.asset.models import AssetAccount, NetworkDevice
-from apps.int_utilization.models import InterfaceUsedNew
+from apps.int_utilization.models import InterfaceUsed
 from apps.automation.tools.h3c import H3cProc
 from apps.automation.tools.hillstone import HillstoneProc
 from apps.automation.tools.huawei import HuaweiProc
@@ -131,7 +131,7 @@ def interface_used(device_ip=None):
                     post_data[k.lower()] = data[k]
                 logger.info('落库data:{}'.format(post_data))
                 try:
-                    InterfaceUsedNew.objects.create(**post_data)
+                    InterfaceUsed.objects.create(**post_data)
                     cache.set("interface_used_" + str(post_data['host_id']),
                               json.dumps(post_data, cls=JsonEncoder), 3600 * 5)
                 except Exception as e:

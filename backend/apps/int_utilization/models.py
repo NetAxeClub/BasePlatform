@@ -3,8 +3,8 @@ from django.db import models
 # Create your models here.
 
 
-class InterfaceUsedNew(models.Model):
-    """接口使用率新"""
+class InterfaceUsed(models.Model):
+    """接口使用率"""
     host = models.CharField(verbose_name='主机名', max_length=200, null=True, blank=True)
     host_id = models.CharField(verbose_name='硬件ID', max_length=50, null=True, blank=True)
     host_ip = models.GenericIPAddressField(verbose_name='管理IP', null=True, blank=True)
@@ -43,7 +43,7 @@ class InterfaceUsedNew(models.Model):
 
     class Meta:
         verbose_name_plural = '接口利用率表'
-        db_table = 'interface_used_new'  # 通过db_table自定义数据表名
+        db_table = 'interface_used'  # 通过db_table自定义数据表名
         indexes = [models.Index(fields=['host', ]),
                    models.Index(fields=['host_id', ]),
                    models.Index(fields=['host_ip', ]),
