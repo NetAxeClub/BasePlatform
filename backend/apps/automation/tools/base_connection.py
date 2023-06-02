@@ -23,6 +23,7 @@ from utils.connect_layer.my_netmiko import my_netmiko
 1. 无特殊情况，默认情况下，连接方式默认用BaseConnection类
 2. 特殊设备特殊处理，可以考虑继承BaseConnection类进行功能扩展
 """
+# netmiko 参数映射
 device_type_map = {
     "H3C": "hp_comware",
     "Huawei": "huawei",
@@ -33,6 +34,7 @@ device_type_map = {
     "Maipu": "ruijie_os",
     "Cisco": "cisco_ios",
 }
+# fsm解析器参数映射
 fsm_flag_map = {
     "H3C": "hp_comware",
     "Huawei": "huawei_vrp",
@@ -43,6 +45,7 @@ fsm_flag_map = {
     "Maipu": "maipu",
     "Cisco": "cisco_ios",
 }
+# netconf连接类映射
 netconf_class_map = {
     "huawei_usg": HuaweiUSG,
     "huawei": HuaweiCollection,
@@ -116,6 +119,7 @@ class InterfaceFormat(object):
         return value.strip()
 
 
+# 自动化基类
 class BaseConn:
     def __init__(self, **kwargs):
         self.hostip = kwargs['manage_ip']

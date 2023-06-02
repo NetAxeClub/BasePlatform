@@ -9,7 +9,9 @@ function usePermissionGuard() {
     if (whiteRoutes.includes(to.path)) {
       return true
     }
-    // const userStore = useUserStore()
+    const userStore = useUserStore()
+    // console.log(userStore)
+    // console.log(userStore.isTokenExpire())
     // if (userStore.isTokenExpire()) {
     //   return {
     //     path: '/login',
