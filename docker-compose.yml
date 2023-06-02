@@ -2,7 +2,7 @@ version: "3.7"
 
 services:
     # 后端入口
-    base-platform-backend:
+    base-backend:
       image: registry.cn-hangzhou.aliyuncs.com/netaxe/base-backend:1.0
       build:
           context: .
