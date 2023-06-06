@@ -15,7 +15,7 @@ import pika
 import time
 from queue import Queue
 from threading import Lock
-from backend.confload.confload import config
+from confload.confload import config
 
 
 # 回调方法
@@ -69,8 +69,11 @@ class SyncMessageBus:
                 channel = self.channel_pool.get()
         return channel
 
-    def publish(self, routing_key, body, properties=None):
+    def publish(self, queue, routing_key, body, properties=None, durable=True, auto_delete=False):
         channel = self.get_channel()
+        result = channel.queue_declare(queue=queue, durable=durable, auto_delete=auto_delete)
+        queue_name = result.method.queue
+        channel.queue_bind(exchange=self.exchange, queue=queue_name, routing_key=routing_key)
         channel.basic_publish(
             exchange=self.exchange,
             routing_key=routing_key,
