@@ -119,6 +119,23 @@ class Config:
             cls._instance = super().__new__(cls)
         return cls._instance
 
+    # 项目日志配置
+    def setup_logging(self, max_debug=False):
+        with open(self.log_config_filename) as infil:
+            log_config_dict = yaml.load(infil, Loader=yaml_loader)
+
+        if max_debug:
+            for handler in log_config_dict["handlers"].values():
+                handler["level"] = "DEBUG"
+
+            for logger in log_config_dict["loggers"].values():
+                logger["level"] = "DEBUG"
+
+            log_config_dict["root"]["level"] = "DEBUG"
+
+        logging.config.dictConfig(log_config_dict)
+        log.info(f"confload: Logging setup @ {__name__}")
+
     # 获取项目根目录
     @property
     def get_root_path(self):

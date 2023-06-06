@@ -15,14 +15,24 @@ import os
 import django
 import schedule
 import time
+import sys
+import logging
+import socket
+from multiprocessing import Process
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'netaxe.settings')
 django.setup()
 from manager import app_manager_sync
 from confload.confload import config
-from utils.metric import run_time_sync
+BASE_DIR = os.path.dirname(__file__)
+# 定位到log日志文件
+log_path = os.path.join(BASE_DIR, 'logs')
+hostname = socket.gethostname()
+if not os.path.exists(log_path):
+    os.mkdir(log_path)
+log = logging.getLogger(__name__)
+config.setup_logging(max_debug=True)
 
 
-# @run_time_sync
 def register_server():
     tmp = {
         "method": "register_server",  # 指定rbac的route 回调方法
@@ -33,7 +43,6 @@ def register_server():
     app_manager_sync.pubilch_task(queue='rbac', routing_key='rbac', data=json.dumps(tmp))
 
 
-# @run_time_sync
 def register_menu():
     tmp = {
         "method": "register_menu",  # 指定rbac的route 回调方法
@@ -43,14 +52,34 @@ def register_menu():
     app_manager_sync.pubilch_task(queue='rbac', routing_key='rbac', data=json.dumps(tmp))
 
 
+# 实现work的基本方法
+def run_worker():
+    try:
+        register_server()
+        register_menu()
+        schedule.every(10).minutes.do(register_server)
+        schedule.every(6).hours.do(register_menu)
+    except Exception as e:
+        return e
+
+
+# 开启多进程
+def worker_constructor():
+    try:
+        p = Process(target=run_worker, name="worker-{}".format(hostname))
+        p.start()
+        while True:
+            time.sleep(99999999)
+    finally:
+        sys.exit()
+
+
+# 最终调用
+def main(args):
+    worker_type = args[-1]
+    if worker_type == "default":
+        worker_constructor()
+
 
 if __name__ == "__main__":
-    # 每隔10分钟执行一次 job() 函数
-    # register_server()
-    register_menu()
-    # schedule.every(10).minutes.do(register_server)
-    #
-    # # 启动定时任务
-    # while True:
-    #     schedule.run_pending()
-    #     time.sleep(1)
+    main(sys.argv)

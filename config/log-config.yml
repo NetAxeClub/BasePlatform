@@ -1,0 +1,74 @@
+version: 1
+formatters:
+  simple:
+    format: '%(levelname) -5s %(asctime)s %(name) -5s %(funcName) -5s %(lineno) -5d: %(message)s'
+  standard:
+    format: '[%(asctime)s][%(threadName)s:%(thread)d][%(filename)s:%(lineno)d][%(levelname)s][%(message)s]'
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: simple
+    stream: ext://sys.stdout
+  default:
+    level: INFO
+    class: logging.handlers.RotatingFileHandler
+    filename: logs/log.log
+    maxBytes: 52428800
+    formatter: standard
+    encoding: utf-8
+  aio_pika:
+    level: INFO
+    class: logging.handlers.RotatingFileHandler
+    filename: logs/aio_pika.log
+    maxBytes: 52428800
+    formatter: standard
+    encoding: utf-8
+  pika:
+    level: INFO
+    class: logging.handlers.RotatingFileHandler
+    filename: logs/pika.log
+    maxBytes: 52428800
+    formatter: standard
+    encoding: utf-8
+  aiormq:
+    level: INFO
+    class: logging.handlers.RotatingFileHandler
+    filename: logs/aiormq.log
+    maxBytes: 52428800
+    formatter: standard
+    encoding: utf-8
+loggers:
+  worker:
+    level: INFO
+    handlers: [default]
+    propagate: no
+  aio_pika:
+    level: INFO
+    handlers: [aio_pika]
+  aiormq:
+    level: INFO
+    handlers: [aiormq]
+  pika:
+    level: INFO
+    handlers: [pika]
+  backend:
+    level: INFO
+  routers:
+    level: INFO
+  manager_async:
+    handlers: [default]
+    level: INFO
+  motor:
+    level: INFO
+  metric:
+    handlers: [default]
+    level: INFO
+  nacos:
+    handlers: [default]
+    level: INFO
+root:
+  level: INFO
+  handlers: [console]
+
+disable_existing_loggers: False
