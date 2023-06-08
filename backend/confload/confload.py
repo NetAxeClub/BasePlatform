@@ -86,8 +86,10 @@ class Config:
         self.nacos = data['nacos']
         self.version = data['version']
         self.local_dev = data['local_dev']
-        self.server_ip = data['server_ip']
-        self.server_port = data['server_port']
+        self.backend_ip = data['backend_ip']
+        self.backend_port = data['backend_port']
+        self.web_ip = data['web_ip']
+        self.web_port = data['backend_port']
         self.nacos_port = data['nacos_port']
         self.virtual_host = data['virtual_host']
         self.allow_origins = data['allow_origins']
@@ -110,8 +112,6 @@ class Config:
         self.default_webhook_name = data["default_webhook_name"]
         self.default_webhook_headers = data["default_webhook_headers"]
         self.custom_webhooks = data["custom_webhooks"]
-        # 微服务 消息网关
-        self.msg_gateway = data["msg_gateway"]
 
     # 单例模式
     def __new__(cls):

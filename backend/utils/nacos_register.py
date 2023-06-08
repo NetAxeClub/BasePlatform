@@ -23,8 +23,8 @@ def nacos_init():
             'routing_key': config.routing_key,
             # 'menu': config.default_menu,
         }
-        config.registerService(serviceIp=config.server_ip,
-                               servicePort=config.server_port,
+        config.registerService(serviceIp=config.backend_ip,
+                               servicePort=config.backend_port,
                                serviceName=config.queue, groupName="default",
                                metadata=metadata)
         config.healthyCheck()

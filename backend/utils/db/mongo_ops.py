@@ -332,18 +332,6 @@ class MongoNetOps(object):
     @staticmethod
     def arp_reindex():
         """
-        {"node_hostname":"B3.NET.INT.ED.001",
-        "node_ip":"10.254.12.10",
-        "idc_name":"合肥B3",
-        "node_interface":"M-GigabitEthernet0/0/0",
-        "node_location":"运营商机房1_B02_35U",
-        "server_ip_address":"10.254.12.68",
-        "server_mac_address":"882a-5e62-c4b8",
-        "server_admin":"",
-        "server_platform":"",
-        "server_location":"",
-        "server_managername":"",
-        "attribute":"生产网"}
         :return:
         """
         my_mongo = MongoOps(db='Automation', coll='ARPTable')
@@ -728,7 +716,7 @@ class IpamOps(object):
         log_time = datetime.now().strftime("%Y-%m-%d")
         my_mongo = MongoOps(db='IPAMData', coll='netaxe_ipam_fail_ip')
         query_tmp = my_mongo.find(query_dict={'fail_ip': ip})
-        print(query_tmp)
+        # print(query_tmp)
         if query_tmp:
             if query_tmp[0]['log_time'] != log_time:
                 return 'update', my_mongo.update(filter={'fail_ip': ip}, update={"$set": {'log_time': log_time}})

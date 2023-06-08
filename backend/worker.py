@@ -38,7 +38,7 @@ def register_server():
         "method": "register_server",  # 指定rbac的route 回调方法
         "key": config.project_name,
         "name": "基础平台",
-        "url": "http://{}:{}".format(config.server_ip, config.server_port)
+        "url": "http://{}:{}".format(config.web_ip, config.web_port)
     }
     app_manager_sync.pubilch_task(queue='rbac', routing_key='rbac', data=json.dumps(tmp))
 
