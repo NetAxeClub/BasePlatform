@@ -73,6 +73,10 @@ class Config:
         self.__configDict = {}
         self.healthy = ""
         self.data = data
+        self.backend_ip = data['backend_ip']
+        self.backend_port = data['backend_port']
+        self.web_ip = data['web_ip']
+        self.web_port = data['web_port']
         self.drivers = data['drivers']
         self.mysql_db = data['mysql_db']
         self.mysql_host = data['mysql_host']
@@ -86,10 +90,6 @@ class Config:
         self.nacos = data['nacos']
         self.version = data['version']
         self.local_dev = data['local_dev']
-        self.backend_ip = data['backend_ip']
-        self.backend_port = data['backend_port']
-        self.web_ip = data['web_ip']
-        self.web_port = data['backend_port']
         self.nacos_port = data['nacos_port']
         self.virtual_host = data['virtual_host']
         self.allow_origins = data['allow_origins']
