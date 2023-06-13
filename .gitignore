@@ -9,7 +9,6 @@ web/.DS_Store
 web/dist
 web/*.local
 web/.idea/
-web/.vscode/
 web/node_modules
 backend/logs
 config/config.json
