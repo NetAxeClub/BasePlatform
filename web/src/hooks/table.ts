@@ -1,4 +1,4 @@
-import { h, reactive, Ref, ref, unref, VNode } from 'vue'
+import { h, reactive, Ref, ref, shallowReactive, VNode } from 'vue'
 
 import { DataTableColumn, NButton } from 'naive-ui'
 import { TableFooterType, TableHeaderType } from '@/types/components'
@@ -10,17 +10,17 @@ export interface TableActionModel {
   onClick: () => {}
 }
 
-interface Table<T = any> {
-  dataList: Ref<T[] | undefined>
+interface Table {
+  dataList: Array<any>
   bordered: Ref<Boolean>
-  selectRows: Ref<Array<string | number> | undefined>
+  selectRows: Array<string | number>
   tableLoading: Ref<boolean>
   tableHeaderRef: Ref<TableHeaderType | null>
   tableFooterRef: Ref<TableFooterType | null>
   tableHeight: Ref<number>
-  handleSuccess: (res: any) => Promise<T[]>
-  handleSelectionChange: (tempSelectRows: Array<string | number>) => void
-  useTableColumn: (columns: DataTableColumn[], options: DataTableColumn) => Array<DataTableColumn>
+  handleSuccess: (res: any) => Promise<any>
+  handleSelectionChange: (tempSelectRows: Array<any>) => void
+  useTableColumn: (columns: DataTableColumn[], options: DataTableColumn) => Array<any>
   selectionColumn: { type: 'selection' }
   indexColumn: {
     title: string
@@ -49,21 +49,23 @@ export const useTableHeight = async function (): Promise<number> {
   })
 }
 
-export const useTable = function <T = any>(): Table<T> {
-  const dataList = ref<Array<T>>()
-  const selectRows = ref<Array<string | number>>()
+export const useTable = function (): Table {
+  const dataList = shallowReactive([]) as Array<any>
+  const selectRows = shallowReactive([]) as Array<any>
   const tableHeaderRef = ref<TableHeaderType | null>(null)
   const tableFooterRef = ref<TableFooterType | null>(null)
   const tableHeight = ref(200)
   const bordered = ref(false)
   const tableLoading = ref(true)
-  const handleSuccess = ({ data = [] }: { data: T[] }): Promise<T[]> => {
+  const handleSuccess = ({ results = [] }): Promise<any> => {
     tableLoading.value = false
-    dataList.value = data
-    return Promise.resolve(data)
+    dataList.length = 0
+    dataList.push(...results)
+    return Promise.resolve(results)
   }
-  const handleSelectionChange = (tempSelectRows: Array<string | number>) => {
-    selectRows.value = tempSelectRows
+  const handleSelectionChange = (tempSelectRows: Array<any>) => {
+    selectRows.length = 0
+    selectRows.push(...tempSelectRows)
   }
   return {
     dataList,
@@ -84,7 +86,7 @@ export const useTable = function <T = any>(): Table<T> {
 }
 
 export const useRenderAction = function (actions: TableActionModel[]) {
-  const renderActions = actions.map((it) => {
+  return actions.map((it) => {
     return h(
       NButton,
       {
@@ -100,7 +102,6 @@ export const useRenderAction = function (actions: TableActionModel[]) {
       }
     )
   })
-  return renderActions
 }
 
 export const useRowKey = function (propName: string) {
@@ -109,11 +110,8 @@ export const useRowKey = function (propName: string) {
   }
 }
 
-export const useTableColumn = function (columns: DataTableColumn[], options?: DataTableColumn) {
-  const tempColumns = ref<DataTableColumn[]>()
-  const tempOpt = options ?? {}
-  tempColumns.value = columns.map((it) => Object.assign({ ...tempOpt }, it))
-  return unref(tempColumns)!
+export const useTableColumn = function (columns: DataTableColumn[], options: DataTableColumn) {
+  return columns.map((it) => Object.assign(it))
 }
 
 export const useTableIndexColumn = function () {
@@ -137,14 +135,17 @@ export const usePagination = function (callback: () => void) {
   const paginationInfo = reactive({
     page: 1,
     pageSize: 10,
+    limit: 10,
+    start: 0,
     showSizePicker: true,
     pageCount: 1,
-    Count: 1,
-    pageSizes: [10, 20, 30, 40],
+    itemCount: 1,
+    pageSizes: [10, 50, 100, 200],
     onChange,
     onPageSizeChange,
     setTotalSize(totalSize: number) {
       paginationInfo.pageCount = Math.ceil(totalSize / paginationInfo.pageSize)
+      paginationInfo.itemCount = totalSize
     },
   })
   return paginationInfo

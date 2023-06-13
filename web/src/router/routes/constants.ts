@@ -65,4 +65,14 @@ export const constantRoutes = [
       hidden: true,
     },
   },
+    {
+        path: '/ssh',
+        name: 'ssh',
+        component: () => import('@/views/ssh.vue'),
+        hidden: true,
+        meta: {
+            requireAuth: true,
+            index: '/ssh',
+        }
+    },
 ]

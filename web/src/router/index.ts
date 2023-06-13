@@ -1,10 +1,11 @@
 import { App } from 'vue'
 import { mapTwoLevelRouter } from '@/store/help'
-import { createRouter, createWebHashHistory } from 'vue-router'
+import { createRouter, createWebHashHistory,createWebHistory } from 'vue-router'
 import { constantRoutes } from './routes/constants'
 
 const router = createRouter({
-  history: createWebHashHistory(),
+  // history: createWebHashHistory(),
+  history: createWebHistory(),
   routes: mapTwoLevelRouter([...constantRoutes]),
 })
 
