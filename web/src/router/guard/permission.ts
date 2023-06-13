@@ -21,7 +21,6 @@ function usePermissionGuard() {
     const permissionStore = usePermissionStore()
     // 判断是否空路由
     const isEmptyRoute = permissionStore.isEmptyPermissionRoute()
-    console.log('isEmptyRoute',isEmptyRoute)
     if (isEmptyRoute && to.path!='/ssh') {
       await permissionStore.initPermissionRoute()
       return { ...to, replace: true }
