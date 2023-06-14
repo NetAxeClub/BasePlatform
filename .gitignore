@@ -9,6 +9,7 @@ web/.DS_Store
 web/dist
 web/*.local
 web/.idea/
+web/.env.development
 web/node_modules
 backend/logs
 config/config.json
