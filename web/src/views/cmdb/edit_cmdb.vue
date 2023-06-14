@@ -9,52 +9,27 @@
             <TableBody>
               <template #header>
                 <n-space>
-                  <n-button
-                    size="tiny"
-                    type="info"
-                    @click="add_vendor_show = true"
-                    >新增供应商
+                  <n-button size="tiny" type="info" @click="add_vendor_show = true">新增供应商
                   </n-button>
-                  <n-button
-                    size="tiny"
-                    type="info"
-                    @click="add_devicetype_show = true"
-                    >新增设备类型
+                  <n-button size="tiny" type="info" @click="add_devicetype_show = true">新增设备类型
                   </n-button>
-                  <n-button
-                    size="tiny"
-                    type="info"
-                    @click="add_model_show = true"
-                    >新增硬件型号
+                  <n-button size="tiny" type="info" @click="add_model_show = true">新增硬件型号
                   </n-button>
-                  <n-input
-                    size="tiny"
-                    placeholder="硬件型号搜索"
-                    v-model:value="model_keyword"
-                    @keyup.enter.native="model_filter_func"
-                  ></n-input>
+                  <n-input size="tiny" placeholder="硬件型号搜索" v-model:value="model_keyword"
+                    @keyup.enter.native="model_filter_func" />
                 </n-space>
               </template>
               <template #default>
-                <n-data-table
-                  :data="
-                    model_list.slice(
-                      (model_page - 1) * model_pageSize,
-                      model_page * model_pageSize
-                    )
-                  "
-                  :columns="model_tableColumns"
-                  :row-key="rowKey"
-                />
+                <n-data-table :data="model_list.slice(
+                  (model_page - 1) * model_pageSize,
+                  model_page * model_pageSize
+                )
+                  " :columns="model_tableColumns" :row-key="rowKey" />
               </template>
               <template #footer>
                 <div class="flex justify-center">
-                  <n-pagination
-                    v-model:page="model_page"
-                    :page-count="model_pageCount"
-                    show-size-picker
-                    :page-sizes="model_pageSizes"
-                  >
+                  <n-pagination v-model:page="model_page" :page-count="model_pageCount" show-size-picker
+                    :page-sizes="model_pageSizes">
                     <template #prefix="{ itemCount, startIndex }">
                       共 {{ model_count }} 项
                     </template>
@@ -68,41 +43,24 @@
             <TableBody>
               <template #header>
                 <n-space>
-                  <n-button
-                    size="tiny"
-                    type="info"
-                    @click="add_role_show = true"
-                    >新增设备角色
+                  <n-button size="tiny" type="info" @click="add_role_show = true">新增设备角色
                   </n-button>
 
-                  <n-input
-                    size="tiny"
-                    placeholder="设备角色搜索"
-                    v-model:value="role_keyword"
-                    @keyup.enter.native="role_filter_func"
-                  ></n-input>
+                  <n-input size="tiny" placeholder="设备角色搜索" v-model:value="role_keyword"
+                    @keyup.enter.native="role_filter_func" />
                 </n-space>
               </template>
               <template #default>
-                <n-data-table
-                  :data="
-                    role_list.slice(
-                      (role_page - 1) * role_pageSize,
-                      role_page * role_pageSize
-                    )
-                  "
-                  :columns="role_tableColumns"
-                  :row-key="rowKey"
-                />
+                <n-data-table :data="role_list.slice(
+                  (role_page - 1) * role_pageSize,
+                  role_page * role_pageSize
+                )
+                  " :columns="role_tableColumns" :row-key="rowKey" />
               </template>
               <template #footer>
                 <div class="flex justify-center">
-                  <n-pagination
-                    v-model:page="role_page"
-                    :page-count="role_pageCount"
-                    show-size-picker
-                    :page-sizes="role_pageSizes"
-                  >
+                  <n-pagination v-model:page="role_page" :page-count="role_pageCount" show-size-picker
+                    :page-sizes="role_pageSizes">
                     <template #prefix="{ itemCount, startIndex }">
                       共 {{ role_count }} 项
                     </template>
@@ -124,40 +82,23 @@
             <TableBody>
               <template #header>
                 <n-space>
-                  <n-button
-                    size="tiny"
-                    type="info"
-                    @click="add_netzone_show = true"
-                    >新增网络区域
+                  <n-button size="tiny" type="info" @click="add_netzone_show = true">新增网络区域
                   </n-button>
-                  <n-input
-                    size="tiny"
-                    placeholder="网络区域搜索"
-                    v-model:value="netzone_keyword"
-                    @keyup.enter.native="netzone_filter_func"
-                  ></n-input>
+                  <n-input size="tiny" placeholder="网络区域搜索" v-model:value="netzone_keyword"
+                    @keyup.enter.native="netzone_filter_func" />
                 </n-space>
               </template>
               <template #default>
-                <n-data-table
-                  :data="
-                    netzone_list.slice(
-                      (netzone_page - 1) * netzone_pageSize,
-                      netzone_page * netzone_pageSize
-                    )
-                  "
-                  :columns="netzone_tableColumns"
-                  :row-key="rowKey"
-                />
+                <n-data-table :data="netzone_list.slice(
+                  (netzone_page - 1) * netzone_pageSize,
+                  netzone_page * netzone_pageSize
+                )
+                  " :columns="netzone_tableColumns" :row-key="rowKey" />
               </template>
               <template #footer>
                 <div class="flex justify-center">
-                  <n-pagination
-                    v-model:page="netzone_page"
-                    :page-count="netzone_pageCount"
-                    show-size-picker
-                    :page-sizes="netzone_pageSizes"
-                  >
+                  <n-pagination v-model:page="netzone_page" :page-count="netzone_pageCount" show-size-picker
+                    :page-sizes="netzone_pageSizes">
                     <template #prefix="{ itemCount, startIndex }">
                       共 {{ netzone_count }} 项
                     </template>
@@ -178,40 +119,23 @@
             <TableBody>
               <template #header>
                 <n-space>
-                  <n-button
-                    size="tiny"
-                    type="info"
-                    @click="add_attribute_show = true"
-                    >新增网络属性
+                  <n-button size="tiny" type="info" @click="add_attribute_show = true">新增网络属性
                   </n-button>
-                  <n-input
-                    size="tiny"
-                    placeholder="网络属性搜索"
-                    v-model:value="net_attribute_keyword"
-                    @keyup.enter.native="net_attributefilter_func"
-                  ></n-input>
+                  <n-input size="tiny" placeholder="网络属性搜索" v-model:value="net_attribute_keyword"
+                    @keyup.enter.native="net_attributefilter_func" />
                 </n-space>
               </template>
               <template #default>
-                <n-data-table
-                  :data="
-                    attribute_list.slice(
-                      (attribute_page - 1) * attribute_pageSize,
-                      attribute_page * attribute_pageSize
-                    )
-                  "
-                  :columns="attribute_tableColumns"
-                  :row-key="rowKey"
-                />
+                <n-data-table :data="attribute_list.slice(
+                  (attribute_page - 1) * attribute_pageSize,
+                  attribute_page * attribute_pageSize
+                )
+                  " :columns="attribute_tableColumns" :row-key="rowKey" />
               </template>
               <template #footer>
                 <div class="flex justify-center">
-                  <n-pagination
-                    v-model:page="attribute_page"
-                    :page-count="attribute_pageCount"
-                    show-size-picker
-                    :page-sizes="attribute_pageSizes"
-                  >
+                  <n-pagination v-model:page="attribute_page" :page-count="attribute_pageCount" show-size-picker
+                    :page-sizes="attribute_pageSizes">
                     <template #prefix="{ itemCount, startIndex }">
                       共 {{ attribute_count }} 项
                     </template>
@@ -232,40 +156,23 @@
             <TableBody>
               <template #header>
                 <n-space>
-                  <n-button
-                    size="tiny"
-                    type="info"
-                    @click="add_framework_show = true"
-                    >新增网络架构
+                  <n-button size="tiny" type="info" @click="add_framework_show = true">新增网络架构
                   </n-button>
-                  <n-input
-                    size="tiny"
-                    placeholder="网络架构搜索"
-                    v-model:value="net_framework_keyword"
-                    @keyup.enter.native="net_frameworkfilter_func"
-                  ></n-input>
+                  <n-input size="tiny" placeholder="网络架构搜索" v-model:value="net_framework_keyword"
+                    @keyup.enter.native="net_frameworkfilter_func" />
                 </n-space>
               </template>
               <template #default>
-                <n-data-table
-                  :data="
-                    framework_list.slice(
-                      (framework_page - 1) * framework_pageSize,
-                      framework_page * framework_pageSize
-                    )
-                  "
-                  :columns="framework_tableColumns"
-                  :row-key="rowKey"
-                />
+                <n-data-table :data="framework_list.slice(
+                  (framework_page - 1) * framework_pageSize,
+                  framework_page * framework_pageSize
+                )
+                  " :columns="framework_tableColumns" :row-key="rowKey" />
               </template>
               <template #footer>
                 <div class="flex justify-center">
-                  <n-pagination
-                    v-model:page="framework_page"
-                    :page-count="framework_pageCount"
-                    show-size-picker
-                    :page-sizes="framework_pageSizes"
-                  >
+                  <n-pagination v-model:page="framework_page" :page-count="framework_pageCount" show-size-picker
+                    :page-sizes="framework_pageSizes">
                     <template #prefix="{ itemCount, startIndex }">
                       共 {{ framework_count }} 项
                     </template>
@@ -286,52 +193,27 @@
             <TableBody>
               <template #header>
                 <n-space>
-                  <n-button
-                    size="tiny"
-                    type="info"
-                    @click="add_cmdb_show = true"
-                    >新增网络机房
+                  <n-button size="tiny" type="info" @click="add_cmdb_show = true">新增网络机房
                   </n-button>
-                  <n-button
-                    size="tiny"
-                    type="success"
-                    @click="add_rack_show = true"
-                    >新增网络模块
+                  <n-button size="tiny" type="success" @click="add_rack_show = true">新增网络模块
                   </n-button>
-                  <n-button
-                    size="tiny"
-                    type="warning"
-                    @click="add_rack_show = true"
-                    >新增网络机柜
+                  <n-button size="tiny" type="warning" @click="add_rack_show = true">新增网络机柜
                   </n-button>
-                  <n-input
-                    size="tiny"
-                    placeholder="网络机柜搜索"
-                    v-model:value="net_rack_keyword"
-                    @keyup.enter.native="net_rackfilter_func"
-                  ></n-input>
+                  <n-input size="tiny" placeholder="网络机柜搜索" v-model:value="net_rack_keyword"
+                    @keyup.enter.native="net_rackfilter_func" />
                 </n-space>
               </template>
               <template #default>
-                <n-data-table
-                  :data="
-                    rack_list.slice(
-                      (rack_page - 1) * rack_pageSize,
-                      rack_page * rack_pageSize
-                    )
-                  "
-                  :columns="rack_tableColumns"
-                  :row-key="rowKey"
-                />
+                <n-data-table :data="rack_list.slice(
+                  (rack_page - 1) * rack_pageSize,
+                  rack_page * rack_pageSize
+                )
+                  " :columns="rack_tableColumns" :row-key="rowKey" />
               </template>
               <template #footer>
                 <div class="flex justify-center">
-                  <n-pagination
-                    v-model:page="rack_page"
-                    :page-count="rack_pageCount"
-                    show-size-picker
-                    :page-sizes="rack_pageSizes"
-                  >
+                  <n-pagination v-model:page="rack_page" :page-count="rack_pageCount" show-size-picker
+                    :page-sizes="rack_pageSizes">
                     <template #prefix="{ itemCount, startIndex }">
                       共 {{ rack_count }} 项
                     </template>
@@ -354,39 +236,22 @@
             <TableBody>
               <template #header>
                 <n-space>
-                  <n-button
-                    size="tiny"
-                    type="info"
-                    @click="add_server_vendor_show = true"
-                    >新增服务器供应商
+                  <n-button size="tiny" type="info" @click="add_server_vendor_show = true">新增服务器供应商
                   </n-button>
-                  <n-input
-                    size="tiny"
-                    placeholder="服务器供应商搜索"
-                    @keyup.enter.native=""
-                  ></n-input>
+                  <n-input size="tiny" placeholder="服务器供应商搜索" @keyup.enter.native="" />
                 </n-space>
               </template>
               <template #default>
-                <n-data-table
-                  :data="
-                    server_vendor_list.slice(
-                      (server_vendor_page - 1) * server_vendor_pageSize,
-                      server_vendor_page * server_vendor_pageSize
-                    )
-                  "
-                  :columns="server_vendor_tableColumns"
-                  :row-key="rowKey"
-                />
+                <n-data-table :data="server_vendor_list.slice(
+                  (server_vendor_page - 1) * server_vendor_pageSize,
+                  server_vendor_page * server_vendor_pageSize
+                )
+                  " :columns="server_vendor_tableColumns" :row-key="rowKey" />
               </template>
               <template #footer>
                 <div class="flex justify-center">
-                  <n-pagination
-                    v-model:page="server_vendor_page"
-                    :page-count="server_vendor_pageCount"
-                    show-size-picker
-                    :page-sizes="server_vendor_pageSizes"
-                  />
+                  <n-pagination v-model:page="server_vendor_page" :page-count="server_vendor_pageCount" show-size-picker
+                    :page-sizes="server_vendor_pageSizes" />
                   <!--              <n-button  circle class="ml-1" size="tiny" type="primary" @click="refresh">-->
                   <!--                <template #icon>-->
                   <!--                  <n-icon>-->
@@ -403,36 +268,21 @@
             <TableBody>
               <template #header>
                 <n-space>
-                  <n-button size="tiny" type="info" @click=""
-                    >新增服务器账户</n-button
-                  >
-                  <n-input
-                    size="tiny"
-                    placeholder="服务器账户搜索"
-                    @keyup.enter.native=""
-                  ></n-input>
+                  <n-button size="tiny" type="info" @click="">新增服务器账户</n-button>
+                  <n-input size="tiny" placeholder="服务器账户搜索" @keyup.enter.native="" />
                 </n-space>
               </template>
               <template #default>
-                <n-data-table
-                  :data="
-                    server_account_list.slice(
-                      (server_account_page - 1) * server_account_pageSize,
-                      server_account_page * server_account_pageSize
-                    )
-                  "
-                  :columns="server_account_tableColumns"
-                  :row-key="rowKey"
-                />
+                <n-data-table :data="server_account_list.slice(
+                  (server_account_page - 1) * server_account_pageSize,
+                  server_account_page * server_account_pageSize
+                )
+                  " :columns="server_account_tableColumns" :row-key="rowKey" />
               </template>
               <template #footer>
                 <div class="flex justify-center">
-                  <n-pagination
-                    v-model:page="server_account_page"
-                    :page-count="server_account_pageCount"
-                    show-size-picker
-                    :page-sizes="server_account_pageSizes"
-                  />
+                  <n-pagination v-model:page="server_account_page" :page-count="server_account_pageCount" show-size-picker
+                    :page-sizes="server_account_pageSizes" />
                   <!--              <n-button  circle class="ml-1" size="tiny" type="primary" @click="refresh">-->
                   <!--                <template #icon>-->
                   <!--                  <n-icon>-->
@@ -449,39 +299,22 @@
             <TableBody>
               <template #header>
                 <n-space>
-                  <n-button
-                    size="tiny"
-                    type="info"
-                    @click="add_server_model_show = true"
-                    >新增服务器型号
+                  <n-button size="tiny" type="info" @click="add_server_model_show = true">新增服务器型号
                   </n-button>
-                  <n-input
-                    size="tiny"
-                    placeholder="服务器型号搜索"
-                    @keyup.enter.native=""
-                  ></n-input>
+                  <n-input size="tiny" placeholder="服务器型号搜索" @keyup.enter.native="" />
                 </n-space>
               </template>
               <template #default>
-                <n-data-table
-                  :data="
-                    server_model_list.slice(
-                      (server_model_page - 1) * server_model_pageSize,
-                      server_model_page * server_model_pageSize
-                    )
-                  "
-                  :columns="server_model_tableColumns"
-                  :row-key="rowKey"
-                />
+                <n-data-table :data="server_model_list.slice(
+                  (server_model_page - 1) * server_model_pageSize,
+                  server_model_page * server_model_pageSize
+                )
+                  " :columns="server_model_tableColumns" :row-key="rowKey" />
               </template>
               <template #footer>
                 <div class="flex justify-center">
-                  <n-pagination
-                    v-model:page="server_model_page"
-                    :page-count="server_model_pageCount"
-                    show-size-picker
-                    :page-sizes="server_model_pageSizes"
-                  />
+                  <n-pagination v-model:page="server_model_page" :page-count="server_model_pageCount" show-size-picker
+                    :page-sizes="server_model_pageSizes" />
                   <!--              <n-button  circle class="ml-1" size="tiny" type="primary" @click="refresh">-->
                   <!--                <template #icon>-->
                   <!--                  <n-icon>-->
@@ -500,39 +333,22 @@
             <TableBody>
               <template #header>
                 <n-space>
-                  <n-button
-                    size="tiny"
-                    type="info"
-                    @click="add_cmdb_account_show = true"
-                    >新增设备管理账户
+                  <n-button size="tiny" type="info" @click="add_cmdb_account_show = true">新增设备管理账户
                   </n-button>
-                  <n-input
-                    size="tiny"
-                    placeholder="管理账户搜索"
-                    @keyup.enter.native=""
-                  ></n-input>
+                  <n-input size="tiny" placeholder="管理账户搜索" @keyup.enter.native="" />
                 </n-space>
               </template>
               <template #default>
-                <n-data-table
-                  :data="
-                    cmdb_account_list.slice(
-                      (cmdb_account_page - 1) * cmdb_account_pageSize,
-                      cmdb_account_page * cmdb_account_pageSize
-                    )
-                  "
-                  :columns="cmdb_account_tableColumns"
-                  :row-key="rowKey"
-                />
+                <n-data-table :data="cmdb_account_list.slice(
+                  (cmdb_account_page - 1) * cmdb_account_pageSize,
+                  cmdb_account_page * cmdb_account_pageSize
+                )
+                  " :columns="cmdb_account_tableColumns" :row-key="rowKey" />
               </template>
               <template #footer>
                 <div class="flex justify-center">
-                  <n-pagination
-                    v-model:page="cmdb_account_page"
-                    :page-count="cmdb_account_pageCount"
-                    show-size-picker
-                    :page-sizes="cmdb_account_pageSizes"
-                  />
+                  <n-pagination v-model:page="cmdb_account_page" :page-count="cmdb_account_pageCount" show-size-picker
+                    :page-sizes="cmdb_account_pageSizes" />
                   <!--              <n-button  circle class="ml-1" size="tiny" type="primary" @click="refresh">-->
                   <!--                <template #icon>-->
                   <!--                  <n-icon>-->
@@ -591,333 +407,179 @@
     </n-card>
     <n-modal v-model:show="add_vendor_show" preset="dialog" title="新增供应商">
       <div>
-        <n-form
-          :model="add_vendor_form"
-          label-placement="left"
-          label-width="auto"
-        >
+        <n-form :model="add_vendor_form" label-placement="left" label-width="auto">
           <n-form-item label="供应商">
-            <n-input
-              v-model:value="add_vendor_form.name"
-              placeholder="供应商"
-            />
+            <n-input v-model:value="add_vendor_form.name" placeholder="供应商" />
           </n-form-item>
         </n-form>
       </div>
       <template #action>
         <div>
           <n-space>
-            <n-button size="tiny" type="warning" @click="CancelAddVendor()"
-              >取消</n-button
-            >
-            <n-button size="tiny" type="info" @click="AddVendorConfirm()"
-              >确认</n-button
-            >
+            <n-button size="tiny" type="warning" @click="CancelAddVendor()">取消</n-button>
+            <n-button size="tiny" type="info" @click="AddVendorConfirm()">确认</n-button>
           </n-space>
         </div>
       </template>
     </n-modal>
-    <n-modal
-      v-model:show="add_devicetype_show"
-      preset="dialog"
-      title="新增设备类型"
-    >
+    <n-modal v-model:show="add_devicetype_show" preset="dialog" title="新增设备类型">
       <div>
-        <n-form
-          :model="add_devicetype_form"
-          label-placement="left"
-          label-width="auto"
-        >
+        <n-form :model="add_devicetype_form" label-placement="left" label-width="auto">
           <n-form-item label="设备类型">
-            <n-input
-              v-model:value="add_devicetype_form.name"
-              placeholder="设备类型"
-            />
+            <n-input v-model:value="add_devicetype_form.name" placeholder="设备类型" />
           </n-form-item>
           <n-form-item label="供应商">
-            <n-select
-              v-model:value="add_devicetype_form.vendor"
-              filterable
-              placeholder="选择供应商"
-              :options="vendor_options"
-            >
-            </n-select>
+            <n-select v-model:value="add_devicetype_form.vendor" filterable placeholder="选择供应商"
+              :options="vendor_options" />
           </n-form-item>
         </n-form>
       </div>
       <template #action>
         <div>
           <n-space>
-            <n-button size="tiny" type="warning" @click="CancelAddDeviceType()"
-              >取消</n-button
-            >
-            <n-button size="tiny" type="info" @click="AddDeviceTypeConfirm()"
-              >确认</n-button
-            >
+            <n-button size="tiny" type="warning" @click="CancelAddDeviceType()">取消</n-button>
+            <n-button size="tiny" type="info" @click="AddDeviceTypeConfirm()">确认</n-button>
           </n-space>
         </div>
       </template>
     </n-modal>
     <n-modal v-model:show="add_cmdb_show" preset="dialog" title="新增机房">
       <div>
-        <n-form
-          :model="add_cmdb_form"
-          label-placement="left"
-          label-width="auto"
-        >
+        <n-form :model="add_cmdb_form" label-placement="left" label-width="auto">
           <n-form-item label="机房名称">
-            <n-input
-              v-model:value="add_cmdb_form.name"
-              placeholder="机房名称"
-            />
+            <n-input v-model:value="add_cmdb_form.name" placeholder="机房名称" />
           </n-form-item>
         </n-form>
       </div>
       <template #action>
         <div>
           <n-space>
-            <n-button size="tiny" type="warning" @click="CancelAddCmdb()"
-              >取消</n-button
-            >
-            <n-button size="tiny" type="info" @click="AddCmdbConfirm()"
-              >确认</n-button
-            >
+            <n-button size="tiny" type="warning" @click="CancelAddCmdb()">取消</n-button>
+            <n-button size="tiny" type="info" @click="AddCmdbConfirm()">确认</n-button>
           </n-space>
         </div>
       </template>
     </n-modal>
     <n-modal v-model:show="add_rack_show" preset="dialog" title="新增机柜">
       <div>
-        <n-form
-          :model="add_rack_form"
-          label-placement="left"
-          label-width="auto"
-        >
+        <n-form :model="add_rack_form" label-placement="left" label-width="auto">
           <n-form-item label="机柜编号">
-            <n-input
-              v-model:value="add_rack_form.name"
-              placeholder="机柜编号"
-            />
+            <n-input v-model:value="add_rack_form.name" placeholder="机柜编号" />
           </n-form-item>
           <n-form-item label="关联模块">
-            <n-select
-              v-model:value="add_rack_form.idc_model"
-              filterable
-              placeholder="选择关联模块"
-              :options="idc_model_options"
-            >
-            </n-select>
+            <n-select v-model:value="add_rack_form.idc_model" filterable placeholder="选择关联模块"
+              :options="idc_model_options" />
           </n-form-item>
         </n-form>
       </div>
       <template #action>
         <div>
           <n-space>
-            <n-button size="tiny" type="warning" @click="CancelAddRack()"
-              >取消</n-button
-            >
-            <n-button size="tiny" type="info" @click="AddRackConfirm()"
-              >确认</n-button
-            >
+            <n-button size="tiny" type="warning" @click="CancelAddRack()">取消</n-button>
+            <n-button size="tiny" type="info" @click="AddRackConfirm()">确认</n-button>
           </n-space>
         </div>
       </template>
     </n-modal>
     <n-modal v-model:show="add_model_show" preset="dialog" title="新增硬件型号">
       <div>
-        <n-form
-          :model="add_model_form"
-          label-placement="left"
-          label-width="auto"
-        >
+        <n-form :model="add_model_form" label-placement="left" label-width="auto">
           <n-form-item label="硬件型号">
-            <n-input
-              v-model:value="add_model_form.name"
-              placeholder="硬件型号"
-            />
+            <n-input v-model:value="add_model_form.name" placeholder="硬件型号" />
           </n-form-item>
           <n-form-item label="供应商">
-            <n-select
-              v-model:value="add_model_form.vendor"
-              filterable
-              placeholder="选择供应商"
-              :options="vendor_options"
-            >
-            </n-select>
+            <n-select v-model:value="add_model_form.vendor" filterable placeholder="选择供应商" :options="vendor_options" />
           </n-form-item>
         </n-form>
       </div>
       <template #action>
         <div>
           <n-space>
-            <n-button size="tiny" type="warning" @click="CancelModel()"
-              >取消</n-button
-            >
-            <n-button size="tiny" type="info" @click="AddModelConfirm()"
-              >确认</n-button
-            >
+            <n-button size="tiny" type="warning" @click="CancelModel()">取消</n-button>
+            <n-button size="tiny" type="info" @click="AddModelConfirm()">确认</n-button>
           </n-space>
         </div>
       </template>
     </n-modal>
     <n-modal v-model:show="add_role_show" preset="dialog" title="新增设备角色">
       <div>
-        <n-form
-          :model="add_role_form"
-          label-placement="left"
-          label-width="auto"
-        >
+        <n-form :model="add_role_form" label-placement="left" label-width="auto">
           <n-form-item label="设备角色">
-            <n-input
-              v-model:value="add_role_form.name"
-              placeholder="设备角色"
-            />
+            <n-input v-model:value="add_role_form.name" placeholder="设备角色" />
           </n-form-item>
         </n-form>
       </div>
       <template #action>
         <div>
           <n-space>
-            <n-button size="tiny" type="warning" @click="CancelRole()"
-              >取消</n-button
-            >
-            <n-button size="tiny" type="info" @click="AddRoleConfirm()"
-              >确认</n-button
-            >
+            <n-button size="tiny" type="warning" @click="CancelRole()">取消</n-button>
+            <n-button size="tiny" type="info" @click="AddRoleConfirm()">确认</n-button>
           </n-space>
         </div>
       </template>
     </n-modal>
-    <n-modal
-      v-model:show="add_attribute_show"
-      preset="dialog"
-      title="新增网络属性"
-    >
+    <n-modal v-model:show="add_attribute_show" preset="dialog" title="新增网络属性">
       <div>
-        <n-form
-          :model="add_attribute_form"
-          label-placement="left"
-          label-width="auto"
-        >
+        <n-form :model="add_attribute_form" label-placement="left" label-width="auto">
           <n-form-item label="属性名">
-            <n-input
-              v-model:value="add_attribute_form.name"
-              placeholder="属性名"
-            />
+            <n-input v-model:value="add_attribute_form.name" placeholder="属性名" />
           </n-form-item>
         </n-form>
       </div>
       <template #action>
         <div>
           <n-space>
-            <n-button size="tiny" type="warning" @click="CancelAddAttribute()"
-              >取消</n-button
-            >
-            <n-button size="tiny" type="info" @click="AddAttributeConfirm()"
-              >确认</n-button
-            >
+            <n-button size="tiny" type="warning" @click="CancelAddAttribute()">取消</n-button>
+            <n-button size="tiny" type="info" @click="AddAttributeConfirm()">确认</n-button>
           </n-space>
         </div>
       </template>
     </n-modal>
-    <n-modal
-      v-model:show="add_server_vendor_show"
-      preset="dialog"
-      title="新增服务器供应商"
-    >
+    <n-modal v-model:show="add_server_vendor_show" preset="dialog" title="新增服务器供应商">
       <div>
-        <n-form
-          :model="add_server_vendor_form"
-          label-placement="left"
-          label-width="auto"
-        >
+        <n-form :model="add_server_vendor_form" label-placement="left" label-width="auto">
           <n-form-item label="服务器供应商名">
-            <n-input
-              v-model:value="add_server_vendor_form.name"
-              placeholder="服务器供应商名"
-            />
+            <n-input v-model:value="add_server_vendor_form.name" placeholder="服务器供应商名" />
           </n-form-item>
           <n-form-item label="别名">
-            <n-input
-              v-model:value="add_server_vendor_form.alias"
-              placeholder="别名"
-            />
+            <n-input v-model:value="add_server_vendor_form.alias" placeholder="别名" />
           </n-form-item>
         </n-form>
       </div>
       <template #action>
         <div>
           <n-space>
-            <n-button
-              size="tiny"
-              type="warning"
-              @click="CancelAddServerVendor()"
-              >取消</n-button
-            >
-            <n-button size="tiny" type="info" @click="AddServerVendorConfirm()"
-              >确认</n-button
-            >
+            <n-button size="tiny" type="warning" @click="CancelAddServerVendor()">取消</n-button>
+            <n-button size="tiny" type="info" @click="AddServerVendorConfirm()">确认</n-button>
           </n-space>
         </div>
       </template>
     </n-modal>
-    <n-modal
-      v-model:show="add_framework_show"
-      preset="dialog"
-      title="新增网络架构"
-    >
+    <n-modal v-model:show="add_framework_show" preset="dialog" title="新增网络架构">
       <div>
-        <n-form
-          :model="add_framework_form"
-          label-placement="left"
-          label-width="auto"
-        >
+        <n-form :model="add_framework_form" label-placement="left" label-width="auto">
           <n-form-item label="架构名">
-            <n-input
-              v-model:value="add_framework_form.name"
-              placeholder="架构名"
-            />
+            <n-input v-model:value="add_framework_form.name" placeholder="架构名" />
           </n-form-item>
         </n-form>
       </div>
       <template #action>
         <div>
           <n-space>
-            <n-button size="tiny" type="warning" @click="CancelAddFramework()"
-              >取消</n-button
-            >
-            <n-button size="tiny" type="info" @click="AddFrameworkConfirm()"
-              >确认</n-button
-            >
+            <n-button size="tiny" type="warning" @click="CancelAddFramework()">取消</n-button>
+            <n-button size="tiny" type="info" @click="AddFrameworkConfirm()">确认</n-button>
           </n-space>
         </div>
       </template>
     </n-modal>
-    <n-modal
-      v-model:show="add_netzone_show"
-      preset="dialog"
-      title="新增网络区域"
-    >
+    <n-modal v-model:show="add_netzone_show" preset="dialog" title="新增网络区域">
       <div>
-        <n-form
-          :model="add_netzone_form"
-          label-placement="left"
-          label-width="auto"
-        >
+        <n-form :model="add_netzone_form" label-placement="left" label-width="auto">
           <n-form-item label="区域名">
-            <n-input
-              v-model:value="add_netzone_form.name"
-              placeholder="区域名"
-            />
+            <n-input v-model:value="add_netzone_form.name" placeholder="区域名" />
           </n-form-item>
           <n-form-item label="关联机房">
-            <n-select
-              v-model:value="add_netzone_form.idc"
-              filterable
-              placeholder="选择关联机房"
-              :options="idc_options"
-            >
-            </n-select>
+            <n-select v-model:value="add_netzone_form.idc" filterable placeholder="选择关联机房" :options="idc_options" />
           </n-form-item>
           <n-form-item label="备注">
             <n-input v-model:value="add_netzone_form.memo" placeholder="备注" />
@@ -927,169 +589,89 @@
       <template #action>
         <div>
           <n-space>
-            <n-button size="tiny" type="warning" @click="CancelAddNetzone()"
-              >取消</n-button
-            >
-            <n-button size="tiny" type="info" @click="AddNetzoneConfirm()"
-              >确认</n-button
-            >
+            <n-button size="tiny" type="warning" @click="CancelAddNetzone()">取消</n-button>
+            <n-button size="tiny" type="info" @click="AddNetzoneConfirm()">确认</n-button>
           </n-space>
         </div>
       </template>
     </n-modal>
-    <n-modal
-      v-model:show="add_server_model_show"
-      preset="dialog"
-      title="新增服务器型号"
-    >
+    <n-modal v-model:show="add_server_model_show" preset="dialog" title="新增服务器型号">
       <div>
-        <n-form
-          :model="add_server_model_form"
-          label-placement="left"
-          label-width="auto"
-        >
+        <n-form :model="add_server_model_form" label-placement="left" label-width="auto">
           <n-form-item label="硬件型号">
-            <n-input
-              v-model:value="add_server_model_form.name"
-              placeholder="硬件型号"
-            />
+            <n-input v-model:value="add_server_model_form.name" placeholder="硬件型号" />
           </n-form-item>
           <n-form-item label="型号别名">
-            <n-input
-              v-model:value="add_server_model_form.alias"
-              placeholder="型号别名"
-            />
+            <n-input v-model:value="add_server_model_form.alias" placeholder="型号别名" />
           </n-form-item>
           <n-form-item label="供应商">
-            <n-select
-              v-model:value="add_server_model_form.vendor"
-              filterable
-              placeholder="选择供应商"
-              :options="server_vendor_options"
-            >
-            </n-select>
+            <n-select v-model:value="add_server_model_form.vendor" filterable placeholder="选择供应商"
+              :options="server_vendor_options" />
           </n-form-item>
         </n-form>
       </div>
       <template #action>
         <div>
           <n-space>
-            <n-button size="tiny" type="warning" @click="CancelAddServerModel()"
-              >取消</n-button
-            >
-            <n-button size="tiny" type="info" @click="AddServerModelConfirm()"
-              >确认</n-button
-            >
+            <n-button size="tiny" type="warning" @click="CancelAddServerModel()">取消</n-button>
+            <n-button size="tiny" type="info" @click="AddServerModelConfirm()">确认</n-button>
           </n-space>
         </div>
       </template>
     </n-modal>
-    <n-modal
-      v-model:show="add_cmdb_account_show"
-      preset="dialog"
-      title="新增设备管理账户"
-    >
+    <n-modal v-model:show="add_cmdb_account_show" preset="dialog" title="新增设备管理账户">
       <div>
-        <n-form
-          :model="add_cmdb_account_form"
-          label-placement="left"
-          label-width="auto"
-        >
+        <n-form :model="add_cmdb_account_form" label-placement="left" label-width="auto">
           <n-form-item label="账户标识名">
-            <n-input
-              v-model:value="add_cmdb_account_form.name"
-              placeholder="账户标识名"
-            />
+            <n-input v-model:value="add_cmdb_account_form.name" placeholder="账户标识名" />
           </n-form-item>
           <n-form-item label="登录用户名">
-            <n-input
-              v-model:value="add_cmdb_account_form.username"
-              placeholder="登录用户名"
-            />
+            <n-input v-model:value="add_cmdb_account_form.username" placeholder="登录用户名" />
           </n-form-item>
           <n-form-item label="登录密码">
-            <n-input
-              v-model:value="add_cmdb_account_form.password"
-              placeholder="登录密码"
-            />
+            <n-input v-model:value="add_cmdb_account_form.password" placeholder="登录密码" />
           </n-form-item>
           <n-form-item label="协议">
-            <n-input
-              v-model:value="add_cmdb_account_form.protocol"
-              placeholder="协议:ssh/netconf/telnet"
-            />
+            <n-input v-model:value="add_cmdb_account_form.protocol" placeholder="协议:ssh/netconf/telnet" />
           </n-form-item>
           <n-form-item label="端口">
-            <n-input
-              v-model:value="add_cmdb_account_form.port"
-              placeholder="协议端口"
-            />
+            <n-input v-model:value="add_cmdb_account_form.port" placeholder="协议端口" />
           </n-form-item>
           <n-form-item label="特权密码">
-            <n-input
-              v-model:value="add_cmdb_account_form.enable_password"
-              placeholder="特权密码"
-            />
+            <n-input v-model:value="add_cmdb_account_form.enable_password" placeholder="特权密码" />
           </n-form-item>
 
           <n-form-item label="账户角色">
-            <n-select
-              v-model:value="add_cmdb_account_form.user_role"
-              filterable
-              placeholder="选择账户角色"
-              :options="user_role_options"
-            >
-            </n-select>
+            <n-select v-model:value="add_cmdb_account_form.user_role" filterable placeholder="选择账户角色"
+              :options="user_role_options" />
           </n-form-item>
         </n-form>
       </div>
       <template #action>
         <div>
           <n-space>
-            <n-button size="tiny" type="warning" @click="CancelAddCmdbAccount()"
-              >取消</n-button
-            >
-            <n-button size="tiny" type="info" @click="AddCmdbAccountConfirm()"
-              >确认</n-button
-            >
+            <n-button size="tiny" type="warning" @click="CancelAddCmdbAccount()">取消</n-button>
+            <n-button size="tiny" type="info" @click="AddCmdbAccountConfirm()">确认</n-button>
           </n-space>
         </div>
       </template>
     </n-modal>
-    <n-modal
-      v-model:show="add_connect_type_show"
-      preset="dialog"
-      title="新增协议端口"
-    >
+    <n-modal v-model:show="add_connect_type_show" preset="dialog" title="新增协议端口">
       <div>
-        <n-form
-          :model="add_connect_type_form"
-          label-placement="left"
-          label-width="auto"
-        >
+        <n-form :model="add_connect_type_form" label-placement="left" label-width="auto">
           <n-form-item label="协议名">
-            <n-input
-              v-model:value="add_connect_type_form.name"
-              placeholder="协议名"
-            />
+            <n-input v-model:value="add_connect_type_form.name" placeholder="协议名" />
           </n-form-item>
           <n-form-item label="端口号">
-            <n-input
-              v-model:value="add_connect_type_form.port"
-              placeholder="端口号"
-            />
+            <n-input v-model:value="add_connect_type_form.port" placeholder="端口号" />
           </n-form-item>
         </n-form>
       </div>
       <template #action>
         <div>
           <n-space>
-            <n-button size="tiny" type="warning" @click="CancelAddConnectType()"
-              >取消</n-button
-            >
-            <n-button size="tiny" type="info" @click="AddConnectTypeConfirm()"
-              >确认</n-button
-            >
+            <n-button size="tiny" type="warning" @click="CancelAddConnectType()">取消</n-button>
+            <n-button size="tiny" type="info" @click="AddConnectTypeConfirm()">确认</n-button>
           </n-space>
         </div>
       </template>
@@ -1098,10 +680,10 @@
 </template>
 
 <script lang="ts">
-import { NumberAnimationInst } from 'naive-ui'
+// import { NumberAnimationInst } from 'naive-ui'
 // import { computed, defineComponent, reactive, ref, watch } from 'vue'
 // import { useLayoutStore } from '@/components'
-import { sortColumns } from '@/utils'
+// import { sortColumns } from '@/utils'
 import {
   // getFirewallList,
   // getAddress_setList,
@@ -1126,27 +708,27 @@ import {
 import usePost from '@/hooks/usePost'
 import useGet from '@/hooks/useGet'
 import {
-  TableActionModel,
-  useTable,
-  useRenderAction,
+  // TableActionModel,
+  // useTable,
+  // useRenderAction,
   useTableColumn,
-  usePagination
+  // usePagination
 } from '@/hooks/table'
 import {
   DataTableColumn,
-  NInput,
-  NSelect,
+  // NInput,
+  // NSelect,
   SelectOption,
-  useDialog,
+  // useDialog,
   useMessage,
-  NDropdown,
+  // NDropdown,
   NButton,
   NPopconfirm
 } from 'naive-ui'
 import {
   defineComponent,
-  computed,
-  watch,
+  // computed,
+  // watch,
   h,
   nextTick,
   onMounted,
@@ -1154,12 +736,12 @@ import {
   ref,
   shallowReactive
 } from 'vue'
-import { DataFormType, FormItem, ModalDialogType } from '@/types/components'
+// import { DataFormType, FormItem, ModalDialogType } from '@/types/components'
 import useDelete from '@/hooks/useDelete'
-import usePatch from '@/hooks/usePatch'
+// import usePatch from '@/hooks/usePatch'
 
 export default defineComponent({
-  name: 'edit_cmdb',
+  name: 'EditCmdb',
   setup() {
     const message = useMessage()
     const model_keyword = ref('')
@@ -1244,7 +826,6 @@ export default defineComponent({
     const get = useGet()
     const post = usePost()
     const delete_func = useDelete()
-    const patch = usePatch()
     const model_list = shallowReactive([] as Array<SelectOption>)
     const vendor_options = shallowReactive([] as Array<SelectOption>)
     const idc_options = shallowReactive([] as Array<SelectOption>)
@@ -1581,7 +1162,7 @@ export default defineComponent({
           {
             title: '删除',
             key: 'delete',
-            render: (rowData) => {
+            render: () => {
               return h(
                 NPopconfirm,
                 {
@@ -2422,7 +2003,7 @@ export default defineComponent({
       post({
         url: getVendorList,
         data: new_data
-      }).then((res) => {
+      }).then(() => {
         message.success('新增供应商成功')
         get_vendor()
         get_idc_model()
@@ -2476,7 +2057,7 @@ export default defineComponent({
       post({
         url: getCategoryList,
         data: post_data
-      }).then((res) => {
+      }).then(() => {
         message.success('新增设备类型成功')
         get_idc_model()
       })
@@ -2493,7 +2074,7 @@ export default defineComponent({
       post({
         url: getCmdbModelList,
         data: post_data
-      }).then((res) => {
+      }).then(() => {
         message.success('新增硬件型号成功')
         get_idc_model()
       })
@@ -2507,7 +2088,7 @@ export default defineComponent({
       post({
         url: getCmdbRoleList,
         data: role_data
-      }).then((res) => {
+      }).then(() => {
         add_role_show.value = false
         message.success('新增设备角色成功')
         get_role()
@@ -2519,11 +2100,11 @@ export default defineComponent({
       const netzone_data = new FormData()
       netzone_data.append('name', add_netzone_form.value.name)
       netzone_data.append('memo', add_netzone_form.value.memo)
-      netzone_data.append('idc', add_netzone_form.value['idc'])
+      netzone_data.append('idc', add_netzone_form.value['idc'].toString())
       post({
         url: getCmdbNetzoneList,
         data: netzone_data
-      }).then((res) => {
+      }).then(() => {
         message.success('新增网络区域成功')
         add_netzone_form.value['name'] = ''
         add_netzone_form.value['memo'] = ''
@@ -2539,7 +2120,8 @@ export default defineComponent({
       post({
         url: getAttributeList,
         data: attribute_data
-      }).then((res) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      }).then(() => {
         message.success('新增网络属性成功')
         add_attribute_show.value = false
         get_attribute()
@@ -2553,7 +2135,7 @@ export default defineComponent({
       post({
         url: getFrameworkList,
         data: framework_data
-      }).then((res) => {
+      }).then(() => {
         message.success('新增网络架构成功')
         add_framework_show.value = false
         get_framework()
@@ -2568,7 +2150,7 @@ export default defineComponent({
       post({
         url: get_cmdb_rack,
         data: rack_data
-      }).then((res) => {
+      }).then(() => {
         message.success('新增网络机柜成功')
         add_rack_show.value = false
         get_rack()
@@ -2582,7 +2164,7 @@ export default defineComponent({
       post({
         url: getCmdbIdcList,
         data: rack_data
-      }).then((res) => {
+      }).then(() => {
         message.success('新增网络机房成功')
         add_cmdb_show.value = false
         get_cmdb_idc_model()
@@ -2596,7 +2178,7 @@ export default defineComponent({
       post({
         url: getServerVendorList,
         data: post_data
-      }).then((res) => {
+      }).then(() => {
         message.success('新增服务器供应商成功')
         add_server_vendor_show.value = false
         get_server_vendor()
@@ -2612,7 +2194,7 @@ export default defineComponent({
       post({
         url: getCmdbServerModelList,
         data: post_data
-      }).then((res) => {
+      }).then(() => {
         message.success('新增服务器型号成功')
         add_server_model_show.value = false
         get_server_model()
@@ -2638,7 +2220,7 @@ export default defineComponent({
       post({
         url: getcmdb_accountList,
         data: post_data
-      }).then((res) => {
+      }).then(() => {
         message.success('新增管理账户成功')
         add_cmdb_account_show.value = false
         add_cmdb_account_form.value['name'] = ''
@@ -2658,7 +2240,7 @@ export default defineComponent({
       post({
         url: getcmdb_accountList,
         data: post_data
-      }).then((res) => {
+      }).then(() => {
         message.success('新增协议端口成功')
         get_cmdb_protocol()
         add_connect_type_show.value = false
@@ -2730,7 +2312,7 @@ export default defineComponent({
     function delete_model(item) {
       delete_func({
         url: getCmdbModelList + item.id + '/'
-      }).then((res) => {
+      }).then(() => {
         message.success('删除硬件型号成功')
         get_idc_model()
       })
@@ -2739,7 +2321,7 @@ export default defineComponent({
     function delete_role(item) {
       delete_func({
         url: getCmdbRoleList + item.id + '/'
-      }).then((res) => {
+      }).then(() => {
         message.success('删除设备角色成功')
         get_role()
       })
@@ -2748,7 +2330,7 @@ export default defineComponent({
     function delete_netzone(item) {
       delete_func({
         url: getCmdbNetzoneList + item.id + '/'
-      }).then((res) => {
+      }).then(() => {
         message.success('删除网络区域成功')
         get_netzone()
       })
@@ -2757,7 +2339,7 @@ export default defineComponent({
     function delete_attribute(item) {
       delete_func({
         url: getAttributeList + '/' + item.id + '/'
-      }).then((res) => {
+      }).then(() => {
         message.success('删除网络属性成功')
         get_attribute()
       })
@@ -2766,7 +2348,7 @@ export default defineComponent({
     function delete_framework(item) {
       delete_func({
         url: getFrameworkList + '/' + item.id + '/'
-      }).then((res) => {
+      }).then(() => {
         message.success('删除网络架构成功')
         get_framework()
       })
@@ -2775,7 +2357,7 @@ export default defineComponent({
     function delete_rack(item) {
       delete_func({
         url: get_cmdb_rack + '/' + item.id + '/'
-      }).then((res) => {
+      }).then(() => {
         message.success('删除网络机柜成功')
         get_rack()
       })
@@ -2784,7 +2366,7 @@ export default defineComponent({
     function delete_server_vendor(item) {
       delete_func({
         url: getServerVendorList + '/' + item.id + '/'
-      }).then((res) => {
+      }).then(() => {
         message.success('删除成功')
         get_server_vendor()
       })
@@ -2793,7 +2375,7 @@ export default defineComponent({
     function delete_server_model(item) {
       delete_func({
         url: getCmdbServerModelList + '/' + item.id + '/'
-      }).then((res) => {
+      }).then(() => {
         message.success('删除成功')
         get_server_model()
       })
@@ -2802,7 +2384,7 @@ export default defineComponent({
     function delete_cmdb_account(item) {
       delete_func({
         url: getcmdb_accountList + '/' + item.id + '/'
-      }).then((res) => {
+      }).then(() => {
         message.success('删除成功')
         get_cmdb_account()
       })
@@ -2811,7 +2393,7 @@ export default defineComponent({
     function delete_cmdb_protol(item) {
       delete_func({
         url: getasset_account_protocolList + '/' + item.id + '/'
-      }).then((res) => {
+      }).then(() => {
         message.success('删除成功')
         get_cmdb_protocol()
       })

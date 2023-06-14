@@ -89,9 +89,9 @@ export const getInterfaceUsedList = baseAddress + '/int_utilization/interfaceuse
 // 合规性检查结果
 export const get_compliance_results = baseAddress + '/config_center/compliance_results'
 export const ttp_parse = baseAddress + '/config_center/ttp_parse'
-export const config_compliance = baseAddress + '/config_center/api/config_compliance/'
-export const config_center_api = baseAddress + '/config_center/api/'
-export const config_template = baseAddress + '/config_center/api/config_template/'
+export const config_compliance = baseAddress + '/config_center/config_compliance/'
+export const config_center_api = baseAddress + '/config_center/'
+export const config_template = baseAddress + '/config_center/config_template/'
 export const fsm_parse = baseAddress + '/config_center/fsm_parse'
 export const jinja2_parse = baseAddress + '/config_center/jinja2_parse'
 export const config_center = baseAddress + '/config_center'

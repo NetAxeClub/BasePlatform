@@ -57,7 +57,8 @@ function http<T = any>({url, data, method, headers, beforeRequest, afterRequest}
         if (res.data.code === 201) {
             return res.data
         }
-        throw new Error(res.data.msg || '请求失败，未知异常')
+        // throw new Error(res.data.msg || '请求失败，未知异常')
+        return res.data
     }
     const failHandler = (error: Response<Error>) => {
         afterRequest && afterRequest()
