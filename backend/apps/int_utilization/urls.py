@@ -9,7 +9,7 @@ from .views import InterfaceUsedNewViewSet
 
 router = DefaultRouter()
 
-router.register(r'interfaceused', InterfaceUsedNewViewSet)
+router.register(r'interfaceused/', InterfaceUsedNewViewSet)
 
 urlpatterns = [
     path(r'', include(router.urls)),
