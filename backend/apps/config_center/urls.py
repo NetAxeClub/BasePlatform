@@ -17,15 +17,15 @@ from rest_framework_extensions.routers import (
 
 from apps.config_center import views
 
-app_name = 'config_center'
+# app_name = 'config_center'
 router = DefaultRouter()
 
-router.register(r'config_compliance/', views.ConfigComplianceViewSet)
-router.register(r'config_template/', views.ConfigTemplateViewSet)
-router.register(r'ttp_template/', views.TTPTemplateViewSet)
+router.register(r'config_compliance', views.ConfigComplianceViewSet)
+router.register(r'config_template', views.ConfigTemplateViewSet)
+router.register(r'ttp_template', views.TTPTemplateViewSet)
 
 urlpatterns = [
-    path(r'api/', include(router.urls)),
+    path(r'', include(router.urls)),
     # 配置文件目录树
     path('git_config', views.GitConfig.as_view(), name='git_config'),
     path('compliance_results', views.ComplianceResults.as_view(), name='compliance_results'),
