@@ -510,8 +510,7 @@ class MainIn:
 def ping(host):
     try:
         ip_string = IPAddress(host)
-        i = subprocess.call('ping -c 1 {0}'.format(ip_string.format()), shell=False, stdout=open('/dev/null', 'w'),
-                            stderr=subprocess.STDOUT)
+        i = subprocess.call('ping -c 1 {0}'.format(ip_string.format()), shell=True, stdout=open('/dev/null', 'w'), stderr=subprocess.STDOUT)
         if i == 0:
             # print('已开始执行: {0}'.format(host))
             return True
