@@ -7,7 +7,7 @@ services:
       build:
           context: .
           dockerfile: ./dockerfiles/backend_dockerfile
-      command: sh start.sh web
+      command: sh init.sh
       networks:
           - docker_netaxe
       restart: always
