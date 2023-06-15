@@ -73,6 +73,7 @@ export const constantRoutes = [
         meta: {
             requireAuth: true,
             index: '/ssh',
+          hidden: true,
         }
     },
 ]
