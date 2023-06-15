@@ -13,8 +13,7 @@ from apps.config_center.config_parse.config_parse import config_file_parse
 from apps.config_center.git_tools.git_proc import push_file
 from apps.config_center.my_nornir import config_backup_nornir
 from utils.db.mongo_ops import MongoOps
-# from utils.send_email import send_mail
-# from utils.wechat_api import send_msg_netops
+
 
 config_mongo = MongoOps(db='netops', coll='ConfigBackupStatistics')
 
