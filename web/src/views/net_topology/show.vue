@@ -1037,10 +1037,9 @@ function init_nodes() {
     .attr('class', 'node unselected')
   svg_node.call(drag(simulation))
   svg_node
-    //.append('image')
-    .append('img')
+    .append('image')
     // .attr('xlink:href', function (d) {
-    .attr('src', function (d) {
+    .attr('href', function (d) {
       return topology_media_img + d.image
     })
     .style('opacity', 1)
