@@ -14,7 +14,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import *
 
-app_name = 'resources_manage'
+app_name = 'asset'
 router = DefaultRouter()
 
 router.register(r'cmdb_idc', IdcViewSet)
@@ -29,6 +29,7 @@ router.register(r'cmdb_model', ModelViewSet)
 router.register(r'attribute', AttributelViewSet)
 router.register(r'framework', FrameworkViewSet)
 router.register(r'asset_networkdevice', NetworkDeviceViewSet)
+router.register(r'login_record', AdminRecordViewSet)
 
 urlpatterns = [
     path(r'', include(router.urls)),

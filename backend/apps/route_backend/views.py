@@ -29,6 +29,7 @@ from .serializers import CrontabSerializer, IntervalSerializer
 class QueryParamsKeyConstructor(DefaultKeyConstructor):
     all_query_params = bits.QueryParamsKeyBit()
 
+
 # 弃用
 class LimitSet(pagination.LimitOffsetPagination):
     # 每页默认几条

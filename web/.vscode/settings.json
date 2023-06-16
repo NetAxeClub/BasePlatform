@@ -29,6 +29,7 @@
     "files.eol": "\n",
     // 保存到额时候用使用 prettier进行格式化
     "editor.formatOnSave": true,
+    "vue.codeActions.enabled": false,
     
     // // 不要有分号
     // "prettier.semi": false,

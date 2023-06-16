@@ -71,6 +71,7 @@ class MyThread(threading.Thread):
         # self.record()
 
     def record(self):
+        print('record')
         record_path = os.path.join(settings.MEDIA_ROOT, 'admin_ssh_records', self.chan.scope['user'].username,
                                    time.strftime('%Y-%m-%d'))
         if not os.path.exists(record_path):
@@ -94,7 +95,8 @@ class MyThread(threading.Thread):
         login_status_time = self.format_time(time.time() - self.start_time)
         login_user = self.chan.scope['user']
         login_server = r'{}@{}'.format(self.chan.username, self.chan.ip)
-
+        print(login_user) # AnonymousUser
+        print(login_server) # None@10.254.23.47
         try:
             # if login_user.is_superuser:
             admin_file.delay(record_file_path, self.stdout, header)
@@ -144,6 +146,7 @@ class MySSH(WebsocketConsumer):
         self.tab_mode = False  # 使用tab命令补全时需要读取返回数据然后添加到当前输入命令后
         self.history_mode = False
         self.index = 0
+        print(self.scope)
 
     def connect(self):
         # if self.scope["user"].is_anonymous:
@@ -221,7 +224,7 @@ class MySSH(WebsocketConsumer):
         vi_index = None
         fg_index = None  # 捕捉使用ctrl+z将vim放到后台的操作
         q_index = None
-        q_keys = (':wq', ':q', ':q!')
+        q_keys = (':wq', ':q', ':q!', 'quit', 'exit')
         for index, value in enumerate(self.cmd):
             if 'vi' in value:
                 vi_index = index

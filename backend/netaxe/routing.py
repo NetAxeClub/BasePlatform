@@ -13,14 +13,14 @@
 from channels.auth import AuthMiddlewareStack
 from channels.routing import ProtocolTypeRouter, URLRouter
 from django.urls import re_path
-from apps.asset.consumers import WebSshConsumer
+from apps.asset.consumers import WebSSHConsumer
 
 application = ProtocolTypeRouter({
 
     "websocket": AuthMiddlewareStack(
         URLRouter(
             [
-                re_path(r'ws/ssh/([0-9]+)/', WebSshConsumer),
+                re_path(r'base_platform/ws/ssh/([0-9]+)/', WebSSHConsumer),
                 # path('ws/ssh/1/', WebSshConsumer),
             ]
         ),

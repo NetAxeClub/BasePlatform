@@ -43,6 +43,8 @@ export const getdispach = baseAddress + '/backend/dispatch_page/'
 export const jobcenterTaskUrl = baseAddress + '/backend/jobCenter/'
 // 网络设备
 export const get_device_expand = baseAddress + '/backend/networklist/'
+// 获取webssh登录日志
+export const getLoginRecordList = baseAddress + '/asset/login_record/'
 // 采集方案
 export const deviceCollect = baseAddress + '/backend/deviceCollect/'
 // webssh
@@ -82,14 +84,18 @@ export const getNetworkDeviceList = baseAddress + '/asset/asset_networkdevice/'
 
 export const get_git_config_tree = baseAddress + '/config_center/git_config'
 
-export const getCollection_planList = baseAddress + '/automation/collection_plan/'
+export const getCollection_planList =
+  baseAddress + '/automation/collection_plan/'
 
-export const getInterfaceUsedList = baseAddress + '/int_utilization/interfaceused/'
+export const getInterfaceUsedList =
+  baseAddress + '/int_utilization/interfaceused/'
 
 // 合规性检查结果
-export const get_compliance_results = baseAddress + '/config_center/compliance_results'
+export const get_compliance_results =
+  baseAddress + '/config_center/compliance_results'
 export const ttp_parse = baseAddress + '/config_center/ttp_parse'
-export const config_compliance = baseAddress + '/config_center/config_compliance/'
+export const config_compliance =
+  baseAddress + '/config_center/config_compliance/'
 export const config_center_api = baseAddress + '/config_center/'
 export const config_template = baseAddress + '/config_center/config_template/'
 export const fsm_parse = baseAddress + '/config_center/fsm_parse'

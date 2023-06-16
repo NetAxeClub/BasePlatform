@@ -49,6 +49,19 @@
             "icon": "index",
             "cacheable": false
           }
+        },
+        {
+          "name": "登录日志",
+          "parentPath": "/cmdb",
+          "path": "/cmdb/login_record",
+          "web_path": "/cmdb/login_record",
+          "meta": {
+            "title": "登录日志",
+            "affix": true,
+            "iconPrefix": "iconfont",
+            "icon": "index",
+            "cacheable": false
+          }
         }
       ]
     },

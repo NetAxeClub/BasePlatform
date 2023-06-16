@@ -1038,7 +1038,6 @@ function init_nodes() {
   svg_node.call(drag(simulation))
   svg_node
     .append('image')
-    // .attr('xlink:href', function (d) {
     .attr('href', function (d) {
       return topology_media_img + d.image
     })

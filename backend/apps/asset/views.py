@@ -12,10 +12,10 @@ from utils.crypt_pwd import CryptPwd
 from apps.api.tools.custom_pagination import LargeResultsSetPagination
 from apps.api.tools.custom_viewset_base import CustomViewBase
 from apps.asset.models import Idc, AssetAccount, Vendor, Role, Category, Model, Attribute, Framework, NetworkDevice, \
-    IdcModel, NetZone, Rack
+    IdcModel, NetZone, Rack, AdminRecord
 from apps.asset.serializers import IdcSerializer, AssetAccountSerializer, AssetVendorSerializer, RoleSerializer, \
     CategorySerializer, ModelSerializer, AttributeSerializer, FrameworkSerializer, NetworkDeviceSerializer, \
-    IdcModelSerializer, NetZoneSerializer, CmdbRackSerializer
+    IdcModelSerializer, NetZoneSerializer, CmdbRackSerializer, AdminRecordSerializer
 from utils.cmdb_import import search_cmdb_vendor_id, search_cmdb_idc_id, search_cmdb_netzone_id, search_cmdb_role_id, \
     search_cmdb_idc_model_id, search_cmdb_cabinet_id, search_cmdb_category_id, search_cmdb_attribute_id, \
     search_cmdb_framework_id, returndate, csv_device_staus, pandas_read_file, old_import_parse
@@ -321,3 +321,47 @@ class NetworkDeviceViewSet(CustomViewBase):
     # def update(self, request, *args, **kwargs):
     #     print('更新', super().update(request, *args, **kwargs))
     #     return super().update(request, *args, **kwargs)
+
+
+# webssh登录日志 模糊字段过滤器
+class AdminRecordFilter(django_filters.FilterSet):
+    """模糊字段过滤"""
+
+    admin_start_time = django_filters.CharFilter(lookup_expr='icontains')
+
+    # host__idc = django_filters.CharFilter()
+    # host__name = django_filters.CharFilter(lookup_expr='icontains')
+    # host__manage_ip = django_filters.CharFilter(lookup_expr='icontains')
+    # host__manage_ip = django_filters.CharFilter(lookup_expr='icontains')
+
+    class Meta:
+        model = AdminRecord
+        fields = '__all__'
+
+
+# webssh登录日志
+class AdminRecordViewSet(CustomViewBase):
+    """
+    webssh登录日志---处理  GET POST , 处理 /api/post/<pk>/ GET PUT PATCH DELETE
+    """
+    queryset = AdminRecord.objects.all().order_by('-id')
+    queryset = AdminRecordSerializer.setup_eager_loading(queryset)
+    serializer_class = AdminRecordSerializer
+    permission_classes = ()
+    authentication_classes = ()
+    # 配置搜索功能
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    # 如果要允许对某些字段进行过滤，可以使用filter_fields属性。
+    filterset_class = AdminRecordFilter
+    filter_fields = '__all__'
+    search_fields = '__all__'
+    ordering_fields = '__all__'
+
+    def get_queryset(self):
+        start = self.request.query_params.get('start_time', None)
+        end = self.request.query_params.get('end_time', None)
+        if start and end:
+            return AdminRecord.objects.select_related('admin_login_user').filter(
+                admin_start_time__gt=start,
+                admin_start_time__lt=end)
+        return AdminRecord.objects.all()

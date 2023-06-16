@@ -14,6 +14,8 @@
 # import os
 # import time
 import logging
+import traceback
+
 import paramiko
 # import threading
 from django import db
@@ -240,9 +242,11 @@ class SSHConsumer(MySSH):
 class WebSSHConsumer(MySSH):
     def __init__(self, *args, **kwargs):
         super(WebSSHConsumer, self).__init__(*args, **kwargs)
+        print(self.scope['path'].split('/')[4])
         db.connections.close_all()
-        self.server = NetworkDevice.objects.get(id=self.scope['path'].split('/')[3])
-        self.bind_ssh_ip = AssetIpInfo.objects.filter(device=self.scope['path'].split('/')[3], name='SSH').values()
+        self.server = NetworkDevice.objects.get(id=self.scope['path'].split('/')[4])
+        print(self.server)
+        self.bind_ssh_ip = AssetIpInfo.objects.filter(device=self.scope['path'].split('/')[4], name='SSH').values()
         # 如果有关联SSH的IP，则使用关联SSH方式登录
         if self.bind_ssh_ip:
             self.ip = self.bind_ssh_ip[0]['ipaddr']

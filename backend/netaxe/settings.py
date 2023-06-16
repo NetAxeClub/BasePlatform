@@ -233,7 +233,7 @@ LOGGING = {
         },
         # 数据库相关日志
         "django.db.backends": {
-            "handlers": ['console'],
+            "handlers": ['file'],
             "propagate": True,
             "level": "DEBUG",
         },

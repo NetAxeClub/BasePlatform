@@ -11,6 +11,7 @@ declare module '@vue/runtime-core' {
   export interface GlobalComponents {
     Actions: typeof import('./src/components/actions/index.vue')['default']
     AddButton: typeof import('./src/components/common/AddButton.vue')['default']
+    AsciinemaPlayer: typeof import('./src/components/asciinema-player.vue')['default']
     Breadcrumb: typeof import('./src/components/breadcrumb/index.vue')['default']
     CitySelector: typeof import('./src/components/common/CitySelector.vue')['default']
     DeleteButton: typeof import('./src/components/common/DeleteButton.vue')['default']

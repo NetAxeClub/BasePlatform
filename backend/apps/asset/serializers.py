@@ -13,7 +13,7 @@
 from rest_framework import serializers
 
 from apps.asset.models import (
-    Idc, NetZone, Role, IdcModel, Rack, Vendor, Category, Model,
+    Idc, NetZone, Role, IdcModel, Rack, Vendor, Category, Model, AdminRecord,
     Attribute, Framework, AssetIpInfo, AssetAccount, NetworkDevice)
 
 
@@ -89,6 +89,7 @@ class RoleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Role
         fields = '__all__'
+
 
 # 机房机柜
 class CmdbRackSerializer(serializers.ModelSerializer):
@@ -173,4 +174,22 @@ class NetworkDeviceSerializer(serializers.ModelSerializer):
                                            'rack')
         queryset = queryset.prefetch_related(
             'bind_ip', 'account')
+        return queryset
+
+
+# SSH登陆日志
+class AdminRecordSerializer(serializers.ModelSerializer):
+    admin_start_time = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
+    user = serializers.CharField(source='admin_login_user.username', read_only=True)
+
+    class Meta:
+        model = AdminRecord
+        fields = '__all__'
+
+    @staticmethod
+    def setup_eager_loading(queryset):
+        """ Perform necessary eager loading of data. """
+        # select_related for "to-one" relationships
+        queryset = queryset.select_related('admin_login_user')
+
         return queryset
