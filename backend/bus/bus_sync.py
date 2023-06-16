@@ -11,17 +11,21 @@
 -------------------------------------------------
 使用pika 封装一个消息总线类，实现消息发布订阅、消息确认、qos、公平队列、限速、消息广播功能
 """
+import functools
 import pika
 import time
 from queue import Queue
 from threading import Lock
+from pika.exchange_type import ExchangeType
 from confload.confload import config
 
 
 # 回调方法
-def callbacka(ch, method, properties, body):
-    print('Receive: {}'.format(body.decode()))
-    time.sleep(0.5)
+def on_message(chan, method_frame, header_frame, body, userdata=None):
+    """Called when a message is received. Log message and ack it."""
+    print('Delivery properties: %s, message metadata: %s', method_frame, header_frame)
+    print('Userdata: %s, message body: %s', userdata, body)
+    chan.basic_ack(delivery_tag=method_frame.delivery_tag)
 
 
 class SyncMessageBus:
@@ -69,11 +73,8 @@ class SyncMessageBus:
                 channel = self.channel_pool.get()
         return channel
 
-    def publish(self, queue, routing_key, body, properties=None, durable=True, auto_delete=False):
+    def publish(self, routing_key, body, properties=None):
         channel = self.get_channel()
-        result = channel.queue_declare(queue=queue, durable=durable, auto_delete=auto_delete)
-        queue_name = result.method.queue
-        channel.queue_bind(exchange=self.exchange, queue=queue_name, routing_key=routing_key)
         channel.basic_publish(
             exchange=self.exchange,
             routing_key=routing_key,
@@ -81,23 +82,27 @@ class SyncMessageBus:
             properties=properties
         )
 
-    def subscribe(self, queue, routing_key, exchange_type, callback, durable=True, auto_delete=False):
+    def subscribe(self, queue, routing_key, callback, durable=True, auto_delete=False):
         """
         exchange_type  topic  fanout
         """
         channel = self.get_channel()
-        channel.basic_qos(prefetch_count=self.queue_qos)
         channel.exchange_declare(
             exchange=self.exchange,
-            exchange_type=exchange_type,
+            exchange_type=ExchangeType.topic,
             durable=durable,
             auto_delete=auto_delete
         )
-        result = channel.queue_declare(queue=queue, durable=durable, auto_delete=auto_delete)
-        queue_name = result.method.queue
-        channel.queue_bind(exchange=self.exchange, queue=queue_name, routing_key=routing_key)
-        channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=True)
-        channel.start_consuming()
+        channel.queue_declare(queue=queue, durable=durable, auto_delete=auto_delete)
+        channel.queue_bind(queue=queue, exchange=self.exchange, routing_key=routing_key)
+        channel.basic_qos(prefetch_count=self.queue_qos)
+        on_message_callback = functools.partial(
+            callback, userdata='on_message_userdata')
+        channel.basic_consume(queue=queue, on_message_callback=on_message_callback)
+        try:
+            channel.start_consuming()
+        except KeyboardInterrupt:
+            channel.stop_consuming()
 
     def ack_message(self, delivery_tag):
         channel = self.get_channel()
@@ -164,12 +169,12 @@ def broadcast():
 
 def broadcast_recv1():
     bus = SyncMessageBus()
-    bus.receive_broadcast(queue='a', callback=callbacka)
+    bus.receive_broadcast(queue='a', callback=on_message)
 
 
 def broadcast_recv2():
     bus = SyncMessageBus()
-    bus.receive_broadcast(queue='b', callback=callbacka)
+    bus.receive_broadcast(queue='b', callback=on_message)
 
 
 # 队列发送
@@ -177,10 +182,10 @@ def publish():
     bus = SyncMessageBus()
     for i in range(50):
         print(i)
-        bus.publish(routing_key='msg_gateway', body="test{}".format(i))
+        bus.publish(routing_key='base_platform', body="test{}".format(i))
 
 
 # 队列接收, 可以多次调用
 def consume():
     bus = SyncMessageBus()
-    bus.subscribe(queue='msg_gateway', routing_key='msg_gateway', exchange_type='topic', callback=callbacka)
+    bus.subscribe(queue='base_platform', routing_key='base_platform', callback=on_message)

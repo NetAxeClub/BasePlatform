@@ -90,7 +90,6 @@ class RoleSerializer(serializers.ModelSerializer):
         model = Role
         fields = '__all__'
 
-
 # 机房机柜
 class CmdbRackSerializer(serializers.ModelSerializer):
     idc_model_name = serializers.CharField(source='idc_model.name', read_only=True)
@@ -149,9 +148,7 @@ class NetworkDeviceSerializer(serializers.ModelSerializer):
     idc_model_name = serializers.CharField(source='idc_model.name', read_only=True)
     idc_model_floor = serializers.CharField(source='idc_model.floor', read_only=True)
     idc_model_area = serializers.CharField(source='idc_model.area', read_only=True)
-    # adpp_device = serializers.StringRelatedField(many=True, read_only=True)
     bind_ip = serializers.StringRelatedField(many=True, read_only=True)
-    # bgbu = BgBuSerializer(many=True)
     # 针对choices的处理
     status_name = serializers.CharField(source='get_status_display', read_only=True)
     ha_status_name = serializers.CharField(source='get_ha_status_display', read_only=True)

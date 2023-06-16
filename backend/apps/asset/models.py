@@ -460,7 +460,7 @@ class AdminRecord(models.Model):
         verbose_name='用户',
         related_name='admin_record',
         on_delete=models.CASCADE)
-    admin_server = models.CharField(max_length=32, verbose_name='登录主机')
+    admin_server = models.CharField(max_length=200, verbose_name='登录主机')
     admin_remote_ip = models.GenericIPAddressField(verbose_name='远程地址')
     admin_start_time = models.CharField(max_length=64, verbose_name='开始时间')
     admin_login_status_time = models.CharField(
@@ -471,6 +471,7 @@ class AdminRecord(models.Model):
         choices=record_modes,
         verbose_name='登录协议',
         default='ssh')
+    admin_record_cmds = models.TextField(verbose_name='命令记录', default='')
 
     class Meta:
         db_table = 'asset_admin_record'
@@ -603,6 +604,7 @@ class Server(models.Model):
     manager_tel = models.CharField(verbose_name='归属人联系方式', max_length=100, null=True, blank=True)
     purpose = models.CharField(verbose_name='用途', max_length=200, null=True, blank=True)
     memo = models.TextField(verbose_name='备注', null=True, blank=True)
+    account = models.ManyToManyField('AssetAccount', verbose_name='管理账户', blank=True)
 
     def __str__(self):
         return '%s-%s-%s' % (self.name, self.get_sub_asset_type_display(), self.manage_ip)
@@ -639,30 +641,5 @@ class ContainerService(models.Model):
         verbose_name_plural = "服务管理"
         db_table = 'asset_service'
 
-
-# 服务器账户表
-class ServerAccount(models.Model):
-    """
-    服务器和账户关联表
-    """
-    server = models.ForeignKey(
-        "Server",
-        verbose_name='服务器',
-        related_name='to_account',
-        on_delete=models.CASCADE)
-
-    account = models.ForeignKey(
-        "AssetAccount",
-        verbose_name='账户',
-        related_name='to_server',
-        on_delete=models.CASCADE)
-
-    def __str__(self):
-        return 'server:%s account:%s' % (self.server, self.account)
-
-    class Meta:
-        unique_together = (("server", "account"),)
-        verbose_name_plural = '服务器和账户关联表'
-        db_table = 'asset_account2server'  # 通过db_table自定义数据表名
 
 
