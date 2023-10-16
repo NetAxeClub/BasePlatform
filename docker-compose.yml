@@ -1,0 +1,80 @@
+version: "3.7"
+
+services:
+    # 后端入口
+    base-backend:
+      image: registry.cn-hangzhou.aliyuncs.com/netaxe/base-backend:1.0
+      container_name: base-backend
+      build:
+          context: .
+          #dockerfile: ./dockerfiles/backend_dockerfile
+          dockerfile: ./dockerfiles/backend_update_dockerfile
+      ports:
+        - "5555:5555"
+      command: sh init.sh
+      volumes:
+        - ./config.json:/config/config.json
+        - ./logs:/app/logs
+      networks:
+          - docker_netaxe
+      restart: always
+
+    # nginx代理
+    base-nginx:
+      image: registry.cn-hangzhou.aliyuncs.com/netaxe/base-nginx:1.23.1
+      container_name: base-nginx
+      build:
+        context: .
+        dockerfile: ./dockerfiles/nginx_dockerfile
+      networks:
+          - docker_netaxe
+      ports:
+        - "31100:80"
+
+    # 前端
+    base-web:
+      image: registry.cn-hangzhou.aliyuncs.com/netaxe/base-web:1.0
+      container_name: base-web
+      build:
+        context: .
+        dockerfile: ./dockerfiles/web_dockerfile
+      ports:
+        - "32200:80"
+      depends_on:
+        - base-nginx
+        - base-backend
+      networks:
+          - docker_netaxe
+      restart: always
+
+    celery-default:
+      image: registry.cn-hangzhou.aliyuncs.com/netaxe/base-backend:1.0
+      container_name: celery-default
+      command: sh start.sh default
+      build:
+        context: .
+        dockerfile: ./dockerfiles/backend_update_dockerfile
+      depends_on:
+        - base-backend
+      volumes:
+        - ./config.json:/config/config.json
+      networks:
+        - docker_netaxe
+
+    celery-config:
+      image: registry.cn-hangzhou.aliyuncs.com/netaxe/base-backend:1.0
+      container_name: celery-config
+      command: sh start.sh config
+      build:
+        context: .
+        dockerfile: ./dockerfiles/backend_update_dockerfile
+      volumes:
+        - ./config.json:/config/config.json
+      depends_on:
+        - base-backend
+      networks:
+        - docker_netaxe
+
+networks:
+  docker_netaxe:
+    external: true

@@ -1,0 +1,16 @@
+Value Required Slot (\d)
+Value BOARD_TYPE (\S+)
+Value Release_Ver (\S+\s\S+)
+Value Patch_Ver (Release\s\S+)
+Value Filldown Version ((\S+\sRelease\s\S+|\S+\sFeature\s\S+))
+
+Start
+  ^H3C Comware Software,\sVersion\s${Version}
+  ^Slot\s${Slot} -> SLOT
+
+SLOT
+  ^Slot\s${Slot}
+  ^BOARD\sTYPE:\s+${BOARD_TYPE}
+  ^Release\sVersion:\s+${Release_Ver}
+  ^Patch\sVersion:\s+${Patch_Ver}
+  ^$$ -> Continue.Record

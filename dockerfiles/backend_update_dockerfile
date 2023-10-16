@@ -1,0 +1,11 @@
+FROM registry.cn-hangzhou.aliyuncs.com/netaxe/base-backend:1.0
+COPY backend/ /app
+COPY config/ /config
+COPY web/default_menu.json /web/default_menu.json
+# 再次切换工作目录为Django主目录
+WORKDIR /app
+
+EXPOSE 8001
+EXPOSE 8000
+EXPOSE 5555
+CMD ["sh", "start.sh", "web"]

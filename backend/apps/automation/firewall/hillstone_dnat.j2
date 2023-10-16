@@ -1,0 +1,81 @@
+dnatrule
+{%- if id  %} id {{ id }} {%- endif %}
+{%- if insert  %} {{ insert }} {%- endif %}
+{%- if ingress_interface %} ingress-interface {{ ingress_interface }} {%- endif %}
+{#- FROM 判断  #}
+{%- if soft_version == '5.5R6'  %}
+    {#- 版本5.5R6   #}
+from
+    {%- if from.ip  %} ip {{ from.ip }}/32
+    {%- elif from.address_book  %} address-book {{ from.object }}
+    {%- else %}
+address-book Any
+    {%- endif %}
+{%- else %}
+    {#- 版本非5.5R6 #}
+from
+    {%- if from.ip  %} {{ from.ip }}/32
+    {%- elif from.address_book  %} {{ from.address_book }}
+    {%- else %}
+Any
+    {%- endif %}
+{%- endif %}
+
+{#- TO 判断  #}
+{%- if soft_version == '5.5R6'  %}
+    {#- 版本5.5R6   #}
+to
+    {%- if to.ip  %} ip/32 {{ to.ip }}
+    {%- elif to.object  %} address-book {{ to.object }}
+    {%- else %}
+address-book Any
+    {%- endif %}
+{%- else %}
+    {#- 版本非5.5R6 #}
+to
+    {%- if to.ip  %} {{ to.ip }}/32
+    {%- elif to.object  %} {{ to.object }}
+    {%- else %}
+Any
+    {%- endif %}
+{%- endif %}
+
+{#- servcie 判断   #}
+{%- if service  %}
+service {{ service }}
+{%- endif %}
+
+
+{#- trans_to 判断   #}
+{%- if soft_version == '5.5R6'  %}
+    {%- if trans_to.ip  %}
+trans-to ip {{ trans_to.ip }} {%- if port  %} port {{ port }} {%- endif %}
+    {%- elif trans_to.slb_server_pool  %}
+trans-to slb-server-pool {{ trans_to.slb_server_pool }}
+    {%- elif trans_to.address_book  %}
+trans-to address-book {{ trans_to.address_book }} {%- if port  %} port {{ port }} {%- endif %}
+    {%- elif trans_to.custom_slb  %}
+trans-to slb-server-pool {{ name }}
+    {%- else %}
+no-trans
+    {%- endif %}
+{%- else %}
+    {%- if trans_to.ip  %}
+trans-to {{ trans_to.ip }} {%- if port  %} port {{ port }} {%- endif %}
+    {%- elif trans_to.slb_server_pool  %}
+trans-to slb-server-pool {{ trans_to.slb_server_pool }}
+    {%- elif trans_to.address_book  %}
+trans-to {{ trans_to.address_book }} {%- if port  %} port {{ port }} {%- endif %}
+    {%- elif trans_to.custom_slb  %}
+trans-to slb-server-pool {{ name }}
+    {%- else %}
+    {%- else %}
+no-trans
+    {%- endif %}
+{%- endif %}
+
+{%- if log  %} log  {%- endif %}
+{%- if load_balance  %} load-balance  {%- endif %}
+{%- if track_tcp %} track-tcp {{ track_tcp }} {%- endif %}
+{%- if track_ping %} track-ping  {%- endif %}
+

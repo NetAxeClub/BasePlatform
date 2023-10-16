@@ -1,0 +1,41 @@
+slb-server-pool {{ name }}
+ {%- if description!='' -%}
+description {{ description }}
+ {%- endif -%}
+ {#- 遍历生成 server  #}
+ {% for object in objects -%}
+ {#- 新增ip服务 #}
+  {%- if object.add_detail_ip -%}
+  {% for _ip in object.ip_mask %}
+server ip {{ _ip }} {%- if object.port %} port {{ object.port }} {%- endif %} weight-per-server {{ object.weight }} max-connection-per-server {{ object.max_connection }}
+  {% endfor %}
+  {% endif %}
+  {#- 删除ip服务 #}
+  {%- if object.del_detail_ip -%}
+  {% for _ip in object.ip_mask %}
+no server ip {{ _ip }} {%- if object.port %} port {{ object.port }} {%- endif %}
+  {% endfor %}
+  {% endif %}
+  {#- 新增range服务 #}
+  {%- if object.add_detail_range %}
+server ip-range {{ object.range_start }} {{ object.range_end }}{%- if object.port %} port {{ object.port }} {%- endif %} weight-per-server {{ object.weight }} max-connection-per-server {{ object.max_connection }}
+  {% endif %}
+  {#- 删除range服务 #}
+  {%- if object.del_detail_range %}
+no server ip-range {{ object.range_start }} {{ object.range_end }}{%- if object.port %} port {{ object.port }} {%- endif %}
+  {% endif %}
+ {% endfor %}
+ {#- weight-per-server 指定负载均衡中流量转发的权重，1-255 默认1 #}
+ {#- max-connection-per-server  指定服务器最大连接数，1-1000000000 默认0表示不限制 #}
+ {#- 配置监测规则  #}
+ {#- track-ping | track-tcp port | track-udp port  #}
+ {#- threshold 监测失败警戒值 默认3 范围1-255 #}
+ {#- weight 该条监测失败对整个监测对象失败贡献的权重值 范围1-255 #}
+ {%- if monitor=='track-ping' %}
+monitor track-ping interval 10 threshold 3 weight 1
+ {%- elif monitor=='track-tcp' -%}
+monitor track-tcp interval 10 threshold 3 weight 1
+ {% endif %}
+ {% if monitor_threshold %}
+monitor threshold {{ monitor_threshold }}
+ {%- endif -%}
