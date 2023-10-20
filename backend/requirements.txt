@@ -73,4 +73,3 @@ uwsgi==2.0.21
 daphne==2.3.0
 schedule==1.2.0
 drf-spectacular==0.26.2
-py2neo==2021.2.3
