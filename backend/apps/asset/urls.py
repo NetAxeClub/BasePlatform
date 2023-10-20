@@ -43,8 +43,4 @@ urlpatterns = [
     path('import_template', ResourceManageExcelView.as_view(), name='import_template'),
     path('device_account', DeviceAccountView.as_view(), name='device_account'),
     path('cmdbChart', CmdbChart.as_view(), name='device_account'),
-    path('firewall_base/', FirewallBase.as_view(), name="firewall_base"),  # 通用属性
-    path('address_set/', AddressSet.as_view(), name="address_set"),  # 地址组
-    path('service_set/', ServiceSet.as_view(), name="service_set"),  # 服务组
-    path('dnat/', DestAddTranslate.as_view(), name="dnat"),  # DNAT
 ]

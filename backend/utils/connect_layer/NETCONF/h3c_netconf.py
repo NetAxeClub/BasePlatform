@@ -1885,7 +1885,6 @@ class H3CinfoCollection(H3CNetconf):
                         a.update(Name=b['Name'])
         return routelist
 
-
 # 防火墙自动化
 class H3CSecPath(H3CNetconf):
 
@@ -3956,7 +3955,3 @@ class H3CSecPath(H3CNetconf):
             'SecurityPolicies': IPv4Rules
         }]
         return self.config_top(top=data)
-
-
-if __name__ == '__main__':
-    pass

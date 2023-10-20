@@ -342,6 +342,3 @@ class CiscoSoftwareinfoCollection(CiscoNetconfConnect):
         request_info = self.netconfig_get_config()
         return request_info
 
-
-if __name__ == '__main__':
-    pass
