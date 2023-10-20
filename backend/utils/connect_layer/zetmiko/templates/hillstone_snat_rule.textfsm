@@ -3,6 +3,8 @@ Value Required ID (\d+)
 Value INGRESS_INTERFACE (\S+)
 Value EGRESS_INTERFACE (\S+)
 Value FROM (\S+)
+Value FROMZONE (\S+)
+Value TOZONE (\S+)
 Value TO (\S+)
 Value FROM_IP (\d+.\d+.\d+.\d+|\d+.\d+.\d+.\d+\/\d{1,2})
 Value TO_IP (\d+.\d+.\d+.\d+)
@@ -25,4 +27,6 @@ VRT
   ^\s+snatrule\s+id\s+${ID}\s+(ingress-interface\s"${INGRESS_INTERFACE}"\s+)?from\s+(address-book\s"${FROM}"|ip\s${FROM_IP})\sto\s(address-book\s"${TO}"|ip\s${TO_IP})\s*service\s+"${SERVICE}"(\s*eif\s${EGRESS_INTERFACE})?(\s*trans-to\s(address-book\s"${TRANSTO}"|ip\s${TRANSTO_IP}|${TRANSTO_EIP}))?(\s*mode\s+${MODE})?(\s*${LOG})?(\s*${DISABLE})?(\s*track\s{TRACK})?(\s*description${DESC})? -> Continue.Record
   ## 5.0
   ^\s+snatrule\s+id\s+${ID}\s+from\s+("${FROM}"|ip\s${FROM_IP})\sto\s("${TO}"|ip\s${TO_IP})\s*service\s+"${SERVICE}"(\s*eif\s${EGRESS_INTERFACE})?(\s*trans-to\s(address-book\s"${TRANSTO}"|ip\s${TRANSTO_IP}|${TRANSTO_EIP}))?(\s*mode\s+${MODE})?(\s*${LOG})?(\s*${DISABLE})?(\s*track\s{TRACK})?(\s*description${DESC})? -> Continue.Record
+  ## 5.5r10
+  ^\s+snatrule\s+id\s+${ID}\s+from-zone\s+"${FROMZONE}"\s+to-zone\s+"${TOZONE}"\s+from\s+(address-book\s"${FROM}"|ip\s${FROM_IP})\sto\s(address-book\s"${TO}"|ip\s${TO_IP})\s*service\s+"${SERVICE}"(\s*eif\s${EGRESS_INTERFACE})?(\s*trans-to\s(address-book\s"${TRANSTO}"|ip\s${TRANSTO_IP}|${TRANSTO_EIP}))?(\s*mode\s+${MODE})?(\s*${LOG})?(\s*${DISABLE})?(\s*track\s{TRACK})?(\s*description${DESC})? -> Continue.Record
   ^exit -> Record Start

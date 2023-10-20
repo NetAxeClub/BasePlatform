@@ -10,3 +10,4 @@ Start
   ^============+
   ^\s+Name\s+Type
   ^\s+${Name}\s+${Type}\s+${Vswitch}\s+${Ifcount}\s+${Shared}\s*$$ -> Continue.Record
+  ^\s+${Name}\s+${Type}\s+${Vswitch}\s+${Ifcount}$$ -> Continue.Record
