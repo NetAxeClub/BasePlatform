@@ -29,7 +29,6 @@ from netaxe.celery import AxeTask
 from netaxe.settings import DEBUG
 from apps.asset.models import NetworkDevice
 from apps.automation.tools.hillstone import HillstoneProc
-from apps.automation.tools.models_api import get_firewall_list
 from apps.automation.firewall.h3c import H3cFirewall
 from apps.automation.firewall.hillstone import HillstoneBase
 from apps.automation.firewall.huawei import HuaweiUsgSecPolicyConf
@@ -409,9 +408,6 @@ class FirewallMain(object):
                     self.dev_infos['ip'] = self.dev_infos['bind_ip__ipaddr']
         else:
             raise ValueError("FirewallMain初始化未获取到设备CMDB信息")
-
-    def get_firewall_list(self):
-        return get_firewall_list()
 
     # 流程引擎操作
     def flow_engine(self, *args, **kwargs):

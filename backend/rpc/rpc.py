@@ -15,6 +15,7 @@ from confload.confload import config
 from pika import BasicProperties
 from bus.bus_sync import SyncMessageBus
 from apps.automation.sec_main import FirewallMain
+from apps.automation.tools.models_api import get_firewall_list
 
 
 class Automation:
@@ -25,9 +26,12 @@ class Automation:
 
 # 分发器
 def dispatcher(method, data):
-    _FirewallMain = FirewallMain(data['host'])
-    func = getattr(_FirewallMain, method)
-    return func(**data)
+    if method == 'get_firewall_list':
+        return get_firewall_list()
+    else:
+        _FirewallMain = FirewallMain(data['host'])
+        func = getattr(_FirewallMain, method)
+        return func(**data)
 
 
 # 响应RPC请求
