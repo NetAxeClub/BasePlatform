@@ -4,7 +4,7 @@
 # @Site    : 
 # @File    : h3c.py
 # @Software: PyCharm
-from apps.service.NETCONF.h3c_netconf import H3CSecPath
+from utils.connect_layer.NETCONF.h3c_netconf import H3CSecPath
 from apps.automation.tasks import StandardFSMAnalysis, AutomationMongo
 from utils.wechat_api import send_msg_netops
 from netaddr import IPNetwork

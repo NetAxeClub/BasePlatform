@@ -12,14 +12,18 @@
 使用pika 封装一个消息总线类，实现消息发布订阅、消息确认、qos、公平队列、限速、消息广播功能
 """
 import functools
+import uuid
 import pika
+import json
 import time
 import logging
 from queue import Queue
 from threading import Lock
 from pika.exchange_type import ExchangeType
 from confload.confload import config
+
 logger = logging.getLogger(__name__)
+
 
 # 回调方法
 def on_message(chan, method_frame, header_frame, body, userdata=None):
@@ -27,6 +31,15 @@ def on_message(chan, method_frame, header_frame, body, userdata=None):
     print('Delivery properties: %s, message metadata: %s', method_frame, header_frame)
     print('Userdata: %s, message body: %s', userdata, body)
     chan.basic_ack(delivery_tag=method_frame.delivery_tag)
+
+
+def fib(n):
+    if n == 0:
+        return 0
+    elif n == 1:
+        return 1
+    else:
+        return fib(n - 1) + fib(n - 2)
 
 
 class SyncMessageBus:
@@ -46,6 +59,9 @@ class SyncMessageBus:
         self.exchange = config.exchange
         self.queue_qos = config.queue_qos
         self.routing_key = ''
+        self.callback_queue = None
+        self.response = None
+        self.corr_id = None
 
     def get_connection(self):
         with self.connection_pool_lock:
@@ -155,7 +171,8 @@ class SyncMessageBus:
 
     def broadcast(self, body, persistent=True):
         channel = self.get_channel()
-        channel.basic_publish(exchange='broadcast', routing_key='', body=body, properties=pika.BasicProperties(delivery_mode=2 if persistent else 1))
+        channel.basic_publish(exchange='broadcast', routing_key='', body=body,
+                              properties=pika.BasicProperties(delivery_mode=2 if persistent else 1))
 
     def receive_broadcast(self, queue, callback, durable=True, auto_delete=False):
         channel = self.get_channel()
@@ -170,6 +187,49 @@ class SyncMessageBus:
         channel.queue_bind(exchange='broadcast', queue=queue_name)
         channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=True)
         channel.start_consuming()
+
+    def on_response(self, ch, method, props, body):
+        if self.corr_id == props.correlation_id:
+            self.response = body
+
+    def call(self, n, queue):
+        self.response = None
+        self.corr_id = str(uuid.uuid4())
+        connection = self.get_connection()
+        channel = connection.channel()
+        result = channel.queue_declare(queue=queue, exclusive=True)
+        self.callback_queue = result.method.queue
+        channel.basic_publish(
+            exchange='',
+            routing_key='rpc_queue',
+            properties=pika.BasicProperties(
+                reply_to=self.callback_queue,
+                correlation_id=self.corr_id,
+            ),
+            body=str(n).encode())
+        connection.process_data_events(time_limit=None)
+        return int(self.response)
+
+    def rpc_server(self, queue, routing_key, callback, durable=True, auto_delete=False):
+        channel = self.get_channel()
+        arguments = {"x-max-priority": 10}
+        channel.exchange_declare(
+            exchange=self.exchange,
+            exchange_type=ExchangeType.topic,
+            durable=durable,
+            auto_delete=auto_delete
+        )
+        channel.queue_declare(queue=queue, durable=durable, auto_delete=auto_delete, arguments=arguments)
+        channel.queue_bind(queue=queue, exchange=self.exchange, routing_key=routing_key)
+        channel.basic_qos(prefetch_count=1)
+        on_message_callback = functools.partial(
+            callback, userdata='on_request')
+        channel.basic_consume(queue='rpc_queue', on_message_callback=on_message_callback)
+        try:
+            channel.start_consuming()
+        except KeyboardInterrupt as e:
+            logger.error(str(e))
+            channel.stop_consuming()
 
 
 # broadcast

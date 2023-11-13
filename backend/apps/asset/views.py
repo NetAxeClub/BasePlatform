@@ -19,7 +19,6 @@ from .json_validate.dnat_schema import post_dnat_schema
 from .json_validate.service_schema import service_schema
 # from .json_validate import address_schema
 from .jsonschema import single_json_validate
-from .utils.models_api import get_firewall_list
 from apps.automation.tasks import interface_used
 from netaxe.settings import MEDIA_ROOT, DEBUG
 from utils.crypt_pwd import CryptPwd

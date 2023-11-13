@@ -1,8 +1,6 @@
 from django.db import models
 from simple_history.models import HistoricalRecords
 from django.db.models.signals import pre_save
-from django_fsm import FSMField, transition, ConcurrentTransitionMixin
-from django_fsm_log.decorators import fsm_log_by
 from django.dispatch import receiver
 import xml.etree.ElementTree as ET
 import json
@@ -293,7 +291,7 @@ class AutomationInventory(models.Model):
                             max_length=64, null=False)
 
 
-class AutoFlow(ConcurrentTransitionMixin, models.Model):
+class AutoFlow(models.Model):
     task_id = models.CharField(verbose_name='任务ID', max_length=128, null=False, default='')
     origin = models.CharField(verbose_name='来源', max_length=128, null=False, default='运维平台')
     task_result = models.TextField(verbose_name='任务结果', null=True, default=None, editable=False)
@@ -325,7 +323,7 @@ class AutoFlow(ConcurrentTransitionMixin, models.Model):
         blank=True, default='[]',
         verbose_name='回退命令',
     )
-    state = FSMField(default=State.DRAFT, verbose_name='流程状态', choices=State.CHOICES, protected=True, )
+    state = models.CharField(default=State.DRAFT, verbose_name='流程状态', choices=State.CHOICES, max_length=200)
     code = models.IntegerField(verbose_name='状态码', default=9000, null=True, blank=True)
 
     # 判断是否失败状态
@@ -333,68 +331,41 @@ class AutoFlow(ConcurrentTransitionMixin, models.Model):
         return self.state == State.FAILED
 
     # 流程打回
-    @fsm_log_by
-    @transition(field=state, source=State.APPROVED, target=State.DRAFT,
-                permission='automation.change_autoflow')
     def unapprove(self, by=None):
         """恢复到批准状态(流程打回)"""
         self.code = 9000
 
     # 流程批准，状态转换
-    @fsm_log_by
-    @transition(field=state, source=State.DRAFT, target=State.APPROVED,
-                permission='automation.change_autoflow')
     def approve(self, by=None):
         """经过审查后得到批准"""
         self.code = 9002
 
     # 流程初始化失败
-    @fsm_log_by
-    @transition(field=state, source=State.APPROVED, target=State.FAILED,
-                permission='automation.change_autoflow')
     def draft_failed(self, by=None):
         """初始化失败"""
         self.code = 9003
 
     # 准备执行 任务发布
-    @fsm_log_by
-    @transition(field=state, source=State.APPROVED, target=State.PUBLISHED,
-                permission='automation.change_autoflow')
     def publish(self, by=None):
         self.code = 9006
 
     # 发布 -> 完成工单闭环
-    @fsm_log_by
-    @transition(field=state, source=State.PUBLISHED, target=State.FINISH,
-                permission='automation.change_autoflow')
     def finish(self, by=None):
         self.code = 9008
 
     # 发布 -> 回退
-    @fsm_log_by
-    @transition(field=state, source=State.PUBLISHED, target=State.BACKOFF,
-                permission='automation.change_autoflow')
     def back_off(self, by=None):
         self.code = 9004
 
     # 执行完成 -> 失败
-    @fsm_log_by
-    @transition(field=state, source=State.PUBLISHED, target=State.FAILED,
-                permission='automation.change_autoflow')
     def failed(self, by=None):
         self.code = 9005
 
     # 执行失败 -> 回退
-    @fsm_log_by
-    @transition(field=state, source=State.FAILED, target=State.BACKOFF,
-                permission='automation.change_autoflow')
     def failed_back_off(self, by=None):
         self.code = 9007
 
     # 执行回退 -> 失败
-    @fsm_log_by
-    @transition(field=state, source=State.BACKOFF, target=State.FAILED,
-                permission='automation.change_autoflow')
     def back_off_failed(self, by=None):
         self.code = 9009
 
