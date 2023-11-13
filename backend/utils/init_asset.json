@@ -1,6 +1,5 @@
 {
   "Idc": [{"name": "默认机房", "address": "demo", "tel": "demo"}],
-  "IdcModel": [{"name": "默认模块", "floor": 1, "area": 1, "idc_id": 1}],
   "Vendor": [
     {"name": "华三", "alias": "H3C"},
     {"name": "华为", "alias": "Huawei"},

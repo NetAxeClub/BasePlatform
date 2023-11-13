@@ -18,7 +18,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'netboost.settings')
 django.setup()
 from netaxe.settings import BASE_DIR
 from django.apps import apps
-from apps.asset.models import Idc
+from apps.asset.models import Idc, IdcModel
 
 
 def main():
@@ -28,8 +28,6 @@ def main():
             my_model = apps.get_model("asset", table)
             if my_model:
                 for value in values:
-                    if table == "IdcModel":
-                        value['idc'] = Idc.objects.get(id=value['idc_id'])
                     my_model.objects.get_or_create(**value)
 
 
