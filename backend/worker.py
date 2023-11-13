@@ -19,10 +19,13 @@ import sys
 import logging
 import socket
 from multiprocessing import Process
+
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'netaxe.settings')
 django.setup()
 from manager import app_manager_sync
+from rpc import RPC
 from confload.confload import config
+
 BASE_DIR = os.path.dirname(__file__)
 # 定位到log日志文件
 log_path = os.path.join(BASE_DIR, 'logs')
@@ -52,6 +55,11 @@ def register_menu():
     app_manager_sync.pubilch_task(queue='rbac', routing_key='rbac', data=json.dumps(tmp))
 
 
+# 运行rpc服务器
+def run_rpc_server():
+    RPC.run_rpc_server()
+
+
 # 实现work的基本方法
 def run_worker():
     try:
@@ -74,11 +82,24 @@ def worker_constructor():
         sys.exit()
 
 
+# 开启多进程
+def worker_rpc():
+    try:
+        p = Process(target=run_rpc_server, name="worker-rpc-{}".format(hostname))
+        p.start()
+        while True:
+            time.sleep(99999999)
+    finally:
+        sys.exit()
+
+
 # 最终调用
 def main(args):
     worker_type = args[-1]
     if worker_type == "default":
         worker_constructor()
+    elif worker_type == "rpc":
+        worker_rpc()
 
 
 if __name__ == "__main__":
