@@ -14,7 +14,7 @@ import json
 from confload.confload import config
 from pika import BasicProperties
 from bus.bus_sync import SyncMessageBus
-from backend.apps.automation.sec_main import FirewallMain
+from apps.automation.sec_main import FirewallMain
 
 
 class Automation:
