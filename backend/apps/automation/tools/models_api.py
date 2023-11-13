@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 # 2023/8/28
 from django.db import connections
-
+from django.core import serializers
 from apps.asset.models import NetworkDevice, Category
 
 
 def get_firewall_list(manage_ip_list=None):
+    connections.close_all()
     category = Category.objects.filter(name='防火墙').values('id').first()
     all_devs = []
     # 获取所有cmdb设备

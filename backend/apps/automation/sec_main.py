@@ -326,9 +326,9 @@ class FirewallMain(object):
                     self.dev_info = {
                         'device_type': 'h3c',
                         'ip': self.dev_infos.get('bind_ip__ipaddr') if self.dev_infos.get('bind_ip__ipaddr') else host,
-                        'port': self.dev_infos['netconf_port'],
-                        'username': self.dev_infos['netconf_username'],
-                        'password': self.dev_infos['netconf_password'],
+                        'port': self.dev_infos['netconf']['port'],
+                        'username': self.dev_infos['netconf']['username'],
+                        'password': self.dev_infos['netconf']['password'],
                         'timeout': 200,  # float，连接超时时间，默认为100
                         'session_timeout': 100,  # float，每个请求的超时时间，默认为60
                         'patch_version': self.dev_infos.get('patch_version'),
@@ -397,9 +397,9 @@ class FirewallMain(object):
                 self.dev_info = {
                     'device_type': 'hillstone_telnet' if 'telnet' in self.dev_infos['protocol'] else 'hillstone',
                     'ip': host,
-                    'port': self.dev_infos['port'],
-                    'username': self.dev_infos['username'],
-                    'password': self.dev_infos['password'],
+                    'port': self.dev_infos['ssh']['port'],
+                    'username': self.dev_infos['ssh']['username'],
+                    'password': self.dev_infos['ssh']['password'],
                     'timeout': 100,  # float，连接超时时间，默认为100
                     'session_timeout': 60,  # float，每个请求的超时时间，默认为60，
                     'encoding': 'utf-8'
@@ -4745,6 +4745,11 @@ class FirewallMain(object):
         except Exception as e:
             send_msg_sec_manage("安全纳管华三防火墙 {} NETCONF初始化失败:{}".format(self.host, str(e)))
             return []
+
+    def get_hillstone_address_obj(self):
+        res = MongoOps(db='Automation', coll='hillstone_address') \
+            .find(query_dict=dict(hostip=self.host), fileds={'_id': 0})
+        return res
 
 
 class SecPolicyMain(object):

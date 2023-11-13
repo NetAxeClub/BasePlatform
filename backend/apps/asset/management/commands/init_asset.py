@@ -18,7 +18,6 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'netboost.settings')
 django.setup()
 from netaxe.settings import BASE_DIR
 from django.apps import apps
-from apps.asset.models import Idc, IdcModel
 
 
 def main():

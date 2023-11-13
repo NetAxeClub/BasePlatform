@@ -26,12 +26,18 @@ class Automation:
 
 # 分发器
 def dispatcher(method, data):
-    if method == 'get_firewall_list':
-        return get_firewall_list()
-    else:
-        _FirewallMain = FirewallMain(data['host'])
-        func = getattr(_FirewallMain, method)
-        return func(**data)
+    print('method', method)
+    try:
+        if method == 'get_firewall_list':
+            res = get_firewall_list()
+            return list(res)
+        else:
+            _FirewallMain = FirewallMain(data['host'])
+            func = getattr(_FirewallMain, method)
+            return func()
+    except Exception as e:
+        print(e)
+        return {'code': 400}
 
 
 # 响应RPC请求
