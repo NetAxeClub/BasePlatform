@@ -96,25 +96,30 @@ export function isMenu(it: OriginRoute) {
 }
 
 export function getNameByUrl(menuUrl: string) {
-  const temp = menuUrl.split('/')
-  return toHump(temp[temp.length - 1])
+  const temp = menuUrl.replaceAll('/', '-')
+  return toHump(temp)
+}
+
+type RouteRow = RouteRecordRaw & {
+  web_path: string
+  children?: RouteRow[]
 }
 
 export function generatorRoutes(res: Array<OriginRoute>) {
-  const tempRoutes: Array<RouteRecordRaw> = []
+  const tempRoutes: Array<RouteRow> = []
   res.forEach((it) => {
     const isMenuFlag = isMenu(it)
     const localRoute = isMenuFlag
       ? filterRoutesFromLocalRoutes(it, asyncRoutes)
       : null
     if (localRoute) {
-      tempRoutes.push(localRoute as RouteRecordRaw)
+      tempRoutes.push(localRoute as RouteRow)
     } else {
-      const route: RouteRecordRaw = {
+      const route: RouteRow = {
         path:
           it.link_path && isExternal(it.link_path) ? it.link_path : it.web_path,
         web_path: it.web_path,
-        name: it.name || getNameByUrl(it.web_path),
+        name: getNameByUrl(it.web_path),
         component: isMenuFlag ? LAYOUT : getComponent(it),
         meta: {
           hidden: !!it.hidden,
@@ -129,7 +134,7 @@ export function generatorRoutes(res: Array<OriginRoute>) {
         }
       }
       if (it.children) {
-        route.children = generatorRoutes(it.children)
+        route.children = generatorRoutes(it.children) as any
       }
       tempRoutes.push(route)
     }

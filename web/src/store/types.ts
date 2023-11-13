@@ -74,11 +74,12 @@ export interface OriginRoute {
   parentPath?: string
   menuUrl?: string
   web_path: string
-  menuName?: string
+  is_link: boolean
+  link_path: string
+  is_catalog: boolean
+  key: string
   name: string
-  routeName?: string
   hidden?: boolean
-  outLink?: string
   affix?: boolean
   cacheable?: boolean
   isRootPath?: boolean
