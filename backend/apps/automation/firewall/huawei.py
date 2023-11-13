@@ -6,7 +6,7 @@
 # @Software: PyCharm
 # from apps.automation.utils.model_api import get_device_info_v2
 from apps.automation.tools.model_api import get_device_info_v2
-from apps.service.NETCONF.huawei_netconf import HuaweiUSG
+from utils.connect_layer.NETCONF.huawei_netconf import HuaweiUSG
 from apps.automation.tasks import StandardFSMAnalysis, AutomationMongo
 from utils.wechat_api import send_msg_netops
 from utils.db.mongo_ops import MongoOps
