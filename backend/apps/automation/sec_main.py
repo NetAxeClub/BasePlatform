@@ -4400,7 +4400,7 @@ class FirewallMain(object):
         raise RuntimeError("DCS:未查询到安全策略的动作")
 
     # 华三获取SNAT表项
-    def get_h3c_snat(self):
+    def get_h3c_snat(self, **kwargs):
         # get_source_nat
         try:
             device = H3CSecPath(host=self.host, user=self.dev_info['username'], password=self.dev_info['password'])
@@ -4423,7 +4423,7 @@ class FirewallMain(object):
             return False
 
     # 华为获取全局NAT策略 用于SNAT
-    def get_huawei_nat_policy(self):
+    def get_huawei_nat_policy(self, **kwargs):
         # get_nat_policy
         device = HuaweiUSG(host=self.dev_info['ip'],
                            user=self.dev_info['username'], password=self.dev_info['password'])
@@ -4440,7 +4440,7 @@ class FirewallMain(object):
             return []
 
     # 获取华三单个设备地址组对象列表V2
-    def get_h3c_address_obj(self):
+    def get_h3c_address_obj(self, **kwargs):
         try:
             device = H3CSecPath(host=self.host, user=self.dev_info['username'], password=self.dev_info['password'])
 
@@ -4462,7 +4462,7 @@ class FirewallMain(object):
             return False
 
     # 获取华为单个设备地址组对象列表V2
-    def get_huawei_address_obj(self):
+    def get_huawei_address_obj(self, **kwargs):
         device = HuaweiUSG(host=self.dev_info['ip'], user=self.dev_info['username'], password=self.dev_info['password'])
         try:
             address_ser = device.get_address_set()
@@ -4478,7 +4478,7 @@ class FirewallMain(object):
             return False
 
     # 获取华三单个设备服务对象列表V2
-    def get_h3c_service_obj(self):
+    def get_h3c_service_obj(self, **kwargs):
         try:
             device = H3CinfoCollection(host=self.host,
                                        user=self.dev_info['username'], password=self.dev_info['password'])
@@ -4497,7 +4497,7 @@ class FirewallMain(object):
             return False
 
     # 获取华为单个设备服务对象列表V2
-    def get_huawei_service_obj(self):
+    def get_huawei_service_obj(self, **kwargs):
         device = HuaweiUSG(host=self.dev_info['ip'],
                            user=self.dev_info['username'], password=self.dev_info['password'])
         try:
@@ -4513,7 +4513,7 @@ class FirewallMain(object):
             return False
 
     # 获取华为单个设备安全策略
-    def get_huawei_sec_policy(self):
+    def get_huawei_sec_policy(self, **kwargs):
         device = HuaweiUSG(host=self.dev_info['ip'],
                            user=self.dev_info['username'], password=self.dev_info['password'])
         try:
@@ -4529,7 +4529,7 @@ class FirewallMain(object):
             return False
 
     # 获取华三全局DNAT表项
-    def get_h3c_global_dnat(self):
+    def get_h3c_global_dnat(self, **kwargs):
         try:
             device = H3CSecPath(host=self.host, user=self.dev_info['username'], password=self.dev_info['password'])
 
@@ -4551,7 +4551,7 @@ class FirewallMain(object):
             return []
 
     # 获取华为全局DNAT表项(NAT SERVER)
-    def get_huawei_nat_server(self):
+    def get_huawei_nat_server(self, **kwargs):
         device = HuaweiUSG(host=self.dev_info['ip'],
                            user=self.dev_info['username'], password=self.dev_info['password'])
         try:
@@ -4696,13 +4696,13 @@ class FirewallMain(object):
         return before, data, res
 
     # 更新单个山石防火墙nat信息
-    def refresh_hillstone_configuration(self):
+    def refresh_hillstone_configuration(self, **kwargs):
         _HillstoneProc = HillstoneProc(**self.dev_infos)
         _HillstoneProc.manual_cmd_run(*['show configuration'])
         return
 
     # 获取华三安全域列表
-    def get_h3c_sec_zone(self):
+    def get_h3c_sec_zone(self, **kwargs):
         try:
             device = H3CSecPath(host=self.host, user=self.dev_info['username'], password=self.dev_info['password'])
 
@@ -4724,7 +4724,7 @@ class FirewallMain(object):
             return []
 
     # 获取华三安全策略
-    def get_h3c_sec_policy(self):
+    def get_h3c_sec_policy(self, **kwargs):
         try:
             device = H3CSecPath(host=self.host, user=self.dev_info['username'],
                                 password=self.dev_info['password'])
@@ -4746,7 +4746,7 @@ class FirewallMain(object):
             send_msg_sec_manage("安全纳管华三防火墙 {} NETCONF初始化失败:{}".format(self.host, str(e)))
             return []
 
-    def get_hillstone_address_obj(self):
+    def get_hillstone_address_obj(self, **kwargs):
         res = MongoOps(db='Automation', coll='hillstone_address') \
             .find(query_dict=dict(hostip=self.host), fileds={'_id': 0})
         return res
@@ -6398,11 +6398,11 @@ def address_set(self, **post_param):
     _FirewallMain = FirewallMain(post_param['hostip'])
     # "event_id": event_id.id,  # 关联事件
     event_id = post_param.get('event_id') or None
-    # 更新地址组
-    if all(k in post_param for k in ("vendor", "update_device")):
-        if post_param['vendor'] == 'Hillstone':
-            _FirewallMain.refresh_hillstone_configuration()
-        return
+    # # 更新地址组
+    # if all(k in post_param for k in ("vendor", "update_device")):
+    #     if post_param['vendor'] == 'Hillstone':
+    #         _FirewallMain.refresh_hillstone_configuration()
+    #     return
     if post_param['vendor'] == 'H3C':
         # 首先判断具体操作
         """ 

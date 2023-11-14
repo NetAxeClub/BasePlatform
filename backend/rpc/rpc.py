@@ -13,9 +13,16 @@
 import json
 from confload.confload import config
 from pika import BasicProperties
+from netaxe.settings import DEBUG
 from bus.bus_sync import SyncMessageBus
 from apps.automation.sec_main import FirewallMain
 from apps.automation.tools.models_api import get_firewall_list
+from apps.automation.sec_main import address_set
+
+if DEBUG:
+    CELERY_QUEUE = 'dev'
+else:
+    CELERY_QUEUE = 'config_backup'
 
 
 class Automation:
@@ -31,6 +38,10 @@ def dispatcher(method, data):
         if method == 'get_firewall_list':
             res = get_firewall_list()
             return list(res)
+        elif method == 'address_set':
+            res = address_set.apply_async(kwargs=data, queue=CELERY_QUEUE,
+                                          retry=True)  # config_backup
+            return str(res)
         else:
             _FirewallMain = FirewallMain(data['host'])
             func = getattr(_FirewallMain, method)
@@ -61,4 +72,3 @@ class SyncRPC:
 
     def run_rpc_server(self):
         self.bus.rpc_server(queue=f"rpc_{config.queue}", routing_key=f"rpc_{config.queue}", callback=on_request)
-
