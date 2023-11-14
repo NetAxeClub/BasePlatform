@@ -22,7 +22,7 @@ from apps.automation.sec_main import address_set
 if DEBUG:
     CELERY_QUEUE = 'dev'
 else:
-    CELERY_QUEUE = 'config_backup'
+    CELERY_QUEUE = 'config'
 
 
 class Automation:
@@ -41,6 +41,8 @@ def dispatcher(method, data):
         elif method == 'address_set':
             res = address_set.apply_async(kwargs=data, queue=CELERY_QUEUE,
                                           retry=True)  # config_backup
+            print('res')
+            print(str(res))
             return str(res)
         else:
             _FirewallMain = FirewallMain(data['host'])
