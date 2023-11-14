@@ -302,6 +302,9 @@ CHANNEL_LAYERS = {
         },
     },
 }
+CELERY_IMPORTS = (
+    'apps.automation.sec_main',
+)
 CELERY_ONCE_URL = "{}1".format(REDIS_URL)
 CELERY_RESULT_BACKEND = "django-db"  # 使用django数据库
 CELERY_BROKER_URL = "{}8".format(REDIS_URL)
