@@ -304,6 +304,11 @@ CHANNEL_LAYERS = {
 }
 CELERY_IMPORTS = (
     'apps.automation.sec_main',
+    'apps.automation.tasks',
+    'apps.asset.tasks',
+    'apps.config_center.tasks',
+    'apps.route_backend.tasks',
+    'apps.topology.tasks',
 )
 CELERY_ONCE_URL = "{}1".format(REDIS_URL)
 CELERY_RESULT_BACKEND = "django-db"  # 使用django数据库
