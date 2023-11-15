@@ -4711,7 +4711,7 @@ class FirewallMain(object):
     def refresh_hillstone_configuration(self, **kwargs):
         _HillstoneProc = HillstoneProc(**self.dev_infos)
         _HillstoneProc.manual_cmd_run(*['show configuration'])
-        return
+        return {'code': 200}
 
     # 获取华三安全域列表
     def get_h3c_sec_zone(self, **kwargs):

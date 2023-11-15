@@ -11,6 +11,7 @@
 -------------------------------------------------
 """
 import json
+import logging
 from confload.confload import config
 from pika import BasicProperties
 from netaxe.settings import DEBUG
@@ -18,22 +19,16 @@ from bus.bus_sync import SyncMessageBus
 from apps.dcs_control.tasks import FirewallMain
 from apps.automation.tools.models_api import get_firewall_list
 from apps.dcs_control.tasks import address_set
-
+log = logging.getLogger(__name__)
 if DEBUG:
     CELERY_QUEUE = 'dev'
 else:
     CELERY_QUEUE = 'config'
 
 
-class Automation:
-    def test(self, **kwargs):
-        print(kwargs)
-        return {'n': 100}
-
-
 # 分发器
 def dispatcher(method, data):
-    print('method', method)
+    log.info(f"method:{method}")
     try:
         if method == 'get_firewall_list':
             res = get_firewall_list()
@@ -41,13 +36,13 @@ def dispatcher(method, data):
         elif method == 'address_set':
             res = address_set.apply_async(kwargs=data, queue=CELERY_QUEUE,
                                           retry=True)  # config_backup
-            print('res')
-            print(str(res))
-            return str(res)
+            log.info('res')
+            log.info(str(res))
+            return list({'task_id': str(res)})
         else:
             _FirewallMain = FirewallMain(data['host'])
             func = getattr(_FirewallMain, method)
-            return func()
+            return func(**data)
     except Exception as e:
         print(e)
         return {'code': 400}
