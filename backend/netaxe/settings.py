@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "apps.topology.apps.TopologyConfig",
     "apps.asset.apps.AssetConfig",
     "apps.automation.apps.AutomationConfig",
+    "apps.dcs_control.apps.DcsControlConfig",
     "apps.config_center.apps.ConfigCenterConfig",
     # "apps.route_backend.apps.RouteBackendConfig",
     "apps.int_utilization.apps.IntUtilizationConfig",
@@ -302,14 +303,6 @@ CHANNEL_LAYERS = {
         },
     },
 }
-CELERY_IMPORTS = (
-    'apps.automation.sec_main',
-    'apps.automation.tasks',
-    'apps.asset.tasks',
-    'apps.config_center.tasks',
-    'apps.route_backend.tasks',
-    'apps.topology.tasks',
-)
 CELERY_ONCE_URL = "{}1".format(REDIS_URL)
 CELERY_RESULT_BACKEND = "django-db"  # 使用django数据库
 CELERY_BROKER_URL = "{}8".format(REDIS_URL)

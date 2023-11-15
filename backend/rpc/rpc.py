@@ -15,9 +15,9 @@ from confload.confload import config
 from pika import BasicProperties
 from netaxe.settings import DEBUG
 from bus.bus_sync import SyncMessageBus
-from apps.automation.sec_main import FirewallMain
+from apps.dcs_control.tasks import FirewallMain
 from apps.automation.tools.models_api import get_firewall_list
-from apps.automation.sec_main import address_set
+from apps.dcs_control.tasks import address_set
 
 if DEBUG:
     CELERY_QUEUE = 'dev'
