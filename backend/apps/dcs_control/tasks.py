@@ -6499,7 +6499,7 @@ def address_set(self, **post_param):
             order_code=post_param.get('order_code') if post_param.get('order_code') else ' ',
             task_id=post_param.get('task_id') or str(self.request.id),
             origin=post_param.get('origin') if post_param.get('origin') else '运维平台',
-            commit_user=post_param['user'],
+            commit_user=post_param.get('user') or '',
             remote_ip=post_param.get('remote_ip'),
             task=post_param.get('task') or AutoFlowTasks.ADDRESS_SET,
             device=post_param['hostip'],
