@@ -444,7 +444,7 @@ class BatManMain(object):
         except Exception as e:  # 未知报错记录
             error_text = '[Error 3] Unknown error. {}'.format(str(e))
             print('[Error 3] Unknown error. {}'.format(str(e)))
-            # print(traceback.print_exc())
+            print(traceback.print_exc())
             # 采集失败的记录日志
             # BatManMongo.insert_failed_logs(hostip=dev_info['ip'], device_type=dev_info['device_type'], info=error_text)
             # print(str(e))
