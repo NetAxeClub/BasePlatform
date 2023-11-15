@@ -401,7 +401,7 @@ class BatManMain(object):
                 if default_storage.exists(filename):
                     # 删除已经存在的文件重新生成
                     default_storage.delete(filename)
-                # tmp = default_storage.save(filename, ContentFile('test'))
+                default_storage.save(filename, ContentFile('.'))
                 # netmiko自带log方法需要使用绝对路径存储
                 dev_connection.open_session_log(filename=BASE_DIR + '/media/' + filename)
                 dev_connection.send_config_set(config_commands=cmds,
