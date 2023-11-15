@@ -448,6 +448,7 @@ class FirewallMain(object):
             res, netconf_error = run_netconf_config(**self.dev_info)
         else:
             print('开始执行SSH配置下发动作 ')
+            log.info('开始执行SSH配置下发动作 ')
             # 开始执行SSH配置下发动作 很关键
             res, path, netmiko_error = run_cmd_config(*cmds, **self.dev_info)
             if res:

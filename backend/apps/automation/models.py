@@ -347,6 +347,7 @@ class AutoFlow(models.Model):
 
     # 准备执行 任务发布
     def publish(self, by=None):
+        self.state = State.PUBLISHED
         self.code = 9006
 
     # 发布 -> 完成工单闭环
