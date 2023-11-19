@@ -42,7 +42,10 @@ def dispatcher(method, data):
         else:
             _FirewallMain = FirewallMain(data['host'])
             func = getattr(_FirewallMain, method)
-            return func(**data)
+            res = func(**data)
+            if res is None:
+                return {'code': 200}
+            return res
     except Exception as e:
         print(e)
         return {'code': 400}

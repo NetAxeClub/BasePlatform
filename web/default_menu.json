@@ -90,6 +90,18 @@
       },
       "children": [
         {
+          "name": "原子事件",
+          "path": "/automated/atomic_event",
+          "web_path": "/automated/atomic_event",
+          "meta": {
+            "title": "原子事件",
+            "affix": true,
+            "iconPrefix": "iconfont",
+            "icon": "index",
+            "cacheable": false
+          }
+        },
+        {
           "name": "采集方案",
           "path": "/automated/collect",
           "web_path": "/automated/collect",

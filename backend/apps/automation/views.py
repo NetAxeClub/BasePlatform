@@ -1,13 +1,16 @@
+import operator
 from django.http import JsonResponse
 from django.apps import apps
 # from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 import django_filters
+from django.db.models import Count
 from rest_framework import filters
 from rest_framework.views import APIView
 from apps.api.tools.custom_pagination import LargeResultsSetPagination
-from apps.automation.models import CollectionPlan, CollectionRule, CollectionMatchRule
-from apps.automation.serializers import CollectionPlanSerializer, CollectionRuleSerializer, CollectionMatchRuleSerializer
+from apps.automation.models import CollectionPlan, CollectionRule, CollectionMatchRule, AutoFlow
+from apps.automation.serializers import (
+    CollectionPlanSerializer, CollectionRuleSerializer, CollectionMatchRuleSerializer, AutoFlowSerializer)
 from apps.api.tools.custom_viewset_base import CustomViewBase
 from django.db.models import CharField, ForeignKey, GenericIPAddressField
 from driver import auto_driver_map
@@ -47,6 +50,18 @@ class CollectionMatchRuleFilter(django_filters.FilterSet):
     class Meta:
         model = CollectionMatchRule
         fields = '__all__'
+
+
+# 自动化工作流
+class AutoFlowViewSet(CustomViewBase):
+    queryset = AutoFlow.objects.all().order_by('-commit_time')
+    serializer_class = AutoFlowSerializer
+    # # 配置搜索功能
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    # 如果要允许对某些字段进行过滤，可以使用filter_fields属性。
+    # filterset_class = NetFileVTEPFilter
+    filter_fields = '__all__'
+    ordering_fields = ('-id',)
 
 
 class CollectionPlanViewSet(CustomViewBase):
@@ -158,3 +173,65 @@ class VueCollectionRule(APIView):
         post_param = request.data
         print(post_param)
         return JsonResponse({'code': 400, 'msg': '未匹配动作'})
+
+
+# 自动化chart
+class AutomationChart(APIView):
+    def get(self, request):
+        get_params = request.GET.dict()
+        if 'event_task_module' in get_params:
+            event_task_module_list = []
+            event_task_module_queryset = AutoFlow.objects.values('task').annotate(sum_count=Count('task'))
+            for i in event_task_module_queryset:
+                event_task_module_list.append(i)
+            # 根据数目count排序
+            sorted_event_task_module_list = sorted(event_task_module_list, key=operator.itemgetter('sum_count'),
+                                                   reverse=True)
+            result = {
+                "code": 200,
+                "data": sorted_event_task_module_list
+            }
+            return JsonResponse(result, safe=False)
+
+        if 'event_task_user' in get_params:
+            event_task_user_list = []
+            event_task_user_queryset = AutoFlow.objects.values('commit_user').annotate(sum_count=Count('commit_user'))
+            for i in event_task_user_queryset:
+                event_task_user_list.append(i)
+            # 根据数目count排序
+            sorted_event_task_user_list = sorted(event_task_user_list, key=operator.itemgetter('sum_count'),
+                                                 reverse=True)
+            result = {
+                "code": 200,
+                "data": sorted_event_task_user_list
+            }
+            return JsonResponse(result, safe=False)
+        if 'event_commit_time' in get_params:
+            login_time_list = []
+            work_time_list = []
+            event_commit_queryset = AutoFlow.objects.values().all()
+            for i in event_commit_queryset:
+                current_day = i['commit_time'].strftime("%Y-%m-%d %H:%M:%S")[0:11]
+                if current_day + '08:30' < i['commit_time'].strftime("%Y-%m-%d %H:%M:%S") < current_day + "17:30":
+                    work_time_list.append(i)
+            result = {
+                'code': 200,
+                'data': {
+                    'work_time_count': len(work_time_list),
+                    'total_time_count': len(event_commit_queryset),
+                    'not_work_time': len(event_commit_queryset) - len(work_time_list)
+                }
+            }
+            return JsonResponse(result, safe=False)
+
+        if "collection_plan" in get_params:
+            collection_plan_list = []
+            collection_plan_queryset = CollectionPlan.objects.values("vendor").annotate(sum_count=Count("vendor"))
+            for i in collection_plan_queryset:
+                collection_plan_list.append(i)
+
+            result = {
+                'code': 200,
+                'data': collection_plan_list
+            }
+            return JsonResponse(result, safe=False)

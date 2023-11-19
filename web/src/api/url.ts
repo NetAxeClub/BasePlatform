@@ -45,13 +45,13 @@ export const jobcenterTaskUrl = baseAddress + '/backend/jobCenter/'
 export const get_device_expand = baseAddress + '/backend/networklist/'
 // 获取webssh登录日志
 export const getLoginRecordList = baseAddress + '/asset/login_record/'
-export const get_server_expand =baseAddress + '/backend/server_cmdb_expand/'
+export const get_server_expand = baseAddress + '/backend/server_cmdb_expand/'
 // 采集方案
 export const deviceCollect = baseAddress + '/backend/deviceCollect/'
 // webssh
 export const deviceWebSshLogin = baseAddress + '/backend/deviceWebSsh/'
 export const serverWebSsh = baseAddress + '/backend/serverWebSsh/'
-export const automation_chart = baseAddress + '/backend/automationChart/'
+
 // 未知
 export const deviceInfoChange = baseAddress + '/backend/deviceInfoChange/'
 export const getperiodic_taskList = baseAddress + '/backend/periodic_task/'
@@ -70,7 +70,8 @@ export const getinterval_schedule = baseAddress + '/backend/interval_schedule/'
 
 export const get_cmdb_rack = baseAddress + '/asset/cmdb_rack/'
 export const device_import_url = baseAddress + '/asset/import_template'
-export const device_import_excel_path = baseAddress +'/media/cmdbExcelTemplate/import-demo.xlsx/'
+export const device_import_excel_path =
+  baseAddress + '/media/cmdbExcelTemplate/import-demo.xlsx/'
 export const getCmdbIdcList = baseAddress + '/asset/cmdb_idc/'
 export const getCmdbRackList = baseAddress + '/asset/cmdb_rack/'
 export const getCmdbRoleList = baseAddress + '/asset/cmdb_role/'
@@ -84,7 +85,7 @@ export const getCmdbNetzoneList = baseAddress + '/asset/cmdb_netzone/'
 export const getcmdb_accountList = baseAddress + '/asset/cmdb_account/'
 export const get_cmdb_idc_model = baseAddress + '/asset/cmdb_idc_model'
 export const device_account_url = baseAddress + '/asset/device_account'
-export const server_account_url = baseAddress +'/asset/server_account/'
+export const server_account_url = baseAddress + '/asset/server_account/'
 export const getCmdbIdcModelList = baseAddress + '/asset/cmdb_idc_model/'
 export const getNetworkDeviceList = baseAddress + '/asset/asset_networkdevice/'
 export const getServerDeviceList = baseAddress + '/asset/asset_server/'
@@ -100,6 +101,10 @@ export const getCollection_planList =
 // 采集规则
 export const collection_rule_api =
   baseAddress + '/automation/api/collection_rule/'
+// 自动化工作流图形
+export const automation_chart = baseAddress + '/automation/automation_chart/'
+// 自动化工作流 原子事件
+export const AutoWorkFlow = baseAddress + '/automation/api/auto_work_flow/'
 // 采集规则APIVIEW
 export const collection_rule_url = baseAddress + '/automation/collection_rule/'
 // 采集规则匹配方法
