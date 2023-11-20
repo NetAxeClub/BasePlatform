@@ -262,6 +262,7 @@ class WebSSHConsumer(MySSH):
             self.ip = self.bind_ssh_ip[0]['ipaddr']
         else:
             self.ip = self.server.manage_ip
+        self.account = None
 
     def connect(self):
         self.accept()

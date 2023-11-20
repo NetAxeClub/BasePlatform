@@ -32,7 +32,9 @@ class UserData(object):
 
 
 def get_auth_user(token):
+    logger.info("get_auth_user")
     rbac_instance = config.service_dicovery('rbac')
+    logger.info(rbac_instance.status_code)
     if rbac_instance.status_code == 200:
         rbac_res = rbac_instance.json()
         auth_service_url = "http://{}:{}".format(rbac_res['hosts'][0]['ip'], rbac_res['hosts'][0]['port'])
@@ -41,6 +43,7 @@ def get_auth_user(token):
                    'Content-Type': 'application/json'}
         try:
             res = requests.request(method="GET", url=auth_decode_url, headers=headers)
+            logger.info(str(res.json()))
             if 200 <= res.status_code < 300:
                 logger.info(res.status_code)
                 logger.info(str(res.json()))
