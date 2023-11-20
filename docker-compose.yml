@@ -17,7 +17,6 @@ services:
       volumes:
         - /etc/localtime:/etc/localtime
         - ./backend:/app
-        - ./device_config:/app/media/device_config
       networks:
           - docker_netaxe
       restart: always
@@ -70,7 +69,6 @@ services:
       volumes:
         - /etc/localtime:/etc/localtime
         - ./backend:/app
-        - ./device_config:/app/media/device_config
       networks:
         - docker_netaxe
 
@@ -86,7 +84,6 @@ services:
       volumes:
         - /etc/localtime:/etc/localtime
         - ./backend:/app
-        - ./device_config:/app/media/device_config
       networks:
         - docker_netaxe
 
