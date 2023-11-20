@@ -43,7 +43,7 @@ def get_auth_user(token):
             res = requests.request(method="GET", url=auth_decode_url, headers=headers)
             if 200 <= res.status_code < 300:
                 logger.info(res.status_code)
-                # logger.info(str(res.json()))
+                logger.info(str(res.json()))
                 return UserData(res.json()['results'])
             else:
                 return AnonymousUser()
