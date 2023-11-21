@@ -201,11 +201,7 @@ class NetworkDeviceSerializer(serializers.ModelSerializer):
     # 针对choices的处理
     status_name = serializers.CharField(source='get_status_display', read_only=True)
     ha_status_name = serializers.CharField(source='get_ha_status_display', read_only=True)
-    org = OrgField(many=True)
     account = AccountField(many=True)
-
-    # org = serializers.StringRelatedField(many=True)
-    # account = serializers.StringRelatedField(many=True)
 
     class Meta:
         model = NetworkDevice
@@ -226,7 +222,7 @@ class NetworkDeviceSerializer(serializers.ModelSerializer):
                                            'zone',
                                            'rack')
         queryset = queryset.prefetch_related(
-            'bind_ip', 'account', 'org')
+            'bind_ip', 'account')
         return queryset
 
     # def create(self, validated_data):
