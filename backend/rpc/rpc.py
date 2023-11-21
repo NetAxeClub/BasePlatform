@@ -71,4 +71,5 @@ class SyncRPC:
         self.bus = SyncMessageBus()
 
     def run_rpc_server(self):
-        self.bus.rpc_server(queue=f"rpc_{config.queue}", routing_key=f"rpc_{config.queue}", callback=on_request)
+        # self.bus.rpc_server(queue=f"rpc_{config.queue}", routing_key=f"rpc_{config.queue}", callback=on_request)
+        self.bus.rpc_server(queue="rpc_base_platform", routing_key="rpc_base_platform", callback=on_request)
