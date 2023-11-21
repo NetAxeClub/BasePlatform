@@ -111,7 +111,7 @@ def get_auth_user(token):
         rbac_res = rbac_instance.json()
         # print(rbac_res)
         auth_service_url = "http://{}:{}".format(rbac_res['hosts'][0]['ip'], rbac_res['hosts'][0]['port'])
-        auth_decode_url = f'{auth_service_url}/rbac/status'
+        auth_decode_url = f'{auth_service_url}/rbac/userinfo'
         headers = {'Accept': 'application/json', 'Authorization': f'{str(token)}',
                    'Content-Type': 'application/json'}
         try:
