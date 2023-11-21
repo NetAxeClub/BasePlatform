@@ -141,10 +141,10 @@ def get_user(scope):
 
 
 class CorsMiddleWare(MiddlewareMixin):
-    def process_request(self, request):
-        if request.COOKIES.get('netops-token'):
-            user = get_auth_user(parse.unquote(request.COOKIES['netops-token']))
-            request.user = user
+    # def process_request(self, request):
+    #     if request.COOKIES.get('netops-token'):
+    #         user = get_auth_user(parse.unquote(request.COOKIES['netops-token']))
+    #         request.user = user
 
     def process_response(self, request, response):
         if request.headers.get("Username"):
