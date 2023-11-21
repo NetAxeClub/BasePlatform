@@ -16,6 +16,7 @@ class CollectionPlan(models.Model):
         ('Huawei', 'Huawei'),
         ('Cisco', 'Cisco'),
         ('Ruijie', 'ruijie'),
+        ('Hillstone', 'Hillstone'),
     )
     CATEGORY_CHOICES = (
         ('交换机', '交换机'),

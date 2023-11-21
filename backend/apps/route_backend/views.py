@@ -171,6 +171,7 @@ class DeviceCollectView(APIView):
                 return JsonResponse(dict(code=200, data=res))
             else:
                 return JsonResponse(dict(code=400, data=[]))
+        return JsonResponse(dict(code=400, data=[]))
 
 
 # 自动化chart
