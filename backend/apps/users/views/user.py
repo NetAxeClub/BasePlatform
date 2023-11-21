@@ -5,8 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from apps.api.tools.custom_pagination import LargeResultsSetPagination
-from apps.users.models import UserProfile, Organization
-from apps.users.serializers import BgBuSerializer
+from apps.users.models import UserProfile
 from apps.system.views.role import RoleSerializer
 from utils.custom.json_response import ErrorResponse, DetailResponse
 from utils.custom.serializers import CustomModelSerializer
@@ -218,17 +217,17 @@ class UserViewSet(CustomModelViewSet):
             return ErrorResponse(msg="未获取到用户")
 
 
-class BgBuViewSet(viewsets.ModelViewSet):
-    """
-    BgBu表---处理  GET POST , 处理 /api/post/<pk>/ GET PUT PATCH DELETE
-    """
-    queryset = Organization.objects.all().order_by('name')
-    serializer_class = BgBuSerializer
-    permission_classes = (permissions.IsAuthenticated,)
-    # pagination_class = LimitSet
-    pagination_class = LargeResultsSetPagination
-    # 配置搜索功能
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
-    # 如果要允许对某些字段进行过滤，可以使用filter_fields属性。
-    # filterset_class = DeviceBackupConfigFilter
-    filter_fields = '__all__'
+# class BgBuViewSet(viewsets.ModelViewSet):
+#     """
+#     BgBu表---处理  GET POST , 处理 /api/post/<pk>/ GET PUT PATCH DELETE
+#     """
+#     queryset = Organization.objects.all().order_by('name')
+#     serializer_class = BgBuSerializer
+#     permission_classes = (permissions.IsAuthenticated,)
+#     # pagination_class = LimitSet
+#     pagination_class = LargeResultsSetPagination
+#     # 配置搜索功能
+#     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+#     # 如果要允许对某些字段进行过滤，可以使用filter_fields属性。
+#     # filterset_class = DeviceBackupConfigFilter
+#     filter_fields = '__all__'

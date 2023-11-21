@@ -16,8 +16,7 @@ from driver.cmdb_import import RestApiDriver
 from apps.automation.models import CollectionPlan
 from apps.asset.models import (NetworkDevice, Vendor, Category, Model, IdcModel, Idc, Role, Rack, Attribute, Framework,
                                NetZone, AssetIpInfo, AssetAccount)
-from apps.users.models import Organization
-from os import getenv, environ
+from os import getenv
 import logging
 import requests
 import json
@@ -130,13 +129,6 @@ class CmdbImportDriver(RestApiDriver):
                                 "device": device_instance,
                             }
                             AssetIpInfo.objects.get_or_create(defaults=bind_ip_data, **bind_ip_data)
-                    if i['bgbu']:
-                        org_list = []
-                        for _sub in i['bgbu']:
-                            org_instance, _ = Organization.objects.get_or_create(name=_sub)
-                            org_list.append(org_instance.id)
-                        if org_list:
-                            device_instance.org.set(org_list)
                     if i.get('plan_name'):
                         plan_instance, _ = CollectionPlan.objects.get_or_create(name=i['plan_name'])
                         device_instance.plan = plan_instance

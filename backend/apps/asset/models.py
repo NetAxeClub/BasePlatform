@@ -425,7 +425,6 @@ class NetworkDevice(models.Model):
     account = models.ManyToManyField('AssetAccount', verbose_name='管理账户', blank=True)
     plan = models.ForeignKey("automation.CollectionPlan", verbose_name='采集方案',
                              blank=True, null=True, related_name='releate_device', on_delete=models.SET_NULL)
-    org = models.ManyToManyField("users.Organization", verbose_name='org', blank=True)
     history = HistoricalRecords()
 
     def __str__(self):
