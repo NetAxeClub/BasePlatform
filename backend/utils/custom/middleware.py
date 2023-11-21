@@ -98,6 +98,8 @@ class ApiLoggingMiddleware(MiddlewareMixin):
 class UserData(object):
     is_authenticated = True
     is_anonymous = False
+    is_staff = True
+    is_active = True
 
     def __init__(self, my_dict):
         for key in my_dict:
