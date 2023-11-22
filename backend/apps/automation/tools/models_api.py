@@ -11,14 +11,14 @@ def get_firewall_list(manage_ip_list=None):
     all_devs = []
     # 获取所有cmdb设备
     if manage_ip_list:
-        all_devs = NetworkDevice.objects.filter(
+        all_devs = NetworkDevice.objects.filter(auto_enable=True,
                                                 manage_ip__in=manage_ip_list, category=category['id'], status=0,
                                                 ha_status__in=[0, 1]).select_related(
             'id', 'vendor', 'category').prefetch_related('bind_ip').values(
             'id', 'manage_ip', 'name', 'vendor__alias', 'bind_ip__ipaddr', 'soft_version')
     else:
-        all_devs = NetworkDevice.objects.filter(
-            status=0, category=category['id'], ha_status__in=[0, 1]).select_related(
+        all_devs = NetworkDevice.objects.filter(auto_enable=True,
+                                                status=0, category=category['id'], ha_status__in=[0, 1]).select_related(
             'vendor', 'category').prefetch_related('bind_ip').values(
             'id', 'manage_ip', 'name', 'vendor__alias', 'bind_ip__ipaddr', 'soft_version')
     return all_devs
