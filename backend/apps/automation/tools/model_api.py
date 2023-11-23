@@ -27,20 +27,20 @@ def get_device_info_v2(**kwargs):
         kwargs['status'] = 0
         kwargs['auto_enable'] = True
         all_devs = NetworkDevice.objects.filter(**kwargs).select_related(
-            'idc_model', 'model', 'role', 'attribute', 'category', 'vendor', 'idc', 'framework', 'plan', 'zone',
-            'rack').prefetch_related('bgbu', 'bind_ip', 'adpp_device').values(
+            'idc_model', 'model', 'category', 'vendor', 'idc', 'plan',
+            'rack').prefetch_related('bind_ip', 'adpp_device').values(
             'id', 'serial_num', 'manage_ip', 'name', 'vendor__name', 'soft_version', 'vendor__alias', 'plan_id',
-            'category__name', 'framework__name', 'model__name', 'account',
+            'category__name', 'model__name', 'account',
             'patch_version', 'soft_version', 'status', 'idc__name', 'auto_enable',
             'ha_status', 'chassis', 'slot', 'bind_ip__ipaddr')
     else:
         # 获取所有cmdb设备
         all_devs = NetworkDevice.objects.filter(
             status=0, vendor__alias__in=support_vendor, auto_enable=True).select_related(
-            'idc_model', 'model', 'role', 'attribute', 'category', 'vendor', 'idc', 'framework', 'plan', 'zone',
-            'rack').prefetch_related('bgbu', 'bind_ip', 'account').values(
+            'idc_model', 'model', 'category', 'vendor', 'idc', 'plan',
+            'rack').prefetch_related('bind_ip', 'account').values(
             'id', 'serial_num', 'manage_ip', 'name', 'soft_version', 'vendor__name', 'vendor__alias',
-            'category__name', 'framework__name', 'model__name', 'plan_id',
+            'category__name', 'model__name', 'plan_id',
             'patch_version', 'soft_version', 'status', 'idc__name', 'auto_enable',
             'ha_status', 'chassis', 'slot')  # bind_ip__ipaddr
     # 获取中文标识的port、username、password表，方便处理
