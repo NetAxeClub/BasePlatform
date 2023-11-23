@@ -48,8 +48,8 @@ def dispatcher(method, data):
                 return {'code': 200}
             return res
     except Exception as e:
-        print(e)
-        return {'code': 400}
+        log.error(e)
+        return {'code': 400, "msg": str(e)}
 
 
 # 响应RPC请求
