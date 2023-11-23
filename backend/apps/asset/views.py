@@ -456,17 +456,15 @@ class NetworkDeviceViewSet(CustomViewBase):
     # 配置搜索功能
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filterset_class = NetworkDeviceFilter
-    filter_fields = ('serial_num', 'manage_ip', 'bridge_mac', 'category__name', 'role__name',
-                     'name', 'vendor__name', 'idc__name', 'patch_version', 'idc_model__name', 'soft_version',
-                     'model__name', 'netzone__name', 'attribute__name', 'framework__name', 'rack__name',
-                     'u_location', 'memo', 'status', 'ha_status')
+    filter_fields = ('serial_num', 'manage_ip', 'bridge_mac', 'category__name',
+                     'name', 'vendor__name', 'idc__name', 'patch_version', 'soft_version',
+                     'model__name', 'memo', 'status', 'ha_status')
     # pagination_class = LimitSet
     pagination_class = LargeResultsSetPagination
     # 设置搜索的关键字
-    search_fields = ('serial_num', 'manage_ip', 'bridge_mac', 'category__name', 'role__name',
-                     'name', 'vendor__name', 'idc__name', 'patch_version', 'idc_model__name', 'soft_version',
-                     'model__name', 'zone__name', 'attribute__name', 'framework__name', 'rack__name',
-                     'u_location', 'memo', 'status', 'ha_status')
+    search_fields = ('serial_num', 'manage_ip', 'bridge_mac', 'category__name',
+                     'name', 'vendor__name', 'idc__name', 'patch_version', 'soft_version',
+                     'model__name', 'memo', 'status', 'ha_status')
 
     def get_queryset(self):
         """

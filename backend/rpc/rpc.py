@@ -36,9 +36,10 @@ def dispatcher(method, data):
         elif method == 'address_set':
             res = address_set.apply_async(kwargs=data, queue=CELERY_QUEUE,
                                           retry=True)  # config_backup
-            log.info('res')
-            log.info(str(res))
-            return list({'task_id': str(res)})
+            if str(res) == 'None':
+                print('forget')
+                res.forget()
+            return {'task_id': str(res)}
         else:
             _FirewallMain = FirewallMain(data['host'])
             func = getattr(_FirewallMain, method)

@@ -291,7 +291,9 @@
       <!-- <n-button @click="download_template">
         下载导入模板 -->
       <a :href="device_import_template_url">
-        <n-button @click="template_wait()" type="success" size="small">下载导入模板</n-button>
+        <n-button @click="template_wait()" type="success" size="small"
+          >下载导入模板</n-button
+        >
       </a>
       <!-- </n-button> -->
       <div class="flex justify-end" style="padding-top: 100px">
@@ -1053,23 +1055,6 @@ export default defineComponent({
         }
       },
       {
-        key: 'role',
-        label: '角色',
-        value: ref(''),
-        optionItems: shallowReactive([] as Array<SelectOption>),
-        render: (formItem) => {
-          return h(NSelect, {
-            options: formItem.optionItems as Array<SelectOption>,
-            value: formItem.value.value,
-            placeholder: '请选择角色',
-            filterable: true,
-            onUpdateValue: (val) => {
-              formItem.value.value = val
-            }
-          })
-        }
-      },
-      {
         key: 'manage_ip',
         label: '管理IP',
         value: ref(''),
@@ -1098,42 +1083,6 @@ export default defineComponent({
             options: formItem.optionItems as Array<SelectOption>,
             value: formItem.value.value,
             placeholder: '请选择类型',
-            filterable: true,
-            onUpdateValue: (val) => {
-              formItem.value.value = val
-            }
-          })
-        }
-      },
-      {
-        key: 'idc_model',
-        label: '模块',
-        value: ref(''),
-        optionItems: shallowReactive([] as Array<SelectOption>),
-        render: (formItem) => {
-          return h(NSelect, {
-            options: formItem.optionItems as Array<SelectOption>,
-            value: formItem.value.value,
-            placeholder: '请选择模块',
-            filterable: true,
-            onUpdateValue: (val) => {
-              formItem.value.value = val
-            },
-            'on-update:value': get_info_by_idc_model.bind(formItem.value.value)
-          })
-        }
-      },
-
-      {
-        key: 'netzone',
-        label: '区域',
-        value: ref(''),
-        optionItems: shallowReactive([] as Array<SelectOption>),
-        render: (formItem) => {
-          return h(NSelect, {
-            options: formItem.optionItems as Array<SelectOption>,
-            value: formItem.value.value,
-            placeholder: '请选择区域',
             filterable: true,
             onUpdateValue: (val) => {
               formItem.value.value = val
@@ -1178,24 +1127,6 @@ export default defineComponent({
         }
       },
       {
-        key: 'rack',
-        label: '机柜',
-        value: ref(''),
-        optionItems: shallowReactive([] as Array<SelectOption>),
-        render: (formItem) => {
-          return h(NSelect, {
-            options: formItem.optionItems as Array<SelectOption>,
-            value: formItem.value.value,
-            placeholder: '请选择机柜',
-            filterable: true,
-            onUpdateValue: (val) => {
-              formItem.value.value = val
-            }
-          })
-        }
-      },
-
-      {
         key: 'status',
         label: '状态',
         value: ref('0'),
@@ -1215,60 +1146,6 @@ export default defineComponent({
             onUpdateValue: (val) => {
               formItem.value.value = val
             }
-          })
-        }
-      },
-      {
-        key: 'framework',
-        label: '网络架构',
-        value: ref(''),
-        optionItems: shallowReactive([] as Array<SelectOption>),
-        render: (formItem) => {
-          return h(NSelect, {
-            options: formItem.optionItems as Array<SelectOption>,
-            value: formItem.value.value,
-            placeholder: '请选择网络架构',
-            filterable: true,
-            onUpdateValue: (val) => {
-              formItem.value.value = val
-            }
-          })
-        }
-      },
-      {
-        key: 'attribute',
-        label: '网络属性',
-        value: ref(''),
-        optionItems: shallowReactive([] as Array<SelectOption>),
-        render: (formItem) => {
-          return h(NSelect, {
-            options: formItem.optionItems as Array<SelectOption>,
-            value: formItem.value.value,
-            placeholder: '请选择网络属性',
-            filterable: true,
-            onUpdateValue: (val) => {
-              formItem.value.value = val
-            }
-          })
-        }
-      },
-
-      {
-        key: 'u_location_start',
-        label: 'U位',
-        value: ref(''),
-        render: (formItem) => {
-          return h(NInput, {
-            value: formItem.value.value,
-            onUpdateValue: (val) => {
-              formItem.value.value = val
-            },
-            onKeyup: (Event) => {
-              if (Event.keyCode == 13) {
-                onSearch()
-              }
-            },
-            placeholder: '起始U位'
           })
         }
       },
@@ -1391,19 +1268,6 @@ export default defineComponent({
                         style: { width: '32%' }
                       },
                       () => h('span', {}, '' + rowData.category_name)
-                    ),
-                    h(
-                      NFormItem,
-                      {
-                        label: '所属区域:',
-                        style: { width: '32%' }
-                      },
-                      () =>
-                        h(
-                          'span',
-                          {},
-                          '' + rowData.netzone_name ? rowData.netzone_name : ''
-                        )
                     )
                   ]
                 ),
@@ -1438,14 +1302,6 @@ export default defineComponent({
                             ? rowData.model_name
                             : '未获取'
                         )
-                    ),
-                    h(
-                      NFormItem,
-                      {
-                        label: '设备角色:',
-                        style: { width: '32%' }
-                      },
-                      () => h('span', {}, '' + rowData.role_name)
                     )
                   ]
                 ),
@@ -1473,14 +1329,6 @@ export default defineComponent({
                         style: { width: '32%' }
                       },
                       () => h('span', {}, '' + rowData.soft_version)
-                    ),
-                    h(
-                      NFormItem,
-                      {
-                        label: '机房模块:',
-                        style: { width: '32%' }
-                      },
-                      () => h('span', {}, '' + rowData.idc_model_name)
                     )
                   ]
                 ),
@@ -1508,14 +1356,6 @@ export default defineComponent({
                         style: { width: '32%' }
                       },
                       () => h('span', {}, '' + rowData.patch_version)
-                    ),
-                    h(
-                      NFormItem,
-                      {
-                        label: '机柜:',
-                        style: { width: '32%' }
-                      },
-                      () => h('span', {}, '' + rowData.rack_name)
                     )
                   ]
                 ),
@@ -1535,30 +1375,6 @@ export default defineComponent({
                         style: { width: '32%' }
                       },
                       () => h('span', {}, '' + rowData.slot)
-                    ),
-                    h(
-                      NFormItem,
-                      {
-                        label: '上线日期:',
-                        style: { width: '32%' }
-                      },
-                      () => h('span', {}, '' + rowData.uptime)
-                    ),
-                    h(
-                      NFormItem,
-                      {
-                        label: 'U位:',
-                        style: { width: '32%' }
-                      },
-                      () =>
-                        h(
-                          'span',
-                          {},
-                          '' +
-                            rowData.u_location_start +
-                            '-' +
-                            rowData.u_location_end
-                        )
                     )
                   ]
                 ),
@@ -1597,28 +1413,7 @@ export default defineComponent({
                           },
                           ' ' + status_check.value
                         )
-                    ),
-                    // h(
-                    //   NFormItem,
-                    //   { label: '变更轨迹\n:', style: { width: '32%' } },
-                    //   () =>
-                    //     h(
-                    //       NButton,
-                    //       {
-                    //         text: true,
-                    //         color: '#204d74',
-                    //         onclick: change_handleClick.bind(null, rowData)
-                    //       },
-                    //       () => h('span', {}, '变更轨迹')
-                    //     )
-                    // ),
-                    // () => h('span',
-                    // //     {
-                    // //   type: status_check  ? 'success' : 'error', size: 'small',
-                    // // },
-                    //     {},
-                    // '监控状态: ' + status_check ? '正常' : '异常',)),
-                    ,
+                    )
                   ]
                 ),
                 h(
@@ -1933,16 +1728,6 @@ export default defineComponent({
             width: 100
           },
           {
-            title: '区域',
-            key: 'netzone_name',
-            width: 100
-          },
-          {
-            title: '角色',
-            key: 'role_name',
-            width: 100
-          },
-          {
             title: '状态',
             key: 'status_name',
             width: 80
@@ -1956,19 +1741,6 @@ export default defineComponent({
                 type: !!rowData.auto_enable ? 'success' : 'error',
                 size: 'small'
               })
-          },
-          {
-            title: '机柜',
-            key: 'rack_name',
-            width: 80
-          },
-          {
-            title: 'U位',
-            key: 'u_location_start',
-            width: 120,
-            render: (rowData) => {
-              return rowData.u_location_start + '-' + rowData.u_location_end
-            }
           },
           {
             title: '编辑',
@@ -3332,98 +3104,26 @@ export default defineComponent({
             value: collection_list[i]['id']
           }
           collection_options.push(dict)
-          if (conditionItems[15].optionItems != undefined) {
-            conditionItems[15].optionItems.push(dict)
+          if (conditionItems[8].optionItems != undefined) {
+            conditionItems[8].optionItems.push(dict)
           }
           if (EditFormOptions[16].optionItems != undefined) {
             EditFormOptions[16].optionItems.push(dict)
           }
         }
         nextTick(() => {
-          conditionItems[15].optionItems.splice(0, 0, { label: '', value: '' })
+          conditionItems[8].optionItems.splice(0, 0, { label: '', value: '' })
         })
       })
     }
-
-    function doFramework() {
-      get({
-        url: getFrameworkList,
-        data: () => {
-          return {
-            limit: 1000
-          }
-        }
-      }).then((res) => {
-        const framework_list = res.results
-        for (var i = 0; i < framework_list.length; i++) {
-          const dict = {
-            label: framework_list[i]['name'],
-            value: framework_list[i]['id']
-          }
-          framework_options.push(dict)
-          if (conditionItems[12].optionItems != undefined) {
-            conditionItems[12].optionItems.push(dict)
-          }
-
-          if (EditFormOptions[1].optionItems != undefined) {
-            EditFormOptions[1].optionItems.push(dict)
-          }
-          if (importFormOptions[1].optionItems != undefined) {
-            importFormOptions[1].optionItems.push(dict)
-          }
-        }
-        nextTick(() => {
-          conditionItems[12].optionItems.splice(0, 0, { label: '', value: '' })
-        })
-      })
-    }
-
-    function doAttribute() {
-      get({
-        url: getAttributeList,
-        data: () => {
-          return {
-            limit: 1000
-          }
-        }
-      }).then((res) => {
-        const attribute_list = res.results
-        for (var i = 0; i < attribute_list.length; i++) {
-          const dict = {
-            label: attribute_list[i]['name'],
-            value: attribute_list[i]['id']
-          }
-          attribute_options.push(dict)
-          if (conditionItems[13].optionItems != undefined) {
-            conditionItems[13].optionItems.push(dict)
-          }
-
-          if (EditFormOptions[13].optionItems != undefined) {
-            EditFormOptions[13].optionItems.push(dict)
-          }
-          if (importFormOptions[13].optionItems != undefined) {
-            importFormOptions[13].optionItems.push(dict)
-          }
-        }
-        nextTick(() => {
-          conditionItems[13].optionItems.splice(0, 0, { label: '', value: '' })
-        })
-      })
-    }
-
     onMounted(get_cmdb_account)
     onMounted(doRefresh)
     onMounted(doIdc)
     onMounted(doVendor)
-    onMounted(doRole)
     onMounted(doCagetory)
     onMounted(doCollection)
-    onMounted(doFramework)
-    onMounted(doAttribute)
     return {
       // doReport,
-      doAttribute,
-      doFramework,
       ConnectAccountConfirm,
       Copy,
       device_info,

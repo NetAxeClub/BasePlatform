@@ -366,54 +366,54 @@ class NetworkDevice(models.Model):
         max_length=200,
         default='',
         null=True)
-    role = models.ForeignKey(
-        "Role",
-        verbose_name='设备角色',
-        related_name='role_asset',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True)
-    attribute = models.ForeignKey(
-        "Attribute",
-        verbose_name='网络属性',
-        related_name='attribute_asset',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True)
-    framework = models.ForeignKey(
-        "Framework",
-        verbose_name='网络架构',
-        related_name='framework_asset',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True)
-    zone = models.ForeignKey(
-        "NetZone",
-        verbose_name='网络区域',
-        related_name='zone_asset',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True)
-    rack = models.ForeignKey(
-        "Rack",
-        verbose_name='机柜编号',
-        related_name='rack_asset',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True)
-    idc_model = models.ForeignKey(
-        "IdcModel",
-        verbose_name='模块',
-        related_name='idc_model_asset',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True)
-    u_location_start = models.IntegerField(
-        verbose_name='机架位起始', default=0, validators=[MaxValueValidator(50), MinValueValidator(1)])
-    u_location_end = models.IntegerField(
-        verbose_name='机架位结束', default=0, validators=[MaxValueValidator(50), MinValueValidator(1)])
-    uptime = models.DateField(verbose_name='上线时间', null=True, default=timezone.now)
-    expire = models.DateField(verbose_name='维保日期', null=True, blank=True)
+    # role = models.ForeignKey(
+    #     "Role",
+    #     verbose_name='设备角色',
+    #     related_name='role_asset',
+    #     on_delete=models.SET_NULL,
+    #     null=True,
+    #     blank=True)
+    # attribute = models.ForeignKey(
+    #     "Attribute",
+    #     verbose_name='网络属性',
+    #     related_name='attribute_asset',
+    #     on_delete=models.SET_NULL,
+    #     null=True,
+    #     blank=True)
+    # framework = models.ForeignKey(
+    #     "Framework",
+    #     verbose_name='网络架构',
+    #     related_name='framework_asset',
+    #     on_delete=models.SET_NULL,
+    #     null=True,
+    #     blank=True)
+    # zone = models.ForeignKey(
+    #     "NetZone",
+    #     verbose_name='网络区域',
+    #     related_name='zone_asset',
+    #     on_delete=models.SET_NULL,
+    #     null=True,
+    #     blank=True)
+    # rack = models.ForeignKey(
+    #     "Rack",
+    #     verbose_name='机柜编号',
+    #     related_name='rack_asset',
+    #     on_delete=models.SET_NULL,
+    #     null=True,
+    #     blank=True)
+    # idc_model = models.ForeignKey(
+    #     "IdcModel",
+    #     verbose_name='模块',
+    #     related_name='idc_model_asset',
+    #     on_delete=models.SET_NULL,
+    #     null=True,
+    #     blank=True)
+    # u_location_start = models.IntegerField(
+    #     verbose_name='机架位起始', default=0, validators=[MaxValueValidator(50), MinValueValidator(1)])
+    # u_location_end = models.IntegerField(
+    #     verbose_name='机架位结束', default=0, validators=[MaxValueValidator(50), MinValueValidator(1)])
+    # uptime = models.DateField(verbose_name='上线时间', null=True, default=timezone.now)
+    # expire = models.DateField(verbose_name='维保日期', null=True, blank=True)
     memo = models.TextField(verbose_name='备注', null=True, default='')
     status = models.PositiveSmallIntegerField(
         verbose_name='状态', choices=status_choices, default=0)
@@ -434,9 +434,6 @@ class NetworkDevice(models.Model):
     def account_list(self):
         return ','.join([i.name for i in self.account.all()])
 
-    def org_list(self):
-        return ','.join([i.name for i in self.org.all()])
-
     class Meta:
         # unique_together = (("rack", "u_location_start", "u_location_end"),)
         verbose_name = '网络设备表'
@@ -447,8 +444,6 @@ class NetworkDevice(models.Model):
                    models.Index(fields=['name', ]),
                    models.Index(fields=['soft_version', ]),
                    models.Index(fields=['patch_version', ]),
-                   models.Index(fields=['uptime', ]),
-                   models.Index(fields=['expire', ]),
                    models.Index(fields=['status', ]),
                    ]
         index_together = ['manage_ip', 'name']

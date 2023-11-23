@@ -188,15 +188,6 @@ class NetworkDeviceSerializer(serializers.ModelSerializer):
     vendor_alias = serializers.CharField(source='vendor.alias', read_only=True)
     category_name = serializers.CharField(source='category.name', read_only=True)
     model_name = serializers.CharField(source='model.name', read_only=True)
-    role_name = serializers.CharField(source='role.name', read_only=True)
-    attribute_name = serializers.CharField(source='attribute.name', read_only=True)
-    framework_name = serializers.CharField(source='framework.name', read_only=True)
-    netzone_name = serializers.CharField(source='zone.name', read_only=True)
-    rack_name = serializers.CharField(source='rack.name', read_only=True)
-    rack_row = serializers.CharField(source='rack.rack_row', read_only=True)
-    idc_model_name = serializers.CharField(source='idc_model.name', read_only=True)
-    idc_model_floor = serializers.CharField(source='idc_model.floor', read_only=True)
-    idc_model_area = serializers.CharField(source='idc_model.area', read_only=True)
     bind_ip = serializers.StringRelatedField(many=True, read_only=True)
     # 针对choices的处理
     status_name = serializers.CharField(source='get_status_display', read_only=True)
@@ -211,16 +202,10 @@ class NetworkDeviceSerializer(serializers.ModelSerializer):
     def setup_eager_loading(queryset):
         """ Perform necessary eager loading of data. """
         # select_related for "to-one" relationships
-        queryset = queryset.select_related('idc_model',
-                                           'model',
-                                           'role',
-                                           'attribute',
+        queryset = queryset.select_related('model',
                                            'category',
                                            'vendor',
-                                           'idc',
-                                           'framework',
-                                           'zone',
-                                           'rack')
+                                           'idc',)
         queryset = queryset.prefetch_related(
             'bind_ip', 'account')
         return queryset
