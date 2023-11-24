@@ -64,7 +64,7 @@ predefined_mongo = MongoOps(db='Automation', coll='hillstone_service_predefined'
 if DEBUG:
     CELERY_QUEUE = 'dev'
 else:
-    CELERY_QUEUE = 'config_backup'
+    CELERY_QUEUE = 'config'
 log = logging.getLogger(__name__)
 
 
