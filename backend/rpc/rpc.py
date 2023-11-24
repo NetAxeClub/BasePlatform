@@ -40,14 +40,14 @@ def dispatcher(method, data):
             if str(res) == 'None':
                 print('forget')
                 res.forget()
-            return {'task_id': str(res)}
+            return [{'task_id': str(res)}]
         elif method == 'address_set':
             res = address_set.apply_async(kwargs=data, queue=CELERY_QUEUE,
                                           retry=True)  # config_backup
             if str(res) == 'None':
                 print('forget')
                 res.forget()
-            return {'task_id': str(res)}
+            return [{'task_id': str(res)}]
         else:
             _FirewallMain = FirewallMain(data['host'])
             func = getattr(_FirewallMain, method)
