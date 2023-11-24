@@ -6921,7 +6921,7 @@ def config_sec_policy(self, **post_param):
     return
 
 
-# 一键封堵V2
+# 一键封堵V2/场景任务执行模块
 @shared_task(base=AxeTask, once={'graceful': True}, bind=True)
 def bulk_deny_by_address(self, **post_param):
     """
@@ -6935,100 +6935,88 @@ def bulk_deny_by_address(self, **post_param):
     :param post_param:
     :return:
     """
-    hosts = AutomationInventory.objects.prefetch_related(
-        'ans_group_hosts').filter(id=int(post_param['inventory_id'])).values('ans_group_name',
-                                                                             'ans_group_hosts__ans_host',
-                                                                             'ans_group_hosts__ans_obj',
-                                                                             'ans_group_hosts__ans_vars',
-                                                                             'ans_group_hosts__ans_memo',
-                                                                             )
+    hosts = post_param['inventory'][0]['ans_group_hosts']
+
     event_id = AutoEvent.objects.create(**dict(commit_user=post_param['user'],
                                                remote_ip=post_param['remote_ip'],
                                                task=AutoFlowTasks.DENY))
     for host in hosts:
-        if host['ans_group_hosts__ans_vars']:
-            # json卸载主机变量
-            try:
-                host_vars = json.loads(host['ans_group_hosts__ans_vars'])
-            except:
-                b = eval(host['ans_group_hosts__ans_vars'])
-                host_vars = json.loads(b)
-            if post_param.get('ip_mask'):
-                if post_param.get('add_detail_ip'):
-                    post_data = {
-                        "origin": post_param['origin'],
-                        "vendor": host_vars['vendor__alias'],
-                        "add_detail_ip": True,
-                        "ip_mask": post_param['ip_mask'],
-                        "name": host['ans_group_hosts__ans_obj'],
-                        "hostip": host_vars['manage_ip'],
-                        "hostid": host_vars['id'],
-                        "user": post_param['user'],
-                        "remote_ip": post_param['remote_ip'],
-                        "room_group_name": post_param.get('room_group_name'),
-                        "task_id": str(self.request.id),
-                        "task": AutoFlowTasks.DENY,
-                        "event_id": event_id.id,  # 关联事件
-                    }
-                    address_set.apply_async(kwargs=post_data, queue=CELERY_QUEUE,
-                                            retry=True)  # config_backup
-                elif post_param.get('del_detail_ip'):
-                    post_data = {
-                        "origin": post_param['origin'],
-                        "vendor": host_vars['vendor__alias'],
-                        "del_detail_ip": True,
-                        "ip_mask": post_param['ip_mask'],
-                        "name": host['ans_group_hosts__ans_obj'],
-                        "hostip": host_vars['manage_ip'],
-                        "hostid": host_vars['id'],
-                        "user": post_param['user'],
-                        "remote_ip": post_param['remote_ip'],
-                        "room_group_name": post_param.get('room_group_name'),
-                        "task_id": str(self.request.id),
-                        "task": AutoFlowTasks.DENY,
-                        "event_id": event_id.id,  # 关联事件
-                    }
-                    address_set.apply_async(kwargs=post_data, queue=CELERY_QUEUE,
-                                            retry=True)  # config_backup
-            if post_param.get('range_start') and post_param.get('range_end'):
-                if post_param.get('add_detail_range'):
-                    post_data = {
-                        "origin": post_param['origin'],
-                        "vendor": host_vars['vendor__alias'],
-                        "add_detail_range": True,
-                        "range_start": post_param['range_start'],
-                        "range_end": post_param['range_end'],
-                        "name": host['ans_group_hosts__ans_obj'],
-                        "hostip": host_vars['manage_ip'],
-                        "hostid": host_vars['id'],
-                        "user": post_param['user'],
-                        "remote_ip": post_param['remote_ip'],
-                        "room_group_name": post_param.get('room_group_name'),
-                        "task_id": str(self.request.id),
-                        "task": AutoFlowTasks.DENY,
-                        "event_id": event_id.id,  # 关联事件
-                    }
-                    address_set.apply_async(kwargs=post_data, queue=CELERY_QUEUE,
-                                            retry=True)  # config_backup
-                elif post_param.get('del_detail_range'):
-                    post_data = {
-                        "origin": post_param['origin'],
-                        "vendor": host_vars['vendor__alias'],
-                        "del_detail_range": True,
-                        "range_start": post_param['range_start'],
-                        "range_end": post_param['range_end'],
-                        "name": host['ans_group_hosts__ans_obj'],
-                        "hostip": host_vars['manage_ip'],
-                        "hostid": host_vars['id'],
-                        "user": post_param['user'],
-                        "remote_ip": post_param['remote_ip'],
-                        "room_group_name": post_param.get('room_group_name'),
-                        "task_id": str(self.request.id),
-                        "task": AutoFlowTasks.DENY,
-                        "event_id": event_id.id,  # 关联事件
-                    }
-                    address_set.apply_async(kwargs=post_data, queue=CELERY_QUEUE,
-                                            retry=True)  # config_backup
+        if post_param.get('ip_mask'):
+            if post_param.get('add_detail_ip'):
+                post_data = {
+                    "origin": post_param['origin'],
+                    "vendor": host['ans_vars']['vendor__alias'],
+                    "add_detail_ip": True,
+                    "ip_mask": post_param['ip_mask'],
+                    "name": post_param['inventory'][0]['ans_obj'],
+                    "hostip": post_param['inventory'][0]['ans_host'],  # 这个很重要，如果有绑定ip的话，是以绑定IP来下发配置
+                    "hostid": host['ans_vars']['id'],
+                    "user": post_param['user'],
+                    "remote_ip": post_param['remote_ip'],
+                    "room_group_name": post_param.get('room_group_name'),
+                    "task_id": str(self.request.id),
+                    "task": AutoFlowTasks.DENY,
+                    "event_id": event_id.id,  # 关联事件
+                }
+                address_set.apply_async(kwargs=post_data, queue=CELERY_QUEUE,
+                                        retry=True)  # config_backup
+            elif post_param.get('del_detail_ip'):
+                post_data = {
+                    "origin": post_param['origin'],
+                    "vendor": host['ans_vars']['vendor__alias'],
+                    "del_detail_ip": True,
+                    "ip_mask": post_param['ip_mask'],
+                    "name": post_param['inventory'][0]['ans_obj'],
+                    "hostip": post_param['inventory'][0]['ans_host'],
+                    "hostid": host['ans_vars']['id'],
+                    "user": post_param['user'],
+                    "remote_ip": post_param['remote_ip'],
+                    "room_group_name": post_param.get('room_group_name'),
+                    "task_id": str(self.request.id),
+                    "task": AutoFlowTasks.DENY,
+                    "event_id": event_id.id,  # 关联事件
+                }
+                address_set.apply_async(kwargs=post_data, queue=CELERY_QUEUE,
+                                        retry=True)  # config_backup
+        if post_param.get('range_start') and post_param.get('range_end'):
+            if post_param.get('add_detail_range'):
+                post_data = {
+                    "origin": post_param['origin'],
+                    "vendor": host['ans_vars']['vendor__alias'],
+                    "add_detail_range": True,
+                    "range_start": post_param['range_start'],
+                    "range_end": post_param['range_end'],
+                    "name": post_param['inventory'][0]['ans_obj'],
+                    "hostip": post_param['inventory'][0]['ans_host'],
+                    "hostid": host['ans_vars']['id'],
+                    "user": post_param['user'],
+                    "remote_ip": post_param['remote_ip'],
+                    "room_group_name": post_param.get('room_group_name'),
+                    "task_id": str(self.request.id),
+                    "task": AutoFlowTasks.DENY,
+                    "event_id": event_id.id,  # 关联事件
+                }
+                address_set.apply_async(kwargs=post_data, queue=CELERY_QUEUE,
+                                        retry=True)  # config_backup
+            elif post_param.get('del_detail_range'):
+                post_data = {
+                    "origin": post_param['origin'],
+                    "vendor": host['ans_vars']['vendor__alias'],
+                    "del_detail_range": True,
+                    "range_start": post_param['range_start'],
+                    "range_end": post_param['range_end'],
+                    "name": post_param['inventory'][0]['ans_obj'],
+                    "hostip": post_param['inventory'][0]['ans_host'],
+                    "hostid": host['ans_vars']['id'],
+                    "user": post_param['user'],
+                    "remote_ip": post_param['remote_ip'],
+                    "room_group_name": post_param.get('room_group_name'),
+                    "task_id": str(self.request.id),
+                    "task": AutoFlowTasks.DENY,
+                    "event_id": event_id.id,  # 关联事件
+                }
+                address_set.apply_async(kwargs=post_data, queue=CELERY_QUEUE,
+                                        retry=True)  # config_backup
     return
 
 

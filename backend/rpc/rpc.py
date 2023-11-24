@@ -18,7 +18,8 @@ from netaxe.settings import DEBUG
 from bus.bus_sync import SyncMessageBus
 from apps.dcs_control.tasks import FirewallMain
 from apps.automation.tools.models_api import get_firewall_list
-from apps.dcs_control.tasks import address_set
+from apps.dcs_control.tasks import address_set, bulk_deny_by_address
+
 log = logging.getLogger(__name__)
 if DEBUG:
     CELERY_QUEUE = 'dev'
@@ -33,6 +34,13 @@ def dispatcher(method, data):
         if method == 'get_firewall_list':
             res = get_firewall_list()
             return list(res)
+        elif method == 'bulk_deny_by_address':
+            res = bulk_deny_by_address.apply_async(kwargs=data, queue=CELERY_QUEUE,
+                                                   retry=True)  # config_backup
+            if str(res) == 'None':
+                print('forget')
+                res.forget()
+            return {'task_id': str(res)}
         elif method == 'address_set':
             res = address_set.apply_async(kwargs=data, queue=CELERY_QUEUE,
                                           retry=True)  # config_backup
