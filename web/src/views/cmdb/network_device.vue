@@ -324,8 +324,6 @@ import {
   getCmdbRackList,
   getcmdb_accountList,
   getCollection_planList,
-  getFrameworkList,
-  getAttributeList,
   device_import_excel_path
 } from '@/api/url'
 import { useTable, usePagination, useTableColumn } from '@/hooks/table'
@@ -2093,57 +2091,27 @@ export default defineComponent({
     }
 
     function onSearch() {
-      let request_url = ''
       // if (item) {
       //   request_url = getNetworkDeviceList + '?search=' + item
       // } else {
       const search_form = searchForm.value?.generatorParams()
       searchDataFormRef.value = search_form
-      request_url =
-        getNetworkDeviceList +
-        '?name=' +
-        search_form.name +
-        '&manage_ip=' +
-        search_form.manage_ip +
-        '&vendor=' +
-        search_form.vendor +
-        '&idc=' +
-        search_form.idc +
-        '&role=' +
-        search_form.role +
-        '&category=' +
-        search_form.category +
-        '&serial_num=' +
-        search_form.serial_num +
-        '&framework=' +
-        search_form.framework +
-        '&attribute=' +
-        search_form.attribute +
-        '&plan=' +
-        search_form.plan +
-        '&model=' +
-        search_form.model +
-        '&netzone=' +
-        search_form.netzone +
-        '&idc_model=' +
-        search_form.idc_model +
-        '&status=' +
-        search_form.status +
-        '&search=' +
-        search_form.search +
-        '&rack=' +
-        search_form.rack
-      // }
-
-      //  //console.log(searchForm.value?.generatorParams())
-
       get({
-        url: request_url,
+        url: getNetworkDeviceList,
         data: () => {
           return {
-            start: 0,
-            // pageSize: pagination.pageSize,
-            limit: pagination.pageSize
+            start: pagination.start,
+            limit: pagination.limit,
+            name: search_form.name,
+            manage_ip: search_form.manage_ip,
+            vendor: search_form.vendor,
+            idc: search_form.idc,
+            category: search_form.category,
+            serial_num: search_form.serial_num,
+            plan: search_form.plan,
+            model: search_form.model,
+            status: search_form.status,
+            search: search_form.search
           }
         }
       }).then((res) => {
