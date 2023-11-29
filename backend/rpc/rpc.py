@@ -36,7 +36,6 @@ def dispatcher(method, data):
             return list(res)
         elif method == 'get_firewall_zone':
             res = get_firewall_zone(**data)
-            log.info(str(res))
             return res
         elif method == 'bulk_deny_by_address':
             res = bulk_deny_by_address.apply_async(kwargs=data, queue=CELERY_QUEUE,
