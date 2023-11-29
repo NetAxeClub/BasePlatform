@@ -4763,6 +4763,12 @@ class FirewallMain(object):
             .find(query_dict=dict(hostip=self.host), fileds={'_id': 0})
         return res
 
+    # 获取山石安全域
+    def get_hillstone_zone(self, **kwargs):
+        res = MongoOps(db='Automation', coll='hillstone_zone') \
+            .find(query_dict=dict(hostip=self.host), fileds={'_id': 0})
+        return res
+
 
 class SecPolicyMain(object):
 

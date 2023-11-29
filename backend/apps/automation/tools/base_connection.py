@@ -288,6 +288,8 @@ class BaseConn:
                 logger.info('执行命令下发')
                 paths = self._send_cmd(cmds)
                 self._collection_analysis(paths)
+            else:
+                logger.error("没有要下发的命令，结束……")
         return
 
     # 手动运行命令
