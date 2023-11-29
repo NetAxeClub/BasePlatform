@@ -317,6 +317,16 @@ def run_netconf_config(**dev_info):
     return False, '等待设备锁释放超时'
 
 
+def get_firewall_zone(**kwargs):
+    res = []
+    vendor = kwargs['vendor']
+    hostip = kwargs['hostip']
+    if vendor == "Hillstone":
+        res = MongoOps(db='Automation', coll='hillstone_zone') \
+            .find(query_dict=dict(hostip=hostip), fileds={'_id': 0})
+        return res
+    return res
+
 # 防火墙统一处理 集中在此处理或调度
 class FirewallMain(object):
     def __init__(self, host):
@@ -4760,12 +4770,6 @@ class FirewallMain(object):
 
     def get_hillstone_address_obj(self, **kwargs):
         res = MongoOps(db='Automation', coll='hillstone_address') \
-            .find(query_dict=dict(hostip=self.host), fileds={'_id': 0})
-        return res
-
-    # 获取山石安全域
-    def get_hillstone_zone(self, **kwargs):
-        res = MongoOps(db='Automation', coll='hillstone_zone') \
             .find(query_dict=dict(hostip=self.host), fileds={'_id': 0})
         return res
 
