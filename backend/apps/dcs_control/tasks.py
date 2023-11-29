@@ -327,6 +327,7 @@ def get_firewall_zone(**kwargs):
         return res
     return res
 
+
 # 防火墙统一处理 集中在此处理或调度
 class FirewallMain(object):
     def __init__(self, host):

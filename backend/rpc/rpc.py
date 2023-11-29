@@ -34,11 +34,10 @@ def dispatcher(method, data):
         if method == 'get_firewall_list':
             res = get_firewall_list()
             return list(res)
-
         elif method == 'get_firewall_zone':
             res = get_firewall_zone(**data)
-            return list[res]
-
+            log.info(str(res))
+            return res
         elif method == 'bulk_deny_by_address':
             res = bulk_deny_by_address.apply_async(kwargs=data, queue=CELERY_QUEUE,
                                                    retry=True)  # config_backup
