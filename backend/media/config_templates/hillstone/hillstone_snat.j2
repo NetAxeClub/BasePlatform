@@ -1,0 +1,94 @@
+snatrule
+{%- if id  %} id {{ id }} {%- endif %}
+{%- if insert  %} {{ insert }} {%- endif %}
+{%- if ingress_interface %} ingress-interface {{ ingress_interface }} {%- endif %}
+{#- FROM 判断  #}
+{%- if soft_version == '5.5R6'  %}
+    {#- 版本5.5R6   #}
+from
+    {%- if from.ip  %} ip {{ from.ip }}/32
+    {%- elif from.object  %} address-book {{ from.object }}
+    {%- else %}
+address-book Any
+    {%- endif %}
+{%- elif soft_version == 'Version 5.0 SG6000-M-2-5.0R3P9.bin' %}
+from
+    {%- if from.ip  %} {{ from.ip }}
+    {%- elif from.object  %} {{ from.object }}
+    {%- else %}
+Any
+    {%- endif %}
+{%- else %}
+    {#- 版本非5.5R6 #}
+from
+    {%- if from.ip  %} {{ from.ip }}/32
+    {%- elif from.object  %} {{ from.object }}
+    {%- else %}
+Any
+    {%- endif %}
+{%- endif %}
+
+{#- TO 判断  #}
+{%- if soft_version == '5.5R6'  %}
+    {#- 版本5.5R6   #}
+to
+    {%- if to.ip  %} ip {{ to.ip }}
+    {%- elif to.object  %} address-book {{ to.object }}
+    {%- else %}
+address-book Any
+    {%- endif %}
+{%- elif soft_version == 'Version 5.0 SG6000-M-2-5.0R3P9.bin' %}
+to
+    {%- if to.ip  %} {{ to.ip }}
+    {%- elif to.object  %} {{ to.object }}
+    {%- else %}
+Any
+    {%- endif %}
+{%- else %}
+    {#- 版本非5.5R6 #}
+to
+    {%- if to.ip  %} {{ to.ip }}/32
+    {%- elif to.object  %} {{ to.object }}
+    {%- else %}
+Any
+    {%- endif %}
+{%- endif %}
+
+{#- servcie 判断   #}
+{%- if service  %}
+service {{ service }}
+{%- endif %}
+{%- if egress_interface %} eif {{ egress_interface }} {%- endif %}
+
+{#- trans_to 判断   #}
+{%- if soft_version == '5.5R6'  %}
+    {%- if trans_to.ip  %}
+trans-to ip {{ trans_to.ip }}
+    {%- elif trans_to.address_book  %}
+trans-to address-book {{ trans_to.address_book }}
+    {%- elif trans_to.eif_ip  %}
+trans-to eif-ip
+    {%- else %}
+no-trans
+    {%- endif %}
+{%- else %}
+    {%- if trans_to.ip  %}
+trans-to {{ trans_to.ip }}
+    {%- elif trans_to.eif_ip  %}
+trans-to eif-ip
+    {%- elif trans_to.address_book  %}
+trans-to {{ trans_to.address_book }}
+    {%- else %}
+no-trans
+    {%- endif %}
+{%- endif %}
+
+{%- if nat_mode  %}
+mode {{ nat_mode }}
+{%- endif %}
+
+{%- if log  %} log  {%- endif %}
+{%- if track_tcp %} track-tcp {{ track_tcp }} {%- endif %}
+{%- if track_ping %} track-ping  {%- endif %}
+
+
