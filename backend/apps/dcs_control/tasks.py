@@ -2042,8 +2042,8 @@ class FirewallMain(object):
             _vars = {
                 'ops': 'create',
                 'name': kwargs['name'],  # 低版本不支持name
-                'from': kwargs['from'],  # {'object': 'address-book'} | {'ip':'A.B.C.D '} | {'any': True}
-                'to': kwargs['to'],  # {'object': 'address-book'} | {'ip':'A.B.C.D'}
+                'from_zone': kwargs['from_zone'],  # {'object': 'address-book'} | {'ip':'A.B.C.D '} | {'any': True}
+                'to_zone': kwargs['to_zone'],  # {'object': 'address-book'} | {'ip':'A.B.C.D'}
                 'service': kwargs['service'],  # 服务对象名
                 'from_addr': kwargs['from_addr'],
                 'to_addr': kwargs['to_addr'],
@@ -2067,8 +2067,8 @@ class FirewallMain(object):
                 'id': kwargs['id'],  # 如果不指定，系绝会为觃则自劢生成一个 ID。如果指定的ID为已有的规则的ID，已有的规则会被覆盖。
                 'name': kwargs['name'],  # 低版本不支持name
                 'insert': kwargs.get('insert', ''),  # [before id | after id | top]
-                'from': kwargs['from'],  # {'object': 'address-book'} | {'ip':'A.B.C.D '} | {'any': True}
-                'to': kwargs['to'],  # {'object': 'address-book'} | {'ip':'A.B.C.D'}
+                'from_zone': kwargs['from_zone'],  # {'object': 'address-book'} | {'ip':'A.B.C.D '} | {'any': True}
+                'to_zone': kwargs['to_zone'],  # {'object': 'address-book'} | {'ip':'A.B.C.D'}
                 'service': kwargs['service'],  # 服务对象名
                 'from_addr': kwargs['from_addr'],
                 'to_addr': kwargs['to_addr'],
@@ -6785,7 +6785,6 @@ def config_sec_policy(self, **post_param):
         if 'sort_object' in post_param.keys():
             class_method = 'action_top'
         cmds, back_off_cmds = _FirewallMain.h3c_sec_policy_detail(**post_param)
-        print(cmds)
         # step 2 生成流程
         _data = dict(
             order_code=post_param.get('order_code'),
@@ -6802,7 +6801,7 @@ def config_sec_policy(self, **post_param):
             method='NETCONF',
             back_off_commands=json.dumps(back_off_cmds)
         )
-        _FirewallMain.flow_engine(*[cmds, back_off_cmds, class_method], **_data)
+        # _FirewallMain.flow_engine(*[cmds, back_off_cmds, class_method], **_data)
     elif post_param.get('vendor') == 'Huawei':
         class_method = 'config_sec_policy'
         cmds, back_off_cmds = _FirewallMain.huawei_sec_policy(**post_param)
