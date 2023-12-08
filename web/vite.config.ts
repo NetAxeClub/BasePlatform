@@ -7,9 +7,10 @@ import vitePluginCompression from 'vite-plugin-compression'
 import ViteComponents from 'unplugin-vue-components/vite'
 import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
 
+import monacoEditorPlugin from 'vite-plugin-monaco-editor'
 import vueJsx from '@vitejs/plugin-vue-jsx'
 
-export default ({mode}) => {
+export default ({ mode }) => {
   const env = loadEnv(mode, './')
   return {
     base: '/',
@@ -17,30 +18,31 @@ export default ({mode}) => {
       vue(),
       viteSvgIcons({
         iconDirs: [path.resolve(process.cwd(), 'src/icons')],
-        symbolId: 'icon-[dir]-[name]',
+        symbolId: 'icon-[dir]-[name]'
       }),
       vitePluginCompression({
-        threshold: 1024 * 10,
+        threshold: 1024 * 10
       }),
       ViteComponents({
-        resolvers: [NaiveUiResolver()],
+        resolvers: [NaiveUiResolver()]
       }),
       vueJsx(),
+      monacoEditorPlugin({})
     ],
     css: {
       preprocessorOptions: {
         scss: {
-          additionalData: '@use "./src/styles/variables.scss" as *;',
-        },
-      },
+          additionalData: '@use "./src/styles/variables.scss" as *;'
+        }
+      }
     },
     resolve: {
       alias: [
         {
           find: '@/',
-          replacement: path.resolve(process.cwd(), 'src') + '/',
-        },
-      ],
+          replacement: path.resolve(process.cwd(), 'src') + '/'
+        }
+      ]
     },
     server: {
       open: true,
@@ -49,16 +51,17 @@ export default ({mode}) => {
         '/base_platform': {
           target: env.VITE_BASIC_URL,
           ws: true, //代理websockets
-          changeOrigin: true, // 
-          rewrite: (path: string) => path.replace(/^\/base_platform/, '/base_platform'),
+          changeOrigin: true, //
+          rewrite: (path: string) =>
+            path.replace(/^\/base_platform/, '/base_platform')
         },
         '/rbac': {
           target: env.VITE_RBAC_URL,
           ws: true, //代理websockets
-          changeOrigin: true, // 
-          rewrite: (path: string) => path.replace(/^\/rbac/, '/rbac'),
-        },
+          changeOrigin: true, //
+          rewrite: (path: string) => path.replace(/^\/rbac/, '/rbac')
+        }
       }
-    },
+    }
   }
 }

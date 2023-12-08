@@ -125,3 +125,5 @@ export const config_template = baseAddress + '/config_center/config_template/'
 export const fsm_parse = baseAddress + '/config_center/fsm_parse'
 export const jinja2_parse = baseAddress + '/config_center/jinja2_parse'
 export const config_center = baseAddress + '/config_center'
+// 插件管理
+export const plugin_tree = baseAddress + '/system/plugin_tree'

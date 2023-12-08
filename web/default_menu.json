@@ -273,11 +273,11 @@
       },
       "children": [
         {
-          "name": "地址定位",
-          "path": "/plugins/address_location",
-          "web_path": "/plugins/address_location",
+          "name": "文件管理",
+          "path": "/plugins/plugin_tree",
+          "web_path": "/plugins/plugin_tree",
           "meta": {
-            "title": "地址定位",
+            "title": "文件管理",
             "affix": true,
             "iconPrefix": "iconfont",
             "icon": "index",

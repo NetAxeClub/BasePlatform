@@ -26,6 +26,7 @@ declare module '@vue/runtime-core' {
     Main: typeof import('./src/components/Main.vue')['default']
     MainLayout: typeof import('./src/components/MainLayout.vue')['default']
     ModalDialog: typeof import('./src/components/common/ModalDialog.vue')['default']
+    MonacoEditor: typeof import('./src/components/MonacoEditor/index.vue')['default']
     NAlert: typeof import('naive-ui')['NAlert']
     NAvatar: typeof import('naive-ui')['NAvatar']
     NavBar: typeof import('./src/components/navbar/NavBar.vue')['default']
