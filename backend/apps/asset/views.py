@@ -466,25 +466,25 @@ class NetworkDeviceViewSet(CustomViewBase):
                      'name', 'vendor__name', 'idc__name', 'patch_version', 'soft_version',
                      'model__name', 'memo', 'status', 'ha_status')
 
-    def get_queryset(self):
-        """
-        expires  比 expire多一个s ，用来筛选已过期的设备数据 lt 小于  gt 大于  lte小于等于  gte 大于等于
-        :return:
-        """
-        expires = self.request.query_params.get('expires', None)
-        search_host_list = self.request.query_params.get('search_host_list', None)
-        if search_host_list:
-            if search_host_list.find('-') != -1:
-                return self.queryset.filter(manage_ip__in=search_host_list.split('-'))
-            else:
-                return self.queryset.filter(manage_ip__in=[search_host_list])
-            # return self.queryset.filter(manage_ip__in=search_host_list)
-        if expires == '1':
-            return self.queryset.filter(expire__lt=date.today())
-        elif expires == '0':
-            return self.queryset.filter(expire__gt=date.today())
-        else:
-            return self.queryset
+    # def get_queryset(self):
+    #     """
+    #     expires  比 expire多一个s ，用来筛选已过期的设备数据 lt 小于  gt 大于  lte小于等于  gte 大于等于
+    #     :return:
+    #     """
+    #     expires = self.request.query_params.get('expires', None)
+    #     search_host_list = self.request.query_params.get('search_host_list', None)
+    #     if search_host_list:
+    #         if search_host_list.find('-') != -1:
+    #             return self.queryset.filter(manage_ip__in=search_host_list.split('-'))
+    #         else:
+    #             return self.queryset.filter(manage_ip__in=[search_host_list])
+    #         # return self.queryset.filter(manage_ip__in=search_host_list)
+    #     if expires == '1':
+    #         return self.queryset.filter(expire__lt=date.today())
+    #     elif expires == '0':
+    #         return self.queryset.filter(expire__gt=date.today())
+    #     else:
+    #         return self.queryset
 
     # 重新update方法主要用来捕获更改前的字段值并赋值给self.log
     # def update(self, request, *args, **kwargs):

@@ -414,7 +414,7 @@ class NetworkDevice(models.Model):
     #     verbose_name='机架位结束', default=0, validators=[MaxValueValidator(50), MinValueValidator(1)])
     # uptime = models.DateField(verbose_name='上线时间', null=True, default=timezone.now)
     # expire = models.DateField(verbose_name='维保日期', null=True, blank=True)
-    memo = models.TextField(verbose_name='备注', null=True, default='')
+    memo = models.TextField(verbose_name='备注', null=True, default='', blank=True)
     status = models.PositiveSmallIntegerField(
         verbose_name='状态', choices=status_choices, default=0)
     ha_status = models.PositiveSmallIntegerField(
@@ -422,7 +422,7 @@ class NetworkDevice(models.Model):
     chassis = models.IntegerField(verbose_name='机框编号', default=0)
     slot = models.IntegerField(verbose_name='槽位编号', default=0)
     auto_enable = models.BooleanField(verbose_name="自动化纳管", null=False, default=True)
-    account = models.ManyToManyField('AssetAccount', verbose_name='管理账户', blank=True)
+    account = models.ManyToManyField('AssetAccount', verbose_name='管理账户', blank=True, null=True)
     plan = models.ForeignKey("automation.CollectionPlan", verbose_name='采集方案',
                              blank=True, null=True, related_name='releate_device', on_delete=models.SET_NULL)
     history = HistoricalRecords()

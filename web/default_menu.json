@@ -262,6 +262,31 @@
       ]
     },
     {
+      "name": "插件管理",
+      "hidden": false,
+      "web_path": "/plugins",
+      "path": "/plugins",
+      "meta": {
+        "title": "插件管理",
+        "iconPrefix": "iconfont",
+        "icon": "menu"
+      },
+      "children": [
+        {
+          "name": "地址定位",
+          "path": "/plugins/address_location",
+          "web_path": "/plugins/address_location",
+          "meta": {
+            "title": "地址定位",
+            "affix": true,
+            "iconPrefix": "iconfont",
+            "icon": "index",
+            "cacheable": false
+          }
+        }
+      ]
+    },
+    {
       "name": "拓扑管理",
       "hidden": false,
       "web_path": "/net_topology",

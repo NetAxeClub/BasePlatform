@@ -164,21 +164,6 @@ class OrgField(serializers.StringRelatedField):
             raise serializers.ValidationError("org with name: %s not found" % value)
 
 
-# AccountField
-class AccountField(serializers.StringRelatedField):
-
-    def to_internal_value(self, value):
-        # print(value, type(value))
-        # value = value[1:-1]
-        value = json.loads(value)
-        # print('解码后', value, type(value))
-        # print(value, type(value))
-        if isinstance(value, list):
-            return value
-        else:
-            raise serializers.ValidationError("org with name: %s not found" % value)
-
-
 # 网络设备
 class NetworkDeviceSerializer(serializers.ModelSerializer):
     plan_name = serializers.CharField(source='plan.name', read_only=True)
@@ -192,7 +177,6 @@ class NetworkDeviceSerializer(serializers.ModelSerializer):
     # 针对choices的处理
     status_name = serializers.CharField(source='get_status_display', read_only=True)
     ha_status_name = serializers.CharField(source='get_ha_status_display', read_only=True)
-    account = AccountField(many=True)
 
     class Meta:
         model = NetworkDevice

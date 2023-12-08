@@ -20,7 +20,7 @@
 
           <template #top-right>
             <n-button type="info" size="small" @click="device_import">
-              资产录入</n-button
+              新增设备</n-button
             >
 
             <n-button type="warning" size="small" @click="btnClick">
@@ -70,7 +70,7 @@
           :row-key="rowKey"
           @update:checked-row-keys="handleCheck"
           @update:expanded-row-keys="handleExpand"
-          :scroll-x="1800"
+          :scroll-x="1500"
         />
       </template>
       <template #footer>
@@ -92,7 +92,103 @@
         />
       </template>
     </ModalDialog>
-
+    <n-modal
+      v-model:show="showAssetModal"
+      class="custom-card"
+      preset="card"
+      :style="bodyStyle"
+      :title="assetModalTitle"
+      size="huge"
+      :bordered="false"
+      :segmented="segmented"
+    >
+      <template #header-extra> </template>
+      <n-form
+        label-align="left"
+        label-placement="left"
+        :model="asset_form"
+        label-width="120"
+        ref="silentForm"
+      >
+        <n-form-item label="管理IP">
+          <n-input
+            v-model:value="asset_form.manage_ip"
+            type="text"
+            placeholder="管理IP"
+          />
+        </n-form-item>
+        <n-form-item label="序列号">
+          <n-input
+            v-model:value="asset_form.serial_num"
+            type="text"
+            placeholder="序列号"
+          />
+        </n-form-item>
+        <n-form-item label="备注">
+          <n-input
+            v-model:value="asset_form.memo"
+            type="text"
+            placeholder="备注"
+          />
+        </n-form-item>
+        <n-form-item label="供应商">
+          <n-select
+            v-model:value="asset_form.vendor"
+            placeholder="供应商"
+            :options="venderOptions"
+            filterable
+          />
+        </n-form-item>
+        <n-form-item label="机房">
+          <n-select
+            v-model:value="asset_form.idc"
+            placeholder="机房"
+            :options="idcOptions"
+            filterable
+          />
+        </n-form-item>
+        <n-form-item label="类型">
+          <n-select
+            v-model:value="asset_form.category"
+            placeholder="类型"
+            :options="categoryOptions"
+            filterable
+          />
+        </n-form-item>
+        <n-form-item label="账户">
+          <n-select
+            v-model:value="asset_form.account"
+            placeholder="类型"
+            :options="accountOptions"
+            filterable
+            multiple
+          />
+        </n-form-item>
+        <n-form-item label="采集方案">
+          <n-select
+            v-model:value="asset_form.plan"
+            placeholder="类型"
+            :options="planOptions"
+            filterable
+          />
+        </n-form-item>
+        <n-form-item label="状态">
+          <n-select
+            v-model:value="asset_form.status"
+            placeholder="状态"
+            :options="statusOptions"
+          />
+        </n-form-item>
+        <n-form-item label="自动化">
+          <n-switch v-model:value="asset_form.auto_enable" />
+        </n-form-item>
+      </n-form>
+      <template #footer>
+        <div style="display: flex; justify-content: flex-end">
+          <n-button type="primary" @click="add_asset_btn"> 添加 </n-button>
+        </div>
+      </template>
+    </n-modal>
     <ModalDialog
       ref="device_import_modalDialog"
       title="资产数据录入"
@@ -103,7 +199,7 @@
         <DataForm
           ref="importDataFormRef"
           :form-config="{
-            labelWidth: 60
+            labelWidth: 80
           }"
           preset="grid-item"
           :options="importFormOptions"
@@ -314,7 +410,6 @@ import {
   device_import_url,
   getNetworkDeviceList,
   getCmdbIdcList,
-  getCmdbRoleList,
   getVendorList,
   getCategoryList,
   get_api_request_log,
@@ -344,6 +439,7 @@ import {
   NSelect,
   NButton,
   NForm,
+  NTag,
   NFormItem,
   SelectOption,
   useDialog,
@@ -359,8 +455,9 @@ import {
 import usePost from '@/hooks/usePost'
 import { renderTag } from '@/hooks/form'
 import useGet from '@/hooks/useGet'
-// import usePut from '@/hooks/usePut'
+import usePut from '@/hooks/usePut'
 import usePatch from '@/hooks/usePatch'
+import useDelete from '@/hooks/useDelete'
 import { sortColumns } from '@/utils'
 import Cookies from 'js-cookie'
 import router from '@/router'
@@ -370,10 +467,39 @@ export default defineComponent({
   name: 'Networkdevice',
   components: {},
   setup() {
+    const assetModalTitle = ref('新增设备')
+    const showAssetModal = ref(false)
+    const asset_form = ref({
+      id: 0,
+      manage_ip: '',
+      serial_num: '',
+      vendor: '',
+      idc: '',
+      category: '',
+      memo: '',
+      status: 0,
+      plan: 0,
+      auto_enable: true,
+      account: []
+    })
+    const venderOptions = ref([{}])
+    const idcOptions = ref([{}])
+    const categoryOptions = ref([{}])
+    const accountOptions = ref([{}])
+    const planOptions = ref([{}])
+    const statusOptions = ref([
+      { value: '', label: '' },
+      { value: 0, label: '在线' },
+      { value: 1, label: '下线' },
+      { value: 2, label: '挂牌' },
+      { value: 3, label: '备用' }
+    ])
     const formRef = ref({})
     const term = ref(null)
     const socket = ref(null)
-    const bodyStyle = '80%'
+    const bodyStyle = {
+      width: '600px'
+    }
     const segmented = {
       content: 'soft',
       footer: 'soft'
@@ -705,25 +831,9 @@ export default defineComponent({
           })
         }
       }
-      // {
-      //   key: 'protocol_port',
-      //   label: '协议端口',
-      //   value: ref(''),
-      //   optionItems: [],
-      //   render: (formItem: any) => {
-      //     return h(NSelect, {
-      //       options: formItem.optionItems as Array<SelectOption>,
-      //       value: formItem.value.value,
-      //       placeholder: '请选择协议端口',
-      //       onUpdateValue: (val) => {
-      //         formItem.value.value = val
-      //       },
-      //     })
-      //   },
-      // },
     ]
     const device_import_template_url = device_import_excel_path
-    const importFormOptions = [
+    const importFormOptions: Array<FormItem> = [
       {
         key: 'manage_ip',
         label: '管理地址',
@@ -741,22 +851,6 @@ export default defineComponent({
         }
       },
       {
-        key: 'framework',
-        label: '网络架构',
-        value: ref(''),
-        optionItems: shallowReactive([] as Array<SelectOption>),
-        render: (formItem) => {
-          return h(NSelect, {
-            options: formItem.optionItems as Array<SelectOption>,
-            value: formItem.value.value,
-            placeholder: '请选择架构',
-            onUpdateValue: (val) => {
-              formItem.value.value = val
-            }
-          })
-        }
-      },
-      {
         key: 'vendor',
         label: '供应商',
         value: ref(''),
@@ -766,23 +860,6 @@ export default defineComponent({
             options: formItem.optionItems as Array<SelectOption>,
             value: formItem.value.value,
             placeholder: '请选择供应商',
-            filterable: true,
-            onUpdateValue: (val) => {
-              formItem.value.value = val
-            }
-          })
-        }
-      },
-      {
-        key: 'role',
-        label: '设备角色',
-        value: ref(''),
-        optionItems: shallowReactive([] as Array<SelectOption>),
-        render: (formItem) => {
-          return h(NSelect, {
-            options: formItem.optionItems as Array<SelectOption>,
-            value: formItem.value.value,
-            placeholder: '请选择角色',
             filterable: true,
             onUpdateValue: (val) => {
               formItem.value.value = val
@@ -826,24 +903,6 @@ export default defineComponent({
         }
       },
       {
-        key: 'idc_model',
-        label: '模块',
-        value: ref(''),
-        optionItems: shallowReactive([] as Array<SelectOption>),
-        render: (formItem) => {
-          return h(NSelect, {
-            options: formItem.optionItems as Array<SelectOption>,
-            value: formItem.value.value,
-            filterable: true,
-            placeholder: '请选择模块',
-            onUpdateValue: (val) => {
-              formItem.value.value = val
-            },
-            'on-update:value': get_info_by_idc_model.bind(formItem.value.value)
-          })
-        }
-      },
-      {
         key: 'serial_num',
         label: 'SN号',
         value: ref(''),
@@ -854,71 +913,6 @@ export default defineComponent({
               formItem.value.value = val
             },
             placeholder: '请输入序列号'
-          })
-        }
-      },
-      {
-        key: 'rack',
-        label: '机柜',
-        value: ref(''),
-        optionItems: shallowReactive([] as Array<SelectOption>),
-        render: (formItem) => {
-          return h(NSelect, {
-            options: formItem.optionItems as Array<SelectOption>,
-            value: formItem.value.value,
-            placeholder: '请选择机柜',
-            filterable: true,
-            onUpdateValue: (val) => {
-              formItem.value.value = val
-            }
-          })
-        }
-      },
-      {
-        key: 'u_location_start',
-        label: 'U位开始',
-        value: ref(''),
-        render: (formItem) => {
-          return h(NInput, {
-            value: formItem.value.value,
-            onUpdateValue: (newVal: any) => {
-              formItem.value.value = newVal
-            },
-            maxlength: 50,
-            placeholder: 'U位开始'
-          })
-        }
-      },
-      {
-        key: 'u_location_end',
-        label: 'U位结束',
-        value: ref(''),
-        render: (formItem) => {
-          return h(NInput, {
-            value: formItem.value.value,
-            onUpdateValue: (newVal: any) => {
-              formItem.value.value = newVal
-            },
-            maxlength: 50,
-            placeholder: 'U位结束'
-          })
-        }
-      },
-      {
-        key: 'netzone',
-        label: '网络区域',
-        value: ref(''),
-        optionItems: shallowReactive([] as Array<SelectOption>),
-        render: (formItem) => {
-          return h(NSelect, {
-            options: formItem.optionItems as Array<SelectOption>,
-            value: formItem.value.value,
-            filterable: true,
-            // disabled: checkedValueRef.value,
-            placeholder: '请选择网络区域',
-            onUpdateValue: (val) => {
-              formItem.value.value = val
-            }
           })
         }
       },
@@ -934,23 +928,6 @@ export default defineComponent({
               formItem.value.value = val
             },
             placeholder: '请输入备注信息'
-          })
-        }
-      },
-      {
-        key: 'attribute',
-        label: '网络属性',
-        value: ref(''),
-        optionItems: shallowReactive([] as Array<SelectOption>),
-        render: (formItem) => {
-          return h(NSelect, {
-            options: formItem.optionItems as Array<SelectOption>,
-            value: formItem.value.value,
-            filterable: true,
-            placeholder: '请选择网络属性',
-            onUpdateValue: (val) => {
-              formItem.value.value = val
-            }
           })
         }
       },
@@ -1697,43 +1674,42 @@ export default defineComponent({
           {
             title: '设备名称',
             key: 'name',
-            width: 150,
-            fixed: 'left'
+            width: '10%'
           },
           {
             title: '管理IP',
             key: 'manage_ip',
-            width: 120
+            width: '10%'
           },
           {
             title: '厂商',
             key: 'vendor_name',
-            width: 100
+            width: '10%'
           },
           {
             title: '型号',
             key: 'model_name',
-            width: 100
+            width: '10%'
           },
           {
             title: '类型',
             key: 'category_name',
-            width: 100
+            width: '10%'
           },
           {
             title: '机房',
             key: 'idc_name',
-            width: 100
+            width: '10%'
           },
           {
             title: '状态',
             key: 'status_name',
-            width: 80
+            width: '5%'
           },
           {
             title: '自动化',
             key: 'auto_enable',
-            width: 60,
+            width: '5%',
             render: (rowData) =>
               renderTag(!!rowData.auto_enable ? '启用' : '禁用', {
                 type: !!rowData.auto_enable ? 'success' : 'error',
@@ -1741,75 +1717,78 @@ export default defineComponent({
               })
           },
           {
-            title: '编辑',
-            key: 'edit',
-            fixed: 'right',
-            width: 80,
-            render: (rowData) => {
+            title: '自动化方案',
+            key: 'plan',
+            width: '10%',
+            render: (row) => {
+              let plan_label = row.plan
+              planOptions.value.forEach((element) => {
+                if (element.value == row.plan) {
+                  plan_label = element.label
+                }
+              })
               return h(
-                NButton,
+                NTag,
                 {
-                  type: 'info',
-                  size: 'tiny',
-                  onClick: EditFunction.bind(null, rowData)
+                  style: {
+                    marginRight: '6px'
+                  },
+                  bordered: false
                 },
-                () => h('span', {}, 'EDIT')
+                {
+                  default: () => plan_label
+                }
               )
-              // return useRenderAction([
-              //   {
-              //     label: 'Edit',
-              //     onClick: EditFunction.bind(null, rowData),
-              //   },
-              //
-              // ] as TableActionModel[])
             }
           },
           {
-            title: 'WEBSSH',
-            key: 'webssh',
+            title: '操作',
+            key: 'id',
             fixed: 'right',
-            width: 80,
+            width: '15%',
             render: (rowData) => {
-              return h(
-                NButton,
-                {
-                  type: 'success',
-                  size: 'tiny',
-                  onClick: onWebssh.bind(null, rowData)
-                },
-                () => h('span', {}, 'WEBSSH')
-              )
-              // return useRenderAction([
-              //   {
-              //     label: 'WEBSSH',
-              //     onClick: onWebssh.bind(null, rowData),
-              //   },
-              //
-              // ] as TableActionModel[])
-            }
-          },
-          {
-            title: '复制',
-            key: 'actions',
-            fixed: 'right',
-            width: 80,
-            render: (rowData) => {
-              return h(
-                NButton,
-                {
-                  type: 'warning',
-                  size: 'tiny',
-                  onClick: Copy.bind(null, rowData)
-                },
-                () => h('span', {}, '信息复制')
-              )
-              // return useRenderAction([
-              //   {
-              //     label: 'WEBSSH',
-              //     onClick: onWebssh.bind(null, rowData),
-              //   },
-              //
-              // ] as TableActionModel[])
+              return [
+                h(
+                  NButton,
+                  {
+                    type: 'info',
+                    size: 'tiny',
+                    ghost: true,
+                    onClick: EditFunction.bind(null, rowData)
+                  },
+                  () => h('span', {}, '编辑')
+                ),
+                h(
+                  NButton,
+                  {
+                    type: 'warning',
+                    size: 'tiny',
+                    ghost: true,
+                    onClick: onWebssh.bind(null, rowData)
+                  },
+                  () => h('span', {}, 'WEBSSH')
+                ),
+                h(
+                  NButton,
+                  {
+                    type: 'success',
+                    size: 'tiny',
+                    ghost: true,
+                    onClick: Copy.bind(null, rowData)
+                  },
+                  () => h('span', {}, '复制')
+                ),
+                h(
+                  NButton,
+                  {
+                    type: 'error',
+                    size: 'tiny',
+                    ghost: true,
+                    onClick: DeleteDevice.bind(null, rowData)
+                  },
+                  () => h('span', {}, '删除')
+                )
+              ]
             }
           }
         ],
@@ -1970,8 +1949,9 @@ export default defineComponent({
     ]
     const get = useGet()
     const post = usePost()
-    // const put = usePut()
+    const put = usePut()
     const patch = usePatch()
+    const delete_func = useDelete()
     const checkedRowKeysRef = ref([])
     const collection_options = shallowReactive([]) as Array<any>
     const framework_options = shallowReactive([]) as Array<any>
@@ -2221,32 +2201,15 @@ export default defineComponent({
           }
         }
       }).then((res) => {
-        //  //console.log('idc_res', res)
-        //  //console.log(conditionItems)
-        const idc_list = res.results
-        for (var i = 0; i < idc_list.length; i++) {
-          const dict = {
-            label: idc_list[i]['name'],
-            value: idc_list[i]['id']
-          }
-          if (conditionItems[2].optionItems != undefined) {
-            conditionItems[2].optionItems.push(dict)
-          }
-          if (importFormOptions[5].optionItems != undefined) {
-            importFormOptions[5].optionItems.push(dict)
-          }
-          if (EditFormOptions[8].optionItems !== undefined) {
-            EditFormOptions[8].optionItems.push(dict)
-          }
-        }
-        nextTick(() => {
-          conditionItems[2].optionItems.splice(0, 0, { label: '', value: '' })
-          EditFormOptions[8].optionItems.splice(0, 0, { label: '', value: '' })
-          importFormOptions[5].optionItems.splice(0, 0, {
-            label: '',
-            value: ''
+        idcOptions.value = []
+        if (res.code == 200 && res.results.length > 0) {
+          res.results.forEach((item) => {
+            idcOptions.value.push({
+              label: item.name,
+              value: item.id
+            })
           })
-        })
+        }
       })
     }
 
@@ -2259,66 +2222,14 @@ export default defineComponent({
           }
         }
       }).then((res) => {
-        //  //console.log('vendor_res', res)
-        //  //console.log(conditionItems)
-        const idc_list = res.results
-        for (var i = 0; i < idc_list.length; i++) {
-          const dict = {
-            label: idc_list[i]['name'],
-            value: idc_list[i]['id']
-          }
-          if (conditionItems[1].optionItems != undefined) {
-            conditionItems[1].optionItems.push(dict)
-          }
-
-          if (EditFormOptions[2].optionItems != undefined) {
-            EditFormOptions[2].optionItems.push(dict)
-          }
-          if (importFormOptions[2].optionItems != undefined) {
-            importFormOptions[2].optionItems.push(dict)
-          }
-        }
-        nextTick(() => {
-          conditionItems[1].optionItems.splice(0, 0, { label: '', value: '' })
-          EditFormOptions[2].optionItems.splice(0, 0, { label: '', value: '' })
-          importFormOptions[2].optionItems.splice(0, 0, {
-            label: '',
-            value: ''
+        venderOptions.value = []
+        if (res.code == 200 && res.results.length > 0) {
+          res.results.forEach((item) => {
+            venderOptions.value.push({
+              label: item.name,
+              value: item.id
+            })
           })
-        })
-      })
-    }
-
-    function doRole() {
-      get({
-        url: getCmdbRoleList,
-        data: () => {
-          return {
-            limit: 1000
-          }
-        }
-      }).then((res) => {
-        //  //console.log('role_res', res)
-        //  //console.log(conditionItems)
-        const idc_list = res.results
-        for (var i = 0; i < idc_list.length; i++) {
-          const dict = {
-            label: idc_list[i]['name'],
-            value: idc_list[i]['id']
-          }
-          if (conditionItems[3].optionItems != undefined) {
-            conditionItems[3].optionItems.push(dict)
-            // conditionItems[3].optionItems.splice(0, 0, {
-            //   label: '',
-            //   value: ''
-            // });
-          }
-          if (EditFormOptions[3].optionItems != undefined) {
-            EditFormOptions[3].optionItems.push(dict)
-          }
-          if (importFormOptions[3].optionItems != undefined) {
-            importFormOptions[3].optionItems.push(dict)
-          }
         }
       })
     }
@@ -2332,37 +2243,24 @@ export default defineComponent({
           }
         }
       }).then((res) => {
-        //  //console.log('category_res', res)
-        //  //console.log(conditionItems)
-        const idc_list = res.results
-        for (var i = 0; i < idc_list.length; i++) {
-          const dict = {
-            label: idc_list[i]['name'],
-            value: idc_list[i]['id']
-          }
-          if (conditionItems[5].optionItems != undefined) {
-            conditionItems[5].optionItems.push(dict)
-          }
-          if (EditFormOptions[4].optionItems != undefined) {
-            EditFormOptions[4].optionItems.push(dict)
-          }
-          if (importFormOptions[4].optionItems != undefined) {
-            importFormOptions[4].optionItems.push(dict)
-          }
+        categoryOptions.value = []
+        if (res.code == 200 && res.results.length > 0) {
+          res.results.forEach((item) => {
+            categoryOptions.value.push({
+              label: item.name,
+              value: item.id
+            })
+          })
         }
       })
     }
 
     function device_import() {
-      device_import_modalDialog.value?.toggle()
+      showAssetModal.value = true
     }
 
     function importDataFormConfirm() {
       if (importDataFormRef.value?.validator()) {
-        let myDate = new Date()
-        let year = myDate.getFullYear() //获取当前年
-        let mon = myDate.getMonth() + 1 //获取当前月
-        let date = myDate.getDate()
         device_import_modalDialog.value?.toggle()
         let import_form = importDataFormRef.value.generatorParams()
         //console.log('设备录入参数', import_form)
@@ -2372,32 +2270,13 @@ export default defineComponent({
         import_formdata.append('category', import_form['category'])
         import_formdata.append('serial_num', import_form['serial_num'])
         import_formdata.append('idc', import_form['idc'])
-        import_formdata.append('netzone', import_form['netzone'])
-        import_formdata.append('attribute', import_form['attribute'])
-        import_formdata.append('framework', import_form['framework'])
-        import_formdata.append('role', import_form['role'])
-        import_formdata.append('idc_model', import_form['idc_model'])
-        import_formdata.append('rack', import_form['rack'])
-        import_formdata.append(
-          'u_location_start',
-          import_form['u_location_start']
-        )
-        import_formdata.append('u_location_end', import_form['u_location_end'])
         import_formdata.append('memo', import_form['memo'])
         import_formdata.append('status', import_form['status'])
         import_formdata.append('auto_enable', import_form['auto_enable'])
-        import_formdata.append('expire', '2099-01-01')
-        import_formdata.append('uptime', year + '-' + mon + '-' + date)
-        import_formdata.set('uptime', year + '-' + mon + '-' + date)
-        let vendor_id = import_form['vendor']
-        if (vendor_id === 2) {
-          import_formdata.append('plan', '13')
-        }
         post({
           url: getNetworkDeviceList,
           data: import_formdata
         }).then((res) => {
-          console.log('res', res)
           if (res.code === 400) {
             message.error(res.message)
           } else {
@@ -2500,108 +2379,20 @@ export default defineComponent({
       document.body.removeChild(input) // 删除临时实例
       message.success('复制成功')
     }
-
-    function EditFunction(item: any) {
-      modalDialog.value?.toggle()
-      // console.log('编辑当前行', item)
-      rowData.value = item
-      //console.log(rowData.value)
-      // edit_rowData.value['u_location'] = item.u_location_start+"-" +item.u_location_end
-      nextTick(() => {
-        // 查询网络区域
-        get({
-          url: getCmdbNetzoneList,
-          data: () => {
-            return {
-              limit: 1000
-            }
-          }
-        }).then((res) => {
-          if (EditFormOptions[11].optionItems !== undefined) {
-            EditFormOptions[11].optionItems.length = 0
-            let netzone_list: { value: any; label: any }[] = []
-            res.results.forEach((ele: { [x: string]: any }) => {
-              let dict = {
-                value: ele['id'],
-                label: ele['name']
-              }
-              netzone_list.push(dict)
-            })
-            EditFormOptions[11].optionItems.push(...netzone_list)
-          }
-        })
-
-        // 根据机房查询模块
-        get({
-          url: getCmdbIdcModelList,
-          data: () => {
-            return {
-              idc: item.idc,
-              limit: 1000
-            }
-          }
-        }).then((res) => {
-          //console.log('编辑--机房获取模块', res)
-          //  //console.log(conditionItems)
-          // let filter_list = []
-          if (EditFormOptions[5].optionItems !== undefined) {
-            EditFormOptions[5].optionItems.length = 0
-            let idc_model_list: { value: any; label: any }[] = []
-            res.results.forEach((ele: { [x: string]: any }) => {
-              let dict = {
-                value: ele['id'],
-                label: ele['name']
-              }
-              idc_model_list.push(dict)
-            })
-            EditFormOptions[5].optionItems.push(...idc_model_list)
-          }
-        })
-
-        // 根据模块查询机柜
-        get({
-          url: getCmdbRackList,
-          data: () => {
-            return {
-              idc_model: item.idc_model,
-              limit: 1000
-            }
-          }
-        }).then((res) => {
-          //console.log('编辑模块机柜内容', res)
-          //  //console.log(conditionItems)
-          // let filter_list = []
-          if (EditFormOptions[7].optionItems !== undefined) {
-            EditFormOptions[7].optionItems.length = 0
-            let model_list: { value: any; label: any }[] = []
-            res.results.forEach((ele: { [x: string]: any }) => {
-              let dict = {
-                value: ele['id'],
-                label: ele['name']
-              }
-              model_list.push(dict)
-            })
-            EditFormOptions[7].optionItems.push(...model_list)
-          }
-        })
-        // 根据供应商查询型号
-
-        EditFormOptions.forEach((it) => {
-          const key = it.key
-          const propName = item[key]
-
-          if (
-            key === 'id' ||
-            key == 'auto_enable' ||
-            key == 'u_location_start' ||
-            key == 'u_location_end'
-          ) {
-            it.value.value = JSON.stringify(propName)
-          } else {
-            it.value.value = propName
-          }
-        })
+    function DeleteDevice(item) {
+      delete_func({
+        url: getNetworkDeviceList + '/' + item.id + '/'
+      }).then((res) => {
+        if (res.code == 204) {
+          message.success('删除成功')
+          doRefresh()
+        }
       })
+    }
+    function EditFunction(item: any) {
+      showAssetModal.value = true
+      assetModalTitle.value = '编辑设备信息'
+      asset_form.value = item
     }
 
     function get_info_by_idc(item: any) {
@@ -2631,36 +2422,6 @@ export default defineComponent({
           if (importFormOptions[11].optionItems !== undefined) {
             importFormOptions[11].optionItems.length = 0
             importFormOptions[11].optionItems.push(...netzone_list)
-          }
-        }
-      })
-
-      get({
-        url: getCmdbIdcModelList,
-        data: () => {
-          return {
-            idc: item,
-            limit: 1000
-          }
-        }
-      }).then((res) => {
-        //console.log('选中机房获取模块', res)
-        //console.log(conditionItems)
-        // let filter_list = []
-        if (conditionItems[6].optionItems !== undefined) {
-          conditionItems[6].optionItems.length = 0
-          let idc_model_list: { value: any; label: string }[] = []
-          res.results.forEach((ele: { [x: string]: string }) => {
-            let dict = {
-              value: ele['id'],
-              label: ele['floor'].toString() + 'F/' + ele['name']
-            }
-            idc_model_list.push(dict)
-          })
-          conditionItems[6].optionItems.push(...idc_model_list)
-          if (importFormOptions[6].optionItems !== undefined) {
-            importFormOptions[6].optionItems.length = 0
-            importFormOptions[6].optionItems.push(...idc_model_list)
           }
         }
       })
@@ -3020,19 +2781,52 @@ export default defineComponent({
           }
         }
       }).then((res) => {
-        if (connect_account_FormOptions[0].optionItems !== undefined) {
-          res.results.forEach((ele: { [x: string]: any }) => {
-            var dict = {
-              label: ele['name'] + '(' + ele['username'] + ')',
-              value: ele['id']
-            }
-            connect_account_FormOptions[0].optionItems.push(dict)
+        accountOptions.value = []
+        if (res.code == 200 && res.results.length > 0) {
+          res.results.forEach((item) => {
+            accountOptions.value.push({
+              label: item.name,
+              value: item.id
+            })
           })
         }
       })
       //console.log('connect_account_FormOptions', connect_account_FormOptions)
     }
-
+    // 新增设备模态框按钮
+    function add_asset_btn() {
+      if (assetModalTitle.value == '编辑设备信息') {
+        patch({
+          url: getNetworkDeviceList + asset_form.value.id.toString() + '/',
+          data: asset_form.value
+        }).then((res) => {
+          if (res.code === 400) {
+            message.error(res.message)
+          } else {
+            showAssetModal.value = false
+            nextTick(() => {
+              message.success('设备编辑成功')
+              doRefresh()
+            })
+          }
+        })
+      } else {
+        post({
+          url: getNetworkDeviceList,
+          data: asset_form.value
+        }).then((res) => {
+          if (res.code === 400) {
+            message.error(res.message)
+          } else {
+            showAssetModal.value = false
+            nextTick(() => {
+              message.success('设备录入成功')
+              doRefresh()
+            })
+          }
+        })
+      }
+    }
     function ConnectAccountConfirm() {
       console.log(connect_account_DataFormRef.value?.generatorParams())
       console.log('device_info.value', device_info.value)
@@ -3065,23 +2859,15 @@ export default defineComponent({
           }
         }
       }).then((res) => {
-        const collection_list = res.results
-        for (var i = 0; i < collection_list.length; i++) {
-          const dict = {
-            label: collection_list[i]['name'],
-            value: collection_list[i]['id']
-          }
-          collection_options.push(dict)
-          if (conditionItems[8].optionItems != undefined) {
-            conditionItems[8].optionItems.push(dict)
-          }
-          if (EditFormOptions[16].optionItems != undefined) {
-            EditFormOptions[16].optionItems.push(dict)
-          }
+        if (res.code == 200 && res.results.length > 0) {
+          planOptions.value = []
+          res.results.forEach((item) => {
+            planOptions.value.push({
+              label: item.name,
+              value: item.id
+            })
+          })
         }
-        nextTick(() => {
-          conditionItems[8].optionItems.splice(0, 0, { label: '', value: '' })
-        })
       })
     }
     onMounted(get_cmdb_account)
@@ -3091,13 +2877,24 @@ export default defineComponent({
     onMounted(doCagetory)
     onMounted(doCollection)
     return {
+      accountOptions,
+      planOptions,
+      assetModalTitle,
+      idcOptions,
+      add_asset_btn,
+      venderOptions,
+      categoryOptions,
+      statusOptions,
+      asset_form,
       // doReport,
+      showAssetModal,
       ConnectAccountConfirm,
       Copy,
+      delete_func,
       device_info,
       term,
       socket,
-
+      DeleteDevice,
       BindIP_handleClick,
       BindIpConfirm,
       bind_ip_modalDialog,
@@ -3146,7 +2943,6 @@ export default defineComponent({
       account_page,
       account_pageSize,
       account_pageSizes,
-
       change_log_keyword,
       change_log_pageCount,
       change_log_tableColumns,
