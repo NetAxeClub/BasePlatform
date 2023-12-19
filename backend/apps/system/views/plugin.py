@@ -5,6 +5,7 @@ from rest_framework.views import APIView
 from apps.system.tools.plugin_tree import PluginsTree
 from django.http import JsonResponse
 from netaxe.settings import BASE_DIR
+from autopep8 import fix_code, commented_out_code_lines
 
 
 class DateEncoder(json.JSONEncoder):
@@ -65,9 +66,11 @@ class PluginMange(APIView):
             return JsonResponse(data, safe=False)
         if any(k in post_data for k in ("save_fsm_template", "filename")):
             save_fsm_template = post_data['save_fsm_template']
+            pep8_content = fix_code(save_fsm_template, options={'aggressive':2})
+            print(commented_out_code_lines(save_fsm_template))
             with open(BASE_DIR + '/plugins/extensibles/' + post_data['filename'], "w",
                       encoding="utf-8") as f:
-                f.write(save_fsm_template)
+                f.write(pep8_content)
             data = {
                 "code": 200,
                 "data": 'ok',

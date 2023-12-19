@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 # 2023/8/28
 from django.db import connections
-from django.core import serializers
 from apps.asset.models import NetworkDevice, Category
 
 
@@ -22,3 +21,8 @@ def get_firewall_list(manage_ip_list=None):
             'vendor', 'category').prefetch_related('bind_ip').values(
             'id', 'manage_ip', 'name', 'vendor__alias', 'bind_ip__ipaddr', 'soft_version')
     return all_devs
+
+
+def get_device_info(**kwargs):
+    res =  NetworkDevice.objects.filter(**kwargs).values()
+    return list(res)

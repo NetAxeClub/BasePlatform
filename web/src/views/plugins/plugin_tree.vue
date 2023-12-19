@@ -94,7 +94,7 @@
             >
               <template #header-extra>
                 <n-space>
-                  <n-button type="info" size="small" @click="saveFSMcontent">
+                  <n-button type="info" size="small" @click="saveContent">
                     保存
                   </n-button>
                 </n-space>
@@ -171,7 +171,16 @@ export default defineComponent({
     const showRangeRadio = ref(false)
     const showCommitRadio = ref(false)
     const message = useMessage()
-    const ace_option = ref({ fontSize: 14 })
+    const ace_option = ref({
+      fontSize: 14,
+      readOnly: false, // 只读
+      enableSnippets: true, // 启用代码段
+      showLineNumbers: true, // 显示行号
+      enableLiveAutocompletion: true, // 启用实时自动完成功能 （比如：智能代码提示）
+      enableBasicAutocompletion: true, // 启用基本自动完成功能
+      scrollPastEnd: true, // 滚动位置
+      highlightActiveLine: true // 高亮当前行
+    })
     // 获取配置文件树
     function get_config_tree() {
       get({
@@ -234,10 +243,10 @@ export default defineComponent({
     function tab_change(value) {
       console.log(value)
     }
-    // 保存fsm内容
-    function saveFSMcontent() {
+    // 保存文件内容
+    function saveContent() {
       post({
-        url: plugin_tree,
+        url: plugin_tree + '/',
         data: {
           save_fsm_template: content.value,
           filename: current_filename.value
@@ -246,6 +255,20 @@ export default defineComponent({
         console.log(res)
         if (res.code == 200) {
           message.success(res.msg)
+          nextTick(() => {
+            get({
+              url: plugin_tree,
+              data: () => {
+                return {
+                  filename: current_filename.value
+                }
+              }
+            }).then((res) => {
+              if (res) {
+                content.value = res.data
+              }
+            })
+          })
         } else {
           message.error(res.msg)
         }
@@ -300,7 +323,7 @@ export default defineComponent({
       change_file_option,
       tab_change,
       ace_option,
-      saveFSMcontent,
+      saveContent,
       fsm_parse_modal_show,
       vendor_options,
       add_fsm_template_modal_btn,
