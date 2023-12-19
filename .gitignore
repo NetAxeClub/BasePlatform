@@ -33,5 +33,4 @@ backend/conf.py
 backend/media/admin_ssh_records/
 backend/apps/base_plateform/__pycache__/
 backend/apps/int_utilization/__pycache__/
-backend/plugins/extensibles
 backend/scripts
