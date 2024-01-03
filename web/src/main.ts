@@ -1,18 +1,48 @@
-import { createApp } from 'vue'
+import {createApp} from 'vue'
+import './style.scss'
+import './project-init'
 import App from './App.vue'
-import './styles'
-import useGlobalComponents from './components'
-import { useAppRouter } from './router'
-import useRouterGuard from './router/guard'
-import useAppPinia from './store'
+import initRouter from './router'
+import request from './service/request'
+import { createPinia } from 'pinia'
+import '@/assets/font/na-icon.css'
+import service from './hooks/service'
+import directive from './directive'
 
-function vawBoot() {
-  const app = createApp(App)
-  useAppPinia(app)
-  useAppRouter(app)
-  useGlobalComponents(app)
-  useRouterGuard()
-  app.mount('#app')
+declare global {
+  interface Window {
+    // 是否存在无界
+    __POWERED_BY_WUJIE__?: boolean;
+    // 子应用mount函数
+    __WUJIE_MOUNT: () => void;
+    // 子应用unmount函数
+    __WUJIE_UNMOUNT: () => void;
+    // 子应用无界实例
+    __WUJIE: { mount: () => void };
+  }
 }
 
-vawBoot()
+const initApp = () => {
+  const app = createApp(App)
+  const router = initRouter()
+  app.use(router)
+  app.use(createPinia())
+  app.use(service)
+  app.use(directive)
+  app.config.globalProperties.$http = request
+  app.mount('#app')
+  return app
+}
+
+if (window.__POWERED_BY_WUJIE__) {
+  let instance:any
+  window.__WUJIE_MOUNT = () => {
+    instance = initApp()
+  }
+  window.__WUJIE_UNMOUNT = () => {
+    instance.unmount()
+  }
+} else {
+  initApp()
+}
+

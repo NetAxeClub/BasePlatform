@@ -1,67 +1,75 @@
+import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import viteSvgIcons from 'vite-plugin-svg-icons'
-// @ts-ignore
-import path from 'path'
-import { loadEnv } from 'vite'
-import vitePluginCompression from 'vite-plugin-compression'
-import ViteComponents from 'unplugin-vue-components/vite'
+import AutoImport from 'unplugin-auto-import/vite'
+import Components from 'unplugin-vue-components/vite'
 import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
+import eslint from 'vite-plugin-eslint'
+import path from 'path'
+import fs  from 'fs'
 
-import monacoEditorPlugin from 'vite-plugin-monaco-editor'
-import vueJsx from '@vitejs/plugin-vue-jsx'
-
-export default ({ mode }) => {
-  const env = loadEnv(mode, './')
-  return {
-    base: '/',
-    plugins: [
-      vue(),
-      viteSvgIcons({
-        iconDirs: [path.resolve(process.cwd(), 'src/icons')],
-        symbolId: 'icon-[dir]-[name]'
-      }),
-      vitePluginCompression({
-        threshold: 1024 * 10
-      }),
-      ViteComponents({
-        resolvers: [NaiveUiResolver()]
-      }),
-      vueJsx(),
-      monacoEditorPlugin({})
-    ],
-    css: {
-      preprocessorOptions: {
-        scss: {
-          additionalData: '@use "./src/styles/variables.scss" as *;'
-        }
-      }
-    },
-    resolve: {
-      alias: [
-        {
-          find: '@/',
-          replacement: path.resolve(process.cwd(), 'src') + '/'
-        }
-      ]
-    },
-    server: {
-      open: true,
-      port: 32200,
-      proxy: {
-        '/base_platform': {
-          target: env.VITE_BASIC_URL,
-          ws: true, //代理websockets
-          changeOrigin: true, //
-          rewrite: (path: string) =>
-            path.replace(/^\/base_platform/, '/base_platform')
-        },
-        '/rbac': {
-          target: env.VITE_RBAC_URL,
-          ws: true, //代理websockets
-          changeOrigin: true, //
-          rewrite: (path: string) => path.replace(/^\/rbac/, '/rbac')
-        }
-      }
+// 读取代理及前端配置
+let proxy = {}
+let define = {}
+let port = 8080
+if (fs.existsSync(path.resolve(__dirname, 'proxy.json'))) {
+  const proxyConfig = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'proxy.json'), 'utf-8'))
+  let proxyTmp = proxyConfig.proxy || {}
+  for (let key in proxyTmp) {
+    proxy[key] = {
+      target: proxyTmp[key].target,
+      ws: proxyTmp[key].ws || true,
+      changeOrigin: true,
+      // rewrite: (path) => path.replace(proxyTmp[key].url, '')
     }
   }
+  define = (() => {
+    let cfg = proxyConfig.envConfig
+    if (cfg) {
+      let result = {}
+      for (let key in cfg) {
+        result['import.meta.env.' + key] = JSON.stringify(cfg[key])
+      }
+      return result
+    }
+    return {}
+  })()
+  port = proxyConfig.port || 8080
 }
+// https://vitejs.dev/config/
+export default defineConfig({
+  plugins: [
+    vue(),
+    eslint(),
+    AutoImport({
+      imports: [
+        'vue',
+        {
+          'naive-ui': [
+            'useDialog',
+            'useMessage',
+            'useNotification',
+            'useLoadingBar'
+          ]
+        }
+      ]
+    }),
+    Components({
+      resolvers: [NaiveUiResolver()]
+    })
+  ],
+  define: {
+    ...define
+  },
+  server: {
+    port,
+    proxy
+  },
+  resolve: {
+    alias: [
+      {
+        find: '@/',
+        replacement: path.resolve(__dirname, 'src') + '/',
+      }
+    ]
+  }
+})
