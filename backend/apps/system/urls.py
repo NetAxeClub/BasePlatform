@@ -26,5 +26,5 @@ urlpatterns = [
     path('login_log/', LoginLogViewSet.as_view({'get': 'list'})),
     path('login_log/<int:pk>/', LoginLogViewSet.as_view({'get': 'retrieve'})),
     path('dept_lazy_tree/', DeptViewSet.as_view({'get': 'dept_lazy_tree'})),
-    path('plugin_tree/', PluginMange.as_view()),
+    path('plugin_tree/', PluginMange.as_view(), name='plugin_tree'),
 ]

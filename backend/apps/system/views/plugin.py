@@ -1,4 +1,5 @@
 # Create your views here.
+import os
 import json
 from datetime import datetime, date
 from rest_framework.views import APIView
@@ -53,28 +54,37 @@ class PluginMange(APIView):
 
     def post(self, request):
         post_data = request.data
-        if 'add_fsm_platform' in post_data.keys():
-            filename = post_data['add_fsm_platform']
-            with open(BASE_DIR + '/plugins/extensibles/' + filename, "w",
-                      encoding="utf-8") as f:
-                f.write('')
-            data = {
-                "code": 200,
-                "data": 'ok',
-                "msg": "新建配置文件内容成功"
-            }
-            return JsonResponse(data, safe=False)
-        if any(k in post_data for k in ("save_fsm_template", "filename")):
+        if all(k in post_data for k in ("add_fsm_platform", "type")):
+            if post_data['type'] == 'file':
+                filename = post_data['add_fsm_platform']
+                with open(BASE_DIR + '/plugins/extensibles/' + filename, "w",
+                          encoding="utf-8") as f:
+                    f.write('# -*- coding: utf-8 -*-')
+                data = {
+                    "code": 200,
+                    "data": 'ok',
+                    "msg": "新建配置文件内容成功"
+                }
+                return JsonResponse(data, safe=False)
+            else:
+                if not os.path.exists(os.path.join(BASE_DIR, 'plugins/extensibles/{}'.format(post_data['add_fsm_platform']))):
+                    os.makedirs(os.path.join(BASE_DIR, 'plugins/extensibles/{}'.format(post_data['add_fsm_platform'])))
+                data = {
+                    "code": 200,
+                    "data": 'ok',
+                    "msg": "新建目录成功"
+                }
+                return JsonResponse(data, safe=False)
+        if all(k in post_data for k in ("save_fsm_template", "filename")):
             save_fsm_template = post_data['save_fsm_template']
             pep8_content = fix_code(save_fsm_template, options={'aggressive':2})
-            print(commented_out_code_lines(save_fsm_template))
             with open(BASE_DIR + '/plugins/extensibles/' + post_data['filename'], "w",
                       encoding="utf-8") as f:
                 f.write(pep8_content)
             data = {
                 "code": 200,
                 "data": 'ok',
-                "msg": "保存配置文件内容成功"
+                "msg": "保存文件成功"
             }
             return JsonResponse(data, safe=False)
 

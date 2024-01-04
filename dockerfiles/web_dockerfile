@@ -5,7 +5,8 @@ RUN npm config set registry https://registry.npm.taobao.org
 RUN npm install
 COPY web/ .
 #RUN npm run build
-RUN npm run staging
+RUN npm run initproject -- --stage=base-platform --env=production
+RUN npm run build
 
 # production stage
 FROM nginx:1.23.1 as production-stage
