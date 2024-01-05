@@ -15,6 +15,7 @@ dist-ssr
 
 project/
 project-init.ts
+default_menu.json
 
 components.d.ts
 auto-imports.d.ts
