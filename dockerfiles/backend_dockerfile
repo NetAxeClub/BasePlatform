@@ -1,5 +1,5 @@
-FROM node:16.20.0 as build-stage
-WORKDIR /app
+FROM registry.cn-hangzhou.aliyuncs.com/netaxe/base-web:1.0
+WORKDIR /web
 COPY web/src/project/base-platform/default_menu.json /web/default_menu.json
 
 FROM python:3.9.16-slim
