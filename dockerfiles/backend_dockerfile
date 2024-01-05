@@ -1,6 +1,6 @@
 FROM registry.cn-hangzhou.aliyuncs.com/netaxe/base-web:1.0
-WORKDIR /web
-COPY /app/src/project/base-platform/default_menu.json /web/default_menu.json
+WORKDIR /app
+COPY /app/web/src/project/base-platform/default_menu.json /web/default_menu.json
 
 FROM python:3.9.16-slim
 RUN sed -i s@/deb.debian.org/@/mirrors.aliyun.com/@g /etc/apt/sources.list
