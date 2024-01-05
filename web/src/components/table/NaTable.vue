@@ -33,7 +33,8 @@ export type TableColumn = DataTableColumn & {
 }
 
 export type TableParams = {
-  start: number,
+  page: number
+  start: number
   limit: number
 }
 
@@ -171,6 +172,7 @@ const queryList = async () => {
     const params = {
       start: (pagenation.value.page - 1) * pagenation.value.pageSize,
       limit: pagenation.value.pageSize,
+      page: pagenation.value.page,
       ...sorter.value
     }
     loading.value = true

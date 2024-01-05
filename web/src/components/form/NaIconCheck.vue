@@ -37,7 +37,11 @@ import NaIcon from '../NaIcon.vue'
 import { CheckmarkCircle } from '@vicons/ionicons5'
 import {ref, watchEffect, computed} from 'vue'
 import icons from '@/assets/font/icons.json'
-import { EnumsItem } from '@/project/cmdb/enums'
+
+export type EnumsItem = {
+  label: string
+  value: any
+}
 
 const props = defineProps({
   prefix: String,
