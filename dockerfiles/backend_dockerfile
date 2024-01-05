@@ -1,3 +1,7 @@
+FROM node:16.20.0 as build-stage
+WORKDIR /app
+COPY web/src/project/base-platform/default_menu.json /web/default_menu.json
+
 FROM python:3.9.16-slim
 RUN sed -i s@/deb.debian.org/@/mirrors.aliyun.com/@g /etc/apt/sources.list
 RUN set -ex \
@@ -9,7 +13,6 @@ ENV TZ=Asia/Shanghai
 RUN cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 COPY backend/ /app
 COPY config/ /config
-COPY default_menu.json /web/default_menu.json
 # 再次切换工作目录为Django主目录
 WORKDIR /app
 
