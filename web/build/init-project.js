@@ -4,11 +4,13 @@ import yaml from 'js-yaml'
 import minimist from 'minimist'
 import simpleGit from 'simple-git'
 import os from 'os'
+import fse from 'fs-extra'
 
 console.log(os.type)
 const argv = minimist(process.argv.slice(2))
 const stage = argv.stage
 const branch = argv.branch
+const del = argv.del
 const env = argv.env
 if (!stage) {
   throw new Error('请在执行脚本时指定--stage参数')
@@ -47,6 +49,15 @@ export const routes = [
   }
   fs.writeFileSync(path.join(currentDirname, '../proxy.json'), JSON.stringify(jsonObj), {encoding: 'utf8'})
 }
+
+/**
+ * 删除项目目录
+ * @param {string} dir 
+ */
+function _rmProjectDir (dir) {
+  fse.removeSync(dir)
+}
+
 function start () {
   // 读取配置文件
   let gitConfig = {}
@@ -62,6 +73,9 @@ function start () {
   // 从git上拉取代码并创建目录
   const projectInitPath =  path.join(currentDirname, '../src/project-init.ts')
   if (project) {
+    if (del) {
+      _rmProjectDir(path.join(currentDirname, `../src/project/${project.pathname}`))
+    }
     if (fs.existsSync(path.join(currentDirname, `../src/project/${project.pathname}`))) {
       _projectInit(project, projectInitPath)
       console.log(`${project.pathname}已存在\n`)
