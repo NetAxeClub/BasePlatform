@@ -14,12 +14,15 @@ import traceback
 
 from driver.cmdb_import import RestApiDriver
 from apps.automation.models import CollectionPlan
+from apps.asset.models import (NetworkDevice, Vendor, Category, Model, IdcModel, Idc, Role, Rack, Attribute, Framework,
+                               NetZone, AssetIpInfo, AssetAccount)
 from apps.asset.models import (NetworkDevice, Vendor, Category, Model, Idc, AssetIpInfo, AssetAccount)
 from os import getenv
 import logging
 import requests
 import json
 
+log = logging.getLogger(__name__)
 log = logging.getLogger('server')
 
 
@@ -64,11 +67,13 @@ class CmdbImportDriver(RestApiDriver):
         return []
 
     def import_data(self):
+        res = self.do_something('asset_networkdevice/', {'limit': 30000})
         res = self.do_something('asset_networkdevice/', {'limit': 5000})
         sum_count = 0
         fail_count = 0
         for i in res:
             try:
+                # print(i)
                 log.info(i)
                 tmp = {
                     "manage_ip": i['manage_ip'],
@@ -76,6 +81,10 @@ class CmdbImportDriver(RestApiDriver):
                     "name": i.get('name') or '',
                     "soft_version": i.get('soft_version') or '',
                     "patch_version": i.get('patch_version') or '',
+                    "u_location_start": i['u_location_start'],
+                    "u_location_end": i['u_location_end'],
+                    "uptime": i['uptime'],
+                    "expire": i['expire'],
                     "memo": i['memo'],
                     "status": i['status'],
                     "ha_status": i['ha_status'],
@@ -83,6 +92,23 @@ class CmdbImportDriver(RestApiDriver):
                     "slot": i['slot'],
                     "auto_enable": i['auto_enable'],
                 }
+                idc_instance, _ = Idc.objects.get_or_create(name=i['idc_name'])
+                tmp['idc'] = idc_instance
+                if i.get('idc_model_name'):
+                    idc_model_instance, _ = IdcModel.objects.get_or_create(idc=idc_instance, name=i['idc_model_name'])
+                    tmp['idc_model'] = idc_model_instance
+                    if i.get('rack_name'):
+                        rack_instance, _ = Rack.objects.get_or_create(name=i['rack_name'], idc_model=idc_model_instance)
+                        tmp['rack'] = rack_instance
+                vendor_instance, _ = Vendor.objects.get_or_create(name=i['vendor_name'], alias=i['vendor_alias'])
+                tmp['vendor'] = vendor_instance
+                if i.get('model_name'):
+                    model_instance, _ = Model.objects.get_or_create(name=i['model_name'].strip(),
+                                                                    vendor=vendor_instance)
+                    tmp['model'] = model_instance
+                if i.get('role_name'):
+                    role_instance, _ = Role.objects.get_or_create(name=i['role_name'])
+                    tmp['role'] = role_instance
                 idc_name = i['idc_name']
                 model_name = i.get('model_name')
                 idc_instance_query = Idc.objects.filter(name=idc_name)
@@ -108,6 +134,17 @@ class CmdbImportDriver(RestApiDriver):
                     except Exception as e:
                         pass
                 if i.get('category_name'):
+                    category_instance, _ = Category.objects.get_or_create(name=i['category_name'])
+                    tmp['category'] = category_instance
+                if i.get('attribute_name'):
+                    attribute_instance, _ = Attribute.objects.get_or_create(name=i['attribute_name'])
+                    tmp['attribute'] = attribute_instance
+                if i.get('framework_name'):
+                    framework_instance, _ = Framework.objects.get_or_create(name=i['framework_name'])
+                    tmp['framework'] = framework_instance
+                if i.get('netzone_name'):
+                    netzone_instance, _ = NetZone.objects.get_or_create(name=i['netzone_name'])
+                    tmp['zone'] = netzone_instance
                     category_instance_query = Category.objects.filter(name=i['category_name'])
                     if category_instance_query:
                         tmp['category'] = Category.objects.get(name=i['category_name'])
@@ -115,6 +152,7 @@ class CmdbImportDriver(RestApiDriver):
                         tmp['category'] = Category.objects.create(name=i['category_name'])
                 device_quert = NetworkDevice.objects.filter(serial_num=i['serial_num'])
                 if not device_quert:
+                    device_instance, _ = NetworkDevice.objects.create(**tmp)
                     device_instance = NetworkDevice.objects.create(**tmp)
 
                     if i['bind_ip']:
@@ -170,3 +208,4 @@ class CmdbImportDriver(RestApiDriver):
 if __name__ == '__main__':
     pass
     #  不允许直接运行，或者写任何调用的方法
+
