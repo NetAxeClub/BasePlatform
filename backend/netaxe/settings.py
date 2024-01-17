@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     "django_celery_beat",
     "django_celery_results.apps.CeleryResultConfig",
     "rest_framework",
+    'django_filters',
     "simple_history",
     "apps.users.apps.UsersConfig",
     "apps.system.apps.SystemConfig",
@@ -59,8 +60,6 @@ INSTALLED_APPS = [
     "apps.int_utilization.apps.IntUtilizationConfig",
     # 'reversion',
     'import_export',
-    'django_filters',
-
 ]
 
 DATABASES = {
@@ -330,13 +329,15 @@ CELERY_TIMEZONE = "Asia/Shanghai"  # celery 时区问题
 CELERY_TASK_TRACK_STARTED = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.0/howto/static-files/
+# STATIC_ROOT=os.path.join(BASE_DIR, "static") #正确
+
+
+STATIC_URL = '/static/'
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, "static")
+    os.path.join(BASE_DIR, 'static')
 ]
 
-STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "/static/")
-# STATIC_ROOT = "static/"
 
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 MEDIA_URL = "/media/"

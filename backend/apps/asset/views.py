@@ -272,7 +272,6 @@ class CmdbRackModelViewSet(CustomViewBase):
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filter_fields = '__all__'
 
-
 class CmdbIdcModelViewSet(CustomViewBase):
     """
     处理  GET POST , 处理 /api/post/<pk>/ GET PUT PATCH DELETE
@@ -280,12 +279,13 @@ class CmdbIdcModelViewSet(CustomViewBase):
     queryset = IdcModel.objects.all().order_by('id')
     queryset = IdcModelSerializer.setup_eager_loading(queryset)
     serializer_class = IdcModelSerializer
-    # permission_classes = (permissions.IsAuthenticated,)
-    permission_classes = ()
-    pagination_class = LargeResultsSetPagination
-    # 配置搜索功能
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
-    filter_fields = '__all__'
+    # permission_classes = (permissions.IsAuthenticated,)
+    # permission_classes = ()
+    pagination_class = LargeResultsSetPagination
+    # filterset_class = CmdbIdcModelFilter
+    # 配置搜索功能
+    filter_fields = ('id', 'name', 'idc')
 
 
 # asset account

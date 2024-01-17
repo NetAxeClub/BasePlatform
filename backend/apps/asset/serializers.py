@@ -170,8 +170,13 @@ class NetworkDeviceSerializer(serializers.ModelSerializer):
     idc_name = serializers.CharField(source='idc.name', read_only=True)
     nvwa_idc_name = serializers.CharField(source='idc.nvwa_name', read_only=True)
     vendor_name = serializers.CharField(source='vendor.name', read_only=True)
+    rack_name = serializers.CharField(source='rack.name', read_only=True)
+    role_name = serializers.CharField(source='role.name', read_only=True)
+    netzone_name = serializers.CharField(source='zone.name', read_only=True)
+    idc_model_name = serializers.CharField(source='idc_model.name', read_only=True)
     vendor_alias = serializers.CharField(source='vendor.alias', read_only=True)
     category_name = serializers.CharField(source='category.name', read_only=True)
+    framework_name = serializers.CharField(source='framework.name', read_only=True)
     model_name = serializers.CharField(source='model.name', read_only=True)
     bind_ip = serializers.StringRelatedField(many=True, read_only=True)
     # 针对choices的处理

@@ -22,7 +22,7 @@ import logging
 import requests
 import json
 
-log = logging.getLogger(__name__)
+# log = logging.getLogger(__name__)
 log = logging.getLogger('server')
 
 
