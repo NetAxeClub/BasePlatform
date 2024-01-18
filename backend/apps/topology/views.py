@@ -82,9 +82,7 @@ class TopologyShow(APIView):
         return JsonResponse(data)
 
     def post(self, request):
-        # post_param = request.body
         post_param = request.data
-        print(post_param, type(post_param))
         # 保存拓扑图
         if all(k in post_param for k in ("name", "graph")):
             _TopologyTask = TopologyTask(post_param['name'])
