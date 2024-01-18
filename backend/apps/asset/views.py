@@ -97,7 +97,7 @@ class ResourceManageExcelView(APIView):
 
 class DeviceAccountView(APIView):
     def post(self, request):
-        post_params = request.POST.dict()
+        post_params = request.data
         device = NetworkDevice.objects.get(id=post_params['asset_id'])
         account_list = json.loads(post_params['account'])
         device.account.set(account_list)

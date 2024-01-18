@@ -281,7 +281,7 @@ class MongoNetOps(object):
         return []
 
     @staticmethod
-    def topology_ops(**data):
+    def topology_ops(data):
         _query = topology_mongo.find(query_dict={'name': data['name']}, fileds={'_id': 0})
         if _query:
             topology_mongo.delete_many(query={'name': data['name']})

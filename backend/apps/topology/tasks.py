@@ -51,7 +51,7 @@ class TopologyTask:
 
     # 保存拓扑
     def save_graph(self, obj):
-        MongoNetOps.topology_ops(**obj)
+        MongoNetOps.topology_ops(obj)
 
     # 根据设备IP和接口返回接口速率
     def foo_speed(self, hostip, interface_name):

@@ -67,7 +67,7 @@ class CmdbImportDriver(RestApiDriver):
         return []
 
     def import_data(self):
-        res = self.do_something('asset_networkdevice/', {'limit': 30000})
+        # res = self.do_something('asset_networkdevice/', {'limit': 30000})
         res = self.do_something('asset_networkdevice/', {'limit': 5000})
         sum_count = 0
         fail_count = 0
@@ -154,46 +154,47 @@ class CmdbImportDriver(RestApiDriver):
                 if not device_quert:
                     device_instance, _ = NetworkDevice.objects.create(**tmp)
                     device_instance = NetworkDevice.objects.create(**tmp)
-
-                    if i['bind_ip']:
-                        for _sub in i['bind_ip']:
-                            _name, _ip = _sub.split('-')
-                            bind_ip_data = {
-                                "name": _name,
-                                "ipaddr": _ip,
-                                "device": device_instance,
-                            }
-                            AssetIpInfo.objects.get_or_create(defaults=bind_ip_data, **bind_ip_data)
-                    if i.get('plan_name'):
-                        plan_instance, _ = CollectionPlan.objects.get_or_create(name=i['plan_name'])
-                        device_instance.plan = plan_instance
-                    # 账户关联
-                    if i.get('adpp_device'):
-                        _account_device = self.do_something(url=self.asset_account_url, params={'asset': i['id']})
-                        # print(_account_device)
-                        account_list = []
-                        for _sub_account_device in _account_device:
-                            _account = self.do_something(
-                                url="{}{}/".format(self.account_url, _sub_account_device['account']), params={})
-                            _protocol = self.do_something(
-                                url="{}{}/".format(self.protocol_url, _sub_account_device['protocol_port']), params={})
-                            _account_tmp = {
-                                'name': "{}-{}-{}".format(_account['name'], _protocol['protocol'], _protocol['port']),
-                                'username': _account['username'],
-                                'password': _account['password'],
-                                'en_pwd': _account['en_pwd'],
-                                'protocol': _protocol['protocol'],
-                                'port': _protocol['port'],
-                            }
-                            account_instance, _ = AssetAccount.objects.get_or_create(**_account_tmp)
-                            # account_instance, _ = AssetAccount.objects.get(**_account_tmp)
-                            account_list.append(account_instance)
-                        if account_list:
-                            device_instance.account.set(account_list)
-                            log.info("关联设备账户")
-                    device_instance.save()
-                    sum_count += 1
-                    log.info(sum_count)
+                else:
+                    device_instance = NetworkDevice.objects.get(serial_num=i['serial_num'])
+                if i['bind_ip']:
+                    for _sub in i['bind_ip']:
+                        _name, _ip = _sub.split('-')
+                        bind_ip_data = {
+                            "name": _name,
+                            "ipaddr": _ip,
+                            "device": device_instance,
+                        }
+                        AssetIpInfo.objects.get_or_create(defaults=bind_ip_data, **bind_ip_data)
+                if i.get('plan_name'):
+                    plan_instance, _ = CollectionPlan.objects.get_or_create(name=i['plan_name'])
+                    device_instance.plan = plan_instance
+                # 账户关联
+                if i.get('adpp_device'):
+                    _account_device = self.do_something(url=self.asset_account_url, params={'asset': i['id']})
+                    # print(_account_device)
+                    account_list = []
+                    for _sub_account_device in _account_device:
+                        _account = self.do_something(
+                            url="{}{}/".format(self.account_url, _sub_account_device['account']), params={})
+                        _protocol = self.do_something(
+                            url="{}{}/".format(self.protocol_url, _sub_account_device['protocol_port']), params={})
+                        _account_tmp = {
+                            'name': "{}-{}-{}".format(_account['name'], _protocol['protocol'], _protocol['port']),
+                            'username': _account['username'],
+                            'password': _account['password'],
+                            'en_pwd': _account['en_pwd'],
+                            'protocol': _protocol['protocol'],
+                            'port': _protocol['port'],
+                        }
+                        account_instance, _ = AssetAccount.objects.get_or_create(**_account_tmp)
+                        # account_instance, _ = AssetAccount.objects.get(**_account_tmp)
+                        account_list.append(account_instance)
+                    if account_list:
+                        device_instance.account.set(account_list)
+                        log.info("关联设备账户")
+                device_instance.save()
+                sum_count += 1
+                log.info(sum_count)
                 sum_count += 1
             except Exception as e:
                 log.error(str(e))
@@ -203,6 +204,23 @@ class CmdbImportDriver(RestApiDriver):
         print("同步结束")
         print(sum_count)
         print(fail_count)
+
+    def import_account(self):
+        res = self.do_something('cmdb_account/', {'limit': 5000})
+        for i in res:
+            tmp = {
+                "name": i['name'],
+                "username": i['username'],
+                "password": i['password'],
+                "role": i['role'],
+                "en_pwd": i['en_pwd'],
+                "protocol": "ssh",
+                "port": "22",
+            }
+            account_instance_query = AssetAccount.objects.filter(name=i['name'])
+            if not account_instance_query:
+                AssetAccount.objects.create(**tmp)
+
 
 
 if __name__ == '__main__':

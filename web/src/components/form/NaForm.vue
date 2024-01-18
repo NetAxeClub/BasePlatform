@@ -14,6 +14,7 @@
           :span="computedSpan"
           :label="option.label"
           v-if="showFormItem(option)"
+          :path="option.path"
         >
         <component 
           :is="getComponent(option)" 

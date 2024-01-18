@@ -84,17 +84,15 @@ class TopologyShow(APIView):
     def post(self, request):
         # post_param = request.body
         post_param = request.data
-        # print(post_param, type(post_param))
+        print(post_param, type(post_param))
         # 保存拓扑图
         if all(k in post_param for k in ("name", "graph")):
             _TopologyTask = TopologyTask(post_param['name'])
-            graph_data = post_param['graph']
             # 只有link 连线需要重写source 和 target ，d3.js会把source和target改成对应node的字典格式, 默认给到前端是字符串格式的设备ID
-            for i in graph_data['links']:
+            for i in post_param['graph']['links']:
                 i['target'] = i['target']['id']
                 i['source'] = i['source']['id']
-            _TopologyTask.save_graph(graph_data)
-            MongoNetOps.topology_ops(**graph_data)
+            _TopologyTask.save_graph(post_param)
             data = {
                 "code": 200,
                 "data": [],
