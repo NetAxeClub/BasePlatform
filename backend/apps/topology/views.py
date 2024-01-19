@@ -60,7 +60,7 @@ class TopologyShow(APIView):
         if get_param.get('graph'):
             content = MongoNetOps.get_topology(get_param['graph'])
             if content:
-                return JsonResponse(dict(code=200, data=content, msg='获取拓扑数据成功'), content_type="application/json",
+                return JsonResponse(dict(code=200, data=content['graph'], msg='获取拓扑数据成功'), content_type="application/json",
                                     safe=False)
             else:
                 return JsonResponse(dict(code=400, msg='没有拓扑数据'), content_type="application/json", safe=False)
@@ -87,9 +87,9 @@ class TopologyShow(APIView):
         if all(k in post_param for k in ("name", "graph")):
             _TopologyTask = TopologyTask(post_param['name'])
             # 只有link 连线需要重写source 和 target ，d3.js会把source和target改成对应node的字典格式, 默认给到前端是字符串格式的设备ID
-            for i in post_param['graph']['links']:
-                i['target'] = i['target']['id']
-                i['source'] = i['source']['id']
+            # for i in post_param['graph']['links']:
+            #     i['target'] = i['target']['name']
+            #     i['source'] = i['source']['name']
             _TopologyTask.save_graph(post_param)
             data = {
                 "code": 200,
