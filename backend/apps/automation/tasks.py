@@ -19,7 +19,7 @@ import re
 import asyncio
 import time
 import traceback
-
+import ipaddr as IPaddr
 import netaddr
 from celery import shared_task
 from netaxe.celery import AxeTask
@@ -42,7 +42,8 @@ from apps.automation.tools.centec import CentecProc
 from apps.automation.tools.model_api import get_device_info_v2
 from utils.connect_layer.auto_main import HuaweiS, HillstoneFsm
 from utils.db.mongo_ops import MongoOps, MongoNetOps, XunMiOps
-import ipaddr as IPaddr
+from driver import discovered_plugins
+
 
 logger = logging.getLogger('automation')
 
@@ -182,7 +183,7 @@ class InterfaceFormat(object):
         value = str(value) + sizes[c]
         return value.strip()
 
-
+# 接口利用率计算
 @shared_task(base=AxeTask)
 def interface_used(device_ip=None):
     connections.close_all()

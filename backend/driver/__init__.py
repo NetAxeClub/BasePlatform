@@ -18,7 +18,7 @@ discovered_plugins = {
 from driver import discovered_plugins
 def caller(args, func):
     func(args)
-caller(('abc'), eval("discovered_plugins['plugins.extensibles.reader_SG'].reader_SG"))
+caller(('abc'), eval("discovered_plugins['plugins.extensibles.xunmi'].reader_SG"))
 """
 
 __all__ = ['driver_map', 'auto_driver_map', 'discovered_plugins']
