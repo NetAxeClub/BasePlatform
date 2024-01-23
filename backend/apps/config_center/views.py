@@ -162,7 +162,7 @@ class GitConfig(APIView):
             }
             return JsonResponse(data, safe=False)
         if all(k in get_param for k in ("file", "from_commit", "to_commit")):
-            res = _ConfigGit.get_commit_by_file(**get_param)
+            res = _ConfigGit.get_commit_by_file_new(**get_param)
             data = {
                 "code": 200,
                 "data": [res],

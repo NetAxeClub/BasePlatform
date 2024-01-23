@@ -19,7 +19,7 @@ except:
 
 class ConfigGit:
     def __init__(self):
-        self.repo = Repo(path=repo_path)
+        self.repo = repo
 
     # 获取所有的提交
     def get_commit(self, commit=None):
@@ -49,10 +49,6 @@ class ConfigGit:
         file = kwargs['file']
         from_commit = kwargs['from_commit']
         to_commit = kwargs['to_commit']
-        # commits_list = list(repo.iter_commits())
-        # b_commit = commits_list[1]
-        # res = repo.git.diff(a_commit, b_commit, 'git_proc.py')
-        # print(res)
         result = {
             'new_str': '无变更',
             'old_str': '无变更'
@@ -67,6 +63,19 @@ class ConfigGit:
                     result['deleted_lines'] = m.deleted_lines
                     return result
         return result
+
+    def get_commit_by_file_new(self, **kwargs):
+        file_path = kwargs['file']
+        from_commit = repo.commit(kwargs['from_commit'])
+        to_commit = repo.commit(kwargs['to_commit'])
+        from_blob = from_commit.tree / file_path
+        to_blob = to_commit.tree / file_path
+        result = {
+            'new_str': to_blob.data_stream.read().decode('utf-8'),
+            'old_str': from_blob.data_stream.read().decode('utf-8')
+        }
+        return result
+
 
     # 获取单个commit包含的变更文件
     def get_commit_detail(self, commit):
@@ -123,3 +132,11 @@ def push_file():
     return '', '', ''
 
 
+def test():
+    commit1 = repo.commit('7c71676e4260f4ff800a75abcfac75bf3277f4c')
+    commit2 = repo.commit('e3d6cfd54990921b23ad88803105302b629a7228')
+
+    diff = commit1.diff(commit2)
+    for change in diff.iter_change_type('T'):
+        if change.a_path == '/path/to/your/file':
+            print(change.diff)
