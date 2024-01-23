@@ -34,15 +34,16 @@ const initApp = () => {
   return app
 }
 
-if (window.__POWERED_BY_WUJIE__) {
-  let instance:any
-  window.__WUJIE_MOUNT = () => {
-    instance = initApp()
-  }
-  window.__WUJIE_UNMOUNT = () => {
-    instance.unmount()
-  }
-} else {
-  initApp()
-}
+// if (window.__POWERED_BY_WUJIE__) {
+//   let instance:any
+//   window.__WUJIE_MOUNT = () => {
+//     instance = initApp()
+//   }
+//   window.__WUJIE_UNMOUNT = () => {
+//     instance.unmount()
+//   }
+// } else {
+//   initApp()
+// }
+initApp()
 
