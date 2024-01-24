@@ -36,7 +36,7 @@ class BaseTree:
                 self.key += 1
                 sub_data = {
                     'id': self.key,
-                    'key': data['key'] + cp.name,
+                    'key': data['key'] + '/' + cp.name,
                     'label': cp.name,
                 }
                 data['children'].append(sub_data)

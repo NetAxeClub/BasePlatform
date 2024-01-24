@@ -1,8 +1,8 @@
 FROM node:16.20.0 as build-stage
 WORKDIR /app
 COPY web/ .
-# RUN rm -rf package-lock.json
 RUN npm config set registry https://registry.npm.taobao.org
+RUN rm -rf node_modules
 RUN npm install
 RUN npm run initproject -- --stage=base-platform --del=true
 RUN npm run build
