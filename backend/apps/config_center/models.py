@@ -14,11 +14,6 @@ class SupportVendor:
 # 配置合规表
 class ConfigCompliance(models.Model):
     """配置合规"""
-    VENDOR_CHOICES = (
-        ('H3C', 'H3C'),
-        ('Huawei', 'Huawei'),
-        ('Cisco', 'Cisco')
-    )
     CATEGORY_CHOICES = (
         ('switch', 'switch'),
         ('firewall', 'firewall'),
@@ -31,7 +26,7 @@ class ConfigCompliance(models.Model):
         # ('mismatch-non-compliance', 'mismatch-non-compliance'),  # 不匹配-不合规
     )
     name = models.CharField(verbose_name='名称', max_length=50, null=False, unique=True)
-    vendor = models.CharField(verbose_name='厂商', choices=VENDOR_CHOICES, max_length=50, default='H3C')
+    vendor = models.CharField(verbose_name='厂商', choices=SupportVendor.CHOICES, max_length=50, default='H3C')
     category = models.CharField(verbose_name='类型', choices=CATEGORY_CHOICES, max_length=50, default='交换机')
     pattern = models.CharField(verbose_name='模式', choices=MATCH_CHOICES, max_length=50, default='match-compliance')
     regex = models.TextField(verbose_name='表达式', null=False, default='', blank=False)
