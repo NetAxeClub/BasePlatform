@@ -1,4 +1,5 @@
 import os
+import re
 from typing import List
 from nornir import InitNornir
 from nornir.core.task import Result
@@ -14,6 +15,21 @@ from utils.cmdb_inventory import CMDBInventory
 InventoryPluginRegister.register("cmdb_inventory", CMDBInventory)
 
 BACKUP_PATH = BASE_DIR + '/media/device_config/current-configuration'
+
+
+def config_ignore(vendor, filename):
+    final_lines = []
+    # 读取配置文件
+    with open(filename, 'r') as f:
+        lines = f.readlines()
+    for line in lines:
+        # 定义要匹配的日期时间模式
+        pattern = r'!Last\sconfiguration\swas\ssaved\sat.*'
+        # 使用正则表达式替换匹配的字符串
+        final_lines.append(re.sub(pattern, '', line))
+    # 写回配置文件
+    with open('config.txt', 'w') as f:
+        f.writelines(final_lines)
 
 
 # 配置备份

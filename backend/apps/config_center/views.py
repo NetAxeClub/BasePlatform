@@ -34,6 +34,7 @@ def is_safe_dict(data: dict) -> bool:
 
     return True
 
+
 def jinja_render(data, template):
     """ Render a jinja template
     """
@@ -50,7 +51,6 @@ def jinja_render(data, template):
 
         return True, rendered_jinja2_tpl
     return False, "安全校验失败"
-
 
 
 # 配置合规表
@@ -169,8 +169,18 @@ class GitConfig(APIView):
                 "msg": "获取文件变更详情成功"
             }
             return JsonResponse(data, safe=False)
+        # 获取单个文件指定commit下的变更信息
         if all(k in get_param for k in ("file", "single_commit")):
-            res = _ConfigGit.get_commit_by_filename(get_param['single_commit'], get_param['file'])
+            res = _ConfigGit.get_commit_modified_by_filename(get_param['single_commit'], get_param['file'])
+            data = {
+                "code": 200,
+                "data": [res],
+                "msg": "获取文件变更详情成功"
+            }
+            return JsonResponse(data, safe=False)
+        # 获取单个文件指定commit下的原始文件内容
+        if all(k in get_param for k in ("file", "single_commit_real_content")):
+            res = _ConfigGit.get_commit_file_content(get_param['single_commit_real_content'], get_param['file'])
             data = {
                 "code": 200,
                 "data": [res],
