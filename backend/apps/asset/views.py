@@ -246,14 +246,13 @@ class CmdbNetzoneModelViewSet(CustomViewBase):
     """
     处理  GET POST , 处理 /api/post/<pk>/ GET PUT PATCH DELETE
     """
-    queryset = NetZone.objects.all().order_by('-id')
+    queryset = NetZone.objects.all().order_by('id')
     serializer_class = NetZoneSerializer
-    permission_classes = ()
-    authentication_classes = ()
-    pagination_class = LargeResultsSetPagination
     # 配置搜索功能
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    # 如果要允许对某些字段进行过滤，可以使用filter_fields属性。
     filter_fields = '__all__'
+    pagination_class = LargeResultsSetPagination
     # 设置搜索的关键字
     search_fields = '__all__'
 
@@ -271,6 +270,7 @@ class CmdbRackModelViewSet(CustomViewBase):
     # 配置搜索功能
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filter_fields = '__all__'
+
 
 class CmdbIdcModelViewSet(CustomViewBase):
     """
@@ -347,7 +347,6 @@ class VendorViewSet(CustomViewBase):
     """
     queryset = Vendor.objects.all().order_by('id')
     serializer_class = AssetVendorSerializer
-    permission_classes = ()
     # 配置搜索功能
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     # 如果要允许对某些字段进行过滤，可以使用filter_fields属性。
