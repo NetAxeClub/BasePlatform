@@ -709,10 +709,6 @@ class MainIn:
             else:
                 hostname = hostinfo[0]['name']
             memberport_list = memberport.split(',') if memberport.find(',') != -1 else [memberport]
-            plugin = discovered_plugins.get('plugins.extensibles.xunmi')
-            if plugin is not None:
-                methods = sorted([x for x in plugin.__dir__() if not x.startswith('__')])
-
             mongo_data = {
                 'log_time': log_time,
                 'node_hostname': hostname if len(hostinfo) > 0 else '',
@@ -721,9 +717,20 @@ class MainIn:
                 'serial_num': hostinfo[0]['serial_num'],
                 'node_interface': memberport,
                 'memberport': memberport_list,
-                'server_ip_address': str(ip_address),
+                'server_ip_address': ip_address,
                 'server_mac_address': macaddress,
             }
+            plugin = discovered_plugins.get('plugins.extensibles.xunmi')
+            if plugin is not None:
+                methods = sorted([x for x in plugin.__all__])
+                for method in methods:
+                    if callable(eval("discovered_plugins.get('plugins.extensibles.xunmi').{}".format(method))):
+                        flag, res = eval(
+                            "discovered_plugins.get('plugins.extensibles.xunmi').{}".format(method))(
+                            **dict(ip_address=ip_address, hostip=hostip))
+                        if flag:
+                            mongo_data.update(res)
+                            break
             XunMiOps.xunmi_ops(**mongo_data)
         return
 
