@@ -725,12 +725,15 @@ class MainIn:
                 methods = sorted([x for x in plugin.__all__])
                 for method in methods:
                     if callable(eval("discovered_plugins.get('plugins.extensibles.xunmi').{}".format(method))):
-                        flag, res = eval(
-                            "discovered_plugins.get('plugins.extensibles.xunmi').{}".format(method))(
-                            **dict(ip_address=ip_address, hostip=hostip))
-                        if flag:
-                            mongo_data.update(res)
-                            break
+                        try:
+                            flag, res = eval(
+                                "discovered_plugins.get('plugins.extensibles.xunmi').{}".format(method))(
+                                **dict(ip_address=ip_address, hostip=hostip))
+                            if flag:
+                                mongo_data.update(res)
+                                break
+                        except Exception as e:
+                            logger.exception(e)
             XunMiOps.xunmi_ops(**mongo_data)
         return
 
