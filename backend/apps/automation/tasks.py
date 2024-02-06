@@ -1174,6 +1174,7 @@ async def tracking_sub(*args):
 @shared_task(base=AxeTask, once={'graceful': True})
 def tracking_main():
     connections.close_all()
+    start_time = time.time()
     # 重建寻觅表索引
     try:
         XunMiOps.xunmi_reindex()
@@ -1188,6 +1189,8 @@ def tracking_main():
     send_message = "【自动化】地址定位任务下发完成：\n总数量：{}个" \
         .format(len(total_ip_res))
     logger.info(send_message)
+    end_time = time.time()
+    print("time :", int(end_time - start_time))
     # #send_msg_netops'step3:' + send_message)
 
 
