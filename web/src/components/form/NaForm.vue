@@ -13,6 +13,7 @@
           :key="index"
           :span="computedSpan"
           :label="option.label"
+          :label-width="option.labelWidth"
           v-if="showFormItem(option)"
           :path="option.path"
         >
@@ -61,6 +62,7 @@ export type FormOptionItem = {
   /**type不存在时 此方法必须*/
   render?: Func
   bind: any
+  labelWidth?: string | number
 }
 type Props = {
   model: any

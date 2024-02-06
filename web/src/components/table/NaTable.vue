@@ -29,7 +29,7 @@ import NaLoading from '../NaLoading.vue'
 export type TableColumn = DataTableColumn & {
   checked?: boolean
   key?: number | string
-  disabled?: boolean
+  _disabled?: boolean
 }
 
 export type TableParams = {
