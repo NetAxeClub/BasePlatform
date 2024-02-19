@@ -22,7 +22,7 @@
               <div class="checkbox-wrap">
                 <n-checkbox
                   v-model:checked="element.checked"
-                  :disabled="!element.key || element.disabled"
+                  :disabled="!element.key || element._disabled"
                   :label="element.prop"
                   @update:checked="onChange"
                 >
@@ -96,7 +96,7 @@ const checkedEmit = () => {
 const onAllChange = (val:boolean) => {
   let len = 0
   opts.value.forEach(el => {
-    if (el.key && !el.disabled) {
+    if (el.key && !el._disabled) {
       el.checked = val
       len++
     }

@@ -58,3 +58,28 @@ project:
         VITE_LOCAL_ROUTER: false
         VITE_BASIC_URL:
         VITE_RBAC_URL:
+
+  - pathname: msggateway
+    url: https://gitee.com/NetAxeClub/msggateway-fronted.git
+    branch: master
+    username:
+    password:
+    # 是否初始化前端项目初始化文件
+    #uninit: false
+    port: 32201
+    # 前端代理配置相关配置
+    proxy: # 代理
+      /msg_gateway: # 需代理的前缀
+        target: http://127.0.0.1:31101/
+      /rbac:
+        target: http://127.0.0.1:31101/
+    env: production
+    envConfig:
+      development:
+        VITE_LOCAL_ROUTER: true
+        VITE_BASIC_URL:
+        VITE_RBAC_URL:
+      production:
+        VITE_LOCAL_ROUTER: true
+        VITE_BASIC_URL:
+        VITE_RBAC_URL:
