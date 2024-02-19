@@ -69,7 +69,7 @@ prometheus-client==0.17.0
 motor~=3.1.2
 pydantic==1.10.8
 gunicorn==20.1.0
-uwsgi==2.0.21
+uwsgi==2.0.24
 daphne==2.3.0
 schedule==1.2.0
 drf-spectacular==0.26.2

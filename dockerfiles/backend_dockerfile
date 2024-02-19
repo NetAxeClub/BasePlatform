@@ -3,7 +3,8 @@ RUN sed -i s@/deb.debian.org/@/mirrors.aliyun.com/@g /etc/apt/sources.list
 RUN set -ex \
   &&apt-get update\
   &&apt-get install gcc -y\
-  &&apt-get install git curl -y
+  &&apt-get install git curl -y \
+  &&apt-get install build-essential python-dev -y
 # 设定时区
 ENV TZ=Asia/Shanghai
 RUN cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
