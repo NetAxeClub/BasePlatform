@@ -228,6 +228,15 @@ LOGGING = {
             "formatter": "standard",
             "encoding": "utf-8",
         },
+        "middleware": {
+            "level": "DEBUG",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": os.path.join(BASE_DIR, "logs", "middleware.log"),
+            "maxBytes": 1024 * 1024 * 10,  # 10 MB
+            "backupCount": 3,  # 最多备份3个
+            "formatter": "standard",
+            "encoding": "utf-8",
+        },
         "automation": {
             "level": "DEBUG",
             "class": "logging.handlers.RotatingFileHandler",
@@ -253,6 +262,10 @@ LOGGING = {
         },
         "server": {
             "handlers": ["server"],
+            "level": "DEBUG",
+        },
+        "custom_middleware": {
+            "handlers": ["middleware", "console"],
             "level": "DEBUG",
         },
         "websocket": {
@@ -376,14 +389,14 @@ REST_FRAMEWORK = {
         # "rest_framework.permissions.DjangoModelPermissions",
         # "rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly"
     ),
-    # "DEFAULT_AUTHENTICATION_CLASSES": (
-    #     # "utils.authentication.auth.CustomJWTAuthentication"
-    #     # "rest_framework.authentication.BasicAuthentication",
-    #     # "rest_framework.authentication.SessionAuthentication",
-    #     # "rest_framework.authentication.TokenAuthentication",
-    #     # "rest_framework_simplejwt.authentication.JWTAuthentication",
-    #     # "apps.api.authentication.ExpiringTokenAuthentication",
-    # ),
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        # "utils.authentication.auth.CustomJWTAuthentication"
+        # "rest_framework.authentication.BasicAuthentication",
+        # "rest_framework.authentication.SessionAuthentication",
+        # "rest_framework.authentication.TokenAuthentication",
+        # "rest_framework_simplejwt.authentication.JWTAuthentication",
+        # "apps.api.authentication.ExpiringTokenAuthentication",
+    ),
     "EXCEPTION_HANDLER": "utils.custom.exception.CustomExceptionHandler",  # 自定义的异常处理
     # "EXCEPTION_HANDLER": "apps.api.tools.custom_exception.custom_exception_handler", # 自定义的异常处理
     # 下面控制分页

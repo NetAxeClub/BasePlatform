@@ -22,7 +22,7 @@ application = ProtocolTypeRouter({
             [
                 re_path(r'base_platform/ws/ssh/([0-9]+)/', WebSSHConsumer),
                 re_path(r'base_platform/ws/server_ssh/([0-9]+)/', SSHConsumer),
-                re_path(r'ws/ssh/([0-9]+)/', WebSSHConsumer),
+                # re_path(r'ws/ssh/([0-9]+)/', WebSSHConsumer),
                 # path('ws/ssh/1/', WebSshConsumer),
             ]
         ),

@@ -15,8 +15,7 @@ from rest_framework import serializers
 
 from apps.asset.models import (
     Idc, NetZone, Role, IdcModel, Rack, Vendor, Category, Model, AdminRecord,
-    Attribute, Framework, AssetIpInfo, AssetAccount, NetworkDevice, Server, ServerModel, ContainerService, ServerVendor,
-    ServerAccount)
+    Attribute, Framework, AssetIpInfo, AssetAccount, NetworkDevice, Server, ServerModel, ContainerService, ServerVendor)
 
 
 # 机房
@@ -30,16 +29,6 @@ class IdcSerializer(serializers.ModelSerializer):
 class AssetAccountSerializer(serializers.ModelSerializer):  # 指定ModelSerializer序列化model层
     class Meta:
         model = AssetAccount  # 指定要序列化的模型
-        # 指定要序列化的字段
-        fields = '__all__'
-
-
-class ServerAccountSerializer(serializers.ModelSerializer):  # 指定ModelSerializer序列化model层
-    server_name = serializers.CharField(source='server.name', read_only=True)
-    account_name = serializers.CharField(source='account.name', read_only=True)
-
-    class Meta:
-        model = ServerAccount  # 指定要序列化的模型
         # 指定要序列化的字段
         fields = '__all__'
 
@@ -144,6 +133,14 @@ class IdcModelSerializer(serializers.ModelSerializer):
 
 # 网络设备绑定IP信息
 class AssetIpInfoSerializer(serializers.ModelSerializer):
+    @staticmethod
+    def setup_eager_loading(queryset):
+        """ Perform necessary eager loading of data. """
+
+        queryset = queryset.select_related('device')
+
+        return queryset
+
     class Meta:
         model = AssetIpInfo
         fields = '__all__'
@@ -164,6 +161,23 @@ class OrgField(serializers.StringRelatedField):
             raise serializers.ValidationError("org with name: %s not found" % value)
 
 
+class AccountField(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    name = serializers.CharField(max_length=50)
+    username = serializers.CharField(max_length=50)
+    protocol = serializers.CharField(max_length=20)
+    port = serializers.IntegerField()
+    role = serializers.CharField(max_length=20)
+    role_name = serializers.CharField(source='get_role_display', read_only=True)
+
+    # def to_internal_value(self, value):
+    #     value = json.loads(value)
+    #     if isinstance(value, list):
+    #         return value
+    #     else:
+    #         raise serializers.ValidationError("account id with name: %s not found" % value)
+
+
 # 网络设备
 class NetworkDeviceSerializer(serializers.ModelSerializer):
     plan_name = serializers.CharField(source='plan.name', read_only=True)
@@ -182,6 +196,7 @@ class NetworkDeviceSerializer(serializers.ModelSerializer):
     # 针对choices的处理
     status_name = serializers.CharField(source='get_status_display', read_only=True)
     ha_status_name = serializers.CharField(source='get_ha_status_display', read_only=True)
+    account = AccountField(many=True, read_only=True)
 
     class Meta:
         model = NetworkDevice
@@ -203,22 +218,20 @@ class NetworkDeviceSerializer(serializers.ModelSerializer):
     #     """
     #     重写 create
     #     """
-    #     # print(validated_data)
-    #     org = validated_data.get('org')
-    #     account = validated_data.get('account')
-    #     # print(bgbu[0], type(bgbu[0]))
-    #     validated_data.pop('org')
-    #     validated_data.pop('account')
+    #     # account = validated_data.get('account')
+    #     account = self.initial_data['account']
     #     instance = NetworkDevice.objects.create(**validated_data)
-    #     if org:
-    #         if isinstance(org[0], list) and instance:
-    #             dev_obj = NetworkDevice.objects.get(id=instance.id)
-    #             dev_obj.bgbu.set(org[0])
     #     if account:
     #         if isinstance(account[0], list) and instance:
-    #             dev_obj = NetworkDevice.objects.get(id=instance.id)
-    #             dev_obj.bgbu.set(account[0])
+    #             instance.account.set(account[0])
     #     return instance
+
+    def update(self, instance, validated_data):
+        account = self.initial_data['account']
+        if account:
+            account = json.loads(account)
+            instance.account.set(account)
+        return super().update(instance, validated_data)
 
 
 # 服务器序列化
@@ -230,7 +243,7 @@ class ServerSerializer(serializers.ModelSerializer):
     idc_model_name = serializers.CharField(source='idc_model.name', read_only=True)
     model_name = serializers.CharField(source='model.name', read_only=True)
     hosted_on_ip = serializers.CharField(source='hosted_on.manage_ip', read_only=True)
-    to_account = serializers.StringRelatedField(many=True, read_only=True)
+    account = AccountField(many=True, read_only=True)
     server_bind_ip = serializers.StringRelatedField(many=True, read_only=True)
     # 针对choices的处理
     status_name = serializers.CharField(source='get_status_display', read_only=True)
@@ -239,6 +252,13 @@ class ServerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Server
         fields = '__all__'
+
+    def update(self, instance, validated_data):
+        account = self.initial_data['account']
+        if account:
+            account = json.loads(account)
+            instance.account.set(account)
+        return super().update(instance, validated_data)
 
     @staticmethod
     def setup_eager_loading(queryset):
@@ -253,7 +273,7 @@ class ServerSerializer(serializers.ModelSerializer):
         # prefetch_related for "to-many" relationships
         # queryset = queryset.select_related('adpp_device')
         queryset = queryset.prefetch_related(
-            'to_account', 'server_bind_ip', 'service_on_server')
+            'account', 'server_bind_ip', 'service_on_server')
         #
         # # Prefetch for subsets of relationships
         # queryset = queryset.prefetch_related(
@@ -288,13 +308,6 @@ class ContainerServiceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ContainerService
-        fields = '__all__'
-
-
-# 2.0服务器供应商
-class ServerVendorSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ServerVendor
         fields = '__all__'
 
 
