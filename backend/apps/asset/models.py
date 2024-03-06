@@ -277,7 +277,7 @@ class AssetAccount(models.Model):
         null=True)
 
     def __str__(self):
-        return self.name
+        return "{}-{}-{}".format(self.name, self.protocol, self.port)
 
     def __unicode__(self):
         return '%s: %s' % (self.name, self.username)
@@ -322,7 +322,7 @@ class NetworkDevice(models.Model):
     serial_num = models.CharField(
         verbose_name='序列号',
         max_length=200,
-        null=False)
+        null=False, unique=True)
     manage_ip = models.GenericIPAddressField(verbose_name='管理地址', null=False, default='0.0.0.0')
     name = models.CharField(
         verbose_name='资产名称',
@@ -587,12 +587,10 @@ class Server(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True)
-    u_location = models.CharField(
-        verbose_name='机架',
-        max_length=20,
-        null=True,
-        blank=True,
-        default='')
+    u_location_start = models.IntegerField(
+        verbose_name='机架位起始', default=0, validators=[MaxValueValidator(50), MinValueValidator(1)])
+    u_location_end = models.IntegerField(
+        verbose_name='机架位结束', default=0, validators=[MaxValueValidator(50), MinValueValidator(1)])
     sub_asset_type = models.SmallIntegerField(choices=sub_asset_type_choice, default=0, verbose_name="服务器类型")
     hosted_on = models.ForeignKey('self', related_name='hosted_on_server',
                                   blank=True, null=True, verbose_name="宿主机", on_delete=models.SET_NULL)  # 虚拟机专用字段
@@ -655,26 +653,26 @@ class ContainerService(models.Model):
         db_table = 'asset_service'
 
 
-class ServerAccount(models.Model):
-    """
-    服务器和账户关联表
-    """
-    server = models.ForeignKey(
-        "Server",
-        verbose_name='服务器',
-        related_name='to_account',
-        on_delete=models.CASCADE)
-
-    account = models.ForeignKey(
-        "AssetAccount",
-        verbose_name='账户',
-        related_name='to_server',
-        on_delete=models.CASCADE)
-
-    def __str__(self):
-        return 'server:%s account:%s' % (self.server, self.account)
-
-    class Meta:
-        unique_together = (("server", "account"),)
-        verbose_name_plural = '服务器和账户关联表'
-        db_table = 'asset_account2server'  # 通过db_table自定义数据表名
+# class ServerAccount(models.Model):
+#     """
+#     服务器和账户关联表
+#     """
+#     server = models.ForeignKey(
+#         "Server",
+#         verbose_name='服务器',
+#         related_name='to_account',
+#         on_delete=models.CASCADE)
+#
+#     account = models.ForeignKey(
+#         "AssetAccount",
+#         verbose_name='账户',
+#         related_name='to_server',
+#         on_delete=models.CASCADE)
+#
+#     def __str__(self):
+#         return 'server:%s account:%s' % (self.server, self.account)
+#
+#     class Meta:
+#         unique_together = (("server", "account"),)
+#         verbose_name_plural = '服务器和账户关联表'
+#         db_table = 'asset_server_account'  # 通过db_table自定义数据表名

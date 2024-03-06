@@ -25,11 +25,11 @@ from utils.crypt_pwd import CryptPwd
 from apps.api.tools.custom_pagination import LargeResultsSetPagination
 from apps.api.tools.custom_viewset_base import CustomViewBase
 from apps.asset.models import Idc, AssetAccount, Vendor, Role, Category, Model, Attribute, Framework, NetworkDevice, \
-    IdcModel, NetZone, Rack, AdminRecord, Server, ServerModel, ContainerService, ServerVendor, ServerAccount
+    IdcModel, NetZone, Rack, AdminRecord, Server, ServerModel, ContainerService, ServerVendor, AssetIpInfo
 from apps.asset.serializers import IdcSerializer, AssetAccountSerializer, AssetVendorSerializer, RoleSerializer, \
     CategorySerializer, ModelSerializer, AttributeSerializer, FrameworkSerializer, NetworkDeviceSerializer, \
     IdcModelSerializer, NetZoneSerializer, CmdbRackSerializer, AdminRecordSerializer, ServerSerializer, \
-    ServerModelSerializer, ContainerServiceSerializer, ServerVendorSerializer, ServerAccountSerializer
+    ServerModelSerializer, ContainerServiceSerializer, ServerVendorSerializer, AssetIpInfoSerializer
 from utils.cmdb_import import search_cmdb_vendor_id, search_cmdb_idc_id, search_cmdb_netzone_id, search_cmdb_role_id, \
     search_cmdb_idc_model_id, search_cmdb_cabinet_id, search_cmdb_category_id, search_cmdb_attribute_id, \
     search_cmdb_framework_id, returndate, csv_device_staus, pandas_read_file, old_import_parse
@@ -306,21 +306,21 @@ class AccountList(CustomViewBase):
     # list_cache_key_func = QueryParamsKeyConstructor()
 
 
-class ServerAccountList(CustomViewBase):
-    """
-    处理  GET POST , 处理 /api/post/<pk>/ GET PUT PATCH DELETE
-    """
-    queryset = ServerAccount.objects.all().order_by('id')
-    serializer_class = ServerAccountSerializer
-    pagination_class = LargeResultsSetPagination
-    permission_classes = ()
-    # 配置搜索功能
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
-    # 如果要允许对某些字段进行过滤，可以使用filter_fields属性。
-    filter_fields = '__all__'
-    # 设置搜索的关键字
-    search_fields = '__all__'
-    # list_cache_key_func = QueryParamsKeyConstructor()
+# class ServerAccountList(CustomViewBase):
+#     """
+#     处理  GET POST , 处理 /api/post/<pk>/ GET PUT PATCH DELETE
+#     """
+#     queryset = ServerAccount.objects.all().order_by('id')
+#     serializer_class = ServerAccountSerializer
+#     pagination_class = LargeResultsSetPagination
+#     permission_classes = ()
+#     # 配置搜索功能
+#     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+#     # 如果要允许对某些字段进行过滤，可以使用filter_fields属性。
+#     filter_fields = '__all__'
+#     # 设置搜索的关键字
+#     search_fields = '__all__'
+#     # list_cache_key_func = QueryParamsKeyConstructor()
 
 
 class ServerVendorList(CustomViewBase):
@@ -451,7 +451,6 @@ class NetworkDeviceViewSet(CustomViewBase):
     queryset = NetworkDevice.objects.all().order_by('-id')
     queryset = NetworkDeviceSerializer.setup_eager_loading(queryset)
     serializer_class = NetworkDeviceSerializer
-    # authentication_classes = (authentication.JWTAuthentication,)
     # 配置搜索功能
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filterset_class = NetworkDeviceFilter
@@ -465,30 +464,51 @@ class NetworkDeviceViewSet(CustomViewBase):
                      'name', 'vendor__name', 'idc__name', 'patch_version', 'soft_version',
                      'model__name', 'memo', 'status', 'ha_status')
 
-    # def get_queryset(self):
-    #     """
-    #     expires  比 expire多一个s ，用来筛选已过期的设备数据 lt 小于  gt 大于  lte小于等于  gte 大于等于
-    #     :return:
-    #     """
-    #     expires = self.request.query_params.get('expires', None)
-    #     search_host_list = self.request.query_params.get('search_host_list', None)
-    #     if search_host_list:
-    #         if search_host_list.find('-') != -1:
-    #             return self.queryset.filter(manage_ip__in=search_host_list.split('-'))
-    #         else:
-    #             return self.queryset.filter(manage_ip__in=[search_host_list])
-    #         # return self.queryset.filter(manage_ip__in=search_host_list)
-    #     if expires == '1':
-    #         return self.queryset.filter(expire__lt=date.today())
-    #     elif expires == '0':
-    #         return self.queryset.filter(expire__gt=date.today())
-    #     else:
-    #         return self.queryset
+    def get_queryset(self):
+        """
+        expires  比 expire多一个s ，用来筛选已过期的设备数据 lt 小于  gt 大于  lte小于等于  gte 大于等于
+        :return:
+        """
+        expires = self.request.query_params.get('expires', None)
+        history = self.request.query_params.get('history', None)
+        search_host_list = self.request.query_params.get('search_host_list', None)
+        if search_host_list:
+            if search_host_list.find('-') != -1:
+                return self.queryset.filter(manage_ip__in=search_host_list.split('-'))
+            else:
+                return self.queryset.filter(manage_ip__in=[search_host_list])
+            # return self.queryset.filter(manage_ip__in=search_host_list)
+        # if history:
+        #     return self.queryset.history.all()
+        if expires == '1':
+            return self.queryset.filter(expire__lt=date.today())
+        elif expires == '0':
+            return self.queryset.filter(expire__gt=date.today())
+        else:
+            return self.queryset
 
     # 重新update方法主要用来捕获更改前的字段值并赋值给self.log
     # def update(self, request, *args, **kwargs):
     #     print('更新', super().update(request, *args, **kwargs))
     #     return super().update(request, *args, **kwargs)
+
+
+class AssetIpInfoViewSet(CustomViewBase):
+    """
+    处理 网络设备绑定IP地址信息 GET POST , 处理 /api/post/<pk>/ GET PUT PATCH DELETE
+    """
+    queryset = AssetIpInfo.objects.all().order_by('id')
+    queryset = AssetIpInfoSerializer.setup_eager_loading(queryset)
+    serializer_class = AssetIpInfoSerializer
+    # permission_classes = (permissions.IsAuthenticated,)
+    # 配置搜索功能
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    # filterset_class = NetworkDeviceFilter
+    filter_fields = '__all__'
+    pagination_class = LargeResultsSetPagination
+    # 设置搜索的关键字
+    search_fields = '__all__'
+    # list_cache_key_func = QueryParamsKeyConstructor()
 
 
 class ServerFilter(django_filters.FilterSet):

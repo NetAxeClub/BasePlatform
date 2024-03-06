@@ -1,6 +1,7 @@
 import operator
 from django.http import JsonResponse
 from django.apps import apps
+from datetime import datetime
 # from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 import django_filters
@@ -13,6 +14,7 @@ from apps.automation.serializers import (
     CollectionPlanSerializer, CollectionRuleSerializer, CollectionMatchRuleSerializer, AutoFlowSerializer)
 from apps.api.tools.custom_viewset_base import CustomViewBase
 from django.db.models import CharField, ForeignKey, GenericIPAddressField
+from utils.db.mongo_ops import MongoOps
 from driver import auto_driver_map
 
 
@@ -235,3 +237,33 @@ class AutomationChart(APIView):
                 'data': collection_plan_list
             }
             return JsonResponse(result, safe=False)
+
+
+class XunMiView(APIView):
+    def get(self, request):
+        get_param = request.GET.dict()
+        print(get_param)
+        if get_param.get('server_mac_address', '') or get_param.get('server_ip_address', ''):
+            mongo_data = dict()
+            # 用于把key值为空的可以过滤掉，只保留有完整key value的字典信息
+            for param in get_param.keys():
+                if get_param[param]:
+                    if param in ['limit', 'start', 'page', 'method', 'last']:
+                        continue
+                    mongo_data[param] = get_param[param]
+            if get_param['log_time']:
+                start_time = mongo_data['log_time'] + ' 00:00:00'
+                end_time = mongo_data['log_time'] + ' 23:59:59'
+                start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+                end_time = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+                mongo_data['log_time'] = {"$gte": start_time, "$lte": end_time}
+            print('mongo_data', mongo_data)
+        if get_param['last'] == 'true':
+            pass
+        else:
+            pass
+        result = {
+            "code": 200,
+            "data": ''
+        }
+        return JsonResponse(result, safe=False)

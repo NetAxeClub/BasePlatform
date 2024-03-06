@@ -4,7 +4,7 @@ from django.views.decorators.csrf import csrf_exempt
 from rest_framework import routers
 
 from .views import DashboardChart, WebSshView, DeviceCollectView, AutomationChart, \
-    DispatchManageView, JobCenterView, PeriodicTaskViewSet, IntervalScheduleViewSet, ServerWebSshView, ServerCmdbExpand
+    DispatchManageView, JobCenterView, PeriodicTaskViewSet, IntervalScheduleViewSet, ServerWebSshView
 
 app_name = 'vue_backend'
 router = routers.SimpleRouter()
@@ -14,9 +14,9 @@ router.register(r'interval_schedule', IntervalScheduleViewSet)
 urlpatterns = [
     path(r'', include(router.urls)),
     path('dashboardChart/', DashboardChart.as_view(), name='dashboardChart'),
-    path('deviceWebSsh/', WebSshView.as_view(), name='deviceWebSsh'),
-    path('server_cmdb_expand/', ServerCmdbExpand.as_view(), name='server_cmdb_expand'),
-    path('serverWebSsh/', ServerWebSshView.as_view(), name='serverWebSsh'),
+    path('device_webssh/', WebSshView.as_view(), name='device_webssh'),
+    # path('server_cmdb_expand/', ServerCmdbExpand.as_view(), name='server_cmdb_expand'),
+    path('server_webssh/', ServerWebSshView.as_view(), name='server_webssh'),
     path('deviceCollect/', DeviceCollectView.as_view(), name='deviceCollect'),
     path('automationChart/', AutomationChart.as_view(), name='automationChart'),
     path('dispatch_page/', csrf_exempt(DispatchManageView.as_view()), name='dispatch_page'),

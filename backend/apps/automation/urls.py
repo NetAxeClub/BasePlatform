@@ -4,7 +4,7 @@ from rest_framework_extensions.routers import (
 )
 from .views import (
     CollectionPlanViewSet, CollectionRuleViewSet,
-    CollectionMatchRuleViewSet, VueCollectionRule, AutoFlowViewSet, AutomationChart)
+    CollectionMatchRuleViewSet, VueCollectionRule, AutoFlowViewSet, AutomationChart, XunMiView)
 app_name = 'automation'
 
 router = DefaultRouter()
@@ -16,5 +16,6 @@ router.register(r'api/collection_match_rule', CollectionMatchRuleViewSet, basena
 urlpatterns = [
     path(r'', include(router.urls)),
     path('collection_rule/', VueCollectionRule.as_view(), name="collection_rule"),
-    path('automation_chart/', AutomationChart.as_view(), name="automation_chart")
+    path('automation_chart/', AutomationChart.as_view(), name="automation_chart"),
+    path('address_location/', XunMiView.as_view(), name="address_location")
 ]

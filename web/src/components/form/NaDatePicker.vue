@@ -14,7 +14,26 @@ const props = defineProps({
   formatValue: String
 })
 
-const currentValue = ref()
+const _reFormat = (val:any) => {
+  if (typeof val === 'number') {
+    return val
+  }
+  if (!val) {
+    return null
+  }
+  return new Date(val).getTime()
+}
+const initCurVal = (val: any) => {
+  if (val instanceof Array) {
+    if (val.length) {
+      return [_reFormat(val[0]), _reFormat(val[1])]
+    }
+    return []
+  } else {
+    return _reFormat(val)
+  }
+}
+const currentValue = ref<any>(initCurVal(props.value))
 
 const _format = (val:number) => {
   if (typeof val === 'number') {
@@ -27,15 +46,6 @@ const _format = (val:number) => {
   return val
 }
 
-const _reFormat = (val:any) => {
-  if (typeof val === 'number') {
-    return val
-  }
-  if (!val) {
-    return null
-  }
-  return new Date(val).getTime()
-}
 
 /**
  * 监听选择值改变
@@ -48,11 +58,7 @@ const handleUpdateValue = (val:any) => {
   }
 }
 watch(() => props.value, () => {
-  if (props.value instanceof Array) {
-    currentValue.value = [_reFormat(props.value[0]), _reFormat(props.value[1])]
-  } else {
-    currentValue.value = _reFormat(props.value)
-  }
+  currentValue.value = initCurVal(props.value)
 })
 
 </script>
