@@ -511,7 +511,7 @@ def standard_analysis_main():
     total_ip_mongo.delete()
     total_ip_mongo.insert_many(xunmi_res)
     # ip地址统计信息存入monggo，首页显示
-    ip_state_mongo = MongoOps(db='netops', coll='server_ip_statistics')
+    ip_state_mongo = MongoOps(db='BasePlatform', coll='server_ip_statistics')
     ip_state_mongo.insert(dict(
         total=len(xunmi_res), log_time=datetime.today().strftime("%Y-%m-%d")
     ))
