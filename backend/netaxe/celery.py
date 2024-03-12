@@ -52,7 +52,7 @@ app.conf.task_queues = (
     Queue('default', default_exchange, routing_key='default'),
     Queue('config', config_exchange, routing_key='config'),
     Queue('ipam', ipam_exchange, routing_key='ipam'),
-    Queue('xunmi', xunmi_exchange, routing_key='ipam'),
+    Queue('xunmi', xunmi_exchange, routing_key='xunmi'),
     Queue('dev', dev_exchange, routing_key='dev'),
 )
 platforms.C_FORCE_ROOT = True
