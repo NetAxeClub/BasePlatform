@@ -15,6 +15,10 @@ config(){
     mkdir -p /app/logs/celery_logs
     celery -A netaxe worker -Q config -c 40  -l info -n config
 }
+xunmi(){
+    mkdir -p /app/logs/celery_logs
+    celery -A netaxe worker -Q xunmi -c 20  -l info -n config
+}
 case "$1" in
 web)
 web
@@ -25,8 +29,11 @@ default
 config)
 config
 ;;
+xunmi)
+xunmi
+;;
 *)
-echo "Usage: $1 {web|default|config}"
+echo "Usage: $1 {web|default|config|xunmi}"
 ;;
 esac
 echo "start running!"

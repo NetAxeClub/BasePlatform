@@ -285,6 +285,31 @@
           }
         }
       ]
+    },
+    {
+      "name": "插件管理",
+      "hidden": false,
+      "web_path": "/plugins",
+      "path": "/plugins",
+      "meta": {
+        "title": "插件管理",
+        "iconPrefix": "iconfont",
+        "icon": "menu"
+      },
+      "children": [
+        {
+          "name": "插件模块",
+          "path": "/plugins/plugin_tree",
+          "web_path": "/plugins/plugin_tree",
+          "meta": {
+            "title": "插件模块",
+            "affix": true,
+            "iconPrefix": "iconfont",
+            "icon": "index",
+            "cacheable": false
+          }
+        }
+      ]
     }
   ]
 }

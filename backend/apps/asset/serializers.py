@@ -227,8 +227,8 @@ class NetworkDeviceSerializer(serializers.ModelSerializer):
     #     return instance
 
     def update(self, instance, validated_data):
-        account = self.initial_data['account']
-        if account:
+        account = self.initial_data.get('account')
+        if account is not None:
             account = json.loads(account)
             instance.account.set(account)
         return super().update(instance, validated_data)

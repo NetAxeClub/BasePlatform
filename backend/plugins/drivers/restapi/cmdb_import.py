@@ -15,8 +15,7 @@ import traceback
 from driver.cmdb_import import RestApiDriver
 from apps.automation.models import CollectionPlan
 from apps.asset.models import (NetworkDevice, Vendor, Category, Model, IdcModel, Idc, Role, Rack, Attribute, Framework,
-                               NetZone, AssetIpInfo, AssetAccount)
-from apps.asset.models import (NetworkDevice, Vendor, Category, Model, Idc, AssetIpInfo, AssetAccount)
+                               NetZone, AssetIpInfo, AssetAccount, ServerModel, ServerVendor, Server)
 from os import getenv
 import logging
 import requests
@@ -152,7 +151,7 @@ class CmdbImportDriver(RestApiDriver):
                         tmp['category'] = Category.objects.create(name=i['category_name'])
                 device_quert = NetworkDevice.objects.filter(serial_num=i['serial_num'])
                 if not device_quert:
-                    device_instance, _ = NetworkDevice.objects.create(**tmp)
+                    # device_instance, _ = NetworkDevice.objects.create(**tmp)
                     device_instance = NetworkDevice.objects.create(**tmp)
                 else:
                     device_instance = NetworkDevice.objects.get(serial_num=i['serial_num'])
@@ -195,7 +194,6 @@ class CmdbImportDriver(RestApiDriver):
                 device_instance.save()
                 sum_count += 1
                 log.info(sum_count)
-                sum_count += 1
             except Exception as e:
                 log.error(str(e))
                 log.error("{}-{}".format(i['manage_ip'], i['serial_num']))
@@ -221,9 +219,101 @@ class CmdbImportDriver(RestApiDriver):
             if not account_instance_query:
                 AssetAccount.objects.create(**tmp)
 
+    def import_server(self):
+        res = self.do_something('asset_server/', {'limit': 5000})
+        sum_count = 0
+        fail_count = 0
+        for i in res:
+            try:
+                log.info(i)
+                tmp = {
+                    "name": i.get('name') or '',
+                    "serial_num": i['serial_num'],
+                    "manage_ip": i['manage_ip'],
+                    "sub_asset_type": i['sub_asset_type'],
+                    "cpu_model": i['cpu_model'],
+                    "cpu_number": i['cpu_number'],
+                    "vcpu_number": i['vcpu_number'],
+                    "disk_total": i['disk_total'],
+                    "ram_total": i['ram_total'],
+                    "kernel": i['kernel'],
+                    "system": i['system'],
+                    "host_vars": i['host_vars'],
+                    "status": i['status'],
+                    "manager_name": i['manager_name'],
+                    "manager_tel": i['manager_tel'],
+                    "purpose": i['purpose'],
+                    "memo": i['memo'],
+                }
+                # idc
+                # vendor
+                # rack
+                # idc_model
+                # model
+                # hosted_on
+                # account
+                device_quert = Server.objects.filter(serial_num=i['serial_num'])
+                if device_quert:
+                    continue
+                if i.get('u_location'):
+                    if i['u_location'].find('-') != -1:
+                        tmp['u_location_start'] = i['u_location'].strip('U').split('-')[0]
+                        tmp['u_location_end'] = i['u_location'].strip('U').split('-')[-1]
+                    else:
+                        tmp['u_location_start'] = i['u_location'].strip('U')
+                        tmp['u_location_end'] = i['u_location'].strip('U')
+                idc_instance, _ = Idc.objects.get_or_create(name=i['idc_name'])
+                tmp['idc'] = idc_instance
+                vendor_instance, _ = ServerVendor.objects.get_or_create(name=i['vendor_name'])
+                tmp['vendor'] = vendor_instance
+                if i.get('idc_model_name'):
+                    idc_model_instance, _ = IdcModel.objects.get_or_create(idc=idc_instance, name=i['idc_model_name'])
+                    tmp['idc_model'] = idc_model_instance
+                    if i.get('rack_name'):
+                        rack_instance, _ = Rack.objects.get_or_create(name=i['rack_name'], idc_model=idc_model_instance)
+                        tmp['rack'] = rack_instance
+                if i.get('model_name'):
+                    print(vendor_instance.name, i['model_name'], i['manage_ip'])
+                    model_instance, _ = ServerModel.objects.get_or_create(name=i['model_name'].strip(),
+                                                                          vendor=vendor_instance)
+                    tmp['model'] = model_instance
+
+                if not device_quert:
+                    device_instance = Server.objects.create(**tmp)
+                else:
+                    device_instance = Server.objects.get(serial_num=i['serial_num'])
+                # 账户关联
+                if i.get('to_account'):
+                    account_list = []
+                    for _sub_account in i['to_account']:
+                        _account = self.do_something(
+                            url="{}".format(self.account_url), params={'name': _sub_account.split(':')[-1]})
+                        if _account:
+                            _account_tmp = {
+                                'name': _account[0]['name'],
+                                'username': _account[0]['username'],
+                                'password': _account[0]['password'],
+                                'en_pwd': _account[0]['en_pwd'],
+                                'protocol': 'ssh',
+                                'port': 22,
+                            }
+                            account_instance, _ = AssetAccount.objects.get_or_create(**_account_tmp)
+                            account_list.append(account_instance)
+                    if account_list:
+                        device_instance.account.set(account_list)
+                        log.info("关联设备账户")
+                sum_count += 1
+                log.info(sum_count)
+            except Exception as e:
+                log.error(str(e))
+                log.error("{}-{}".format(i['manage_ip'], i['serial_num']))
+                print(traceback.print_exc())
+                fail_count += 1
+        print("同步结束")
+        print(sum_count)
+        print(fail_count)
 
 
 if __name__ == '__main__':
     pass
     #  不允许直接运行，或者写任何调用的方法
-
