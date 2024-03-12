@@ -17,7 +17,7 @@ config(){
 }
 xunmi(){
     mkdir -p /app/logs/celery_logs
-    celery -A netaxe worker -Q xunmi -c 20  -l info -n config
+    celery -A netaxe worker -Q xunmi -c 20  -l info -n xunmi
 }
 case "$1" in
 web)
