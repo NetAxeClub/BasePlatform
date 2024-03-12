@@ -183,6 +183,7 @@ class InterfaceFormat(object):
         value = str(value) + sizes[c]
         return value.strip()
 
+
 # 接口利用率计算
 @shared_task(base=AxeTask)
 def interface_used(device_ip=None):
@@ -895,6 +896,7 @@ def collect_device_main(**kwargs):
     try:
         standard_analysis_main()
         interface_used.apply_async()
+        tracking_main.apply_async()
     except Exception as e:
         pass
     return
@@ -1157,14 +1159,14 @@ async def xunmi_operation(**kwargs):
     return
 
 
-async def tracking_sub(*args):
+@shared_task(base=AxeTask, once={'graceful': True})
+def tracking_sub(*args):
     b = time.time()
     log_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     for _ip in args:
         params = dict(ipaddress=_ip['ipaddress'], log_time=log_time)
         # await xunmi_operation(**params)
-        # asyncio.run(xunmi_operation(**params))
-        await xunmi_operation(**params)
+        asyncio.run(xunmi_operation(**params))
     e = time.time()
     logger.info('async cost time: %s' % (e - b))
     # asyncio.run(async_operation())
@@ -1183,9 +1185,8 @@ def tracking_main():
     total_ip_mongo = MongoOps(db='Automation', coll='Total_ip_list')
     total_ip_res = total_ip_mongo.find(fileds={'_id': 0})
     for ip_address in range(0, len(total_ip_res), 20):
-        asyncio.run(tracking_sub(*total_ip_res[ip_address:ip_address + 20]))
-        # tracking_sub.apply_async(
-        #     args=total_ip_res[ip_address:ip_address + 20], queue='dev', retry=True)
+        # asyncio.run(tracking_sub(*total_ip_res[ip_address:ip_address + 20]))
+        tracking_sub.apply_async(args=total_ip_res[ip_address:ip_address + 20], queue='xunmi', retry=True)
     send_message = "【自动化】地址定位任务下发完成：\n总数量：{}个" \
         .format(len(total_ip_res))
     logger.info(send_message)
