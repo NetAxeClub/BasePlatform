@@ -690,7 +690,7 @@ class MainIn:
                                                         'idc',
                                                         'framework',
                                                         'zone',
-                                                        'rack').prefetch_related('bind_ip', 'account', 'org').filter(
+                                                        'rack').prefetch_related('bind_ip', 'account').filter(
             status=0).values(
             'name', 'idc__name', 'serial_num', 'manage_ip', 'status', 'chassis', 'slot')
         MongoNetOps.post_cmdb(all_devs)
@@ -724,6 +724,7 @@ class MainIn:
             plugin = discovered_plugins.get('plugins.extensibles.xunmi')
             if plugin is not None:
                 methods = sorted([x for x in plugin.__all__])
+                start_time = time.time()
                 for method in methods:
                     if callable(eval("discovered_plugins.get('plugins.extensibles.xunmi').{}".format(method))):
                         try:
@@ -735,6 +736,8 @@ class MainIn:
                                 break
                         except Exception as e:
                             logger.exception(e)
+                end_time = int(time.time() - start_time)
+                logger.info("插件执行耗时：{}".format(str(end_time)))
             XunMiOps.xunmi_ops(**mongo_data)
         return
 
@@ -1027,7 +1030,7 @@ async def xunmi_operation(**kwargs):
                                                    macaddress=arp['macaddress'],
                                                    memberport=','.join(lagg_res['memberports'])))
                 else:
-                    logger.info('ip {}:======>不是聚合口:'.format(ip_address))
+                    # logger.info('ip {}:======>不是聚合口:'.format(ip_address))
                     res, break_falg = await MainIn.xunmi_sub(**dict(mac=mac, arp=arp, ip_address=ip_address))
                     tmp_result += res
                     if break_falg:
@@ -1047,7 +1050,7 @@ async def xunmi_operation(**kwargs):
                     lagg_res = json.loads(lagg_res)
                     lagg_res = lagg_res[0]
                     if len(lagg_res['memberports']) >= 1:
-                        logger.debug("没有查询结果，则以ARP信息为最终结果 且是聚合口")
+                        # logger.debug("没有查询结果，则以ARP信息为最终结果 且是聚合口")
                         for port in lagg_res['memberports']:
                             lldp_res = cache.get(
                                 'lldp_' + lagg_res['hostip'] + '_' + port)
@@ -1104,7 +1107,7 @@ async def xunmi_operation(**kwargs):
                                                macaddress=arp['macaddress'],
                                                memberport=','.join(lagg_res['memberports'])))
                 else:
-                    logger.debug("没有查询结果，则以ARP信息为最终结果 非聚合口")
+                    # logger.debug("没有查询结果，则以ARP信息为最终结果 非聚合口")
                     lldp_res = cache.get('lldp_{}_{}'.format(arp['hostip'], arp['interface']))
                     if not lldp_res:
                         lldp_res = cache.get('lldp_reverse_{}_{}'.format(arp['hostip'], arp['interface']))
