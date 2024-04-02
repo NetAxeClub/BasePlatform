@@ -282,16 +282,15 @@ class JobCenterView(APIView):
     def post(self, request):
         """ run tasks"""
         celery_app = current_app
-        f = request.POST
-        f = json.loads(f['data'])
+        f = json.loads(request.data['data'])
         taskname = f['task']
         args = f['args']
         kwargs = f['kwargs']
         queue = f['queue']
         celery_app.loader.import_default_modules()
         tasks = [(celery_app.tasks.get(taskname),
-                  loads(args),
-                  loads(kwargs),
+                  loads(json.dumps(args)),
+                  loads(json.dumps(kwargs)),
                   queue)]
         if any(t[0] is None for t in tasks):
             for i, t in enumerate(tasks):
