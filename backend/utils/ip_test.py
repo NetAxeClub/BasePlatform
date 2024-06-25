@@ -19,7 +19,7 @@ def test_ip(net_addr):
     for sub in res:
         for i in sub.iter_hosts():
             pass
-        url = "http://10.254.12.169:31103/ipam/v1/ipam_api/"
+        url = "http://10adsfa/ipam/v1/ipam_api/"
 
         payload = {
             "subnet": str(sub),
