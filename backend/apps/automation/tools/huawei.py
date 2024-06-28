@@ -55,14 +55,14 @@ class HuaweiProc(BaseConn):
         'source-zone': 'untrust',
         'destination-zone': 'trust',
         'destination-ip': {
-            'address-set': 'shipinghuiyi'
+            'address-set': 'shighuiyi'
         },
         service: {
             'service-object': 'tcp22'
         },
         enable: 'true',
         action: 'false',
-        hostip: '172.21.250.251'
+        hostip: '1721'
         :param host:
         :param datas:
         :return:

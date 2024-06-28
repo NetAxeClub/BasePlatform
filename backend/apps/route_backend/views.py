@@ -140,6 +140,36 @@ class ServerWebSshView(APIView):
             return JsonResponse({'code': 500, 'msg': '上传失败！{}'.format(e)})
 
 
+class NetworkDeviceWebSshView(APIView):
+    permission_classes = ()
+    authentication_classes = ()
+
+    def get(self, request):
+        get_param = request.GET.dict()
+        server_obj = NetworkDevice.objects.filter(
+            manage_ip=get_param['manage_ips']).values('vendor__name', 'manage_ip').first()
+        init_cmd = ''
+        if server_obj['vendor__name'] in ['华三', '华为', '锐捷', '盛科']:
+            init_cmd = 'terminal monitor'
+        remote_ip = request.META.get('REMOTE_ADDR')
+        return JsonResponse({'code': 200, 'data': {'init_cmd': init_cmd, 'remote_ip': remote_ip}})
+
+    def post(self, request):
+        post_data = request.POST
+        server_obj = NetworkDevice.objects.get(id=post_data.get('pk'))
+        ssh_server_ip = server_obj.manage_ip
+        try:
+            upload_file = request.FILES.get('upload_file')
+            upload_file_path = os.path.join(settings.MEDIA_ROOT, 'fort_files', request.user.username, 'upload',
+                                            server_obj.assets.asset_management_ip)
+            sftp = SFTP(ssh_server_ip, server_obj.port, server_obj.username,
+                        CryptPwd().decrypt_pwd(server_obj.password))
+            sftp.upload_file(upload_file, upload_file_path)
+
+            return JsonResponse({'code': 200, 'msg': '上传成功！文件默认放在{}用户家目录下'.format(server_obj.username)})
+        except Exception as e:
+            return JsonResponse({'code': 500, 'msg': '上传失败！{}'.format(e)})
+
 # 设备采集方案
 class DeviceCollectView(APIView):
     permission_classes = ()
@@ -282,16 +312,15 @@ class JobCenterView(APIView):
     def post(self, request):
         """ run tasks"""
         celery_app = current_app
-        f = request.POST
-        f = json.loads(f['data'])
+        f = json.loads(request.data['data'])
         taskname = f['task']
         args = f['args']
         kwargs = f['kwargs']
         queue = f['queue']
         celery_app.loader.import_default_modules()
         tasks = [(celery_app.tasks.get(taskname),
-                  loads(args),
-                  loads(kwargs),
+                  loads(json.dumps(args)),
+                  loads(json.dumps(kwargs)),
                   queue)]
         if any(t[0] is None for t in tasks):
             for i, t in enumerate(tasks):

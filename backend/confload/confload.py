@@ -74,45 +74,9 @@ class Config:
         self.healthy = ""
         self.data = data
         # self.ssl = data['ssl']
-        self.backend_ip = data['backend_ip']
-        self.backend_port = data['backend_port']
-        self.web_url = data['web_url']
-        self.drivers = data['drivers']
-        self.mysql_db = data['mysql_db']
-        self.mysql_host = data['mysql_host']
-        self.mysql_port = data['mysql_port']
-        self.mysql_user = data['mysql_user']
-        self.mysql_password = data['mysql_password']
-        self.mongodb_host = data['mongodb_host']
-        self.mongodb_port = data['mongodb_port']
-        self.mongodb_user = data['mongodb_user']
-        self.mongodb_password = data['mongodb_password']
-        self.nacos = data['nacos']
-        self.version = data['version']
-        self.local_dev = data['local_dev']
-        self.nacos_port = data['nacos_port']
-        self.virtual_host = data['virtual_host']
-        self.allow_origins = data['allow_origins']
-        self.redis_host = data['redis_host']
-        self.redis_port = data['redis_port']
-        self.redis_pwd = data['redis_pwd']
-        self.push_gateway = data['push_gateway']
-        self.project_name = data['project_name']
-        self.mq_host = data['mq_host']
-        self.mq_username = data['mq_username']
-        self.mq_password = data['mq_password']
-        self.mq_port = data['mq_port']
-        self.queue = data['queue']
-        self.url_prefix = data['url_prefix']
-        self.exchange = data['exchange']
-        self.routing_key = data['routing_key']
-        self.queue_qos = data['queue_qos']
-        self.mongodb_url = data['mongodb_url']
-        self.log_config_filename = data["log_config_filename"]
-        self.default_webhook_name = data["default_webhook_name"]
-        self.default_webhook_headers = data["default_webhook_headers"]
-        self.custom_webhooks = data["custom_webhooks"]
-        self.neo4j = data["neo4j"]
+        for k, v in self.data.items():
+            log.info("[Config set] key:%s, value:%s" % (k, v))
+            setattr(self, k, v)
 
     # 单例模式
     def __new__(cls):

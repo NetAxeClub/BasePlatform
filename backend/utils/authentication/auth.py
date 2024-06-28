@@ -57,9 +57,11 @@ def get_auth_user(token):
 class CustomJWTAuthentication(JWTAuthentication):
 
     def get_validated_token(self, raw_token):
+        print('get_validated_token')
         return raw_token.decode()
 
     def get_user(self, validated_token):
+        print('get_user')
         return get_auth_user(validated_token)
 
 
