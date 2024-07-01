@@ -152,7 +152,7 @@ class NetworkDeviceWebSshView(APIView):
         if server_obj['vendor__name'] in ['华三', '华为', '锐捷', '盛科']:
             init_cmd = 'terminal monitor'
         remote_ip = request.META.get('REMOTE_ADDR')
-        return JsonResponse({'code': 200, 'data': {'init_cmd': init_cmd, 'remote_ip': remote_ip}})
+        return JsonResponse({'code': 200, 'data': {'init_cmd': init_cmd, 'remote_ip': remote_ip, 'id': server_obj['id']}})
 
     def post(self, request):
         post_data = request.POST
