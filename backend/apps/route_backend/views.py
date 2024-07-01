@@ -147,7 +147,7 @@ class NetworkDeviceWebSshView(APIView):
     def get(self, request):
         get_param = request.GET.dict()
         server_obj = NetworkDevice.objects.filter(
-            manage_ip=get_param['manage_ips']).values('vendor__name', 'manage_ip').first()
+            manage_ip=get_param['manage_ips']).values('vendor__name', 'manage_ip', 'id').first()
         init_cmd = ''
         if server_obj['vendor__name'] in ['华三', '华为', '锐捷', '盛科']:
             init_cmd = 'terminal monitor'
