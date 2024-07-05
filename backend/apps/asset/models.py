@@ -506,8 +506,7 @@ class ServerModel(models.Model):
     name = models.CharField(
         verbose_name='硬件型号',
         max_length=30,
-        null=False,
-        unique=True)
+        null=False)
     alias = models.CharField(
         verbose_name='型号别名',
         max_length=50,
