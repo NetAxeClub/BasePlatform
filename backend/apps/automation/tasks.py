@@ -728,7 +728,7 @@ class MainIn:
                 for method in methods:
                     if callable(eval("discovered_plugins.get('plugins.extensibles.xunmi').{}".format(method))):
                         try:
-                            flag, res = eval(
+                            flag, res = await eval(
                                 "discovered_plugins.get('plugins.extensibles.xunmi').{}".format(method))(
                                 **dict(ip_address=ip_address, hostip=hostip))
                             if flag:
@@ -958,6 +958,7 @@ def collcet_device_by_rule():
 
 
 async def xunmi_operation(**kwargs):
+
     start_time = time.time()
     ip_address = kwargs['ipaddress']
     log_time = kwargs.get('log_time')
