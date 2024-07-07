@@ -736,7 +736,7 @@ class MainIn:
                                 break
                         except Exception as e:
                             logger.exception(e)
-                end_time = int(time.time() - start_time)
+                end_time = time.time() - start_time
                 logger.info("插件执行耗时：{}".format(str(end_time)))
             XunMiOps.xunmi_ops(**mongo_data)
         return
