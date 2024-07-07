@@ -735,6 +735,7 @@ class MainIn:
                                 mongo_data.update(res)
                                 break
                         except Exception as e:
+                            logger.info(f"{ip_address}定位使用插件异常")
                             logger.exception(e)
                 end_time = time.time() - start_time
                 logger.info("插件执行耗时：{}".format(str(end_time)))
