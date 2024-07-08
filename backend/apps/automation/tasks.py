@@ -733,7 +733,7 @@ class MainIn:
                                 **dict(ip_address=ip_address, hostip=hostip))
                             if flag:
                                 mongo_data.update(res)
-                                break
+                                # break
                         except Exception as e:
                             logger.info(f"{ip_address}定位使用插件异常")
                             logger.exception(e)
