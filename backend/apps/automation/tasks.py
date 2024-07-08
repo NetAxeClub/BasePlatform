@@ -692,7 +692,7 @@ class MainIn:
                                                         'zone',
                                                         'rack').prefetch_related('bind_ip', 'account').filter(
             status=0).values(
-            'name', 'idc__name', 'serial_num', 'manage_ip', 'status', 'chassis', 'slot')
+            'name', 'idc__name', 'serial_num', 'manage_ip', 'status', 'chassis', 'slot', 'idc_model__name', 'rack__name')
         MongoNetOps.post_cmdb(all_devs)
         return
 
@@ -701,7 +701,15 @@ class MainIn:
     async def tracking_format(ip_address, hostip,
                               log_time, memberport, macaddress) -> None:
         hostinfo = cmdb_mongo.find(query_dict=dict(manage_ip=hostip, status=0),
-                                   fileds={'_id': 0, 'idc__name': 1, 'name': 1, 'serial_num': 1})
+                                   fileds={'_id': 0, 'idc__name': 1, 'name': 1, 'serial_num': 1, 'idc_model__name': 1,
+                                           'rack__name': 1, 'u_location_start': 1, 'u_location_end': 1})
+        node_location = ','.join([str(
+            x.get('idc_model__name')) +
+                                  '_' +
+                                  str(x.get('rack__name')) +
+                                  '_' +
+                                  str(x.get('u_location_start')) +
+                                  '-' + str(x.get('u_location_end')) for x in hostinfo])
         if log_time:
             log_time = datetime.strptime(log_time, "%Y-%m-%d %H:%M:%S")
         if hostinfo:
@@ -714,6 +722,7 @@ class MainIn:
                 'log_time': log_time,
                 'node_hostname': hostname if len(hostinfo) > 0 else '',
                 'node_ip': hostip,
+                'node_location': node_location,
                 'idc_name': hostinfo[0]['idc__name'],
                 'serial_num': hostinfo[0]['serial_num'],
                 'node_interface': memberport,
@@ -733,7 +742,7 @@ class MainIn:
                                 **dict(ip_address=ip_address, hostip=hostip))
                             if flag:
                                 mongo_data.update(res)
-                                break
+                                # break
                         except Exception as e:
                             logger.info(f"{ip_address}定位使用插件异常")
                             logger.exception(e)
@@ -1151,13 +1160,11 @@ async def xunmi_operation(**kwargs):
     for item in tmp_result:
         final_res.setdefault(item['host'], {**item})
     main_in_result = list(final_res.values())
-    return_res = []
     for i in main_in_result:
         logger.info("ip {}:===最终结果===》".format(ip_address))
         if i['macaddress']:
             # 判断MAC地址合法性  (\w+-\w+-\w+)
             if re.search(r'^(\w+-\w+-\w+)', i['macaddress']):
-                return_res.append(i)
                 await MainIn.tracking_format(ip_address, i['host'], log_time, i['memberport'], i['macaddress'])
     total_time = int((time.time() - start_time))
     logger.info("{}地址查询耗时{}秒".format(ip_address, total_time))
