@@ -634,7 +634,7 @@ class AdminRecordViewSet(CustomViewBase):
         start = self.request.query_params.get('start_time', None)
         end = self.request.query_params.get('end_time', None)
         if start and end:
-            return AdminRecord.objects.select_related('admin_login_user').filter(
+            return AdminRecord.objects.filter(
                 admin_start_time__gt=start,
                 admin_start_time__lt=end)
         return AdminRecord.objects.all()
