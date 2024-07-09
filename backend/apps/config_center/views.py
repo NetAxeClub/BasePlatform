@@ -6,8 +6,7 @@ from jinja2 import Environment, StrictUndefined, exceptions
 from datetime import date, datetime
 from django.http import JsonResponse
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import permissions, filters
-from rest_framework.permissions import IsAuthenticated
+from rest_framework import filters
 from rest_framework.views import APIView
 from ttp import ttp
 from netaxe.settings import BASE_DIR
@@ -51,6 +50,18 @@ def jinja_render(data, template):
 
         return True, rendered_jinja2_tpl
     return False, "安全校验失败"
+
+
+# 配置备份
+class ConfigBackupViewSet(CustomViewBase):
+    queryset = ConfigBackup.objects.all().order_by('-id')
+    serializer_class = ConfigBackupSerializer
+    # permission_classes = (permissions.IsAuthenticated,)
+    pagination_class = LargeResultsSetPagination
+    # 配置搜索功能
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    filter_fields = '__all__'
+    search_fields = 'name'
 
 
 # 配置合规表

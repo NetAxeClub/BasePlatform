@@ -12,6 +12,7 @@ from apps.config_center.compliance import config_file_verify
 from apps.config_center.config_parse.config_parse import config_file_parse
 from apps.config_center.git_tools.git_proc import push_file
 from apps.config_center.my_nornir import config_backup_nornir
+from apps.config_center.models import ConfigBackup
 from utils.db.mongo_ops import MongoOps
 from service_mesh import msg_gateway_runner
 
@@ -37,7 +38,18 @@ def config_backup(**kwargs):
     end_time = time.time()
     time_use = int(int(end_time - start_time) / 60)
     fail_host = '\n'.join([x for x in result.failed_hosts.keys()])
-    # #send_msg_netopsf"配置备份完成，耗时:{time_use}分\n备份失败设备:\n{fail_host}")
+    for host in hosts:
+        if host['manage_ip'] not in fail_host:
+            ConfigBackup.objects.create(
+                name=host['name'], manage_ip=host['manage_ip'], config_status='SUCCESS', status=host['status'],
+                idc_name=host['idc__name'], vendor_name=host['vendor__name'], model_name=host['model__name']
+            )
+        else:
+            ConfigBackup.objects.create(
+                name=host['name'], manage_ip=host['manage_ip'], config_status='FAILED', status=host['status'],
+                idc_name=host['idc__name'], vendor_name=host['vendor__name'], model_name=host['model__name']
+            )
+    msg_gateway_runner.send_wechat(channel="netdevops", content=f"配置备份完成，耗时:{time_use}分\n备份失败设备:\n{fail_host}")
     # 配置解析
     loop = asyncio.get_event_loop()
     loop.run_until_complete(config_file_parse())
@@ -57,4 +69,3 @@ def config_backup(**kwargs):
     # 合规性检查
     loop.run_until_complete(config_file_verify())
     return
-

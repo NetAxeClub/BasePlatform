@@ -1,13 +1,14 @@
 import os
 import re
 from typing import List
+from datetime import datetime
 from nornir import InitNornir
 from nornir.core.task import Result
 from nornir_netmiko import netmiko_send_command
 from nornir_utils.plugins.functions import print_result
 from nornir_utils.plugins.tasks.files import write_file
 from nornir.core.plugins.inventory import InventoryPluginRegister
-
+from apps.config_center.models import ConfigBackup
 from netaxe.settings import BASE_DIR
 from utils.cmdb_inventory import CMDBInventory
 
@@ -65,6 +66,7 @@ def configure_backup(task, path) -> Result:
 def config_backup_nornir(devices: List[dict]) -> InitNornir:
     """
     """
+    log_time = datetime.now().strftime("%Y-%m-%d")
     with InitNornir(
             runner={
                 "plugin": "threaded",
@@ -87,11 +89,11 @@ def config_backup_nornir(devices: List[dict]) -> InitNornir:
             'hp_comware', 'hp_comware_telnet',
             'ruijie_os', 'ruijie_os_telnet',
             'cisco_ios',
-            'mellanox',
+            'mellanox'
             ]
         device = nr.filter(filter_func=lambda host: host.platform in support_platform)
         backup_res = device.run(task=configure_backup, name='配置备份', path=BACKUP_PATH)
-        print_result(backup_res)
+        # print_result(backup_res)
         return backup_res
 
 

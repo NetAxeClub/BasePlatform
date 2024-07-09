@@ -23,6 +23,7 @@ router = DefaultRouter()
 router.register(r'config_compliance', views.ConfigComplianceViewSet)
 router.register(r'config_template', views.ConfigTemplateViewSet)
 router.register(r'ttp_template', views.TTPTemplateViewSet)
+router.register(r'config_backup', views.ConfigBackupViewSet)
 
 urlpatterns = [
     path(r'', include(router.urls)),
