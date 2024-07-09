@@ -82,3 +82,30 @@ class TTPTemplate(models.Model):
         verbose_name = '配置片段表'
         db_table = 'ttp_template'  # 通过db_table自定义数据表名
         indexes = [models.Index(fields=['name', 'vendor'])]
+
+
+# 配置备份表
+class ConfigBackup(models.Model):
+    status_choices = ((0, '在线'), (1, '下线'), (2, '挂牌'), (3, '备用'))
+    name = models.CharField(
+        verbose_name='设备名',
+        max_length=100,
+        null=False, default='')
+    manage_ip = models.GenericIPAddressField(verbose_name='管理地址', null=False, default='0.0.0.0')
+    last_time = models.DateTimeField(auto_now=True, verbose_name='最近一次备份时间')
+    idc_name = models.CharField(verbose_name='机房', max_length=100, null=False, default='')
+    model_name = models.CharField(verbose_name='型号', max_length=100, null=False, default='')
+    vendor_name = models.CharField(verbose_name='厂商', max_length=100, null=False, default='')
+    status = models.PositiveSmallIntegerField(
+        verbose_name='状态', choices=status_choices, default=0)
+    config_status = models.CharField(verbose_name='备份状态', max_length=100, null=False, default='')
+    # commit = models.CharField(verbose_name="Commit", max_length=100, null=False, default='')
+
+    def __str__(self):
+        return "{}-{}".format(self.manage_ip, self.last_time)
+
+    class Meta:
+        verbose_name_plural = '配置备份表'
+        verbose_name = '配置备份表'
+        db_table = 'config_backup'  # 通过db_table自定义数据表名
+        indexes = [models.Index(fields=['manage_ip', 'last_time'])]

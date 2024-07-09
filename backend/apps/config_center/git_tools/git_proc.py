@@ -101,7 +101,7 @@ class ConfigGit:
                     result['old_str'] = m.source_code_before if m.source_code_before is not None else ''
                     result['added_lines'] = m.added_lines
                     result['deleted_lines'] = m.deleted_lines
-                    print(m.added_lines)
+                    # print(m.added_lines)
                     return result
         return result
 
