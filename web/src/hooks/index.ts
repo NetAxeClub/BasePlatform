@@ -66,7 +66,7 @@ const hooks:Hooks = {
   router: {
     useRomoteRoute: true,
     history: createWebHistory(),
-    whiteRoutes: ['/login', '/404', '/403', '/500'],
+    whiteRoutes: ['/login', '/404', '/403', '/500', '/na-demo/icon', '/na-demo/component'],
     layout: () => import('@/layout/LayoutCommon.vue'),
     beforeHook: (router) => async (to, _from) => {
       // 判断是否登录
@@ -88,11 +88,11 @@ const hooks:Hooks = {
         if (hooks.router.useRomoteRoute) { // 动态加载权限路由
           const routeRes = await userStore.getOriginPermissionRoute()
           for (let projectName of projectNames) { // TODO支持多项目时此处需变逻辑
-            const mapRoutes = transformRoute(projectName, routeRes, hooks.router.layout)
+            const {mapRoutes, rmenus} = transformRoute(projectName, routeRes, hooks.router.layout)
             mapRoutes.forEach(it => {
               router.addRoute(it)
             })
-            tmp.push(...mapRoutes)
+            tmp.push(...rmenus)
             userStore.remoteRoute = [...mapRoutes]
           }
         } else {

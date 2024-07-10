@@ -12,6 +12,7 @@
     :segmented="segmented"
     display-directive="show"
     v-bind="$attrs"
+    transform-origin="center"
     ref="modalRef"
   >
     <n-scrollbar>
@@ -19,7 +20,7 @@
           <slot></slot>
       </div>
     </n-scrollbar>
-    <template #footer>
+    <template #footer v-if="showFooter">
       <slot name="footer">
         <div class="flex justify-end">
           <n-space>
@@ -34,7 +35,7 @@
 <script setup lang="ts">
 import { computed, ref, watchEffect, nextTick } from 'vue'
 import { drag, unDrag } from './utils/dialog-drag'
-import {isEmpty} from '@/utils'
+// import {isEmpty} from '@/utils'
 
 const props = defineProps({
   /**是否可拖拽 */
@@ -53,6 +54,10 @@ const props = defineProps({
   show: {
     type: Boolean,
     default: false
+  },
+  showFooter: {
+    type: Boolean,
+    default: true
   },
   title: {
     type: String,
@@ -107,10 +112,15 @@ const onConfirm = () => {
  */
 const resetPosition = () => {
   if (parent.value && parentWrap.value) {
-    parent.value.style.top = isEmpty(props.top) ? (window.innerHeight - parentWrap.value.offsetHeight) / 2 + 'px' : props.top + 'px'
+    if (props.top) {
+      let top = -(window.innerHeight - parent.value.offsetHeight) / 2 + props.top
+      parent.value.style.top = `${top}px`
+      // parent.value.style.transform = `translateY(-${top}px)`
+      // parent.value.style.transform = 'translate(0px, 0px)'
+    }
   }
 }
-
+// n-modal-scroll-content
 watchEffect(() => {
   if (!props.dragable) return
   if (props.show) {
@@ -124,8 +134,8 @@ watchEffect(() => {
         parent.value = parentNode
         parentWrap.value = parentP
         if (parentP) {
-          parentP.style.minHeight = 'auto'
-          parentNode.style.top = isEmpty(props.top) ? (window.innerHeight - parentP.offsetHeight) / 2 + 'px' : props.top + 'px'
+          parentP.style.height = '100%'
+          resetPosition()
         }
       }
       // if (parentNode && parentNode?.offsetTop < 0) {
@@ -149,10 +159,10 @@ defineExpose({
 })
 </script>
 <style lang="scss" scoped>
-.modal-dialog-wrapper {
-  color: red;
-  :deep(.n-modal-body-wrapper .n-modal-scroll-content) {
-    min-height: auto;
-  }
-}
+// .modal-dialog-wrapper {
+//   color: red;
+//   :deep(.n-modal-body-wrapper .n-modal-scroll-content) {
+//     min-height: auto;
+//   }
+// }
 </style>

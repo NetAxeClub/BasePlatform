@@ -65,25 +65,34 @@ const _generatorRouteItem = (item:ApiRoutes, component:()=> Promise<unknown>):Ro
 /**
  * 将api配置转换成页面路由
  */
-export const transformRoute = (prjName:string, apiRoutes:ApiRoutes[], layout: ()=> Promise<unknown>):RouteRecordRaw[] => {
+export const transformRoute = (prjName:string, apiRoutes:ApiRoutes[], layout: ()=> Promise<any>):{mapRoutes: RouteRecordRaw[], rmenus: RouteRecordRaw[]} => {
   let routes:RouteRecordRaw[] = []
   const comps = getPages(prjName)
-  const fn = (aRoutes: ApiRoutes[], layout: ()=> Promise<unknown>) => {
-    const tmpRoutes:RouteRecordRaw[] = []
+  const fn = (aRoutes: ApiRoutes[], layout: ()=> Promise<any>, tRoutes:any[], isFirst = false) => {
+    const menusTemp:any[] = []
     aRoutes.forEach(item => {
       let route: RouteRecordRaw
+      let menu: RouteRecordRaw
       if (item.children && item.children.length) {
-        route = _generatorRouteItem(item, layout)
-        route.children = fn(item.children, layout) as any
+        menu = _generatorRouteItem(item, layout)
+        if (isFirst) {
+          route = _generatorRouteItem(item, layout)
+          tRoutes.push(route)
+          route.children = []
+          menu.children = fn(item.children, layout, route.children)
+        } else {
+          menu.children = fn(item.children, layout, tRoutes)
+        }
       } else {
-        route = _generatorRouteItem(item, comps[item.web_path])
+        menu = _generatorRouteItem(item, layout)
+        tRoutes.push(_generatorRouteItem(item, comps[item.web_path]))
       }
-      tmpRoutes.push(route)
+      menusTemp.push(menu)
     })
-    return tmpRoutes
+    return menusTemp
   }
-  routes = fn(apiRoutes, layout)
-  return routes
+  const rmenus = fn(apiRoutes, layout, routes, true)
+  return {mapRoutes: routes, rmenus}
 }
 
 const findFirstUnHideRoutePath = (routes: RouteRecordRaw[]):string => {
@@ -91,9 +100,11 @@ const findFirstUnHideRoutePath = (routes: RouteRecordRaw[]):string => {
   const fn = (rs:RouteRecordRaw[]) => {
     for (let r of  rs) {
       if ((!r.children || !r.children.length) && !str) {
-        str = r.path
+        if (!(r.meta && r.meta.notToRoot)) {
+          str = r.path
+        }
       }
-      if (r.children && r.children.length && !str) {
+      if (r.children && r.children.length && !str && !(r.meta && r.meta.notToRoot)) {
         fn(r.children)
       }
     }

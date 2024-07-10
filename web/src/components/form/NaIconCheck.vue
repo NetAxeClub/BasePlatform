@@ -56,8 +56,8 @@ const filterStr = ref('')
 
 const computedOptions = computed(() => {
   if (!props.options) {
-    return icons.map(el => {
-      const str = el.replace('na-icon-', '')
+    return icons.svg.map(el => {
+      const str = el
       return {
         label: str,
         value: str

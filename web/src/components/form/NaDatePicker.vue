@@ -1,5 +1,5 @@
 <template>
-  <n-date-picker :value="currentValue" @update:value="handleUpdateValue" v-bind="$attrs"></n-date-picker>
+  <n-date-picker ref="pickRef" :value="currentValue" @update:value="handleUpdateValue" v-bind="$attrs"></n-date-picker>
 </template>
 
 <script setup lang="ts">
@@ -33,6 +33,7 @@ const initCurVal = (val: any) => {
     return _reFormat(val)
   }
 }
+const pickRef = ref()
 const currentValue = ref<any>(initCurVal(props.value))
 
 const _format = (val:number) => {
@@ -61,4 +62,9 @@ watch(() => props.value, () => {
   currentValue.value = initCurVal(props.value)
 })
 
+defineExpose({
+  focus: () => {
+    pickRef.value && pickRef.value.focus()
+  }
+})
 </script>

@@ -1,5 +1,5 @@
 <template>
-  <n-select :options="computedOptions" :filterable="filterable" v-bind="$attrs" v-model:value="currentValue" :clearable="clearable"></n-select>
+  <n-select ref="selectRef" :options="computedOptions" :filterable="filterable" v-bind="$attrs" v-model:value="currentValue" :clearable="clearable"></n-select>
 </template>
 <script setup lang="ts">
 import { isEmpty } from '@/utils'
@@ -19,6 +19,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:value', 'change'])
+const selectRef = ref()
 
 const currentOptions = ref()
 const currentValue = ref<any>(isEmpty(props.value) ? null  : props.value)
@@ -52,5 +53,11 @@ const getOptions = async () => {
 }
 
 getOptions()
+
+defineExpose({
+  focus: () => {
+    selectRef.value && selectRef.value.focus()
+  }
+})
 
 </script>

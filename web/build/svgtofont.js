@@ -59,10 +59,14 @@ async function start () {
   }).then(() => {
     // 生成json数据
     const files = fs.readdirSync(path.join(currentDirname, '../src/svg'))
-    let jsonObj = []
+    let jsonObj = {
+      css: [],
+      svg: []
+    }
     files.forEach(file => {
       const name = file.replace('.svg', '')
-      jsonObj.push(prefix + '-' + name)
+      jsonObj.css.push(prefix + '-' + name)
+      jsonObj.svg.push(name)
     })
     // 写入json文件
     fs.writeFileSync(path.join(currentDirname, '../src/assets/font/icons.json'), JSON.stringify(jsonObj))
