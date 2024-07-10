@@ -2,7 +2,6 @@
 import json
 import re
 import yaml
-from datetime import datetime
 from jinja2 import Environment, StrictUndefined, exceptions
 from datetime import date, datetime
 from django.http import JsonResponse
@@ -444,6 +443,7 @@ class ConfigFileView(APIView):
     def post(self, request):
         post_data = request.data
 <<<<<<< HEAD
+<<<<<<< HEAD
         print(post_data)
         # file_path = f"current-configuration/{post_data['manage_ip']}/{post_data['manage_ip']}.txt"
         file_path = f"current-configuration/10.254.30.30/hp_comware-10.254.30.30.txt"
@@ -451,6 +451,9 @@ class ConfigFileView(APIView):
 =======
         get_file_commit = _ConfigGit.get_file_content_by_commit(post_data['file_path'], post_data["commit"])
 >>>>>>> 7c46413f37a900620783da4ddab4da9840d899b5
+=======
+        get_file_commit = _ConfigGit.get_file_content_by_commit(post_data['file_path'], post_data["commit"])
+>>>>>>> 0c254d08ae6d937b64120deea702a3025644e1e8
         if get_file_commit:
             data = {
                 "code": 200,
