@@ -2,7 +2,6 @@
 import json
 import re
 import yaml
-from datetime import datetime
 from jinja2 import Environment, StrictUndefined, exceptions
 from datetime import date, datetime
 from django.http import JsonResponse
