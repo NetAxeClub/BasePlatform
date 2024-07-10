@@ -2,6 +2,7 @@
 import json
 import re
 import yaml
+from datetime import datetime
 from jinja2 import Environment, StrictUndefined, exceptions
 from datetime import date, datetime
 from django.http import JsonResponse
@@ -60,8 +61,23 @@ class ConfigBackupViewSet(CustomViewBase):
     pagination_class = LargeResultsSetPagination
     # 配置搜索功能
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
-    filter_fields = '__all__'
-    search_fields = 'name'
+    filter_fields = ('manage_ip', 'name')
+    search_fields = ('manage_ip', 'name')
+
+    def get_queryset(self):
+        """
+        expires  比 expire多一个s ，用来筛选已过期的设备数据 lt 小于  gt 大于  lte小于等于  gte 大于等于
+        :return:
+        """
+        range_time = self.request.query_params.get('range_time', None)
+        if range_time is not None:
+            dt_object = datetime.fromtimestamp(int(int(range_time)/1000))
+            start_date = dt_object.strftime('%Y-%m-%d %H:%M:%S')
+            end_data = dt_object.strftime('%Y-%m-%d ') + "23:59:59"
+            self.queryset = self.queryset.filter(last_time__range=(
+                datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S'),
+                datetime.strptime(end_data, '%Y-%m-%d %H:%M:%S')))
+        return self.queryset
 
 
 # 配置合规表
@@ -405,6 +421,39 @@ class Jinja2View(APIView):
             }
             return JsonResponse(data)
 
+        data = {
+            "code": 400,
+            "results": [],
+            "message": "没有捕获任何操作"
+        }
+        return JsonResponse(data)
+
+
+class ConfigFileView(APIView):
+    permission_classes = ()
+    authentication_classes = ()
+
+    def get(self, request):
+        data = {
+            "code": 400,
+            "results": [],
+            "message": "没有捕获任何操作"
+        }
+        return JsonResponse(data)
+
+    def post(self, request):
+        post_data = request.data
+        print(post_data)
+        # file_path = f"current-configuration/{post_data['manage_ip']}/{post_data['manage_ip']}.txt"
+        file_path = f"current-configuration/10.254.30.30/hp_comware-10.254.30.30.txt"
+        get_file_commit = _ConfigGit.get_file_commit_filter_by_date(file_path, post_data["last_time"].split(' ')[0])
+        if get_file_commit:
+            data = {
+                "code": 200,
+                "results": get_file_commit,
+                "message": "success"
+            }
+            return JsonResponse(data)
         data = {
             "code": 400,
             "results": [],
