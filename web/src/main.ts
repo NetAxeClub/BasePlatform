@@ -8,6 +8,7 @@ import { createPinia } from 'pinia'
 import '@/assets/font/na-icon.css'
 import service from './hooks/service'
 import directive from './directive'
+import 'virtual:svg-icons-register'
 
 declare global {
   interface Window {

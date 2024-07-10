@@ -132,6 +132,7 @@ class ConfigGit:
         return result
 
     # 获取指定文件在指定日期的所有commit
+<<<<<<< HEAD
     def get_file_commit_filter_by_date(self, file_path: str, date: str):
         result = []
         # 遍历commits
@@ -150,6 +151,33 @@ class ConfigGit:
                 }
                 result.append(_data)
         return result
+=======
+    def get_file_content_by_commit(self, file_path: str, commit_hash: str):
+        try:
+            repo = Repo(repo_path)
+            commit = repo.commit(commit_hash)
+            tree = commit.tree
+            file_blob = tree[file_path]
+            # result = []
+            # # 遍历commits
+            # for commit in repo.iter_commits(paths=file_path):
+            #     print("Commit ID:", commit.hexsha)
+            #     print("Author:", commit.author)
+            #     print("Date:", commit.authored_datetime)
+            #     print("Subject:", commit.message)
+            #     print("-" * 40)  # 打印分隔符
+            #     if str(commit.authored_datetime).startswith(date):
+            #         _data = {
+            #             # 'author': m.author,
+            #             'label': commit.committed_datetime.strftime('%Y-%m-%d %H:%M:%S'),
+            #             # 'message': m.message,
+            #             'value': commit.hexsha,
+            #         }
+            #         result.append(_data)
+            return file_blob.data_stream.read().decode('utf-8')
+        except Exception as e:
+            return f"错误，没有获取到改commit的文件内容{str(e)}"
+>>>>>>> 7c46413f37a900620783da4ddab4da9840d899b5
 
 
 def push_file():

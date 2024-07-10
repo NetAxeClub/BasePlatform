@@ -3,6 +3,7 @@ import vue from '@vitejs/plugin-vue'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
+import {createSvgIconsPlugin} from 'vite-plugin-svg-icons'
 import eslint from 'vite-plugin-eslint'
 import path from 'path'
 import fs  from 'fs'
@@ -39,6 +40,10 @@ if (fs.existsSync(path.resolve(__dirname, 'proxy.json'))) {
 export default defineConfig({
   plugins: [
     vue(),
+    createSvgIconsPlugin({
+      iconDirs: [path.resolve(process.cwd(), 'src/svg')],
+      symbolId: 'icon-[dir]-[name]',
+    }),
     eslint(),
     AutoImport({
       imports: [

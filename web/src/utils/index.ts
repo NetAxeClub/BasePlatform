@@ -26,27 +26,27 @@ const _dialogMehods = ['destroyAll', 'create', 'error', 'info', 'success', 'warn
  */
 const _createMessageMethod = (type: string) => {
   return (...args:any[]) => {
-    if (!GLOABAL.notification) {
-      console.error('消息未初始化')
-    }
+    // if (!GLOABAL.notification) {
+    //   console.error('消息未初始化')
+    // }
     (GLOABAL.message as any)[type](...args)
   }
 }
 
 const _createNotificationMethod = (type:string) => {
   return (...args:any[]) => {
-    if (!GLOABAL.message) {
-      console.error('通知未初始化')
-    }
+    // if (!GLOABAL.message) {
+    //   console.error('通知未初始化')
+    // }
     (GLOABAL.notification as any)[type](...args)
   }
 }
 
 const _createDialogMethod = (type:string) => {
   return (...args:any[]) => {
-    if (!GLOABAL.dialog) {
-      console.error('弹框未初始化')
-    }
+    // if (!GLOABAL.dialog) {
+    //   console.error('弹框未初始化')
+    // }
     (GLOABAL.dialog as any)[type](...args)
   }
 }

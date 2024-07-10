@@ -443,10 +443,14 @@ class ConfigFileView(APIView):
 
     def post(self, request):
         post_data = request.data
+<<<<<<< HEAD
         print(post_data)
         # file_path = f"current-configuration/{post_data['manage_ip']}/{post_data['manage_ip']}.txt"
         file_path = f"current-configuration/10.254.30.30/hp_comware-10.254.30.30.txt"
         get_file_commit = _ConfigGit.get_file_commit_filter_by_date(file_path, post_data["last_time"].split(' ')[0])
+=======
+        get_file_commit = _ConfigGit.get_file_content_by_commit(post_data['file_path'], post_data["commit"])
+>>>>>>> 7c46413f37a900620783da4ddab4da9840d899b5
         if get_file_commit:
             data = {
                 "code": 200,

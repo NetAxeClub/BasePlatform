@@ -1,13 +1,23 @@
-const range = {
-  left: 0,
-  right: 0,
-  top: 0,
-  bottom: 0,
+const getTranslateValues = (element:HTMLElement) => {
+  const style = window.getComputedStyle(element)
+  const matrix = style.transform
+  if (matrix === 'none') {
+    return {x: 0, y: 0}
+  }
+  const values = matrix.split('(')[1].split(')')[0].split(',')
+  return { x: parseFloat(values[values.length - 2]), y: parseFloat(values[values.length - 1]) }
 }
+
 
 const listeners: { name: string; listener: (e: MouseEvent) => void }[] = []
 
 export function drag (wrap: HTMLElement) {
+  const range = {
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+  }
   wrap.style.cursor = 'move'
   const parent = wrap.parentElement
   if (!parent) {
@@ -19,12 +29,15 @@ export function drag (wrap: HTMLElement) {
   wrap.addEventListener('mousedown', (e: MouseEvent) => {
     e.preventDefault()
     status = 'down'
+    const top = parseFloat(parent.style.top || '0')
     range.left = -((document.documentElement.clientWidth - parent.clientWidth) / 2)
     range.right = Math.abs(range.left)
-    range.top = -(document.documentElement.clientHeight - parent.clientHeight)
-    range.bottom = Math.abs(range.top)
-    startX = e.clientX - (parseInt(parent.style.left) || 0)
-    startY = e.clientY - (parseInt(parent.style.top) || 0)
+    const origin = -((document.documentElement.clientHeight - parent.clientHeight) / 2)
+    range.top = origin - top
+    range.bottom = Math.abs(origin) - top
+    const translateVal = getTranslateValues(parent)
+    startX = e.clientX - (translateVal.x || 0)
+    startY = e.clientY - (translateVal.y || 0)
     const handleMove = (e: MouseEvent) => {
       if (status !== 'down') return
       const moveX = e.clientX
@@ -37,14 +50,13 @@ export function drag (wrap: HTMLElement) {
       if (distX >= range.right) {
         distX = range.right
       }
-      if (distY <= 0) {
-        distY = 0
+      if (distY <= range.top) {
+        distY = range.top
       }
       if (distY >= range.bottom) {
         distY = range.bottom
       }
-      parent.style.left = distX + 'px'
-      parent.style.top = distY + 'px'
+      parent.style.transform = `translate(${distX}px, ${distY}px)`
     }
     const handleUp = () => {
       status = 'up'

@@ -16,3 +16,9 @@ project.yml文件内的pathname为npm run initproject -- --stage=的值
 ```bash
 npm run initproject -- --stage=cmdb
 ```
+
+## 其他
+
+### icon使用示例
+
+地址：http://localhost:[port]/na-demo/icon
