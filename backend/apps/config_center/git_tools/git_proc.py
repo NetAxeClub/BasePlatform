@@ -131,6 +131,26 @@ class ConfigGit:
                     result.append(_data)
         return result
 
+    # 获取指定文件在指定日期的所有commit
+    def get_file_commit_filter_by_date(self, file_path: str, date: str):
+        result = []
+        # 遍历commits
+        for commit in repo.iter_commits(paths=file_path):
+            print("Commit ID:", commit.hexsha)
+            print("Author:", commit.author)
+            print("Date:", commit.authored_datetime)
+            print("Subject:", commit.message)
+            print("-" * 40)  # 打印分隔符
+            if str(commit.authored_datetime).startswith(date):
+                _data = {
+                    # 'author': m.author,
+                    'label': commit.committed_datetime.strftime('%Y-%m-%d %H:%M:%S'),
+                    # 'message': m.message,
+                    'value': commit.hexsha,
+                }
+                result.append(_data)
+        return result
+
 
 def push_file():
     # 本地更改的文件

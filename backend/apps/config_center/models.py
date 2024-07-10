@@ -87,6 +87,7 @@ class TTPTemplate(models.Model):
 # 配置备份表
 class ConfigBackup(models.Model):
     status_choices = ((0, '在线'), (1, '下线'), (2, '挂牌'), (3, '备用'))
+    type_choices = (('change', 'change'), ('add', 'add'))
     name = models.CharField(
         verbose_name='设备名',
         max_length=100,
@@ -96,6 +97,9 @@ class ConfigBackup(models.Model):
     idc_name = models.CharField(verbose_name='机房', max_length=100, null=True, default='')
     model_name = models.CharField(verbose_name='型号', max_length=100, null=True, default='')
     vendor_name = models.CharField(verbose_name='厂商', max_length=100, null=True, default='')
+    file_path = models.CharField(verbose_name='文件路径', max_length=200, null=True, default='')
+    commit = models.CharField(verbose_name='提交commit', max_length=200, null=True, default='')
+    git_type = models.CharField(verbose_name='类型', max_length=200, null=True, default='', choices=status_choices)
     status = models.PositiveSmallIntegerField(
         verbose_name='状态', choices=status_choices, default=0)
     config_status = models.CharField(verbose_name='备份状态', max_length=100, null=False, default='')
