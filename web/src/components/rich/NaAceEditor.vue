@@ -17,6 +17,7 @@ import modeGo from 'ace-builds/src-noconflict/mode-golang'
 import modeSass from 'ace-builds/src-noconflict/mode-sass'
 import modeCss from 'ace-builds/src-noconflict/mode-css'
 import modeNginx from 'ace-builds/src-noconflict/mode-nginx'
+import javascript from 'ace-builds/src-noconflict/mode-javascript'
 import modeText from 'ace-builds/src-noconflict/mode-text'
 import modeSql from 'ace-builds/src-noconflict/mode-sql'
 import modeXml from 'ace-builds/src-noconflict/mode-xml'
@@ -26,7 +27,7 @@ import modeNunjucks from 'ace-builds/src-noconflict/mode-nunjucks'
 
 const emit = defineEmits(['update:value', 'change'])
 
-export type LangType = 'nunjucks' | 'python' | 'yaml' | 'html' | 'json' | 'java' | 'golang' | 'sass' | 'css' | 'sql' | 'xml' | 'typescript' | 'text' | 'nginx' | 'django'
+export type LangType = 'nunjucks' | 'python' | 'yaml' | 'html' | 'json' | 'java' | 'golang' | 'sass' | 'css' | 'sql' | 'xml' | 'typescript' | 'text' | 'nginx' | 'django' | 'javascript'
 export type ThemeType = 'monokai' | 'chrome'
 
 const modes = {
@@ -44,7 +45,8 @@ const modes = {
   'text': modeText,
   'nginx': modeNginx,
   'django': modeDjango,
-  'nunjucks': modeNunjucks
+  'nunjucks': modeNunjucks,
+  'javascript': javascript
 }
 const themes = {
   chrome: themeChrome,

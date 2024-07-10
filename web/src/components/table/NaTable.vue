@@ -22,8 +22,8 @@
   </n-data-table>
 </template>
 <script setup lang="ts">
-import type {DataTableColumn} from 'naive-ui'
-import {ref, watch, type PropType} from 'vue'
+import type { DataTableColumn } from 'naive-ui'
+import { ref, watch, type PropType } from 'vue'
 import NaLoading from '../NaLoading.vue'
 
 export type TableColumn = DataTableColumn & {
@@ -62,7 +62,10 @@ const sorter = ref({} as any)
 const needInitAll = ref(false)
 const loading = ref(false)
 
-watch(() => props.columns, () => start())
+watch(
+  () => props.columns,
+  () => start()
+)
 
 /**
  * 生成分页配置
@@ -74,33 +77,43 @@ const generatePagenation = () => {
     itemCount: 0,
     pageCount: 0,
     showSizePicker: true,
-    pageSizes: [{
-      label: '10/页',
-      value: 10
-    }, {
-      label: '50/页',
-      value: 50
-    }, {
-      label: '100/页',
-      value: 100
-    }, {
-      label: '200/页',
-      value: 200
-    }],
-    prefix: ({itemCount}: any) => {
+    pageSizes: [
+      {
+        label: '10/页',
+        value: 10
+      },
+      {
+        label: '50/页',
+        value: 50
+      },
+      {
+        label: '100/页',
+        value: 100
+      },
+      {
+        label: '200/页',
+        value: 200
+      }
+    ],
+    prefix: ({ itemCount }: any) => {
       return `共${itemCount}项`
     }
   }
 }
 
-const getAllColumns = async (cols:TableColumn[]) => {
-  cols.forEach(el => {
-    el.checked = !props.initShowColumns || props.initShowColumns.includes(el.key) || !el.key
+const getAllColumns = async (cols: TableColumn[]) => {
+  cols.forEach((el) => {
+    el.checked =
+      !props.initShowColumns ||
+      props.initShowColumns.includes(el.key) ||
+      !el.key
   })
   if (props.remoteMoreColumns) {
-    const cfgs = await props.remoteMoreColumns() || []
-    cfgs.forEach(el => {
-      el.checked = !!(props.initShowColumns && props.initShowColumns.includes(el.key))
+    const cfgs = (await props.remoteMoreColumns()) || []
+    cfgs.forEach((el) => {
+      el.checked = !!(
+        props.initShowColumns && props.initShowColumns.includes(el.key)
+      )
     })
     return [...cols, ...cfgs]
   }
@@ -110,8 +123,8 @@ const start = async () => {
   allColumns.value = await getAllColumns([...props.columns])
   needInitAll.value = true
   tableColumns.value = []
-  allColumns.value.forEach(el => {
-    el.checked && tableColumns.value.push({...el})
+  allColumns.value.forEach((el) => {
+    el.checked && tableColumns.value.push({ ...el })
   })
 }
 const handleColCfgChange = (columns: TableColumn[]) => {
@@ -121,16 +134,16 @@ const handleColCfgChange = (columns: TableColumn[]) => {
 const getNeedInitAll = () => {
   return needInitAll.value
 }
-const updateNeedInitAll = (val:boolean) => {
+const updateNeedInitAll = (val: boolean) => {
   needInitAll.value = val
 }
 
-const handleUpdatePage = (page:number) => {
+const handleUpdatePage = (page: number) => {
   pagenation.value.page = page
   queryList()
 }
 
-const handleUpdatePageSize = (pageSize:number) => {
+const handleUpdatePageSize = (pageSize: number) => {
   pagenation.value.pageSize = pageSize
   pagenation.value.page = 1
   queryList()
@@ -138,18 +151,25 @@ const handleUpdatePageSize = (pageSize:number) => {
 /**
  * 排序变更
  */
-const handleUpdateSorter = (_options:any) => {}
-
+const handleUpdateSorter = (_options: any) => {}
 
 /*抛出原naive-ui方法*/
-const methodsObj:any = {}
-const tableMethods = ['clearFilters', 'clearSorter', 'filters', 'page', 'scrollTo', 'sort']
-tableMethods.forEach(key => {
-  methodsObj[key] = (...args:any[]) => {
+const methodsObj: any = {}
+const tableMethods = [
+  'clearFilters',
+  'clearSorter',
+  'filters',
+  'page',
+  'scrollTo',
+  'sort'
+]
+tableMethods.forEach((key) => {
+  methodsObj[key] = (...args: any[]) => {
     return table.value && table.value[key](...args)
   }
 })
-if (props.getList) { // 含远程获取表格数据，初始化分页参数
+if (props.getList) {
+  // 含远程获取表格数据，初始化分页参数
   generatePagenation()
 }
 
@@ -176,10 +196,17 @@ const queryList = async () => {
       ...sorter.value
     }
     loading.value = true
-    const res = await props.getList(params)
-    pagenation.value.itemCount = res.total
-    pagenation.value.pageCount = Math.ceil(res.total / pagenation.value.pageSize)
-    loading.value = false
+    try {
+      const res = await props.getList(params)
+      pagenation.value.itemCount = res.total
+      pagenation.value.pageCount = Math.ceil(
+        res.total / pagenation.value.pageSize
+      )
+    } catch (e) {
+      return Promise.reject(e)
+    } finally {
+      loading.value = false
+    }
   }
   return 1
 }
@@ -194,7 +221,6 @@ defineExpose({
   refresh
 })
 start()
-
 </script>
 <style lang="scss" scoped>
 .na-data-table {

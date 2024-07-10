@@ -6,8 +6,7 @@ user:
   password:
 # 项目信息配置
 project:
-  -
-    pathname: base-platform
+  - pathname: base-platform
     url: https://gitee.com/NetAxeClub/base-platform-fronted.git
     branch: master
     username:
@@ -31,8 +30,7 @@ project:
         VITE_LOCAL_ROUTER: false
         VITE_BASIC_URL:
         VITE_RBAC_URL:
-  -
-    pathname: cmdb
+  - pathname: cmdb
     url: https://gitee.com/NetAxeClub/cmdb-fronted.git
     branch: master
     username:
@@ -67,6 +65,31 @@ project:
     # 是否初始化前端项目初始化文件
     #uninit: false
     port: 32201
+    # 前端代理配置相关配置
+    proxy: # 代理
+      /msg_gateway: # 需代理的前缀
+        target: http://127.0.0.1:31101/
+      /rbac:
+        target: http://127.0.0.1:31101/
+    env: production
+    envConfig:
+      development:
+        VITE_LOCAL_ROUTER: true
+        VITE_BASIC_URL:
+        VITE_RBAC_URL:
+      production:
+        VITE_LOCAL_ROUTER: true
+        VITE_BASIC_URL:
+        VITE_RBAC_URL:
+
+  - pathname: ipam
+    url: https://gitee.com/NetAxeClub/ipam-fronted.git
+    branch: master
+    username:
+    password:
+    # 是否初始化前端项目初始化文件
+    #uninit: false
+    port: 32203
     # 前端代理配置相关配置
     proxy: # 代理
       /msg_gateway: # 需代理的前缀
