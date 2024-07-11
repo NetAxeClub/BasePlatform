@@ -35,4 +35,5 @@ urlpatterns = [
     path('fsm_parse', views.TextFSMParse.as_view(), name='fsm_parse'),
     path('jinja2_parse', views.Jinja2View.as_view(), name='jinja2_parse'),
     path('config_backup_file/', views.ConfigFileView.as_view(), name='config_backup_file'),
+    path('get_config_file/', views.ConfigFileListView.as_view(), name='get_config_file'),
 ]

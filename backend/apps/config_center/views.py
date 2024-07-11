@@ -2,9 +2,10 @@
 import json
 import re
 import yaml
+import io
 from jinja2 import Environment, StrictUndefined, exceptions
 from datetime import date, datetime
-from django.http import JsonResponse
+from django.http import JsonResponse, StreamingHttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from rest_framework.views import APIView
@@ -470,6 +471,24 @@ class ConfigFileView(APIView):
                 "message": "success"
             }
             return JsonResponse(data)
+        data = {
+            "code": 400,
+            "results": [],
+            "message": "没有捕获任何操作"
+        }
+        return JsonResponse(data)
+
+
+class ConfigFileListView(APIView):
+    def get(self, request):
+        get_param = request.GET.dict()
+        get_file_commit = _ConfigGit.get_file_content_by_commit(get_param['file_path'], get_param["commit"])
+        if get_file_commit:
+            file_stream = io.BytesIO(bytes(get_file_commit.encode()))
+            # 设置HTTP响应头
+            response = StreamingHttpResponse(file_stream, content_type='application/octet-stream')
+            response['Content-Disposition'] = f"attachment; filename={get_param['file_path'].split('/')[-1]}"
+            return response
         data = {
             "code": 400,
             "results": [],
