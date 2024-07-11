@@ -131,7 +131,6 @@ class ConfigGit:
                     result.append(_data)
         return result
 
-    # 获取指定文件在指定日期的所有commit
     def get_file_content_by_commit(self, file_path: str, commit_hash: str):
             repo = Repo(repo_path)
             commit = repo.commit(commit_hash)

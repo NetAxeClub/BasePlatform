@@ -454,6 +454,15 @@ class ConfigFileView(APIView):
     authentication_classes = ()
 
     def get(self, request):
+        get_params = request.GET.dict()
+        if 'file_path' in get_params.keys():
+            res = _ConfigGit.get_file_all_change_commmit(file_path=get_params['file_path'])
+            data = {
+                "code": 200,
+                "results": res,
+                "message": "获取成功"
+            }
+            return JsonResponse(data)
         data = {
             "code": 400,
             "results": [],
