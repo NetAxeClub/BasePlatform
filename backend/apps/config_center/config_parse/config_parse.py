@@ -55,8 +55,15 @@ def config_file_path_tree():
 
 
 class ConfigTree(BaseTree):
+    _instance = None
+
     def __init__(self):
         super(ConfigTree, self).__init__(BASE_DIR + '/media/device_config/', 'device_config/')
+
+    def __new__(cls):
+        if not cls._instance:
+            cls._instance = super().__new__(cls)
+        return cls._instance
 
 
 class FSMTree:
