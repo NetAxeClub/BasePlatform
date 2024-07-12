@@ -55,13 +55,22 @@ def config_backup(**kwargs):
         # email_subject = '配置备份结果_' + datetime.now().strftime("%Y-%m-%d %H:%M")
         # email_text_content = html_res
         # msg_gateway_runner.send_email(user=email_addr, subject=email_subject, content=email_text_content)
+    for host in hosts:
+        if host['manage_ip'] in fail_host_list:
+            ConfigBackup.objects.create(
+                name=host['name'], manage_ip=host['manage_ip'],
+                config_status='FAILED',
+                status=host['status'], idc_name=host['idc__name'],
+                vendor_name=host['vendor__name'], model_name=host['model__name'],
+                git_type='change', commit='', file_path=''
+            )
     for change_host in changed_files:
         hostip = change_host.split('/')[1]
         host_info = [host for host in hosts if host['manage_ip'] == hostip]
         if host_info:
             ConfigBackup.objects.create(
                 name=host_info[0]['name'], manage_ip=host_info[0]['manage_ip'],
-                config_status='SUCCESS' if hostip not in fail_host_list else 'FAILED',
+                config_status='SUCCESS',
                 status=host_info[0]['status'], idc_name=host_info[0]['idc__name'],
                 vendor_name=host_info[0]['vendor__name'], model_name=host_info[0]['model__name'],
                 git_type='change', commit=commit, file_path=change_host
@@ -72,7 +81,7 @@ def config_backup(**kwargs):
         if host_info:
             ConfigBackup.objects.create(
                 name=host_info[0]['name'], manage_ip=host_info[0]['manage_ip'],
-                config_status='SUCCESS' if hostip not in fail_host_list else 'FAILED',
+                config_status='SUCCESS',
                 status=host_info[0]['status'], idc_name=host_info[0]['idc__name'],
                 vendor_name=host_info[0]['vendor__name'], model_name=host_info[0]['model__name'],
                 git_type='add', commit=commit, file_path=untracked_host

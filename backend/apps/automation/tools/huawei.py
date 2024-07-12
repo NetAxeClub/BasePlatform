@@ -7,7 +7,7 @@
 import json
 import re
 from datetime import datetime
-
+from operator import methodcaller
 from django.core.cache import cache
 from netaddr import IPNetwork, IPAddress
 
@@ -49,20 +49,20 @@ class HuaweiProc(BaseConn):
         # 服务对象
         self.service_set = {}
 
-    def huawei_usg_sec_policy(self, datas):
+    def _huawei_usg_sec_policy(self, datas):
         """
         name: 'shipinghuiyi-deny',
         'source-zone': 'untrust',
         'destination-zone': 'trust',
         'destination-ip': {
-            'address-set': 'shighuiyi'
+            'address-set': 'shipinghuiyi'
         },
         service: {
             'service-object': 'tcp22'
         },
         enable: 'true',
         action: 'false',
-        hostip: '1721'
+        hostip: '172.21.250.251'
         :param host:
         :param datas:
         :return:
@@ -352,7 +352,7 @@ class HuaweiProc(BaseConn):
         sec_mongo.insert_many(results)
         return
 
-    def arp_proc(self, res):
+    def _arp_proc(self, res):
         if isinstance(res, list):
             arp_datas = []
             for i in res:
@@ -375,7 +375,7 @@ class HuaweiProc(BaseConn):
                 MongoNetOps.insert_table(
                     'Automation', self.hostip, arp_datas, 'ARPTable')
 
-    def mac_proc(self, res):
+    def _mac_proc(self, res):
         """
         {'macaddress': '04d7-a541-2eea', 'vlan': '1001', 'interface': 'GE1/1/1', 'type': 'dynamic', 'age': '300'}
         :param res:
@@ -485,11 +485,9 @@ class HuaweiProc(BaseConn):
                 tablename='layer2interface')
         return
 
-    def lldp_proc(self, res):
+    def _lldp_proc(self, res):
         lldp_datas = []
         for i in res:
-            if not isinstance(i, dict):
-                continue
             neighbor_ip = ''
             if 'neighborsysname' in i.keys():
                 if i['neighborsysname']:
@@ -517,7 +515,7 @@ class HuaweiProc(BaseConn):
             MongoNetOps.insert_table(
                 'Automation', self.hostip, lldp_datas, 'LLDPTable')
 
-    def manuinfo_proc(self, res):
+    def _manuinfo_proc(self, res):
         if isinstance(res, list):
             for _tmp in res:
                 NetworkDevice.objects.filter(manage_ip=self.hostip, serial_num=_tmp['serialnum']) \
@@ -526,7 +524,7 @@ class HuaweiProc(BaseConn):
             NetworkDevice.objects.filter(manage_ip=self.hostip, serial_num=res['serialnum']) \
                 .update(slot=int(res['slot']))
 
-    def stack_proc(self, res):
+    def _stack_proc(self, res):
         if isinstance(res, list):
             if len(res) == 1:
                 for _tmp in res:
@@ -560,24 +558,35 @@ class HuaweiProc(BaseConn):
             #             res['slot'])).update(
             #         ha_status=2)
 
+    def _version_proc(self, res):
+        if isinstance(res, list):
+            if res[0]['model'] and self.model__name is None:
+                _vendor = Vendor.objects.get(name='华为')
+                _model_instance, _action = Model.objects.get_or_create(
+                    **dict(vendor=_vendor, name=res[0]['model']))
+                NetworkDevice.objects.filter(manage_ip=self.hostip).update(model=_model_instance)
+            if res[0]['vrp_version'] and self.soft_version != res[0]['vrp_version']:
+                NetworkDevice.objects.filter(manage_ip=self.hostip).update(soft_version=res[0]['vrp_version'])
+        return
+
     # 命令结果解析模块
     def path_map(self, file_name, res: list):
         fsm_map = {
-            'display_arp': self.arp_proc,
-            'display_arp_all': self.arp_proc,
-            'display_mac-address': self.mac_proc,
-            'display_lldp_neighbor': self.lldp_proc,
-            'display_device_manufacture-info': self.manuinfo_proc,
-            'display_stack': self.stack_proc
+            'display_arp': '_arp_proc',
+            'display_arp_all': '_arp_proc',
+            'display_mac-address': '_mac_proc',
+            'display_lldp_neighbor': '_lldp_proc',
+            'display_device_manufacture-info': '_manuinfo_proc',
+            'display_stack': '_stack_proc',
+            'display_version': '_version_proc'
         }
         if file_name in fsm_map.keys():
-            fsm_map[file_name](res)
+            caller = methodcaller(fsm_map[file_name], res)
+            caller(self)
         else:
-            pass
-            #send_msg_netops"设备:{}\n命令:{}\n不被解析".format(self.hostip, file_name))
+            send_msg_netops("设备:{}\n命令:{}\n不被解析".format(self.hostip, file_name))
 
     def _collection_analysis(self, paths: list):
-        # self.cmds += ['display mac-address']
         for path in paths:
             if path['cmd_file'] == 'display_interface':
                 self.interface_proc(path)
@@ -597,37 +606,34 @@ class HuaweiProc(BaseConn):
         """
         if res:
             if isinstance(res, dict):
+                updata_data = {}
                 if self.hostname != res['sysName']:
-                    NetworkDevice.objects.filter(manage_ip=self.hostip, status=0).update(
-                        name=res['sysName'], soft_version=res['platformVer'], patch_version=res['patchVer']
+                    updata_data['name'] = res['sysName']
+                if self.model__name != res['productName']:
+                    updata_data['model'], flag = Model.objects.get_or_create(
+                        vendor=Vendor.objects.get(name='华为'), name=res['productName']
                     )
-                model_q = Model.objects.filter(name=res['productName'])
-                if model_q:
-                    model_obj = Model.objects.get(name=res['productName'])
-                    NetworkDevice.objects.filter(manage_ip=self.hostip, status=0) \
-                        .update(model=model_obj)
-                else:
-                    model_q = Model.objects.create(name=res['productName'],
-                                                        vendor=Vendor.objects.get(alias='Huawei'))
-                    NetworkDevice.objects.filter(manage_ip=self.hostip, status=0) \
-                        .update(model=model_q)
+                if self.soft_version != res['platformVer']:
+                    updata_data['soft_version'] = res['platformVer']
+                if self.patch_version != res.get('patchVer', ''):
+                    updata_data['patch_version'] = res['patchVer']
+                if len(updata_data.keys()) > 0:
+                    NetworkDevice.objects.filter(manage_ip=self.hostip, status=0).update(**updata_data)
             if isinstance(res, list):
                 for _sysinfo in res:
+                    updata_data = {}
                     if self.hostname != _sysinfo['sysName']:
-                        NetworkDevice.objects.filter(manage_ip=self.hostip, status=0).update(
-                            name=_sysinfo['sysName'], soft_version=_sysinfo['platformVer'],
-                            patch_version=_sysinfo['patchVer']
+                        updata_data['name'] = _sysinfo['sysName']
+                    if self.model__name != _sysinfo['productName']:
+                        updata_data['model'], flag = Model.objects.get_or_create(
+                            vendor=Vendor.objects.get(name='华为'), name=_sysinfo['productName']
                         )
-                    model_q = Model.objects.filter(name=_sysinfo['productName'])
-                    if model_q:
-                        model_obj = Model.objects.get(name=_sysinfo['productName'])
-                        NetworkDevice.objects.filter(manage_ip=self.hostip, status=0) \
-                            .update(model=model_obj)
-                    else:
-                        model_q = Model.objects.create(name=_sysinfo['productName'],
-                                                            vendor=Vendor.objects.get(alias='Huawei'))
-                        NetworkDevice.objects.filter(manage_ip=self.hostip, status=0) \
-                            .update(model=model_q)
+                    if self.soft_version != _sysinfo['platformVer']:
+                        updata_data['soft_version'] = _sysinfo['platformVer']
+                    if self.patch_version != _sysinfo.get('patchVer', ''):
+                        updata_data['patch_version'] = _sysinfo['patchVer']
+                    if len(updata_data.keys()) > 0:
+                        NetworkDevice.objects.filter(manage_ip=self.hostip, status=0).update(**updata_data)
 
     def _netconf_moduleinfo(self, dev_moduleinfo):
         if dev_moduleinfo:
@@ -646,8 +652,8 @@ class HuaweiProc(BaseConn):
                 NetworkDevice.objects.filter(manage_ip=self.hostip, serial_num=dev_moduleinfo['entSerialNum']) \
                     .update(slot=int(dev_moduleinfo['position']))
 
-    def _netconf_stack(self, stack_info):
-        if stack_info:
+    def _netconf_stack(self, stack_info: tuple):
+        if stack_info[0]:
             if isinstance(stack_info, list):
                 for _stack in stack_info:
                     if _stack['role'] == 'Master':
@@ -1254,9 +1260,8 @@ class HuaweiProc(BaseConn):
                     datas=nat_policy,
                     tablename='huawei_usg_nat_policy')
         except Exception as e:
-            pass
             # print(traceback.print_exc())
-            #send_msg_netops"设备:{}\nSNAT解析失败\n{}".format(self.hostip, str(e)))
+            send_msg_netops("设备:{}\nSNAT解析失败\n{}".format(self.hostip, str(e)))
 
     # DNAT
     def _netconf_usg_nat_server(self, nat_server):
@@ -1285,6 +1290,7 @@ class HuaweiProc(BaseConn):
                     protocol = protocol_map[i['protocol']] if i['protocol'] in protocol_map.keys(
                     ) else i['protocol']
                 tmp = dict(
+                    id=f"{i['name']}_{self.hostip}",
                     hostip=self.hostip,
                     name=i.get('name'),
                     global_ip=[
@@ -1383,7 +1389,7 @@ class HuaweiProc(BaseConn):
                     sec_policy_result.append(i)
             if sec_policy_result:
                 # 格式化落库
-                self.huawei_usg_sec_policy(sec_policy_result)
+                self._huawei_usg_sec_policy(sec_policy_result)
                 # 原始数据格式落库
                 MongoNetOps.insert_table(db='NETCONF', hostip=self.hostip, datas=sec_policy_result,
                                          tablename='huawei_sec_policy')
@@ -1403,36 +1409,36 @@ class HuaweiProc(BaseConn):
 
     def _netconf_method_map(self, method, res):
         ntf_map = {
-            "colleciton_system_info": self._netconf_ce_system_info,
-            "colleciton_moduleinfo": self._netconf_moduleinfo,
-            "colleciton_stack": self._netconf_stack,
-            "collection_intf_ipv4v6": self._netconf_intf_ipv4v6,
-            "colleciton_arp_list": self._netconf_arp_list,
-            "collection_mac_bd": self._netconf_mac_bd,
-            "collection_mac_vxlan": self._netconf_mac_vxlan,
-            "collection_mac_vxlan_control": self._netconf_mac_vxlan_control,
-            "collection_mac_table": self._netconf_mac_table,
-            "collection_lldp_ip": self._netconf_lldp,
-            "colleciton_trunk_lacp": self._netconf_lldp,
-            "get_system_info": self._netcocnf_system_info,
-            "get_interface_list": self._netcocnf_system_info,
-            "get_vrrp_info": self._netcocnf_system_info,
-            "get_hrp_state": self._netconf_usg_hrp_state,
-            "get_nat_policy": self._netconf_usg_nat_policy,
-            "get_nat_server": self._netconf_usg_nat_server,
-            "get_nat_address": self._netconf_usg_nat_address_group,
-            "get_address_set": self._netconf_usg_address_set,
-            "get_slb_info": self._netconf_usg_slb_info,
-            "get_service_set": self._netconf_usg_service_set,
-            "get_trunk_lacp": self._netconf_usg_trunk_lacp,
-            "get_sec_policy": self._netconf_usg_sec_policy,
-            "get_sec_policy_counting": self._netconf_usg_sec_policy_counting,
+            "colleciton_system_info": '_netconf_ce_system_info',
+            "colleciton_moduleinfo": '_netconf_moduleinfo',
+            "colleciton_stack": '_netconf_stack',
+            "collection_intf_ipv4v6": '_netconf_intf_ipv4v6',
+            "colleciton_arp_list": '_netconf_arp_list',
+            "collection_mac_bd": '_netconf_mac_bd',
+            "collection_mac_vxlan": '_netconf_mac_vxlan',
+            "collection_mac_vxlan_control": '_netconf_mac_vxlan_control',
+            "collection_mac_table": '_netconf_mac_table',
+            "collection_lldp_ip": '_netconf_lldp',
+            "colleciton_trunk_lacp": '_netconf_lldp',
+            "get_system_info": '_netcocnf_system_info',
+            "get_interface_list": '_netconf_usg_interface_list',
+            "get_vrrp_info": '_netconf_usg_vrrp_info',
+            "get_hrp_state": '_netconf_usg_hrp_state',
+            "get_nat_policy": '_netconf_usg_nat_policy',
+            "get_nat_server": '_netconf_usg_nat_server',
+            "get_nat_address": '_netconf_usg_nat_address_group',
+            "get_address_set": '_netconf_usg_address_set',
+            "get_slb_info": '_netconf_usg_slb_info',
+            "get_service_set": '_netconf_usg_service_set',
+            "get_trunk_lacp": '_netconf_usg_trunk_lacp',
+            "get_sec_policy": '_netconf_usg_sec_policy',
+            "get_sec_policy_counting": '_netconf_usg_sec_policy_counting',
         }
-        if callable(ntf_map[method]):
-            return ntf_map[method](res)
+        if method in ntf_map.keys():
+            caller = methodcaller(ntf_map[method], res)
+            caller(self)
         else:
-            pass
-            #send_msg_netops"设备:{}\n方法:{}\n不被解析".format(self.hostip, method))
+            send_msg_netops("设备:{}\n方法:{}\n不被解析".format(self.hostip, method))
 
     # 根据采集清单执行
     def collection_run(self):
@@ -1461,8 +1467,7 @@ class HuaweiProc(BaseConn):
                             if res:
                                 self._netconf_method_map(method, res)
                         except Exception as e:
-                            pass
-                            #send_msg_netops"设备:{}\nnetconf方法:{}\n不被设备支持\n{}".format(self.hostip, method, str(e)))
+                            send_msg_netops("设备:{}\nnetconf方法:{}\n不被设备支持\n{}".format(self.hostip, method, str(e)))
             if self.layer3datas:
                 MongoNetOps.insert_table(db='Automation', hostip=self.hostip, datas=self.layer3datas,
                                          tablename='layer3interface')
@@ -1496,8 +1501,7 @@ class HuaweiProc(BaseConn):
             except Exception as e:
                 print(str(e))
         else:
-            pass
-            #send_msg_netops"设备:{}\nnetconf方法:{}\n不被设备支持\n".format(self.hostip, method))
+            send_msg_netops("设备:{}\nnetconf方法:{}\n不被设备支持\n".format(self.hostip, method))
         if self.layer3datas:
             MongoNetOps.insert_table(db='Automation', hostip=self.hostip, datas=self.layer3datas,
                                      tablename='layer3interface')
