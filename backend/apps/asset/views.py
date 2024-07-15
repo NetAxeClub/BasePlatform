@@ -454,13 +454,13 @@ class NetworkDeviceViewSet(CustomViewBase):
     # 配置搜索功能
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filterset_class = NetworkDeviceFilter
-    filter_fields = ('serial_num', 'manage_ip', 'bridge_mac', 'category__name',
+    filter_fields = ('serial_num', 'manage_ip', 'category__name',
                      'name', 'vendor__name', 'idc__name', 'patch_version', 'soft_version',
                      'model__name', 'memo', 'status', 'ha_status')
     # pagination_class = LimitSet
     pagination_class = LargeResultsSetPagination
     # 设置搜索的关键字
-    search_fields = ('serial_num', 'manage_ip', 'bridge_mac', 'category__name',
+    search_fields = ('serial_num', 'manage_ip', 'category__name',
                      'name', 'vendor__name', 'idc__name', 'patch_version', 'soft_version',
                      'model__name', 'memo', 'status', 'ha_status')
 
@@ -478,8 +478,8 @@ class NetworkDeviceViewSet(CustomViewBase):
             else:
                 return self.queryset.filter(manage_ip__in=[search_host_list])
             # return self.queryset.filter(manage_ip__in=search_host_list)
-        # if history:
-        #     return self.queryset.history.all()
+        if history:
+            return self.queryset.history.all()
         if expires == '1':
             return self.queryset.filter(expire__lt=date.today())
         elif expires == '0':

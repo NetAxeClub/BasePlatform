@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "apps.config_center.apps.ConfigCenterConfig",
     # "apps.route_backend.apps.RouteBackendConfig",
     "apps.int_utilization.apps.IntUtilizationConfig",
+    "apps.event.apps.EventConfig",
     # 'reversion',
     'import_export',
 ]
