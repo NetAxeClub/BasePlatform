@@ -28,9 +28,9 @@ class LargeResultsSetPagination(LimitOffsetPagination):
     def get_paginated_response(self, data):
         code = 200
         msg = 'success'
-        if not data:
-            code = 404
-            msg = "Data Not Found"
+        # if not data:
+        #     code = 200
+        #     msg = "Data Not Found"
 
         return Response(OrderedDict([
             ('code', code),
