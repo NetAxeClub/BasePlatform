@@ -116,19 +116,27 @@ class ConfigGit:
 
     def get_file_all_change_commmit(self, file_path):
         result = []
-        for commit in repo.iter_commits():
-            # 检查每个commit的变更文件
-            for diff in commit.diff(commit.parents, paths=[file_path], create_patch=True):
-                # 如果变更文件包含指定文件，将commit添加到列表中
-                if diff.a_path == file_path or diff.b_path == file_path:
-                    # commits.append(commit)
-                    _data = {
-                        # 'author': m.author,
-                        'label': commit.committed_datetime.strftime('%Y-%m-%d %H:%M:%S'),
-                        # 'message': m.message,
-                        'value': commit.hexsha,
-                    }
-                    result.append(_data)
+        for commit in repo.iter_commits(paths=file_path):
+            _data = {
+                # 'author': m.author,
+                'label': commit.committed_datetime.strftime('%Y-%m-%d %H:%M:%S'),
+                # 'message': m.message,
+                'value': commit.hexsha,
+            }
+            result.append(_data)
+        # for commit in repo.iter_commits():
+        #     # 检查每个commit的变更文件
+        #     for diff in commit.diff(commit.parents, paths=[file_path], create_patch=True):
+        #         # 如果变更文件包含指定文件，将commit添加到列表中
+        #         if diff.a_path == file_path or diff.b_path == file_path:
+        #             # commits.append(commit)
+        #             _data = {
+        #                 # 'author': m.author,
+        #                 'label': commit.committed_datetime.strftime('%Y-%m-%d %H:%M:%S'),
+        #                 # 'message': m.message,
+        #                 'value': commit.hexsha,
+        #             }
+        #             result.append(_data)
         return result
 
     def get_file_content_by_commit(self, file_path: str, commit_hash: str):
