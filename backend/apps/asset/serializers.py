@@ -255,7 +255,9 @@ class ServerSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         account = self.initial_data['account']
-        if account:
+        if isinstance(account, list):
+            instance.account.set([x['id'] for x in account])
+        elif isinstance(account, str):
             account = json.loads(account)
             instance.account.set(account)
         return super().update(instance, validated_data)
