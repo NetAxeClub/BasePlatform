@@ -207,8 +207,8 @@ class NetworkDeviceSerializer(serializers.ModelSerializer):
         """ Perform necessary eager loading of data. """
         # select_related for "to-one" relationships
         queryset = queryset.select_related('model',
-                                           'category',
-                                           'vendor',
+                                           'category', 'plan',
+                                           'vendor', 'role', 'attribute', 'framework', 'zone', 'rack', 'idc_model',
                                            'idc',)
         queryset = queryset.prefetch_related(
             'bind_ip', 'account')

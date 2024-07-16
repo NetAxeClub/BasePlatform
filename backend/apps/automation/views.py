@@ -18,6 +18,8 @@ from utils.db.mongo_ops import MongoOps
 from driver import auto_driver_map
 
 xunmi_mongo = MongoOps(db='BasePlatform', coll='XunMi')
+show_ip_mongo = MongoOps(db='Automation', coll='layer3interface')
+interface_mongo = MongoOps(db='Automation', coll='layer2interface')
 
 
 class CollectionPlanFilter(django_filters.FilterSet):
@@ -244,7 +246,20 @@ class AutomationChart(APIView):
 class XunMiView(APIView):
     def get(self, request):
         get_param = request.GET.dict()
-        print(get_param)
+        mongo_data = dict()
+        if get_param.get('get_interface_by_hostip'):
+            hostip = get_param['get_interface_by_hostip']
+            layer3interface_res = show_ip_mongo.find(query_dict={'hostip': hostip}, fileds={'interface': 1})
+            layer2interface_res = interface_mongo.find(query_dict={'hostip': hostip}, fileds={'interface': 1})
+            result = [x['interface'] for x in layer3interface_res if layer3interface_res] + [x['interface'] for x in layer2interface_res if layer2interface_res]
+            result = {
+                "code": 200,
+                "count": len(result),
+                "message": "成功",
+                "results": result
+            }
+            return JsonResponse(result, safe=False)
+
         if get_param.get('get_table_columns') == '1':
             result = {
                 'code': 200,
@@ -289,62 +304,60 @@ class XunMiView(APIView):
             return JsonResponse(result, safe=False)
         # 最近一次结果
         elif get_param.get('last') == 'true':
-            if get_param.get('server_mac_address', '') or get_param.get('server_ip_address', ''):
-                mongo_data = dict()
-                # 用于把key值为空的可以过滤掉，只保留有完整key value的字典信息
-                for param in get_param.keys():
-                    if get_param[param]:
-                        if param in ['limit', 'start', 'page', 'method', 'last']:
-                            continue
-                        mongo_data[param] = get_param[param]
-                if get_param['log_time']:
-                    start_time = mongo_data['log_time'] + ' 00:00:00'
-                    end_time = mongo_data['log_time'] + ' 23:59:59'
-                    start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
-                    end_time = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
-                    mongo_data['log_time'] = {"$gte": start_time, "$lte": end_time}
-                query_tmp = xunmi_mongo.find(query_dict=mongo_data, fileds={'_id': 0}, sort='log_time')
-                if query_tmp:
-                    mongo_data['log_time'] = query_tmp[-1]['log_time']
-                    res = xunmi_mongo.find(query_dict=mongo_data, fileds={'_id': 0}, sort='log_time')
-                    for i in res:
-                        i['log_time'] = i['log_time'].strftime("%Y-%m-%d %H:%M:%S")
-                    result = {
-                        "code": 200,
-                        "results": res,
-                        "count": len(res)
-                    }
-                    return JsonResponse(result, safe=False)
-        else:
-            if get_param.get('server_mac_address', '') or get_param.get('server_ip_address', ''):
-                mongo_data = dict()
-                # 用于把key值为空的可以过滤掉，只保留有完整key value的字典信息
-                for param in get_param.keys():
-                    if get_param[param]:
-                        if param in ['limit', 'start', 'page', 'method', 'last']:
-                            continue
-                        mongo_data[param] = get_param[param]
-                if get_param['log_time']:
-                    start_time = mongo_data['log_time'] + ' 00:00:00'
-                    end_time = mongo_data['log_time'] + ' 23:59:59'
-                    start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
-                    end_time = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
-                    mongo_data['log_time'] = {"$gte": start_time, "$lte": end_time}
-                res = xunmi_mongo.find_page_query(fileds={'_id': 0}, sort='log_time',
-                                                  query_dict=mongo_data,
-                                                  page_size=int(get_param['limit']),
-                                                  page_num=int(get_param['start']) // 10)
+
+            # 用于把key值为空的可以过滤掉，只保留有完整key value的字典信息
+            for param in get_param.keys():
+                if get_param[param]:
+                    if param in ['limit', 'start', 'page', 'method', 'last', 'idc']:
+                        continue
+                    mongo_data[param] = get_param[param]
+            if get_param.get('log_time'):
+                start_time = mongo_data['log_time'] + ' 00:00:00'
+                end_time = mongo_data['log_time'] + ' 23:59:59'
+                start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+                end_time = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+                mongo_data['log_time'] = {"$gte": start_time, "$lte": end_time}
+
+            query_tmp = xunmi_mongo.find(query_dict=mongo_data, fileds={'_id': 0}, sort='log_time')
+            if query_tmp:
+                mongo_data['log_time'] = query_tmp[-1]['log_time']
+                res = xunmi_mongo.find(query_dict=mongo_data, fileds={'_id': 0}, sort='log_time')
                 for i in res:
                     i['log_time'] = i['log_time'].strftime("%Y-%m-%d %H:%M:%S")
-
-                res_count = MongoOps(db='netops', coll='XunMi').find(fileds={'_id': 0}, sort='log_time',
-                                                                     query_dict=mongo_data)
                 result = {
                     "code": 200,
                     "results": res,
-                    "count": len(res_count)
+                    "count": len(res)
                 }
                 return JsonResponse(result, safe=False)
+        else:
+            # 用于把key值为空的可以过滤掉，只保留有完整key value的字典信息
+            for param in get_param.keys():
+                if get_param[param]:
+                    if param in ['limit', 'start', 'page', 'method', 'last', 'idc']:
+                        continue
+                    mongo_data[param] = get_param[param]
+            if get_param.get("log_time"):
+                start_time = mongo_data['log_time'] + ' 00:00:00'
+                end_time = mongo_data['log_time'] + ' 23:59:59'
+                start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+                end_time = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+                mongo_data['log_time'] = {"$gte": start_time, "$lte": end_time}
+            res = xunmi_mongo.find_page_query(fileds={'_id': 0}, sort='log_time',
+                                              query_dict=mongo_data,
+                                              page_size=int(get_param.get("limit")),
+                                              page_num=int(get_param.get("start")) // 10)
+            for i in res:
+                i['log_time'] = i['log_time'].strftime("%Y-%m-%d %H:%M:%S")
+
+            res_count = MongoOps(db='netops', coll='XunMi').find(fileds={'_id': 0}, sort='log_time',
+                                                                 query_dict=mongo_data)
+            result = {
+                "code": 200,
+                "results": res,
+                "count": len(res_count)
+            }
+            return JsonResponse(result, safe=False)
         result = {
             "code": 400,
             "count": 0,
