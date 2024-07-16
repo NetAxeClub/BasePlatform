@@ -3,6 +3,7 @@ import json
 import re
 import yaml
 import io
+import django_filters
 from jinja2 import Environment, StrictUndefined, exceptions
 from datetime import date, datetime
 from django.http import JsonResponse, StreamingHttpResponse
@@ -53,12 +54,23 @@ def jinja_render(data, template):
     return False, "安全校验失败"
 
 
+class ConfigBackupFilter(django_filters.FilterSet):
+    """模糊字段过滤"""
+
+    name = django_filters.CharFilter(lookup_expr='icontains')
+
+    class Meta:
+        model = ConfigBackup
+        fields = '__all__'
+
+
 # 配置备份
 class ConfigBackupViewSet(CustomViewBase):
     queryset = ConfigBackup.objects.all().order_by('-id')
     serializer_class = ConfigBackupSerializer
     # permission_classes = (permissions.IsAuthenticated,)
     pagination_class = LargeResultsSetPagination
+    filterset_class = ConfigBackupFilter
     # 配置搜索功能
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filter_fields = ('manage_ip', 'name')

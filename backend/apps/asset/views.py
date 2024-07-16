@@ -602,11 +602,6 @@ class AdminRecordFilter(django_filters.FilterSet):
 
     admin_start_time = django_filters.CharFilter(lookup_expr='icontains')
 
-    # host__idc = django_filters.CharFilter()
-    # host__name = django_filters.CharFilter(lookup_expr='icontains')
-    # host__manage_ip = django_filters.CharFilter(lookup_expr='icontains')
-    # host__manage_ip = django_filters.CharFilter(lookup_expr='icontains')
-
     class Meta:
         model = AdminRecord
         fields = '__all__'
@@ -620,8 +615,7 @@ class AdminRecordViewSet(CustomViewBase):
     queryset = AdminRecord.objects.all().order_by('-id')
     queryset = AdminRecordSerializer.setup_eager_loading(queryset)
     serializer_class = AdminRecordSerializer
-    permission_classes = ()
-    authentication_classes = ()
+    pagination_class = LargeResultsSetPagination
     # 配置搜索功能
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     # 如果要允许对某些字段进行过滤，可以使用filter_fields属性。
@@ -637,4 +631,4 @@ class AdminRecordViewSet(CustomViewBase):
             return AdminRecord.objects.filter(
                 admin_start_time__gt=start,
                 admin_start_time__lt=end)
-        return AdminRecord.objects.all()
+        return AdminRecord.objects.all().order_by('-id')
