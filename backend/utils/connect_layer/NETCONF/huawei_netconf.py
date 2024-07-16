@@ -5,7 +5,7 @@
 import json
 import re
 
-from .netconf_connect import HuaweiyangNetconfConnect, XmlToDict
+from utils.connect_layer.NETCONF.netconf_connect import HuaweiyangNetconfConnect, XmlToDict
 
 
 class HuaweiUSG(HuaweiyangNetconfConnect):
@@ -955,20 +955,26 @@ class HuaweiCollection(HuaweiyangNetconfConnect):
             </TrunkIfs>
           </ifmtrunk>
            '''
-        request = self.netconf_get(obtain_xml)
-        # {'ifName': 'Eth-Trunk127', 'TrunkMemberIfs': {'TrunkMemberIf': [{'memberIfName': '40GE1/0/5', 'weight': '1', 'memberIfState': 'Up'}, {'memberIfName': '40GE1/0/6', 'weight': '1', 'memberIfState': 'Up'}]}}
-        # {'ifName': 'Eth-Trunk1', 'TrunkMemberIfs': {'TrunkMemberIf': {'memberIfName': '10GE1/0/1', 'weight': '1', 'memberIfState': 'Up'}}}
-        if request:
-            lacp_res = request['ifmtrunk']['TrunkIfs']['TrunkIf']
-            if isinstance(lacp_res, dict):
-                return [lacp_res]
-            elif isinstance(lacp_res, list):
-                return lacp_res
-            else:
-                return []
-        else:
-            return []
+        res = self.netconf_get(obtain_xml)
+        return res['ifmtrunk']['TrunkIfs']['TrunkIf'] if res else []
 
+    def colleciton_subif(self):
+        """
+        采集MAC信息
+        请求的XML命令
+        <vni></vni>
+        """
+        data_xml = '''
+          <ethernet xmlns="http://www.huawei.com/netconf/vrp/huawei-ethernet">
+            <ethSubIfs>
+              <ethSubIf>
+              </ethSubIf>
+            </ethSubIfs>
+          </ethernet>
+           '''
+        res = self.netconf_get(data_xml)
+        print(res)
+        return res['ethernet']['ethSubIfs']['ethSubIf'] if res else []
     def colleciton_arp_list(self):
         """
         采集ARP信息
@@ -997,6 +1003,97 @@ class HuaweiCollection(HuaweiyangNetconfConnect):
         # {'vrfName': 'MGMT', 'ipAddr': '10.254.2.1', 'macAddr': '9ce8-95d3-f0e2', 'styleType': 'DynamicArp', 'ifName': 'MEth0/0/0'}
         # {'vrfName': '_public_', 'ipAddr': '100.71.0.98', 'macAddr': '70c7-f2be-9c02', 'styleType': 'InterfaceArp', 'ifName': '40GE1/0/1'} 全局
         return res['arp']['arpTables']['arpTable'] if res else []
+
+    def colleciton_mac_vlanFdbs(self):
+        """
+        采集MAC信息
+        请求的XML命令
+        <vni></vni>
+        """
+        data_xml = '''
+          <mac xmlns="http://www.huawei.com/netconf/vrp/huawei-mac">
+            <vlanFdbs>
+              <vlanFdb>
+                <slotId></slotId>
+                <vlanId></vlanId>
+                <macAddress></macAddress>
+                <macType></macType>
+                <outIfName></outIfName>
+              </vlanFdb>
+            </vlanFdbs>
+          </mac>
+        '''
+        res = self.netconf_get(data_xml)
+        return res['mac']['vlanFdbs']['vlanFdb'] if res else []
+
+    def colleciton_mac_vlanFdbDynamics(self):
+        """
+        采集MAC信息
+        请求的XML命令
+        <vni></vni>
+        """
+        data_xml = '''
+          <mac xmlns="http://www.huawei.com/netconf/vrp/huawei-mac">
+            <vlanFdbDynamics>
+              <vlanFdbDynamic>
+                <slotId></slotId>
+                <vlanId></vlanId>
+                <macAddress></macAddress>
+                <macType></macType>
+                <outIfName></outIfName>
+              </vlanFdbDynamic>
+            </vlanFdbDynamics>
+          </mac>
+        '''
+        res = self.netconf_get(data_xml)
+        return res['mac']['vlanFdbDynamics']['vlanFdbDynamic'] if res else []
+
+    def colleciton_mac_bdFdbs(self):
+        """
+        采集MAC信息
+        请求的XML命令
+        <vni></vni>
+        """
+        data_xml = '''
+          <mac xmlns="http://www.huawei.com/netconf/vrp/huawei-mac">
+            <bdFdbs>
+              <bdFdb>
+                <slotId></slotId>
+                <macAddress></macAddress>
+                <bdId></bdId>
+                <macType></macType>
+                <outIfName></outIfName>
+                <vid></vid>
+              </bdFdb>
+            </bdFdbs>
+          </mac>
+        '''
+        res = self.netconf_get(data_xml)
+        return res['mac']['bdFdbs']['bdFdb'] if res else []
+
+    def colleciton_mac_bdFdbDynamic(self):
+        """
+        采集MAC信息
+        请求的XML命令
+        <vni></vni>
+        """
+        data_xml = '''
+          <mac xmlns="http://www.huawei.com/netconf/vrp/huawei-mac">
+            <bdFdbDynamics>
+                <bdFdbDynamic>
+                    <slotId></slotId>
+                    <macAddress></macAddress>
+                    <bdId></bdId>
+                    <pwRole></pwRole>
+                    <macType></macType>
+                    <outIfName></outIfName>
+                    <vid></vid>
+                </bdFdbDynamic>
+             </bdFdbDynamics>
+          </mac>
+        '''
+        res = self.netconf_get(data_xml)
+        return res['mac']['bdFdbDynamics']['bdFdbDynamic'] if res else []
 
     # MAC 转发表项
     def collection_mac_table(self):
@@ -1326,7 +1423,6 @@ class HuaweiCollection(HuaweiyangNetconfConnect):
         '''
         try:
             trunkIfs_data = self.netconf_get(trunkIfs_xml)  # 存在不支持情况
-
         except Exception as e:
             print(e)
             return 'device do not suport netconf about aggregation'
@@ -1338,7 +1434,6 @@ class HuaweiCollection(HuaweiyangNetconfConnect):
             trunkMemberIfs_data = self.netconf_get(trunkMemberIfs_xml)
         else:
             return
-
         res = trunkMemberIfs_data['ifmtrunk']['TrunkIfs']['TrunkIf']
         return res
 

@@ -10,8 +10,8 @@ import re
 import traceback
 from datetime import datetime
 
-from netaddr import IPNetwork, IPAddress
-
+from netaddr import IPNetwork, IPAddress, valid_ipv4
+from operator import methodcaller
 from apps.asset.models import Model, NetworkDevice, Vendor
 from utils.connect_layer.auto_main import BatManMain, HillstoneFsm
 from utils.db.mongo_ops import MongoNetOps, MongoOps
@@ -27,6 +27,21 @@ slb_server_mongo = MongoOps(
 aggr_group_mongo = MongoOps(db='Automation', coll='AggreTable')
 service_predefined_mongo = MongoOps(
     db='Automation', coll='hillstone_service_predefined')
+
+
+def hillstone_speed_format(interface):
+    if re.search(r'^(ethernet)', interface):
+        return '1G'
+
+    elif re.search(r'^(xethernet)', interface):
+        return '10G'
+
+    elif re.search(r'^(cethernet)', interface):
+        return '100G'
+
+    elif re.search(r'^(xxvethernet)', interface):
+        return '25G'
+    return 'auto'
 
 
 def is_ip(ip):
@@ -75,6 +90,10 @@ class HillstoneProc(BaseConn):
         self.snat_result = []
         # snat解析的最终数据
         self.snat_data = []
+        # sec_policy解析的最终数据
+        self.sec_policy_data = []
+        # sec_policy匹配次数的最终数据
+        self.policy_hit_count = []
 
     def _version_proc(self, res):
         """
@@ -82,6 +101,7 @@ class HillstoneProc(BaseConn):
         :param res:
         :return:
         """
+        _sn_list = []
         if isinstance(res, list):
             for i in res:
                 model_q = Model.objects.get_or_create(name=i['product'],
@@ -89,7 +109,10 @@ class HillstoneProc(BaseConn):
                 NetworkDevice.objects.filter(manage_ip=self.hostip).update(model=model_q[0],
                                                                            # serial_num=i['sn'],
                                                                            soft_version=i['version'])
-
+                _sn_list.append(i['sn'])
+        _sn_list = list(set(_sn_list))
+        if self.ha_status == 0 and len(_sn_list) == 1:
+            NetworkDevice.objects.filter(manage_ip=self.hostip).update(serial_num=_sn_list[0])
         return
 
     def _arp_proc(self, res):
@@ -162,12 +185,7 @@ class HillstoneProc(BaseConn):
                 line_status = ''
                 protocol_status = ''
             if int_regex.search(i['interface']):
-                if i['interface'].startswith('ethernet'):
-                    speed = '1G'
-                elif i['interface'].startswith('xethernet'):
-                    speed = '10G'
-                else:
-                    speed = 'auto'
+                speed = hillstone_speed_format(i['interface'])
                 data = dict(hostip=self.hostip,
                             interface=i['interface'],
                             status=physical_status,
@@ -209,7 +227,7 @@ class HillstoneProc(BaseConn):
                 tablename='layer3interface')
         return
 
-    def _hillstone_sec_policy(self, datas, method='bulk'):
+    def _hillstone_sec_policy(self, datas):
         """
         action: 'deny',
         dst_addr: {
@@ -226,8 +244,6 @@ class HillstoneProc(BaseConn):
         :param datas:
         :return:
         """
-        my_mongo = MongoOps(db='Automation', coll='sec_policy')
-        address_mongo = MongoOps(db='Automation', coll='hillstone_address')
         # 地址数据映射集
         address_map = dict()
         address_res = address_mongo.find(
@@ -240,9 +256,8 @@ class HillstoneProc(BaseConn):
                     address_map[_addr['name']].append(_addr)
                 else:
                     address_map[_addr['name']] = [_addr]
-        if method == 'bulk':
-            my_mongo.delete_many(query=dict(hostip=self.hostip))
-        results = []
+        # if method == 'bulk':
+        #     sec_policy_mongo.delete_many(query=dict(hostip=self.hostip))
         for i in datas:
             # print(i)
             tmp = dict()
@@ -404,14 +419,15 @@ class HillstoneProc(BaseConn):
             tmp['dst_addr'] = i.get('dst_addr')  # 地址组
             tmp['log'] = log
             tmp['description'] = i.get('description')
-            results.append(tmp)
-        my_mongo.insert_many(results)
+            self.sec_policy_data.append(tmp)
         return
 
     # dnat 处理
     def _dnat_proc(self, dnat_res):
         for i in dnat_res:
-            if i['RULESTATE'] == 'disable':
+            if i.get('RULESTATE') == 'disable':
+                continue
+            if i.get('disable') == 'disable':
                 continue
             # print(i)
             i['hostip'] = self.hostip
@@ -424,18 +440,25 @@ class HillstoneProc(BaseConn):
             # 变量初始化定义 end
             if i['TO_IP'] in self.address_map.keys():
                 try:
-                    global_ip = [dict(start=i['TO_IP'],
-                                      end=i['TO_IP'],
-                                      start_int=IPAddress(
-                                          i['TO_IP']).value,
-                                      end_int=IPAddress(
-                                          i['TO_IP']).value,
-                                      result=i['TO_IP'])]
+                    if valid_ipv4(i['TO_IP'], flags=1):
+                        global_ip = [dict(start=i['TO_IP'],
+                                          end=i['TO_IP'],
+                                          start_int=IPAddress(
+                                              i['TO_IP']).value,
+                                          end_int=IPAddress(
+                                              i['TO_IP']).value,
+                                          result=i['TO_IP'])]
+                    else:
+                        global_ip = [dict(start=i['TO_IP'],
+                                          end=i['TO_IP'],
+                                          start_int=0,
+                                          end_int=0,
+                                          result=i['TO_IP'])]
+
                 except Exception as e:
-                    pass
-                    #send_msg_netops
-                        # "设备:{} 山石防火墙DNAT解析 TO_IP 字段不是纯IP：{}".format(
-                        #     i['TO_IP'], self.hostip))
+                    send_msg_netops(
+                        "设备:{} 山石防火墙DNAT解析 TO_IP 字段不是纯IP：{}".format(
+                            i['TO_IP'], self.hostip))
                     global_ip = [
                         dict(
                             start=i['TO_IP'],
@@ -759,6 +782,7 @@ class HillstoneProc(BaseConn):
             i['log_time'] = datetime.now()
             self.dnat_result.append(i)  # 存储原始数据信息
             tmp = dict(
+                id=f"{i['ID']}_{self.hostip}",
                 rule_id=i['ID'],
                 hostip=self.hostip,
                 global_ip=global_ip,
@@ -772,8 +796,7 @@ class HillstoneProc(BaseConn):
     def _snat_proc(self, snat_res):
         if isinstance(snat_res, list):
             if not self.address_map:
-                pass
-                # send_msg_netops"山石防火墙:{}\nSNAT拼接时没有查询到地址对象集合，请调整采集方法调用顺序".format(self.hostip))
+                send_msg_netops("山石防火墙:{}\nSNAT拼接时没有查询到地址对象集合，请调整采集方法调用顺序".format(self.hostip))
             for i in snat_res:
                 if i['DISABLE'] == 'disable':
                     continue
@@ -1030,7 +1053,7 @@ class HillstoneProc(BaseConn):
                                                      end=i['SERVICE'],
                                                      protocol=i['SERVICE'],
                                                      result=i['SERVICE']))
-                        #send_msg_netops"山石防火墙:{}\nSNAT查询服务对象:{}失败".format(self.hostip, i['SERVICE']))
+                        send_msg_netops("山石防火墙:{}\nSNAT查询服务对象:{}失败".format(self.hostip, i['SERVICE']))
                 self.snat_result.append(i)
                 tmp = dict(
                     rule_id=i['ID'],
@@ -1060,10 +1083,9 @@ class HillstoneProc(BaseConn):
                 try:
                     self._hillstone_sec_policy(sec_policy_result)
                 except Exception as e:
-                    pass
-                    #send_msg_netops
-                        # "山石防火墙安全策略入库失败,设备:{},错误:{}".format(
-                        #     self.hostip, str(e)))
+                    send_msg_netops(
+                        "山石防火墙安全策略入库失败,设备:{},错误:{}".format(
+                            self.hostip, str(e)))
         except Exception as e:
             print('山石配置文件安全策略解析异常', str(e))
             MongoNetOps.failed_log(
@@ -1252,30 +1274,29 @@ class HillstoneProc(BaseConn):
             #         else:
             #             self.slb_map[_slb['POOLNAME']] = [_slb]
         except Exception as e:
-            pass
-            #send_msg_netops'山石配置文件配置项解析异常\n设备:{}\n异常:{}'.format(self.hostip, str(e)))
+            send_msg_netops('山石配置文件配置项解析异常\n设备:{}\n异常:{}'.format(self.hostip, str(e)))
         # DNAT表项拼接
         try:
-            dnat_res = HillstoneFsm.dnat_proc(path=path)
+            # dnat_res = HillstoneFsm.dnat_proc(path=path)
+            dnat_res, no_parse = HillstoneFsm.dnat_proc_new(path=path)
+            if len(no_parse) > 0:
+                send_msg_netops("山石防火墙:{} 有{}条DNAT表项未解析".format(self.hostip, len(no_parse)))
             if not isinstance(dnat_res, list):
-                pass
-                #send_msg_netops"山石防火墙:{} DNAT表项解析为空".format(self.hostip))
+                send_msg_netops("山石防火墙:{} DNAT表项解析为空".format(self.hostip))
             self._dnat_proc(dnat_res)
         except Exception as e:
-            pass
-            # print(traceback.print_exc())
-            #send_msg_netops'山石配置文件DNAT拼接解析异常\n设备:{}\n异常:{}'.format(self.hostip, str(e)))
+            print(traceback.print_exc())
+            send_msg_netops('山石配置文件DNAT拼接解析异常\n设备:{}\n异常:{}'.format(self.hostip, str(e)))
         # SNAT表项拼接
         try:
             snat_res = HillstoneFsm.snat_proc(path=path)
             if isinstance(snat_res, list) and len(snat_res) > 0:
                 self._snat_proc(snat_res)
             else:
-                pass
-                #send_msg_netops'山石配置文件SNAT没有正常解析\n设备:{}'.format(self.hostip))
+                send_msg_netops('山石配置文件SNAT没有正常解析\n设备:{}'.format(self.hostip))
         except Exception as e:
             print(traceback.print_exc())
-            #send_msg_netops'山石配置文件SNAT拼接解析异常\n设备:{}\n异常:{}'.format(self.hostip, str(e)))
+            send_msg_netops('山石配置文件SNAT拼接解析异常\n设备:{}\n异常:{}'.format(self.hostip, str(e)))
 
     def _hillstone_service_predefined(self, res):
         service_predefined_res = []
@@ -1314,29 +1335,35 @@ class HillstoneProc(BaseConn):
         return
 
     def _zone_proc(self, res):
-        for i in res:
-            i['hostip'] = self.hostip
-        MongoNetOps.insert_table(
-            db='Automation',
-            hostip=self.hostip,
-            datas=res,
-            tablename='hillstone_zone')
+        if isinstance(res, list):
+            for i in res:
+                i['hostip'] = self.hostip
+            MongoNetOps.insert_table(
+                db='Automation',
+                hostip=self.hostip,
+                datas=res,
+                tablename='hillstone_zone')
         return
+
+    def _policy_hit_count(self, res):
+        if isinstance(res, list):
+            self.policy_hit_count = res
 
     def path_map(self, file_name, res: list):
         fsm_map = {
-            'show_arp': self._arp_proc,
-            'show_mac': self._mac_proc,
-            'show_zone': self._zone_proc,
-            'show_version': self._version_proc,
-            'show_interface': self._interface_proc,
-            'show_service_predefined': self._hillstone_service_predefined,
+            'show_arp': '_arp_proc',
+            'show_mac': '_mac_proc',
+            'show_zone': '_zone_proc',
+            'show_version': '_version_proc',
+            'show_interface': '_interface_proc',
+            'show_service_predefined': '_hillstone_service_predefined',
+            'show_policy_hit-count_top_50': '_policy_hit_count'
         }
         if file_name in fsm_map.keys():
-            fsm_map[file_name](res)
+            caller = methodcaller(fsm_map[file_name], res)
+            caller(self)
         else:
-            pass
-            #send_msg_netops"设备:{}\n命令:{}\n不被解析".format(self.hostip, file_name))
+            send_msg_netops("设备:{}\n命令:{}\n不被解析".format(self.hostip, file_name))
 
     def _collection_analysis(self, paths: list):
         # self.cmds += ['display mac-address']
@@ -1358,3 +1385,11 @@ class HillstoneProc(BaseConn):
         if self.snat_result:
             MongoNetOps.insert_table(
                 'Automation', self.hostip, self.snat_result, 'hillstone_snat', True)
+        if self.sec_policy_data:
+            if self.policy_hit_count:
+                for _rule in self.sec_policy_data:
+                    for _count in self.policy_hit_count:
+                        if _rule['id'] == _count['id']:
+                            _rule['count'] = _count['count']
+            MongoNetOps.insert_table(
+                'Automation', self.hostip, self.sec_policy_data, 'sec_policy', True)

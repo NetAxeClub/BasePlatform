@@ -54,15 +54,15 @@ class UserProfile(AbstractUser):
         verbose_name_plural = '用户表'
 
 
-class Organization(models.Model):
-    name = models.CharField(verbose_name='组织名称',
-                            max_length=20, null=False, unique=True)
-
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        db_table = 'organization'  # 通过db_table自定义数据表名
-        verbose_name = '组织表'
-        verbose_name_plural = '组织表'
-        indexes = [models.Index(fields=['name', ]), ]
+# class Organization(models.Model):
+#     name = models.CharField(verbose_name='组织名称',
+#                             max_length=20, null=False, unique=True)
+#
+#     def __str__(self):
+#         return self.name
+#
+#     class Meta:
+#         db_table = 'organization'  # 通过db_table自定义数据表名
+#         verbose_name = '组织表'
+#         verbose_name_plural = '组织表'
+#         indexes = [models.Index(fields=['name', ]), ]

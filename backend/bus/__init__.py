@@ -10,3 +10,7 @@
                     2023/4/11 20:46
 -------------------------------------------------
 """
+from .redisHelper import RedisOps
+redis_conn = RedisOps()
+
+__all__ = ['redis_conn']

@@ -5,11 +5,8 @@
 # @File    : custom_viewset_base.py
 # @Software: PyCharm
 
-from django_filters import rest_framework
-from rest_framework import filters
-from rest_framework import status
-from rest_framework import viewsets
-
+from rest_framework import filters, status, viewsets, authentication, permissions
+from django_filters.rest_framework import DjangoFilterBackend
 from .custom_json_response import JsonResponse
 
 
@@ -18,9 +15,10 @@ class CustomViewBase(viewsets.ModelViewSet):
     serializer_class = ''
     permission_classes = ()
     authentication_classes = ()
-    filter_fields = ()
+    filter_fields = "__all__"
+    filterset_fields = '__all__'
     search_fields = ()
-    filter_backends = (rest_framework.DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter,)
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter,)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)

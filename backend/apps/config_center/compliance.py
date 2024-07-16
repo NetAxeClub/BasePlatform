@@ -93,7 +93,6 @@ async def config_file_verify():
             device_file_list = os.listdir(CONFIG_PATH + _dir)
             # print(device_file_list)
             for host in device_file_list:
-                print(host)
                 if host[-4:] == '.txt':
                     vendor = host.split('-')[0]
                     if vendor in vendor_map.keys():

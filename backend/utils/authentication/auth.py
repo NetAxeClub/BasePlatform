@@ -32,7 +32,7 @@ def get_auth_user(token):
     if rbac_instance.status_code == 200:
         rbac_res = rbac_instance.json()
         auth_service_url = "{}/{}".format(rbac_res['hosts'][0]['ip'], rbac_res['hosts'][0]['port'])
-        auth_decode_url = f'{auth_service_url}/rbac/status'
+        auth_decode_url = f'{auth_service_url}/rbac/userinfo'
         headers = {'Accept': 'application/json', 'Authorization': f'Bearer {str(token)}',
                    'Content-Type': 'application/json'}
         try:
@@ -57,9 +57,11 @@ def get_auth_user(token):
 class CustomJWTAuthentication(JWTAuthentication):
 
     def get_validated_token(self, raw_token):
+        print('get_validated_token')
         return raw_token.decode()
 
     def get_user(self, validated_token):
+        print('get_user')
         return get_auth_user(validated_token)
 
 

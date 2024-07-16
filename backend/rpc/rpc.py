@@ -17,8 +17,9 @@ from pika import BasicProperties
 from netaxe.settings import DEBUG
 from bus.bus_sync import SyncMessageBus
 from apps.dcs_control.tasks import FirewallMain
-from apps.automation.tools.models_api import get_firewall_list
-from apps.dcs_control.tasks import address_set
+from apps.automation.tools.models_api import get_firewall_list, get_device_info
+from apps.dcs_control.tasks import address_set, bulk_deny_by_address, get_firewall_zone, config_sec_policy
+
 log = logging.getLogger(__name__)
 if DEBUG:
     CELERY_QUEUE = 'dev'
@@ -33,19 +34,42 @@ def dispatcher(method, data):
         if method == 'get_firewall_list':
             res = get_firewall_list()
             return list(res)
+        elif method == 'get_firewall_zone':
+            res = get_firewall_zone(**data)
+            return res
+        elif method == 'config_sec_policy':
+            res = config_sec_policy.apply_async(kwargs=data, queue=CELERY_QUEUE,
+                                                retry=True)  # config
+            if str(res) == 'None':
+                print('forget')
+                res.forget()
+            return [{'task_id': str(res)}]
+        elif method == 'bulk_deny_by_address':
+            res = bulk_deny_by_address.apply_async(kwargs=data, queue=CELERY_QUEUE,
+                                                   retry=True)  # config
+            if str(res) == 'None':
+                print('forget')
+                res.forget()
+            return [{'task_id': str(res)}]
         elif method == 'address_set':
             res = address_set.apply_async(kwargs=data, queue=CELERY_QUEUE,
                                           retry=True)  # config_backup
-            log.info('res')
-            log.info(str(res))
-            return list({'task_id': str(res)})
+            if str(res) == 'None':
+                print('forget')
+                res.forget()
+            return [{'task_id': str(res)}]
+        elif method == 'get_device_info':
+            return get_device_info(**data)
         else:
             _FirewallMain = FirewallMain(data['host'])
             func = getattr(_FirewallMain, method)
-            return func(**data)
+            res = func(**data)
+            if res is None:
+                return {'code': 200}
+            return res
     except Exception as e:
-        print(e)
-        return {'code': 400}
+        log.error(e)
+        return {'code': 400, "msg": str(e)}
 
 
 # 响应RPC请求

@@ -11,14 +11,14 @@
 -------------------------------------------------
 """
 import json
-from rest_framework import serializers
-from .models import Organization
-
-
-class BgBuSerializer(serializers.ModelSerializer):
-    """组织表"""
-
-    class Meta:
-        model = Organization
-        fields = ('id', 'name',)
+# from rest_framework import serializers
+# from .models import Organization
+#
+#
+# class BgBuSerializer(serializers.ModelSerializer):
+#     """组织表"""
+#
+#     class Meta:
+#         model = Organization
+#         fields = ('id', 'name',)
 

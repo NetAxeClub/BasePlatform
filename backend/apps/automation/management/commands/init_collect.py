@@ -15,8 +15,6 @@ import os
 import django
 from django.core.management import BaseCommand
 
-from apps.automation.models import CollectionPlan
-
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'netboost.settings')
 django.setup()
 from netaxe.settings import BASE_DIR
@@ -29,12 +27,12 @@ def main():
         code_list = json.load(load_f)
         for table, values in code_list.items():
             my_model = apps.get_model("automation", table)
-            print("my_model", my_model)
             if my_model:
-                for value in values:
-                    # if table == "CollectionPlan":
-                    #     value['id'] = CollectionPlan.objects.get(id=value['id'])
-                    my_model.objects.get_or_create(**value)
+                if my_model.objects.count() == 0:
+                    for value in values:
+                        # if table == "CollectionPlan":
+                        #     value['id'] = CollectionPlan.objects.get(id=value['id'])
+                        my_model.objects.get_or_create(**value)
 
 
 class Command(BaseCommand):

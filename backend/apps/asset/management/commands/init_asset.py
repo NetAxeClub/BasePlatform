@@ -26,8 +26,9 @@ def main():
         for table, values in code_list.items():
             my_model = apps.get_model("asset", table)
             if my_model:
-                for value in values:
-                    my_model.objects.get_or_create(**value)
+                if my_model.objects.count() == 0:
+                    for value in values:
+                        my_model.objects.get_or_create(**value)
 
 
 class Command(BaseCommand):

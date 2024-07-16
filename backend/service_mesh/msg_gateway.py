@@ -77,12 +77,12 @@ class SendRunner:
 
             res = requests.request("POST", url, headers=headers, data=json.dumps(payload))
 
-            print(res.status_code)
-            print(res.text)
-            print(res.json())
-            log.debug(res.status_code)
-            log.debug(res.text)
-            log.debug(res.json())
+            # print(res.status_code)
+            # print(res.text)
+            # print(res.json())
+            # log.debug(res.status_code)
+            # log.debug(res.text)
+            # log.debug(res.json())
         # if self.metadata is not None:
         #     self.queue = self.metadata['queue']
         #     self.routing_key = self.metadata['routing_key']

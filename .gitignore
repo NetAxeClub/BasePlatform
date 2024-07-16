@@ -5,12 +5,7 @@ venv/
 *.py[cod]
 *$py.class
 __pycache__/
-web/.DS_Store
-web/dist
-web/*.local
-web/.idea/
-web/.env.development
-web/node_modules
+web/
 backend/logs
 config/config.json
 backend/logs/server.log
@@ -33,4 +28,5 @@ backend/conf.py
 backend/media/admin_ssh_records/
 backend/apps/base_plateform/__pycache__/
 backend/apps/int_utilization/__pycache__/
-backend/plugins/extensibles
+backend/plugins/extensibles/
+backend/scripts

@@ -50,7 +50,7 @@ def auto_driver_auto_loader():
         for driver_file in driver_files:
             if driver_file.endswith(".py") and not driver_file.startswith("__"):
                 driver_module = driver_file.replace(".py", "")
-                print(f"{driver_dir_module_path}{driver}.{driver_module}")
+                log.info(f"加载插件：{driver_dir_module_path}{driver}.{driver_module}")
                 driver_module = importlib.import_module(
                     f"{driver_dir_module_path}{driver}.{driver_module}"
                 )

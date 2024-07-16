@@ -124,6 +124,7 @@ class H3cProc(BaseConn):
         super(H3cProc, self).__init__(**kwargs)
         self.ser_map = {}
         self.addr_map = {}
+        self.arp_datas = []
         self.dnat_data = []
         self.snat_data = []
         self.nat_addr_groups = {}
@@ -140,10 +141,10 @@ class H3cProc(BaseConn):
         ID: '0',
         Action: '2',
         SrcZoneList: {
-            SrcZoneItem: 'aa'
+            SrcZoneItem: 'taibao'
         },
         DestZoneList: {
-            DestZoneItem: 'aa'
+            DestZoneItem: 'iflytek'
         },
         DestAddrList: {
             DestAddrItem: 'Server-AIaaS'
@@ -808,8 +809,7 @@ class H3cProc(BaseConn):
             caller = methodcaller(fsm_map[file_name], res)
             caller(self)
         else:
-            pass
-            #send_msg_netops"设备:{}\n命令:{}\n没有对应数据处理方法".format(self.hostip, file_name))
+            send_msg_netops("设备:{}\n命令:{}\n没有对应数据处理方法".format(self.hostip, file_name))
 
     # @staticmethod
     # def get_method():
@@ -823,7 +823,6 @@ class H3cProc(BaseConn):
             self.path_map(path['cmd_file'], res)
 
     def _netconf_arp(self, res):
-        arp_datas = []
         for i in res:
             tmp_mac = i['MacAddress'].split('-')
             macaddress = tmp_mac[0] + tmp_mac[1] + '-' + \
@@ -841,11 +840,7 @@ class H3cProc(BaseConn):
                 vpninstance=i.get('VrfName'),
                 log_time=datetime.now()
             )
-            arp_datas.append(tmp)
-        # if host == '10.254.6.254':
-        #     #send_msg_netops"更新6.254，数据量{}".format(len(arp_datas)))
-        MongoNetOps.insert_table(
-            'Automation', self.hostip, arp_datas, 'ARPTable')
+            self.arp_datas.append(tmp)
 
     def _netconf_interface_list(self, res):
         interface_datas = []
@@ -950,7 +945,24 @@ class H3cProc(BaseConn):
                     'Automation', self.hostip, aggre_datas, 'AggreTable')
 
     def _netconf_arp_over_evpn(self, res):
-        pass
+        for i in res:
+            tmp_mac = i['MacAddress'].split('-')
+            macaddress = tmp_mac[0] + tmp_mac[1] + '-' + \
+                         tmp_mac[2] + tmp_mac[3] + '-' + tmp_mac[4] + tmp_mac[5]
+            tmp = dict(
+                hostip=self.hostip,
+                hostname=self.hostname,
+                idc_name=self.idc_name,
+                ipaddress=i['Ipv4Address'],
+                macaddress=macaddress.lower(),
+                aging='',
+                type=i['ArpType'],
+                vlan=i.get('VLANID'),
+                interface=i['Name'],
+                vpninstance=i.get('VrfName'),
+                log_time=datetime.now()
+            )
+            self.arp_datas.append(tmp)
 
     def _netconf_physical(self, res):
         if isinstance(res, dict):
@@ -965,8 +977,8 @@ class H3cProc(BaseConn):
                     NetworkDevice.objects.filter(manage_ip=self.hostip).update(model=model_q)
             # 默认会以独立设备获取设备硬件信息，会返回设备的型号等基础信息，但是框式设备不会有序列号，需要二次执行指定参数获取板卡信息
             if self.serial_num != res['SerialNumber'] and res['SerialNumber'] is not None:
-                #send_msg_netops"独立设备{}序列号不一致,cmdb序列号为:{}, netconf序列号为:{}".format(
-                    # self.hostip, self.serial_num, res['SerialNumber']))
+                send_msg_netops("独立设备{}序列号不一致,cmdb序列号为:{}, netconf序列号为:{}".format(
+                    self.hostip, self.serial_num, res['SerialNumber']))
                 NetworkDevice.objects.filter(serial_num=self.serial_num).update(
                     serial_num=res['SerialNumber'])
             # 框式标记对不上的需要更新
@@ -1004,9 +1016,8 @@ class H3cProc(BaseConn):
                     NetworkDevice.objects.filter(manage_ip=self.hostip).update(soft_version=_physical['SoftwareRev'])
             _serial_nums = list(set([x['SerialNumber'] for x in res if x['SoftwareRev'] is not None]))
             if self.serial_num not in _serial_nums:
-                pass
-                #send_msg_netops"框式设备{}序列号不一致,cmdb序列号为:{},netconf序列号为:{}".format(
-                    # self.hostip, self.serial_num, ','.join(_serial_nums)))
+                send_msg_netops("框式设备{}序列号不一致,cmdb序列号为:{},netconf序列号为:{}".format(
+                    self.hostip, self.serial_num, ','.join(_serial_nums)))
 
             # if None in _serial_nums:
             #     _method = [x for x in self.ntf_map.keys() for y in self.methods if
@@ -1286,8 +1297,9 @@ class H3cProc(BaseConn):
                         list({str(local_port_start), str(local_port_end)}))
 
                     tmp = dict(
+                        id=f"{i['RuleName']}_{self.hostip}",
                         hostip=self.hostip,
-                        name=i.get('RuleName'),
+                        name=i['RuleName'],
                         global_protocol='',
                         global_ip=[
                             dict(start=global_ip_start,
@@ -1326,9 +1338,9 @@ class H3cProc(BaseConn):
                     # nat_int_policy_data.append(i)
             except Exception as e:
                 print(e)
-                #send_msg_netops
-                    # "采集h3c防火墙{},格式化DNAT数据过程中失败:{}".format(
-                    #     self.hostip, str(e)))
+                send_msg_netops(
+                    "采集h3c防火墙{},格式化DNAT数据过程中失败:{}".format(
+                        self.hostip, str(e)))
         # if nat_int_policy_data:
         #     MongoNetOps.insert_table(
         #         'NETCONF', self.hostip, nat_int_policy_data, 'h3c_nat_int_policy')
@@ -1472,6 +1484,7 @@ class H3cProc(BaseConn):
                 local_port_result = '-'.join(
                     list({str(local_port_start), str(local_port_end)}))
                 tmp = dict(
+                    id=f"{i['RuleName']}_{self.hostip}",
                     hostip=self.hostip,
                     name=i.get('RuleName'),
                     global_protocol='',
@@ -1508,10 +1521,9 @@ class H3cProc(BaseConn):
         }
         if isinstance(res, list):
             if not self.addr_set:
-                pass
-                # send_msg_netops"华三防火墙:{}\nSNAT拼接时没有查询到地址对象集，请调整采集方法调用顺序".format(self.hostip))
+                send_msg_netops("华三防火墙:{}\nSNAT拼接时没有查询到地址对象集，请调整采集方法调用顺序".format(self.hostip))
             # if not self.nat_addr_groups:
-            #     #send_msg_netops"华三防火墙:{}\nSNAT拼接时没有查询NAT地址池，请调整采集方法调用顺序".format(self.hostip))
+            #     send_msg_netops("华三防火墙:{}\nSNAT拼接时没有查询NAT地址池，请调整采集方法调用顺序".format(self.hostip))
             for i in res:
                 # self.nat_addr_groups
                 # self.nat_addr_group_member
@@ -1614,8 +1626,7 @@ class H3cProc(BaseConn):
                             end_int=IPAddress(_end).value,
                             result="{}-{}".format(_start, _end))]
                     else:
-                        pass
-                        #send_msg_netops"华三防火墙:{}\nSNAT拼接时没有查询NAT地址池，请调整采集方法调用顺序".format(self.hostip))
+                        send_msg_netops("华三防火墙:{}\nSNAT拼接时没有查询NAT地址池，请调整采集方法调用顺序".format(self.hostip))
                 if i.get('SrvObjGrpList'):
                     _server_obj = i['SrvObjGrpList']['ServiceIpObjGroup']
                     if isinstance(_server_obj, str):
@@ -1685,8 +1696,7 @@ class H3cProc(BaseConn):
             caller = methodcaller(self.ntf_map[method], res)
             res = caller(self)
         else:
-            pass
-            #send_msg_netops"设备:{}\n方法:{}\n不被解析".format(self.hostip, method))
+            send_msg_netops("设备:{}\n方法:{}\n不被解析".format(self.hostip, method))
 
     def collection_run(self):
         # 先执行父类方法
@@ -1717,9 +1727,12 @@ class H3cProc(BaseConn):
                                 time.sleep(3)
                                 NetworkDevice.objects.filter(manage_ip=self.hostip).update(l2vpn=False)
                                 print("设备:{}\nnetconf方法:{}\n不被设备支持\n{}".format(self.hostip, method, str(e)))
-                                # #send_msg_netops"设备:{}\nnetconf方法:{}\n不被设备支持\n{}".format(self.hostip, method, str(e)))
+                                # send_msg_netops("设备:{}\nnetconf方法:{}\n不被设备支持\n{}".format(self.hostip, method, str(e)))
                             except Exception as e:
                                 print("设备:{}\nnetconf方法:{}\n执行过程中异常\n{}".format(self.hostip, method, str(e)))
+                if self.arp_datas:
+                    MongoNetOps.insert_table(
+                        db='Automation', hostip=self.hostip, datas=self.arp_datas, tablename='ARPTable')
                 if self.dnat_data:
                     MongoNetOps.insert_table(db='Automation', hostip=self.hostip, datas=self.dnat_data,
                                              tablename='DNAT')
@@ -1742,7 +1755,7 @@ class H3cProc(BaseConn):
                                 # print("netconf_method:{} ==> res:{}".format(method, str(res)))
                                 self._netconf_method_map(method, res)
                             except Exception as e:
-                                #send_msg_netops"设备:{}\nnetconf方法:{}\n不被设备支持\n{}".format(self.hostip, method, str(e)))
+                                send_msg_netops("设备:{}\nnetconf方法:{}\n不被设备支持\n{}".format(self.hostip, method, str(e)))
                                 print("设备:{}\nnetconf方法:{}\n不被设备支持\n{}".format(self.hostip, method, str(e)))
                                 self.device.closed()
                                 device = H3CSecPath(host=self.netconf_params['ip'],
@@ -1751,6 +1764,9 @@ class H3cProc(BaseConn):
                                                     timeout=600, device_params="hpcomware")
                                 res = class_method()
                                 self._netconf_method_map(method, res)
+                if self.arp_datas:
+                    MongoNetOps.insert_table(
+                        db='Automation', hostip=self.hostip, datas=self.arp_datas, tablename='ARPTable')
                 if self.dnat_data:
                     MongoNetOps.insert_table(db='Automation', hostip=self.hostip, datas=self.dnat_data,
                                              tablename='DNAT')

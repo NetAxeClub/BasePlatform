@@ -13,8 +13,22 @@
 from rest_framework import serializers
 
 from .models import (
-    ConfigCompliance, ConfigTemplate, TTPTemplate
+    ConfigCompliance, ConfigTemplate, TTPTemplate, ConfigBackup
 )
+
+
+# 配置合规表
+class ConfigBackupSerializer(serializers.ModelSerializer):
+    last_time = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', read_only=True)
+
+    @staticmethod
+    def setup_eager_loading(queryset):
+        """ Perform necessary eager loading of data. """
+        return queryset
+
+    class Meta:
+        model = ConfigBackup
+        fields = '__all__'
 
 
 # 配置合规表

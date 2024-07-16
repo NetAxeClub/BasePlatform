@@ -23,14 +23,17 @@ router = DefaultRouter()
 router.register(r'config_compliance', views.ConfigComplianceViewSet)
 router.register(r'config_template', views.ConfigTemplateViewSet)
 router.register(r'ttp_template', views.TTPTemplateViewSet)
+router.register(r'config_backup', views.ConfigBackupViewSet)
 
 urlpatterns = [
     path(r'', include(router.urls)),
     # 配置文件目录树
-    path('git_config', views.GitConfig.as_view(), name='git_config'),
+    path('git_config/', views.GitConfig.as_view(), name='git_config'),
     path('compliance_results', views.ComplianceResults.as_view(), name='compliance_results'),
     path('test_regex', views.RegexTest.as_view(), name='test_regex'),
     path('ttp_parse', views.TTPParse.as_view(), name='ttp_parse'),
     path('fsm_parse', views.TextFSMParse.as_view(), name='fsm_parse'),
     path('jinja2_parse', views.Jinja2View.as_view(), name='jinja2_parse'),
+    path('config_backup_file/', views.ConfigFileView.as_view(), name='config_backup_file'),
+    path('get_config_file/', views.ConfigFileListView.as_view(), name='get_config_file'),
 ]
