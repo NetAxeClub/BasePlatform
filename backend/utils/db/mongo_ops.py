@@ -77,7 +77,7 @@ class MongoOps:
         # pymongo.ASCENDING 升序 从小到大
         # pymongo.DESCENDING 降序 从大到小
         """
-        my_mongo = MongoOps(db='netops', coll='XunMi')
+        my_mongo = MongoOps(db='BasePlatform', coll='XunMi')
         my_mongo.create_index([("log_time", pymongo.DESCENDING)])
         my_mongo.create_index("server_ip_address")
         :param keys:
@@ -261,7 +261,7 @@ class MongoOps:
         return ret
 
 
-xunmi_mongo = MongoOps(db='netops', coll='XunMi')
+xunmi_mongo = MongoOps(db='BasePlatform', coll='XunMi')
 lagg_mongo = MongoOps(db='Automation', coll='AggreTable')
 compliance_mongo = MongoOps(db='Automation', coll='ConfigCompliance')
 topology_mongo = MongoOps(db='Automation', coll='topology')
@@ -281,7 +281,7 @@ class MongoNetOps(object):
         return []
 
     @staticmethod
-    def topology_ops(**data):
+    def topology_ops(data):
         _query = topology_mongo.find(query_dict={'name': data['name']}, fileds={'_id': 0})
         if _query:
             topology_mongo.delete_many(query={'name': data['name']})
@@ -559,7 +559,7 @@ class MongoNetOps(object):
 
     @staticmethod
     def clear_xunmi():
-        my_mongo = MongoOps(db='netops', coll='XunMi')
+        my_mongo = MongoOps(db='BasePlatform', coll='XunMi')
         # a = my_mongo.count_documents()
         today = date.today()
         oneday = timedelta(days=30)
@@ -601,7 +601,7 @@ class MongoNetOps(object):
         :param ipaddress:
         :return:
         """
-        my_mongo = MongoOps(db='netops', coll='XunMi')
+        my_mongo = MongoOps(db='BasePlatform', coll='XunMi')
         query_tmp = my_mongo.find(query_dict=data, fileds={'_id': 0}, sort='log_time')
         if query_tmp:
             data['log_time'] = query_tmp[-1]['log_time']
@@ -617,7 +617,7 @@ class MongoNetOps(object):
         :param ipaddress:
         :return:
         """
-        my_mongo = MongoOps(db='netops', coll='XunMi')
+        my_mongo = MongoOps(db='BasePlatform', coll='XunMi')
         mongo_data = dict(server_ip_address=ipaddress)
         tmp = my_mongo.find(query_dict=mongo_data, fileds={'_id': 0}, sort='log_time')
         if tmp:
@@ -817,7 +817,7 @@ class XunMiOps(object):
         "attribute":"生产网"}
         :return:
         """
-        my_mongo = MongoOps(db='netops', coll='XunMi')
+        my_mongo = MongoOps(db='BasePlatform', coll='XunMi')
         # my_mongo.list_indexes()
         my_mongo.rebuild_index()
         # my_mongo.drop_indexes()
@@ -921,7 +921,6 @@ class XunMiOps(object):
         :return:
         """
         log_time = kwargs['log_time']
-        print(kwargs)
         kwargs.pop('log_time')
         query_tmp = xunmi_mongo.find(query_dict=kwargs)
         if query_tmp:
@@ -969,7 +968,7 @@ class XunMiOps(object):
     @staticmethod
     def get_serverip_xunmi_info(server_ip):
         res = {}
-        my_mongo = MongoOps(db='netops', coll='XunMi')
+        my_mongo = MongoOps(db='BasePlatform', coll='XunMi')
         data = dict(
             server_ip_address=server_ip,
         )

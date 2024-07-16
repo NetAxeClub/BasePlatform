@@ -38,6 +38,7 @@ app.config_from_object('django.conf:settings', namespace='CELERY')
 default_exchange = Exchange('default', type='direct')
 config_exchange = Exchange('config', type='direct')
 ipam_exchange = Exchange('ipam', type='direct')
+xunmi_exchange = Exchange('xunmi', type='direct')
 dev_exchange = Exchange('dev', type='direct')
 
 app.conf.task_time_limit = 86400
@@ -51,6 +52,7 @@ app.conf.task_queues = (
     Queue('default', default_exchange, routing_key='default'),
     Queue('config', config_exchange, routing_key='config'),
     Queue('ipam', ipam_exchange, routing_key='ipam'),
+    Queue('xunmi', xunmi_exchange, routing_key='xunmi'),
     Queue('dev', dev_exchange, routing_key='dev'),
 )
 platforms.C_FORCE_ROOT = True

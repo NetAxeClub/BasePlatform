@@ -35,5 +35,6 @@
   "msg_gateway": "http://msggateway.netaxe.svc:8000",
   "mysql_url": "mysql+mysqlconnector://root:mysql@127.0.0.1:3306",
   "sqlalchemy_mysql_url": "mysql+aiomysql://root:mysql@127.0.0.1:3306/alertgateway",
-  "neo4j": "bolt://1.1.1.1:111"
+  "neo4j": "bolt://1.1.1.1:111",
+  "iam": "http://127.0.0.1:8000"
 }

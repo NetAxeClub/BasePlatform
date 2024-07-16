@@ -15,14 +15,14 @@ import traceback
 from driver.cmdb_import import RestApiDriver
 from apps.automation.models import CollectionPlan
 from apps.asset.models import (NetworkDevice, Vendor, Category, Model, IdcModel, Idc, Role, Rack, Attribute, Framework,
-                               NetZone, AssetIpInfo, AssetAccount)
-from apps.users.models import Organization
-from os import getenv, environ
+                               NetZone, AssetIpInfo, AssetAccount, ServerModel, ServerVendor, Server)
+from os import getenv
 import logging
 import requests
 import json
 
-log = logging.getLogger(__name__)
+# log = logging.getLogger(__name__)
+log = logging.getLogger('server')
 
 
 class CmdbImportDriver(RestApiDriver):
@@ -66,11 +66,14 @@ class CmdbImportDriver(RestApiDriver):
         return []
 
     def import_data(self):
-        res = self.do_something('asset_networkdevice/', {'limit': 30000})
+        # res = self.do_something('asset_networkdevice/', {'limit': 30000})
+        res = self.do_something('asset_networkdevice/', {'limit': 5000})
         sum_count = 0
+        fail_count = 0
         for i in res:
             try:
                 # print(i)
+                log.info(i)
                 tmp = {
                     "manage_ip": i['manage_ip'],
                     "serial_num": i['serial_num'],
@@ -105,6 +108,30 @@ class CmdbImportDriver(RestApiDriver):
                 if i.get('role_name'):
                     role_instance, _ = Role.objects.get_or_create(name=i['role_name'])
                     tmp['role'] = role_instance
+                idc_name = i['idc_name']
+                model_name = i.get('model_name')
+                idc_instance_query = Idc.objects.filter(name=idc_name)
+                log.info(str(idc_instance_query))
+                if idc_instance_query:
+                    tmp['idc'] = Idc.objects.get(name=idc_name)
+                else:
+                    tmp['idc'] = Idc.objects.create(name=idc_name)
+
+                vendor_instance_query = Vendor.objects.filter(name=i['vendor_name'], alias=i['vendor_alias'])
+                if vendor_instance_query:
+                    tmp['vendor'] = Vendor.objects.get(name=i['vendor_name'], alias=i['vendor_alias'])
+                else:
+                    tmp['vendor'] = Vendor.objects.create(name=i['vendor_name'], alias=i['vendor_alias'])
+
+                if model_name is not None:
+                    try:
+                        model_instance_query = Model.objects.filter(name=model_name.strip(), vendor=tmp['vendor'])
+                        if model_instance_query:
+                            tmp['model'] = Model.objects.get(name=model_name.strip(), vendor=tmp['vendor'])
+                        else:
+                            tmp['model'] = Model.objects.create(name=model_name.strip(), vendor=tmp['vendor'])
+                    except Exception as e:
+                        pass
                 if i.get('category_name'):
                     category_instance, _ = Category.objects.get_or_create(name=i['category_name'])
                     tmp['category'] = category_instance
@@ -117,60 +144,174 @@ class CmdbImportDriver(RestApiDriver):
                 if i.get('netzone_name'):
                     netzone_instance, _ = NetZone.objects.get_or_create(name=i['netzone_name'])
                     tmp['zone'] = netzone_instance
+                    category_instance_query = Category.objects.filter(name=i['category_name'])
+                    if category_instance_query:
+                        tmp['category'] = Category.objects.get(name=i['category_name'])
+                    else:
+                        tmp['category'] = Category.objects.create(name=i['category_name'])
                 device_quert = NetworkDevice.objects.filter(serial_num=i['serial_num'])
                 if not device_quert:
-                    device_instance, _ = NetworkDevice.objects.create(**tmp)
-
-                    if i['bind_ip']:
-                        for _sub in i['bind_ip']:
-                            _name, _ip = _sub.split('-')
-                            bind_ip_data = {
-                                "name": _name,
-                                "ipaddr": _ip,
-                                "device": device_instance,
-                            }
-                            AssetIpInfo.objects.get_or_create(defaults=bind_ip_data, **bind_ip_data)
-                    if i['bgbu']:
-                        org_list = []
-                        for _sub in i['bgbu']:
-                            org_instance, _ = Organization.objects.get_or_create(name=_sub)
-                            org_list.append(org_instance.id)
-                        if org_list:
-                            device_instance.org.set(org_list)
-                    if i.get('plan_name'):
-                        plan_instance, _ = CollectionPlan.objects.get_or_create(name=i['plan_name'])
-                        device_instance.plan = plan_instance
-                    # 账户关联
-                    if i.get('adpp_device'):
-                        _account_device = self.do_something(url=self.asset_account_url, params={'asset': i['id']})
-                        # print(_account_device)
-                        account_list = []
-                        for _sub_account_device in _account_device:
-                            _account = self.do_something(
-                                url="{}{}/".format(self.account_url, _sub_account_device['account']), params={})
-                            _protocol = self.do_something(
-                                url="{}{}/".format(self.protocol_url, _sub_account_device['protocol_port']), params={})
-                            _account_tmp = {
-                                'name': "{}-{}-{}".format(_account['name'], _protocol['protocol'], _protocol['port']),
-                                'username': _account['username'],
-                                'password': _account['password'],
-                                'en_pwd': _account['en_pwd'],
-                                'protocol': _protocol['protocol'],
-                                'port': _protocol['port'],
-                            }
-                            account_instance, _ = AssetAccount.objects.get_or_create(**_account_tmp)
-                            # account_instance, _ = AssetAccount.objects.get(**_account_tmp)
-                            account_list.append(account_instance)
-                        if account_list:
-                            device_instance.account.set(account_list)
-                            log.info("关联设备账户")
-                    device_instance.save()
-                    sum_count += 1
-                    log.info(sum_count)
+                    # device_instance, _ = NetworkDevice.objects.create(**tmp)
+                    device_instance = NetworkDevice.objects.create(**tmp)
+                else:
+                    device_instance = NetworkDevice.objects.get(serial_num=i['serial_num'])
+                if i['bind_ip']:
+                    for _sub in i['bind_ip']:
+                        _name, _ip = _sub.split('-')
+                        bind_ip_data = {
+                            "name": _name,
+                            "ipaddr": _ip,
+                            "device": device_instance,
+                        }
+                        AssetIpInfo.objects.get_or_create(defaults=bind_ip_data, **bind_ip_data)
+                if i.get('plan_name'):
+                    plan_instance, _ = CollectionPlan.objects.get_or_create(name=i['plan_name'])
+                    device_instance.plan = plan_instance
+                # 账户关联
+                if i.get('adpp_device'):
+                    _account_device = self.do_something(url=self.asset_account_url, params={'asset': i['id']})
+                    # print(_account_device)
+                    account_list = []
+                    for _sub_account_device in _account_device:
+                        _account = self.do_something(
+                            url="{}{}/".format(self.account_url, _sub_account_device['account']), params={})
+                        _protocol = self.do_something(
+                            url="{}{}/".format(self.protocol_url, _sub_account_device['protocol_port']), params={})
+                        _account_tmp = {
+                            'name': "{}-{}-{}".format(_account['name'], _protocol['protocol'], _protocol['port']),
+                            'username': _account['username'],
+                            'password': _account['password'],
+                            'en_pwd': _account['en_pwd'],
+                            'protocol': _protocol['protocol'],
+                            'port': _protocol['port'],
+                        }
+                        account_instance, _ = AssetAccount.objects.get_or_create(**_account_tmp)
+                        # account_instance, _ = AssetAccount.objects.get(**_account_tmp)
+                        account_list.append(account_instance)
+                    if account_list:
+                        device_instance.account.set(account_list)
+                        log.info("关联设备账户")
+                device_instance.save()
+                sum_count += 1
+                log.info(sum_count)
             except Exception as e:
                 log.error(str(e))
                 log.error("{}-{}".format(i['manage_ip'], i['serial_num']))
                 print(traceback.print_exc())
+                fail_count += 1
+        print("同步结束")
+        print(sum_count)
+        print(fail_count)
+
+    def import_account(self):
+        res = self.do_something('cmdb_account/', {'limit': 5000})
+        for i in res:
+            tmp = {
+                "name": i['name'],
+                "username": i['username'],
+                "password": i['password'],
+                "role": i['role'],
+                "en_pwd": i['en_pwd'],
+                "protocol": "ssh",
+                "port": "22",
+            }
+            account_instance_query = AssetAccount.objects.filter(name=i['name'])
+            if not account_instance_query:
+                AssetAccount.objects.create(**tmp)
+
+    def import_server(self):
+        res = self.do_something('asset_server/', {'limit': 5000})
+        sum_count = 0
+        fail_count = 0
+        for i in res:
+            try:
+                log.info(i)
+                tmp = {
+                    "name": i.get('name') or '',
+                    "serial_num": i['serial_num'],
+                    "manage_ip": i['manage_ip'],
+                    "sub_asset_type": i['sub_asset_type'],
+                    "cpu_model": i['cpu_model'],
+                    "cpu_number": i['cpu_number'],
+                    "vcpu_number": i['vcpu_number'],
+                    "disk_total": i['disk_total'],
+                    "ram_total": i['ram_total'],
+                    "kernel": i['kernel'],
+                    "system": i['system'],
+                    "host_vars": i['host_vars'],
+                    "status": i['status'],
+                    "manager_name": i['manager_name'],
+                    "manager_tel": i['manager_tel'],
+                    "purpose": i['purpose'],
+                    "memo": i['memo'],
+                }
+                # idc
+                # vendor
+                # rack
+                # idc_model
+                # model
+                # hosted_on
+                # account
+                device_quert = Server.objects.filter(serial_num=i['serial_num'])
+                if device_quert:
+                    continue
+                if i.get('u_location'):
+                    if i['u_location'].find('-') != -1:
+                        tmp['u_location_start'] = i['u_location'].strip('U').split('-')[0]
+                        tmp['u_location_end'] = i['u_location'].strip('U').split('-')[-1]
+                    else:
+                        tmp['u_location_start'] = i['u_location'].strip('U')
+                        tmp['u_location_end'] = i['u_location'].strip('U')
+                idc_instance, _ = Idc.objects.get_or_create(name=i['idc_name'])
+                tmp['idc'] = idc_instance
+                vendor_instance, _ = ServerVendor.objects.get_or_create(name=i['vendor_name'])
+                tmp['vendor'] = vendor_instance
+                if i.get('idc_model_name'):
+                    idc_model_instance, _ = IdcModel.objects.get_or_create(idc=idc_instance, name=i['idc_model_name'])
+                    tmp['idc_model'] = idc_model_instance
+                    if i.get('rack_name'):
+                        rack_instance, _ = Rack.objects.get_or_create(name=i['rack_name'], idc_model=idc_model_instance)
+                        tmp['rack'] = rack_instance
+                if i.get('model_name'):
+                    print(vendor_instance.name, i['model_name'], i['manage_ip'])
+                    model_instance, _ = ServerModel.objects.get_or_create(name=i['model_name'].strip(),
+                                                                          vendor=vendor_instance)
+                    tmp['model'] = model_instance
+
+                if not device_quert:
+                    device_instance = Server.objects.create(**tmp)
+                else:
+                    device_instance = Server.objects.get(serial_num=i['serial_num'])
+                # 账户关联
+                if i.get('to_account'):
+                    account_list = []
+                    for _sub_account in i['to_account']:
+                        _account = self.do_something(
+                            url="{}".format(self.account_url), params={'name': _sub_account.split(':')[-1]})
+                        if _account:
+                            _account_tmp = {
+                                'name': _account[0]['name'],
+                                'username': _account[0]['username'],
+                                'password': _account[0]['password'],
+                                'en_pwd': _account[0]['en_pwd'],
+                                'protocol': 'ssh',
+                                'port': 22,
+                            }
+                            account_instance, _ = AssetAccount.objects.get_or_create(**_account_tmp)
+                            account_list.append(account_instance)
+                    if account_list:
+                        device_instance.account.set(account_list)
+                        log.info("关联设备账户")
+                sum_count += 1
+                log.info(sum_count)
+            except Exception as e:
+                log.error(str(e))
+                log.error("{}-{}".format(i['manage_ip'], i['serial_num']))
+                print(traceback.print_exc())
+                fail_count += 1
+        print("同步结束")
+        print(sum_count)
+        print(fail_count)
 
 
 if __name__ == '__main__':

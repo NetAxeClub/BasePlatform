@@ -19,7 +19,7 @@ import re
 import asyncio
 import time
 import traceback
-
+import ipaddr as IPaddr
 import netaddr
 from celery import shared_task
 from netaxe.celery import AxeTask
@@ -42,7 +42,8 @@ from apps.automation.tools.centec import CentecProc
 from apps.automation.tools.model_api import get_device_info_v2
 from utils.connect_layer.auto_main import HuaweiS, HillstoneFsm
 from utils.db.mongo_ops import MongoOps, MongoNetOps, XunMiOps
-import ipaddr as IPaddr
+from driver import discovered_plugins
+
 
 logger = logging.getLogger('automation')
 
@@ -183,6 +184,7 @@ class InterfaceFormat(object):
         return value.strip()
 
 
+# 接口利用率计算
 @shared_task(base=AxeTask)
 def interface_used(device_ip=None):
     connections.close_all()
@@ -510,7 +512,7 @@ def standard_analysis_main():
     total_ip_mongo.delete()
     total_ip_mongo.insert_many(xunmi_res)
     # ip地址统计信息存入monggo，首页显示
-    ip_state_mongo = MongoOps(db='netops', coll='server_ip_statistics')
+    ip_state_mongo = MongoOps(db='BasePlatform', coll='server_ip_statistics')
     ip_state_mongo.insert(dict(
         total=len(xunmi_res), log_time=datetime.today().strftime("%Y-%m-%d")
     ))
@@ -688,9 +690,9 @@ class MainIn:
                                                         'idc',
                                                         'framework',
                                                         'zone',
-                                                        'rack').prefetch_related('bind_ip', 'account', 'org').filter(
+                                                        'rack').prefetch_related('bind_ip', 'account').filter(
             status=0).values(
-            'name', 'idc__name', 'serial_num', 'manage_ip', 'status', 'chassis', 'slot')
+            'name', 'idc__name', 'serial_num', 'manage_ip', 'status', 'chassis', 'slot', 'idc_model__name', 'rack__name')
         MongoNetOps.post_cmdb(all_devs)
         return
 
@@ -699,7 +701,15 @@ class MainIn:
     async def tracking_format(ip_address, hostip,
                               log_time, memberport, macaddress) -> None:
         hostinfo = cmdb_mongo.find(query_dict=dict(manage_ip=hostip, status=0),
-                                   fileds={'_id': 0, 'idc__name': 1, 'name': 1, 'serial_num': 1})
+                                   fileds={'_id': 0, 'idc__name': 1, 'name': 1, 'serial_num': 1, 'idc_model__name': 1,
+                                           'rack__name': 1, 'u_location_start': 1, 'u_location_end': 1})
+        node_location = ','.join([str(
+            x.get('idc_model__name')) +
+                                  '_' +
+                                  str(x.get('rack__name')) +
+                                  '_' +
+                                  str(x.get('u_location_start')) +
+                                  '-' + str(x.get('u_location_end')) for x in hostinfo])
         if log_time:
             log_time = datetime.strptime(log_time, "%Y-%m-%d %H:%M:%S")
         if hostinfo:
@@ -712,13 +722,32 @@ class MainIn:
                 'log_time': log_time,
                 'node_hostname': hostname if len(hostinfo) > 0 else '',
                 'node_ip': hostip,
+                'node_location': node_location,
                 'idc_name': hostinfo[0]['idc__name'],
                 'serial_num': hostinfo[0]['serial_num'],
                 'node_interface': memberport,
                 'memberport': memberport_list,
-                'server_ip_address': str(ip_address),
+                'server_ip_address': ip_address,
                 'server_mac_address': macaddress,
             }
+            plugin = discovered_plugins.get('plugins.extensibles.xunmi')
+            if plugin is not None:
+                methods = sorted([x for x in plugin.__all__])
+                start_time = time.time()
+                for method in methods:
+                    if callable(eval("discovered_plugins.get('plugins.extensibles.xunmi').{}".format(method))):
+                        try:
+                            flag, res = await eval(
+                                "discovered_plugins.get('plugins.extensibles.xunmi').{}".format(method))(
+                                **dict(ip_address=ip_address, hostip=hostip))
+                            if flag:
+                                mongo_data.update(res)
+                                # break
+                        except Exception as e:
+                            logger.info(f"{ip_address}定位使用插件异常")
+                            logger.exception(e)
+                end_time = time.time() - start_time
+                logger.info("插件执行耗时：{}".format(str(end_time)))
             XunMiOps.xunmi_ops(**mongo_data)
         return
 
@@ -880,6 +909,7 @@ def collect_device_main(**kwargs):
     try:
         standard_analysis_main()
         interface_used.apply_async()
+        tracking_main.apply_async()
     except Exception as e:
         pass
     return
@@ -938,6 +968,7 @@ def collcet_device_by_rule():
 
 
 async def xunmi_operation(**kwargs):
+
     start_time = time.time()
     ip_address = kwargs['ipaddress']
     log_time = kwargs.get('log_time')
@@ -1010,7 +1041,7 @@ async def xunmi_operation(**kwargs):
                                                    macaddress=arp['macaddress'],
                                                    memberport=','.join(lagg_res['memberports'])))
                 else:
-                    logger.info('ip {}:======>不是聚合口:'.format(ip_address))
+                    # logger.info('ip {}:======>不是聚合口:'.format(ip_address))
                     res, break_falg = await MainIn.xunmi_sub(**dict(mac=mac, arp=arp, ip_address=ip_address))
                     tmp_result += res
                     if break_falg:
@@ -1030,7 +1061,7 @@ async def xunmi_operation(**kwargs):
                     lagg_res = json.loads(lagg_res)
                     lagg_res = lagg_res[0]
                     if len(lagg_res['memberports']) >= 1:
-                        logger.debug("没有查询结果，则以ARP信息为最终结果 且是聚合口")
+                        # logger.debug("没有查询结果，则以ARP信息为最终结果 且是聚合口")
                         for port in lagg_res['memberports']:
                             lldp_res = cache.get(
                                 'lldp_' + lagg_res['hostip'] + '_' + port)
@@ -1087,7 +1118,7 @@ async def xunmi_operation(**kwargs):
                                                macaddress=arp['macaddress'],
                                                memberport=','.join(lagg_res['memberports'])))
                 else:
-                    logger.debug("没有查询结果，则以ARP信息为最终结果 非聚合口")
+                    # logger.debug("没有查询结果，则以ARP信息为最终结果 非聚合口")
                     lldp_res = cache.get('lldp_{}_{}'.format(arp['hostip'], arp['interface']))
                     if not lldp_res:
                         lldp_res = cache.get('lldp_reverse_{}_{}'.format(arp['hostip'], arp['interface']))
@@ -1129,27 +1160,25 @@ async def xunmi_operation(**kwargs):
     for item in tmp_result:
         final_res.setdefault(item['host'], {**item})
     main_in_result = list(final_res.values())
-    return_res = []
     for i in main_in_result:
         logger.info("ip {}:===最终结果===》".format(ip_address))
         if i['macaddress']:
             # 判断MAC地址合法性  (\w+-\w+-\w+)
             if re.search(r'^(\w+-\w+-\w+)', i['macaddress']):
-                return_res.append(i)
                 await MainIn.tracking_format(ip_address, i['host'], log_time, i['memberport'], i['macaddress'])
     total_time = int((time.time() - start_time))
     logger.info("{}地址查询耗时{}秒".format(ip_address, total_time))
     return
 
 
-async def tracking_sub(*args):
+@shared_task(base=AxeTask, once={'graceful': True})
+def tracking_sub(*args):
     b = time.time()
     log_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     for _ip in args:
         params = dict(ipaddress=_ip['ipaddress'], log_time=log_time)
         # await xunmi_operation(**params)
-        # asyncio.run(xunmi_operation(**params))
-        await xunmi_operation(**params)
+        asyncio.run(xunmi_operation(**params))
     e = time.time()
     logger.info('async cost time: %s' % (e - b))
     # asyncio.run(async_operation())
@@ -1159,6 +1188,7 @@ async def tracking_sub(*args):
 @shared_task(base=AxeTask, once={'graceful': True})
 def tracking_main():
     connections.close_all()
+    start_time = time.time()
     # 重建寻觅表索引
     try:
         XunMiOps.xunmi_reindex()
@@ -1167,12 +1197,13 @@ def tracking_main():
     total_ip_mongo = MongoOps(db='Automation', coll='Total_ip_list')
     total_ip_res = total_ip_mongo.find(fileds={'_id': 0})
     for ip_address in range(0, len(total_ip_res), 20):
-        asyncio.run(tracking_sub(*total_ip_res[ip_address:ip_address + 20]))
-        # tracking_sub.apply_async(
-        #     args=total_ip_res[ip_address:ip_address + 20], queue='dev', retry=True)
+        # asyncio.run(tracking_sub(*total_ip_res[ip_address:ip_address + 20]))
+        tracking_sub.apply_async(args=total_ip_res[ip_address:ip_address + 20], queue='xunmi', retry=True)
     send_message = "【自动化】地址定位任务下发完成：\n总数量：{}个" \
         .format(len(total_ip_res))
     logger.info(send_message)
+    end_time = time.time()
+    print("time :", int(end_time - start_time))
     # #send_msg_netops'step3:' + send_message)
 
 

@@ -63,4 +63,5 @@ urlpatterns = [
     path(r'base_platform/config_center/', include('apps.config_center.urls'), name="config_center"),
     path(r'base_platform/int_utilization/', include('apps.int_utilization.urls'), name="int_utilization"),
     path(r'base_platform/topology/', include('apps.topology.urls'), name="topology"),
+    path(r'base_platform/system/', include('apps.system.urls'), name="system"),
 ]

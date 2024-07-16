@@ -2,12 +2,12 @@
 import json
 import re
 import yaml
+import io
 from jinja2 import Environment, StrictUndefined, exceptions
 from datetime import date, datetime
-from django.http import JsonResponse
+from django.http import JsonResponse, StreamingHttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import permissions, filters
-from rest_framework.permissions import IsAuthenticated
+from rest_framework import filters
 from rest_framework.views import APIView
 from ttp import ttp
 from netaxe.settings import BASE_DIR
@@ -34,6 +34,7 @@ def is_safe_dict(data: dict) -> bool:
 
     return True
 
+
 def jinja_render(data, template):
     """ Render a jinja template
     """
@@ -51,6 +52,32 @@ def jinja_render(data, template):
         return True, rendered_jinja2_tpl
     return False, "安全校验失败"
 
+
+# 配置备份
+class ConfigBackupViewSet(CustomViewBase):
+    queryset = ConfigBackup.objects.all().order_by('-id')
+    serializer_class = ConfigBackupSerializer
+    # permission_classes = (permissions.IsAuthenticated,)
+    pagination_class = LargeResultsSetPagination
+    # 配置搜索功能
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    filter_fields = ('manage_ip', 'name')
+    search_fields = ('manage_ip', 'name')
+
+    def get_queryset(self):
+        """
+        expires  比 expire多一个s ，用来筛选已过期的设备数据 lt 小于  gt 大于  lte小于等于  gte 大于等于
+        :return:
+        """
+        range_time = self.request.query_params.get('range_time', None)
+        if range_time is not None:
+            dt_object = datetime.fromtimestamp(int(int(range_time)/1000))
+            start_date = dt_object.strftime('%Y-%m-%d %H:%M:%S')
+            end_data = dt_object.strftime('%Y-%m-%d ') + "23:59:59"
+            self.queryset = self.queryset.filter(last_time__range=(
+                datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S'),
+                datetime.strptime(end_data, '%Y-%m-%d %H:%M:%S')))
+        return self.queryset
 
 
 # 配置合规表
@@ -126,6 +153,26 @@ class GitConfig(APIView):
         """
         get_param = request.GET.dict()
         # print('get_param', get_param)
+        if 'get_hostip' in get_param.keys():
+            _tree = ConfigTree()
+            _tree.produce_tree()
+            res = _tree.tree_final
+            host_list = [x for x in res[0]['children']]
+            if host_list:
+                data = {
+                    "code": 200,
+                    "data": host_list,
+                    "msg": "成功"
+                }
+                return JsonResponse(data)
+            else:
+                data = {
+                    "code": 400,
+                    "data": {},
+                    "msg": "没有获取到git配置文件目录的设备IP列表"
+                }
+                return JsonResponse(data)
+
         if 'get_tree' in get_param.keys():
             _tree = ConfigTree()
             _tree.produce_tree()
@@ -162,15 +209,25 @@ class GitConfig(APIView):
             }
             return JsonResponse(data, safe=False)
         if all(k in get_param for k in ("file", "from_commit", "to_commit")):
-            res = _ConfigGit.get_commit_by_file(**get_param)
+            res = _ConfigGit.get_commit_by_file_new(**get_param)
             data = {
                 "code": 200,
                 "data": [res],
                 "msg": "获取文件变更详情成功"
             }
             return JsonResponse(data, safe=False)
+        # 获取单个文件指定commit下的变更信息
         if all(k in get_param for k in ("file", "single_commit")):
-            res = _ConfigGit.get_commit_by_filename(get_param['single_commit'], get_param['file'])
+            res = _ConfigGit.get_commit_modified_by_filename(get_param['single_commit'], get_param['file'])
+            data = {
+                "code": 200,
+                "data": [res],
+                "msg": "获取文件变更详情成功"
+            }
+            return JsonResponse(data, safe=False)
+        # 获取单个文件指定commit下的原始文件内容
+        if all(k in get_param for k in ("file", "single_commit_real_content")):
+            res = _ConfigGit.get_commit_file_content(get_param['single_commit_real_content'], get_param['file'])
             data = {
                 "code": 200,
                 "data": [res],
@@ -384,6 +441,63 @@ class Jinja2View(APIView):
             }
             return JsonResponse(data)
 
+        data = {
+            "code": 400,
+            "results": [],
+            "message": "没有捕获任何操作"
+        }
+        return JsonResponse(data)
+
+
+class ConfigFileView(APIView):
+    permission_classes = ()
+    authentication_classes = ()
+
+    def get(self, request):
+        get_params = request.GET.dict()
+        if 'file_path' in get_params.keys():
+            res = _ConfigGit.get_file_all_change_commmit(file_path=get_params['file_path'])
+            data = {
+                "code": 200,
+                "results": res,
+                "message": "获取成功"
+            }
+            return JsonResponse(data)
+        data = {
+            "code": 400,
+            "results": [],
+            "message": "没有捕获任何操作"
+        }
+        return JsonResponse(data)
+
+    def post(self, request):
+        post_data = request.data
+        get_file_commit = _ConfigGit.get_file_content_by_commit(post_data['file_path'], post_data["commit"])
+        if get_file_commit:
+            data = {
+                "code": 200,
+                "results": get_file_commit,
+                "message": "success"
+            }
+            return JsonResponse(data)
+        data = {
+            "code": 400,
+            "results": [],
+            "message": "没有捕获任何操作"
+        }
+        return JsonResponse(data)
+
+
+class ConfigFileListView(APIView):
+    def get(self, request):
+        get_param = request.GET.dict()
+        get_file_commit = _ConfigGit.get_file_content_by_commit(get_param['file_path'], get_param["commit"])
+        if get_file_commit:
+            file_stream = io.BytesIO(bytes(get_file_commit.encode()))
+            # 设置HTTP响应头
+            response = StreamingHttpResponse(file_stream, content_type='application/octet-stream')
+            response['Content-Disposition'] = f"attachment; filename={get_param['file_path'].split('/')[-1]}"
+            return response
         data = {
             "code": 400,
             "results": [],

@@ -19,6 +19,7 @@
 from __future__ import absolute_import, unicode_literals
 
 import copy
+import traceback
 import json
 import time
 # from copy import deepcopy
@@ -64,7 +65,7 @@ predefined_mongo = MongoOps(db='Automation', coll='hillstone_service_predefined'
 if DEBUG:
     CELERY_QUEUE = 'dev'
 else:
-    CELERY_QUEUE = 'config_backup'
+    CELERY_QUEUE = 'config'
 log = logging.getLogger(__name__)
 
 
@@ -315,6 +316,21 @@ def run_netconf_config(**dev_info):
             print('等待30s……')
             time.sleep(30)
     return False, '等待设备锁释放超时'
+
+
+def get_firewall_zone(**kwargs):
+    res = []
+    vendor = kwargs['vendor']
+    hostip = kwargs['hostip']
+    if vendor == "Hillstone":
+        res = MongoOps(db='Automation', coll='hillstone_zone') \
+            .find(query_dict=dict(hostip=hostip), fileds={'_id': 0})
+    elif vendor == 'H3C':
+        _FirewallMain = FirewallMain(hostip)
+        res = _FirewallMain.get_h3c_sec_zone()
+    elif vendor == 'Huawei':
+        res = SecPolicyMain.get_huawei_sec_zone(hostip)
+    return res
 
 
 # 防火墙统一处理 集中在此处理或调度
@@ -2011,138 +2027,54 @@ class FirewallMain(object):
         #     soft_version = '5.5R6'
         elif self.dev_infos['soft_version'].find('Version 5.0 SG6000-M-2-5.0R3P9.bin') != -1:
             soft_version = 'Version 5.0 SG6000-M-2-5.0R3P9.bin'
-        self.cmds += ['policy-global']
-        self.back_off_cmds += ['policy-global']
+        self.cmds += []
+        self.back_off_cmds += []
         # 新增
         if kwargs.get('add_object'):
-            service_res = []
-            service = kwargs['service']
-            # 直接引用服务名
-            if 'name' in service.keys():
-                service_res += service['name']
-            elif 'multi' in service.keys():
-                # 服务名
-                _service = "auto_{}".format(str(int(time.time())))
-                self.cmds += [F"service {_service}"]
-                self.back_off_cmds += [F"no service {_service}"]
-                for _sub_ser in service['multi']:
-                    if all(k in _sub_ser for k in ("protocol", "start_port", "end_port")):
-                        if _sub_ser['protocol'] == 'ICMP':
-                            self.cmds += ["icmp type 8"]
-                        else:
-                            self.cmds += [
-                                F"{_sub_ser['protocol'].lower()} dst-port {_sub_ser['start_port']} {_sub_ser['end_port']}"]
-                self.cmds += ["exit"]
-                service_res += [_service]
-            # 创建服务对象 判断系统预定义服务和已经定义的服务
-            elif all(k in service for k in ("protocol", "start_port", "end_port")):
-                _query_service = MongoNetOps.hillstone_service_query(hostip=self.dev_info['ip'],
-                                                                     protocol=service['protocol'],
-                                                                     start_port=service['start_port'],
-                                                                     end_port=service['end_port'])
-                _service = None
-                # 如果查询到系统中已经存在的服务，如果系统有匹配服务，则引用并且不要写入回退命令，防止回退操作删除服务
-                if _query_service:
-                    if 'items' in _query_service.keys():
-                        # 必须唯一匹配，有的现有的服务，也是一个集合(定义了多个协议端口)，但我们需要仅仅匹配一个
-                        if len(_query_service['items']) == 1:
-                            print('_service赋值', _service)
-                            _service = _query_service['name']
-                if _service is None:
-                    # 服务名
-                    _service = "auto_{}_{}_{}".format(str(service['start_port']), str(service['end_port']),
-                                                      str(int(time.time())))
-                    self.cmds += [F"service {_service}"]
-                    self.back_off_cmds += [F"no service {_service}"]
-                    if service['protocol'] == 'ICMP':
-                        self.cmds += ["icmp type 8"]
-                    else:
-                        self.cmds += [
-                            F"{service['protocol'].lower()} dst-port {service['start_port']} {service['end_port']}"]
-                    self.cmds += ["exit"]
-            else:
-                raise ValueError("service不符合格式，山石service字段只支持name和定义服务对象")
+            self.cmds += []
+            self.back_off_cmds += ["policy-global"]
+            if 'name' not in kwargs['service'].keys():
+                kwargs['service']['name'] = "auto_{}".format(str(int(time.time())))
+            if 'name' not in kwargs['from_addr'].keys():
+                kwargs['from_addr']['name'] = "auto_{}".format(str(int(time.time())))
+            if 'name' not in kwargs['to_addr'].keys():
+                kwargs['to_addr']['name'] = "auto_{}".format(str(int(time.time())))
             _vars = {
                 'ops': 'create',
-                'id': kwargs.get('id'),  # 如果不指定，系绝会为觃则自劢生成一个 ID。如果指定的ID为已有的规则的ID，已有的规则会被覆盖。
                 'name': kwargs['name'],  # 低版本不支持name
-                'insert': kwargs.get('insert', ''),  # [before id | after id | top]
-                'from': kwargs['from'],  # {'object': 'address-book'} | {'ip':'A.B.C.D '} | {'any': True}
-                'to': kwargs['to'],  # {'object': 'address-book'} | {'ip':'A.B.C.D'}
-                'service': service_res,  # 服务对象名
+                'from_zone': kwargs['from_zone'],  # {'object': 'address-book'} | {'ip':'A.B.C.D '} | {'any': True}
+                'to_zone': kwargs['to_zone'],  # {'object': 'address-book'} | {'ip':'A.B.C.D'}
+                'service': kwargs['service'],  # 服务对象名
                 'from_addr': kwargs['from_addr'],
                 'to_addr': kwargs['to_addr'],
                 'soft_version': soft_version,  # 版本区分
                 'action': kwargs['action']
             }
-            print('_vars', _vars)
+            if kwargs.get('id') is not None:
+                _vars['id'] = kwargs['id']  # 如果不指定，系绝会为觃则自劢生成一个 ID。如果指定的ID为已有的规则的ID，已有的规则会被覆盖。
+            if kwargs.get('insert') is not None:
+                _vars['insert'] = kwargs['insert'] # [before id | after id | top]
+            # print('_vars', _vars)
             path = 'config_templates/hillstone/hillstone_sec_policy.j2'
             data_to_parse = default_storage.open(path).read().decode('utf-8')
             template = jinja2.Template(data_to_parse)
             tmp_commands = template.render(_vars)
-            tmp_commands = tmp_commands.split('\n')
-            self.cmds += [' '.join(tmp_commands)]
+            self.cmds += [x for x in tmp_commands.split('\n') if x]
             return self.cmds, self.back_off_cmds
         elif kwargs.get('edit_object'):
-            service = kwargs['service']
-            # 直接引用服务名
-            if 'name' in service.keys():
-                _service = service['name']
-            elif 'multi' in service.keys():
-                # 服务名
-                _service = "auto_{}".format(str(int(time.time())))
-                self.cmds += [F"service {_service}"]
-                self.back_off_cmds += [F"no service {_service}"]
-                for _sub_ser in service['multi']:
-                    if all(k in _sub_ser for k in ("protocol", "start_port", "end_port")):
-                        if _sub_ser['protocol'] == 'ICMP':
-                            self.cmds += ["icmp type 8"]
-                        else:
-                            self.cmds += [
-                                F"{_sub_ser['protocol'].lower()} dst-port {_sub_ser['start_port']} {_sub_ser['end_port']}"]
-                self.cmds += ["exit"]
-            # 创建服务对象 判断系统预定义服务和已经定义的服务
-            elif all(k in service for k in ("protocol", "start_port", "end_port")):
-                _query_service = MongoNetOps.hillstone_service_query(hostip=self.dev_info['ip'],
-                                                                     protocol=service['protocol'],
-                                                                     start_port=service['start_port'],
-                                                                     end_port=service['end_port'])
-                _service = None
-                # 如果查询到系统中已经存在的服务，如果系统有匹配服务，则引用并且不要写入回退命令，防止回退操作删除服务
-                if _query_service:
-                    if 'items' in _query_service.keys():
-                        # 必须唯一匹配，有的现有的服务，也是一个集合(定义了多个协议端口)，但我们需要仅仅匹配一个
-                        if len(_query_service['items']) == 1:
-                            print('_service赋值', _service)
-                            _service = _query_service['name']
-                if _service is None:
-                    # 服务名
-                    _service = "auto_{}_{}_{}".format(str(service['start_port']), str(service['end_port']),
-                                                      str(int(time.time())))
-                    self.cmds += [F"service {_service}"]
-                    self.back_off_cmds += [F"no service {_service}"]
-                    if service['protocol'] == 'ICMP':
-                        self.cmds += ["icmp type 8"]
-                    else:
-                        self.cmds += [
-                            F"{service['protocol'].lower()} dst-port {service['start_port']} {service['end_port']}"]
-                    self.cmds += ["exit"]
-            else:
-                raise ValueError("service不符合格式，山石service字段只支持name和定义服务对象")
             _vars = {
                 'ops': 'edit',
                 'id': kwargs['id'],  # 如果不指定，系绝会为觃则自劢生成一个 ID。如果指定的ID为已有的规则的ID，已有的规则会被覆盖。
                 'name': kwargs['name'],  # 低版本不支持name
                 'insert': kwargs.get('insert', ''),  # [before id | after id | top]
-                'from': kwargs['from'],  # {'object': 'address-book'} | {'ip':'A.B.C.D '} | {'any': True}
-                'to': kwargs['to'],  # {'object': 'address-book'} | {'ip':'A.B.C.D'}
-                'service': _service,  # 服务对象名
+                'from_zone': kwargs['from_zone'],  # {'object': 'address-book'} | {'ip':'A.B.C.D '} | {'any': True}
+                'to_zone': kwargs['to_zone'],  # {'object': 'address-book'} | {'ip':'A.B.C.D'}
+                'service': kwargs['service'],  # 服务对象名
                 'from_addr': kwargs['from_addr'],
                 'to_addr': kwargs['to_addr'],
                 'soft_version': soft_version,  # 版本区分
                 'action': kwargs['action']
             }
-            print('_vars', _vars)
             path = 'config_templates/hillstone/hillstone_sec_policy.j2'
             data_to_parse = default_storage.open(path).read().decode('utf-8')
             template = jinja2.Template(data_to_parse)
@@ -2151,7 +2083,7 @@ class FirewallMain(object):
             print([x.strip() for x in tmp_commands])
             self.cmds += [x.strip() for x in tmp_commands]
             before_cmds = ['show configuration policy']
-            paths = BatManMain.hillstone_send_cmds(*before_cmds, **self.dev_info)
+            paths = BatManMain.send_cmds(*before_cmds, **self.dev_info)
             if isinstance(paths, list):
                 before_ttp_res = HillstoneFsm.check_sec_policy_config_before(rule_id=kwargs['id'], path=paths[0])
                 self.back_off_cmds += ["rule id {}".format(kwargs['id'])]
@@ -2161,7 +2093,7 @@ class FirewallMain(object):
         elif kwargs.get('del_object'):
             self.cmds += ["no rule id {}".format(kwargs['id'])]
             before_cmds = ['show configuration policy']
-            paths = BatManMain.hillstone_send_cmds(*before_cmds, **self.dev_info)
+            paths = BatManMain.send_cmds(*before_cmds, **self.dev_info)
             if isinstance(paths, list):
                 before_ttp_res = HillstoneFsm.check_sec_policy_config_before(rule_id=kwargs['id'], path=paths[0])
                 self.back_off_cmds += ["rule id {}".format(kwargs['id'])]
@@ -6853,7 +6785,6 @@ def config_sec_policy(self, **post_param):
         if 'sort_object' in post_param.keys():
             class_method = 'action_top'
         cmds, back_off_cmds = _FirewallMain.h3c_sec_policy_detail(**post_param)
-        print(cmds)
         # step 2 生成流程
         _data = dict(
             order_code=post_param.get('order_code'),
@@ -6870,11 +6801,10 @@ def config_sec_policy(self, **post_param):
             method='NETCONF',
             back_off_commands=json.dumps(back_off_cmds)
         )
-        _FirewallMain.flow_engine(*[cmds, back_off_cmds, class_method], **_data)
+        # _FirewallMain.flow_engine(*[cmds, back_off_cmds, class_method], **_data)
     elif post_param.get('vendor') == 'Huawei':
         class_method = 'config_sec_policy'
         cmds, back_off_cmds = _FirewallMain.huawei_sec_policy(**post_param)
-        print(cmds)
         # step 2 生成流程
         _data = dict(
             order_code=post_param.get('order_code'),
@@ -6897,7 +6827,8 @@ def config_sec_policy(self, **post_param):
         class_method = 'Hillstone'  # 类方法，山石直接下发命令，所以不需要，主要给华三华为对应对应类方法使用
         try:
             cmds, back_off_cmds = _FirewallMain.hillstone_sec_policy_detail(**post_param)
-            # print(cmds, back_off_cmds)
+            print(cmds)
+            print(back_off_cmds)
             _data = dict(
                 order_code=post_param.get('order_code') if post_param.get('order_code') else ' ',
                 task_id=str(self.request.id),
@@ -6913,15 +6844,15 @@ def config_sec_policy(self, **post_param):
                 class_method=class_method,
                 back_off_commands=json.dumps(back_off_cmds)
             )
-            # print(_data)
-            _FirewallMain.flow_engine(*[cmds, back_off_cmds, class_method], **_data)
+            print(_data)
+            # _FirewallMain.flow_engine(*[cmds, back_off_cmds, class_method], **_data)
         except Exception as e:
-            # print(traceback.print_exc())
-            send_msg_sec_manage("安全纳管引擎\n公网DNAT发布\n任务状态：失败\n原因:生成配置过程异常\n提示:{}".format(str(e)))
+            print(traceback.print_exc())
+            send_msg_sec_manage("安全纳管引擎\n安全策略下发\n任务状态：失败\n原因:生成配置过程异常\n提示:{}".format(str(e)))
     return
 
 
-# 一键封堵V2
+# 一键封堵V2/场景任务执行模块
 @shared_task(base=AxeTask, once={'graceful': True}, bind=True)
 def bulk_deny_by_address(self, **post_param):
     """
@@ -6935,100 +6866,88 @@ def bulk_deny_by_address(self, **post_param):
     :param post_param:
     :return:
     """
-    hosts = AutomationInventory.objects.prefetch_related(
-        'ans_group_hosts').filter(id=int(post_param['inventory_id'])).values('ans_group_name',
-                                                                             'ans_group_hosts__ans_host',
-                                                                             'ans_group_hosts__ans_obj',
-                                                                             'ans_group_hosts__ans_vars',
-                                                                             'ans_group_hosts__ans_memo',
-                                                                             )
+    hosts = post_param['inventory'][0]['ans_group_hosts']
+
     event_id = AutoEvent.objects.create(**dict(commit_user=post_param['user'],
                                                remote_ip=post_param['remote_ip'],
                                                task=AutoFlowTasks.DENY))
     for host in hosts:
-        if host['ans_group_hosts__ans_vars']:
-            # json卸载主机变量
-            try:
-                host_vars = json.loads(host['ans_group_hosts__ans_vars'])
-            except:
-                b = eval(host['ans_group_hosts__ans_vars'])
-                host_vars = json.loads(b)
-            if post_param.get('ip_mask'):
-                if post_param.get('add_detail_ip'):
-                    post_data = {
-                        "origin": post_param['origin'],
-                        "vendor": host_vars['vendor__alias'],
-                        "add_detail_ip": True,
-                        "ip_mask": post_param['ip_mask'],
-                        "name": host['ans_group_hosts__ans_obj'],
-                        "hostip": host_vars['manage_ip'],
-                        "hostid": host_vars['id'],
-                        "user": post_param['user'],
-                        "remote_ip": post_param['remote_ip'],
-                        "room_group_name": post_param.get('room_group_name'),
-                        "task_id": str(self.request.id),
-                        "task": AutoFlowTasks.DENY,
-                        "event_id": event_id.id,  # 关联事件
-                    }
-                    address_set.apply_async(kwargs=post_data, queue=CELERY_QUEUE,
-                                            retry=True)  # config_backup
-                elif post_param.get('del_detail_ip'):
-                    post_data = {
-                        "origin": post_param['origin'],
-                        "vendor": host_vars['vendor__alias'],
-                        "del_detail_ip": True,
-                        "ip_mask": post_param['ip_mask'],
-                        "name": host['ans_group_hosts__ans_obj'],
-                        "hostip": host_vars['manage_ip'],
-                        "hostid": host_vars['id'],
-                        "user": post_param['user'],
-                        "remote_ip": post_param['remote_ip'],
-                        "room_group_name": post_param.get('room_group_name'),
-                        "task_id": str(self.request.id),
-                        "task": AutoFlowTasks.DENY,
-                        "event_id": event_id.id,  # 关联事件
-                    }
-                    address_set.apply_async(kwargs=post_data, queue=CELERY_QUEUE,
-                                            retry=True)  # config_backup
-            if post_param.get('range_start') and post_param.get('range_end'):
-                if post_param.get('add_detail_range'):
-                    post_data = {
-                        "origin": post_param['origin'],
-                        "vendor": host_vars['vendor__alias'],
-                        "add_detail_range": True,
-                        "range_start": post_param['range_start'],
-                        "range_end": post_param['range_end'],
-                        "name": host['ans_group_hosts__ans_obj'],
-                        "hostip": host_vars['manage_ip'],
-                        "hostid": host_vars['id'],
-                        "user": post_param['user'],
-                        "remote_ip": post_param['remote_ip'],
-                        "room_group_name": post_param.get('room_group_name'),
-                        "task_id": str(self.request.id),
-                        "task": AutoFlowTasks.DENY,
-                        "event_id": event_id.id,  # 关联事件
-                    }
-                    address_set.apply_async(kwargs=post_data, queue=CELERY_QUEUE,
-                                            retry=True)  # config_backup
-                elif post_param.get('del_detail_range'):
-                    post_data = {
-                        "origin": post_param['origin'],
-                        "vendor": host_vars['vendor__alias'],
-                        "del_detail_range": True,
-                        "range_start": post_param['range_start'],
-                        "range_end": post_param['range_end'],
-                        "name": host['ans_group_hosts__ans_obj'],
-                        "hostip": host_vars['manage_ip'],
-                        "hostid": host_vars['id'],
-                        "user": post_param['user'],
-                        "remote_ip": post_param['remote_ip'],
-                        "room_group_name": post_param.get('room_group_name'),
-                        "task_id": str(self.request.id),
-                        "task": AutoFlowTasks.DENY,
-                        "event_id": event_id.id,  # 关联事件
-                    }
-                    address_set.apply_async(kwargs=post_data, queue=CELERY_QUEUE,
-                                            retry=True)  # config_backup
+        if post_param.get('ip_mask'):
+            if post_param.get('add_detail_ip'):
+                post_data = {
+                    "origin": post_param['origin'],
+                    "vendor": host['ans_vars']['vendor__alias'],
+                    "add_detail_ip": True,
+                    "ip_mask": post_param['ip_mask'],
+                    "name": host['ans_obj'],
+                    "hostip": host['ans_host'],  # 这个很重要，如果有绑定ip的话，是以绑定IP来下发配置
+                    "hostid": host['ans_vars']['id'],
+                    "user": post_param['user'],
+                    "remote_ip": post_param['remote_ip'],
+                    "room_group_name": post_param.get('room_group_name'),
+                    "task_id": str(self.request.id),
+                    "task": AutoFlowTasks.DENY,
+                    "event_id": event_id.id,  # 关联事件
+                }
+                address_set.apply_async(kwargs=post_data, queue=CELERY_QUEUE,
+                                        retry=True)  # config_backup
+            elif post_param.get('del_detail_ip'):
+                post_data = {
+                    "origin": post_param['origin'],
+                    "vendor": host['ans_vars']['vendor__alias'],
+                    "del_detail_ip": True,
+                    "ip_mask": post_param['ip_mask'],
+                    "name": host['ans_obj'],
+                    "hostip": host['ans_host'],
+                    "hostid": host['ans_vars']['id'],
+                    "user": post_param['user'],
+                    "remote_ip": post_param['remote_ip'],
+                    "room_group_name": post_param.get('room_group_name'),
+                    "task_id": str(self.request.id),
+                    "task": AutoFlowTasks.DENY,
+                    "event_id": event_id.id,  # 关联事件
+                }
+                address_set.apply_async(kwargs=post_data, queue=CELERY_QUEUE,
+                                        retry=True)  # config_backup
+        if post_param.get('range_start') and post_param.get('range_end'):
+            if post_param.get('add_detail_range'):
+                post_data = {
+                    "origin": post_param['origin'],
+                    "vendor": host['ans_vars']['vendor__alias'],
+                    "add_detail_range": True,
+                    "range_start": post_param['range_start'],
+                    "range_end": post_param['range_end'],
+                    "name": host['ans_obj'],
+                    "hostip": host['ans_host'],
+                    "hostid": host['ans_vars']['id'],
+                    "user": post_param['user'],
+                    "remote_ip": post_param['remote_ip'],
+                    "room_group_name": post_param.get('room_group_name'),
+                    "task_id": str(self.request.id),
+                    "task": AutoFlowTasks.DENY,
+                    "event_id": event_id.id,  # 关联事件
+                }
+                address_set.apply_async(kwargs=post_data, queue=CELERY_QUEUE,
+                                        retry=True)  # config_backup
+            elif post_param.get('del_detail_range'):
+                post_data = {
+                    "origin": post_param['origin'],
+                    "vendor": host['ans_vars']['vendor__alias'],
+                    "del_detail_range": True,
+                    "range_start": post_param['range_start'],
+                    "range_end": post_param['range_end'],
+                    "name": host['ans_obj'],
+                    "hostip": host['ans_host'],
+                    "hostid": host['ans_vars']['id'],
+                    "user": post_param['user'],
+                    "remote_ip": post_param['remote_ip'],
+                    "room_group_name": post_param.get('room_group_name'),
+                    "task_id": str(self.request.id),
+                    "task": AutoFlowTasks.DENY,
+                    "event_id": event_id.id,  # 关联事件
+                }
+                address_set.apply_async(kwargs=post_data, queue=CELERY_QUEUE,
+                                        retry=True)  # config_backup
     return
 
 

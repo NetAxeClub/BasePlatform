@@ -15,7 +15,7 @@ from confload.confload import config
 from utils.custom.request_util import get_request_user, get_request_ip, get_request_data, get_request_path, get_os, \
     get_browser, get_verbose_name
 
-logger = logging.getLogger('websocket')
+logger = logging.getLogger('custom_middleware')
 
 
 class ApiLoggingMiddleware(MiddlewareMixin):
@@ -98,6 +98,8 @@ class ApiLoggingMiddleware(MiddlewareMixin):
 class UserData(object):
     is_authenticated = True
     is_anonymous = False
+    is_staff = True
+    is_active = True
 
     def __init__(self, my_dict):
         for key in my_dict:
@@ -106,19 +108,15 @@ class UserData(object):
 
 def get_auth_user(token):
     rbac_instance = config.service_dicovery('rbac')
-    # print(rbac_instance)
     if rbac_instance.status_code == 200:
         rbac_res = rbac_instance.json()
-        # print(rbac_res)
         auth_service_url = "http://{}:{}".format(rbac_res['hosts'][0]['ip'], rbac_res['hosts'][0]['port'])
-        auth_decode_url = f'{auth_service_url}/rbac/status'
+        auth_decode_url = f'{auth_service_url}/rbac/userinfo'
         headers = {'Accept': 'application/json', 'Authorization': f'{str(token)}',
                    'Content-Type': 'application/json'}
         try:
             res = requests.request(method="GET", url=auth_decode_url, headers=headers)
             if 200 <= res.status_code < 300:
-                logger.info(res.status_code)
-                # logger.info(str(res.json()))
                 return UserData(res.json()['results'])
             else:
                 return AnonymousUser()
@@ -127,18 +125,8 @@ def get_auth_user(token):
             return AnonymousUser()
 
 
-def get_user(scope):
-    try:
-        if not config.local_dev and 'netops-token' in scope['cookies'].keys():
-            logger.debug('token: {}'.format(scope['cookies']['netops-token']))
-            return get_auth_user(parse.unquote(scope['cookies']['netops-token']))
-        return AnonymousUser()
-    except Exception as e:
-        logger.error("function 'get_user' error: {}".format(str(e)))
-        return AnonymousUser()
-
-
 class CorsMiddleWare(MiddlewareMixin):
+    # 暂时注释掉，因为这样会导致admin后台无法登陆，因为很多原生的user model的方法无法模拟，所以注释
     def process_request(self, request):
         if request.COOKIES.get('netops-token'):
             user = get_auth_user(parse.unquote(request.COOKIES['netops-token']))

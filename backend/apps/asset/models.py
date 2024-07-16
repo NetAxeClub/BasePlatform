@@ -21,7 +21,7 @@ class Idc(models.Model):
     address = models.CharField(
         verbose_name='机房地址',
         max_length=100,
-        null=False, default='')
+        null=True, default='')
     tel = models.CharField(verbose_name='机房电话', max_length=30, null=False, default='')
 
     def __str__(self):
@@ -277,7 +277,7 @@ class AssetAccount(models.Model):
         null=True)
 
     def __str__(self):
-        return self.name
+        return "{}-{}-{}".format(self.name, self.protocol, self.port)
 
     def __unicode__(self):
         return '%s: %s' % (self.name, self.username)
@@ -322,7 +322,7 @@ class NetworkDevice(models.Model):
     serial_num = models.CharField(
         verbose_name='序列号',
         max_length=200,
-        null=False)
+        null=False, unique=True)
     manage_ip = models.GenericIPAddressField(verbose_name='管理地址', null=False, default='0.0.0.0')
     name = models.CharField(
         verbose_name='资产名称',
@@ -414,7 +414,7 @@ class NetworkDevice(models.Model):
         verbose_name='机架位结束', default=0, validators=[MaxValueValidator(50), MinValueValidator(1)])
     uptime = models.DateField(verbose_name='上线时间', null=True, default=timezone.now)
     expire = models.DateField(verbose_name='维保日期', null=True, blank=True)
-    memo = models.TextField(verbose_name='备注', null=True, default='')
+    memo = models.TextField(verbose_name='备注', null=True, default='', blank=True)
     status = models.PositiveSmallIntegerField(
         verbose_name='状态', choices=status_choices, default=0)
     ha_status = models.PositiveSmallIntegerField(
@@ -425,7 +425,6 @@ class NetworkDevice(models.Model):
     account = models.ManyToManyField('AssetAccount', verbose_name='管理账户', blank=True)
     plan = models.ForeignKey("automation.CollectionPlan", verbose_name='采集方案',
                              blank=True, null=True, related_name='releate_device', on_delete=models.SET_NULL)
-    org = models.ManyToManyField("users.Organization", verbose_name='org', blank=True)
     history = HistoricalRecords()
 
     def __str__(self):
@@ -434,9 +433,6 @@ class NetworkDevice(models.Model):
 
     def account_list(self):
         return ','.join([i.name for i in self.account.all()])
-
-    def org_list(self):
-        return ','.join([i.name for i in self.org.all()])
 
     class Meta:
         # unique_together = (("rack", "u_location_start", "u_location_end"),)
@@ -448,8 +444,6 @@ class NetworkDevice(models.Model):
                    models.Index(fields=['name', ]),
                    models.Index(fields=['soft_version', ]),
                    models.Index(fields=['patch_version', ]),
-                   models.Index(fields=['uptime', ]),
-                   models.Index(fields=['expire', ]),
                    models.Index(fields=['status', ]),
                    ]
         index_together = ['manage_ip', 'name']
@@ -512,8 +506,7 @@ class ServerModel(models.Model):
     name = models.CharField(
         verbose_name='硬件型号',
         max_length=30,
-        null=False,
-        unique=True)
+        null=False)
     alias = models.CharField(
         verbose_name='型号别名',
         max_length=50,
@@ -593,12 +586,10 @@ class Server(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True)
-    u_location = models.CharField(
-        verbose_name='机架',
-        max_length=20,
-        null=True,
-        blank=True,
-        default='')
+    u_location_start = models.IntegerField(
+        verbose_name='机架位起始', default=0, validators=[MaxValueValidator(50), MinValueValidator(1)])
+    u_location_end = models.IntegerField(
+        verbose_name='机架位结束', default=0, validators=[MaxValueValidator(50), MinValueValidator(1)])
     sub_asset_type = models.SmallIntegerField(choices=sub_asset_type_choice, default=0, verbose_name="服务器类型")
     hosted_on = models.ForeignKey('self', related_name='hosted_on_server',
                                   blank=True, null=True, verbose_name="宿主机", on_delete=models.SET_NULL)  # 虚拟机专用字段
@@ -661,26 +652,26 @@ class ContainerService(models.Model):
         db_table = 'asset_service'
 
 
-class ServerAccount(models.Model):
-    """
-    服务器和账户关联表
-    """
-    server = models.ForeignKey(
-        "Server",
-        verbose_name='服务器',
-        related_name='to_account',
-        on_delete=models.CASCADE)
-
-    account = models.ForeignKey(
-        "AssetAccount",
-        verbose_name='账户',
-        related_name='to_server',
-        on_delete=models.CASCADE)
-
-    def __str__(self):
-        return 'server:%s account:%s' % (self.server, self.account)
-
-    class Meta:
-        unique_together = (("server", "account"),)
-        verbose_name_plural = '服务器和账户关联表'
-        db_table = 'asset_account2server'  # 通过db_table自定义数据表名
+# class ServerAccount(models.Model):
+#     """
+#     服务器和账户关联表
+#     """
+#     server = models.ForeignKey(
+#         "Server",
+#         verbose_name='服务器',
+#         related_name='to_account',
+#         on_delete=models.CASCADE)
+#
+#     account = models.ForeignKey(
+#         "AssetAccount",
+#         verbose_name='账户',
+#         related_name='to_server',
+#         on_delete=models.CASCADE)
+#
+#     def __str__(self):
+#         return 'server:%s account:%s' % (self.server, self.account)
+#
+#     class Meta:
+#         unique_together = (("server", "account"),)
+#         verbose_name_plural = '服务器和账户关联表'
+#         db_table = 'asset_server_account'  # 通过db_table自定义数据表名

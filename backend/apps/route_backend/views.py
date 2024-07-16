@@ -13,7 +13,7 @@ from rest_framework_extensions.key_constructor import bits
 from rest_framework import viewsets, permissions, filters, pagination
 from rest_framework_extensions.key_constructor.constructors import DefaultKeyConstructor
 from apps.route_backend.serializers import *
-from apps.asset.models import NetworkDevice, Server, ServerAccount
+from apps.asset.models import NetworkDevice, Server
 from apps.automation.models import CollectionPlan
 from apps.api.tools.custom_viewset_base import CustomViewBase
 from .tasks import get_tasks
@@ -140,6 +140,62 @@ class ServerWebSshView(APIView):
             return JsonResponse({'code': 500, 'msg': '上传失败！{}'.format(e)})
 
 
+class NetworkDeviceWebSshView(APIView):
+    permission_classes = ()
+    authentication_classes = ()
+
+    def get(self, request):
+        get_param = request.GET.dict()
+        server_obj = NetworkDevice.objects.filter(
+            manage_ip=get_param['manage_ips']).values('vendor__name', 'manage_ip', 'id').first()
+        init_cmd = ''
+        if server_obj['vendor__name'] in ['华三', '华为', '锐捷', '盛科']:
+            init_cmd = 'terminal monitor'
+        remote_ip = request.META.get('REMOTE_ADDR')
+        return JsonResponse({'code': 200, 'data': {'init_cmd': init_cmd, 'remote_ip': remote_ip, 'id': server_obj['id']}})
+
+    def post(self, request):
+        post_data = request.POST
+        server_obj = NetworkDevice.objects.get(id=post_data.get('pk'))
+        ssh_server_ip = server_obj.manage_ip
+        try:
+            upload_file = request.FILES.get('upload_file')
+            upload_file_path = os.path.join(settings.MEDIA_ROOT, 'fort_files', request.user.username, 'upload',
+                                            server_obj.assets.asset_management_ip)
+            sftp = SFTP(ssh_server_ip, server_obj.port, server_obj.username,
+                        CryptPwd().decrypt_pwd(server_obj.password))
+            sftp.upload_file(upload_file, upload_file_path)
+
+            return JsonResponse({'code': 200, 'msg': '上传成功！文件默认放在{}用户家目录下'.format(server_obj.username)})
+        except Exception as e:
+            return JsonResponse({'code': 500, 'msg': '上传失败！{}'.format(e)})
+
+
+class NewServerWebSshView(APIView):
+    permission_classes = ()
+    authentication_classes = ()
+
+    def get(self, request):
+        remote_ip = request.META.get('REMOTE_ADDR')
+        return JsonResponse({'code': 200, 'data': {'remote_ip': remote_ip}})
+
+    def post(self, request):
+        post_data = request.POST
+        server_obj = NetworkDevice.objects.get(id=post_data.get('pk'))
+        ssh_server_ip = server_obj.manage_ip
+        try:
+            upload_file = request.FILES.get('upload_file')
+            upload_file_path = os.path.join(settings.MEDIA_ROOT, 'fort_files', request.user.username, 'upload',
+                                            server_obj.assets.asset_management_ip)
+            sftp = SFTP(ssh_server_ip, server_obj.port, server_obj.username,
+                        CryptPwd().decrypt_pwd(server_obj.password))
+            sftp.upload_file(upload_file, upload_file_path)
+
+            return JsonResponse({'code': 200, 'msg': '上传成功！文件默认放在{}用户家目录下'.format(server_obj.username)})
+        except Exception as e:
+            return JsonResponse({'code': 500, 'msg': '上传失败！{}'.format(e)})
+
+
 # 设备采集方案
 class DeviceCollectView(APIView):
     permission_classes = ()
@@ -171,6 +227,7 @@ class DeviceCollectView(APIView):
                 return JsonResponse(dict(code=200, data=res))
             else:
                 return JsonResponse(dict(code=400, data=[]))
+        return JsonResponse(dict(code=400, data=[]))
 
 
 # 自动化chart
@@ -281,16 +338,15 @@ class JobCenterView(APIView):
     def post(self, request):
         """ run tasks"""
         celery_app = current_app
-        f = request.POST
-        f = json.loads(f['data'])
+        f = json.loads(request.data['data'])
         taskname = f['task']
         args = f['args']
         kwargs = f['kwargs']
         queue = f['queue']
         celery_app.loader.import_default_modules()
         tasks = [(celery_app.tasks.get(taskname),
-                  loads(args),
-                  loads(kwargs),
+                  loads(json.dumps(args)),
+                  loads(json.dumps(kwargs)),
                   queue)]
         if any(t[0] is None for t in tasks):
             for i, t in enumerate(tasks):
@@ -339,42 +395,42 @@ class IntervalScheduleViewSet(CustomViewBase):
     search_fields = '__all__'
 
 
-class ServerCmdbExpand(View):
-    def get(self, request):
-        get_param = request.GET.dict()
-        # 查看设备管理账户信息
-        if all(k in get_param for k in ("id", "password")):
-            server_id = get_param["id"]
-            account_tmp = ServerAccount.objects.filter(
-                server__id=server_id).values(
-                'account', 'account__username',
-                'account__password')
-            _CryptPwd = CryptPwd()
-            result = []
-            for tmp in account_tmp:
-                result.append(dict(
-                    account=tmp['account'],
-                    account__username=tmp['account__username'],
-                    account__password=_CryptPwd.decrypt_pwd(tmp['account__password']),
-                ))
-            res = json.dumps({'results': result,
-                              'code': 200})
-            return HttpResponse(res, content_type="application/json")
-        if all(k in get_param for k in ("id", "change_pwd")):
-            server_id = get_param["id"]
-            set_password = get_param["change_pwd"]
-            account_tmp = ServerAccount.objects.filter(
-                server__id=server_id).values('account_id', 'account__name').first()
-            if account_tmp:
-                _CryptPwd = CryptPwd()
-                _account = AssetAccount.objects.get(
-                    id=account_tmp['account_id'], name=account_tmp['account__name'])
-                _account.password = _CryptPwd.encrypt_pwd(set_password)
-                _account.save()
-                res = json.dumps({'results': 'ok',
-                                  'code': 200})
-                return HttpResponse(res, content_type="application/json")
-            else:
-                res = json.dumps({'results': '没有关联账户',
-                                  'code': 400})
-                return HttpResponse(res, content_type="application/json")
+# class ServerCmdbExpand(View):
+#     def get(self, request):
+#         get_param = request.GET.dict()
+#         # 查看设备管理账户信息
+#         if all(k in get_param for k in ("id", "password")):
+#             server_id = get_param["id"]
+#             account_tmp = ServerAccount.objects.filter(
+#                 server__id=server_id).values(
+#                 'account', 'account__username',
+#                 'account__password')
+#             _CryptPwd = CryptPwd()
+#             result = []
+#             for tmp in account_tmp:
+#                 result.append(dict(
+#                     account=tmp['account'],
+#                     account__username=tmp['account__username'],
+#                     account__password=_CryptPwd.decrypt_pwd(tmp['account__password']),
+#                 ))
+#             res = json.dumps({'results': result,
+#                               'code': 200})
+#             return HttpResponse(res, content_type="application/json")
+#         if all(k in get_param for k in ("id", "change_pwd")):
+#             server_id = get_param["id"]
+#             set_password = get_param["change_pwd"]
+#             account_tmp = ServerAccount.objects.filter(
+#                 server__id=server_id).values('account_id', 'account__name').first()
+#             if account_tmp:
+#                 _CryptPwd = CryptPwd()
+#                 _account = AssetAccount.objects.get(
+#                     id=account_tmp['account_id'], name=account_tmp['account__name'])
+#                 _account.password = _CryptPwd.encrypt_pwd(set_password)
+#                 _account.save()
+#                 res = json.dumps({'results': 'ok',
+#                                   'code': 200})
+#                 return HttpResponse(res, content_type="application/json")
+#             else:
+#                 res = json.dumps({'results': '没有关联账户',
+#                                   'code': 400})
+#                 return HttpResponse(res, content_type="application/json")

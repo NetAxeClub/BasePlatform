@@ -224,7 +224,7 @@ class SyncMessageBus:
         channel.basic_qos(prefetch_count=1)
         on_message_callback = functools.partial(
             callback, userdata='on_request')
-        channel.basic_consume(queue='rpc_queue', on_message_callback=on_message_callback)
+        channel.basic_consume(queue=f"rpc_{config.queue}", on_message_callback=on_message_callback)
         try:
             channel.start_consuming()
         except KeyboardInterrupt as e:

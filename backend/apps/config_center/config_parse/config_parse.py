@@ -7,7 +7,7 @@
 import os
 import time
 from pathlib import Path
-
+from utils.base_file_tree import BaseTree
 from netaxe.settings import BASE_DIR
 from apps.config_center.config_parse.hp_comware.ttp_parse import H3cParse
 
@@ -54,57 +54,20 @@ def config_file_path_tree():
         print(_p.name)
 
 
-class ConfigTree:
+class ConfigTree(BaseTree):
+    _instance = None
+
     def __init__(self):
-        self.tree_data = {}
-        self.tree_final = []
-        self.pathname = Path(BASE_DIR + '/media/device_config/')
-        self.tree_str = ''
-        self.key = 0
-        self.root_path = 'device_config/'
+        super(ConfigTree, self).__init__(BASE_DIR + '/media/device_config/', 'device_config/')
 
-    def _second_path(self, root_name, pathname):
-        self.key += 1
-        data = {
-            'id': self.key,
-            'key': root_name + '/' + pathname.name + '/',
-            'children': [],
-            'label': pathname.name,
-        }
-        if pathname.is_dir():
-            for cp in pathname.iterdir():
-                self.key += 1
-                sub_data = {
-                    'id': self.key,
-                    'key': data['key'] + cp.name,
-                    'label': cp.name,
-                }
-                data['children'].append(sub_data)
-        self.tree_data[root_name]['children'].append(data)
-
-    def root_tree(self):
-        black_list = ['.git', '__pycache__']
-        # 遍历根目录下所有文件
-        for root in self.pathname.iterdir():
-            if root.name not in black_list:
-                self.key += 1
-                data = {
-                    'id': self.key,
-                    'key': self.key,
-                    'children': [],
-                    'label': root.name,
-                }
-                self.tree_data[root.name] = data
-                if root.is_dir():
-                    for cp in root.iterdir():
-                        self._second_path(root.name, cp)
-
-    def produce_tree(self):
-        self.root_tree()
-        self.tree_final = [self.tree_data[k] for k in self.tree_data.keys()]
+    def __new__(cls):
+        if not cls._instance:
+            cls._instance = super().__new__(cls)
+        return cls._instance
 
 
 class FSMTree:
+
     def __init__(self):
         self.tree_data = {}
         self.tree_final = []

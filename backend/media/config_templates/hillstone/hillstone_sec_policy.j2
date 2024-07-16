@@ -1,0 +1,86 @@
+{% if service  %}
+service {{ service.name }}
+{% for _service in service.multi %}
+{% if  _service.protocol | lower == "tcp" or _service.protocol | lower == "udp" %}
+{{ _service.protocol | lower }} dst-port {{ _service.start_port }} {{ _service.end_port }}
+{% endif %}
+{% if _service.protocol | lower == "icmp" %}
+icmp type 8
+{% endif %}
+{% endfor %}
+exit
+{% endif %}
+
+
+{% if from_addr  %}
+{% if from_addr.multi  %}
+address {{ from_addr.name }}
+{% for _from_addr in from_addr.multi %}
+{% if _from_addr.ip_mask  %}
+{% for _ip_mask in _from_addr.ip_mask %}
+ip {{ _ip_mask }}
+{% endfor %}
+{% endif %}
+{% if _from_addr.range  %}
+{%- for _range in _from_addr.range %}
+range {{ _range }}
+{% endfor %}
+{% endif %}
+{% endfor %}
+exit
+{% endif %}
+{% endif %}
+
+{% if to_addr  %}
+{% if to_addr.multi  %}
+address {{ to_addr.name }}
+{% for _to_addr in to_addr.multi %}
+{% if _to_addr.ip_mask  %}
+{% for _ip_mask in _to_addr.ip_mask %}
+ip {{ _ip_mask }}
+{% endfor %}
+{% endif %}
+{% if _to_addr.range  %}
+{% for _range in _to_addr.range %}
+range {{ _range }}
+{% endfor %}
+{% endif %}
+{% endfor %}
+exit
+{% endif %}
+{% endif %}
+policy-global
+rule
+{% if id  %} id {{ id }} {% endif %}
+{% if insert  %} {{ insert }} {% endif %}
+{% if soft_version == '5.5R6'  %}
+{% if name  %}
+name {{ name }}
+{% endif %}
+{% endif %}
+{% if from_addr  %}
+{% if from_addr.name  %}
+from {{ from_addr.name }}
+{% else %}
+from any
+{% endif %}
+{% if to_addr.name  %}
+to {{ to_addr.name }}
+{% else %}
+to any
+{% endif %}
+{% endif %}
+{#- FROM  #}
+from-zone {{ from_zone }}
+{#- TO  #}
+to-zone {{ to_zone }}
+{#- servcie  #}
+{% for _service in service %}
+service {{ _service }}
+{% endfor %}
+{% if ops == 'create'  %}
+{{ action }}
+{% else %}
+action {{ action }}
+{% endif %}
+exit

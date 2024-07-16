@@ -25,11 +25,11 @@ from utils.crypt_pwd import CryptPwd
 from apps.api.tools.custom_pagination import LargeResultsSetPagination
 from apps.api.tools.custom_viewset_base import CustomViewBase
 from apps.asset.models import Idc, AssetAccount, Vendor, Role, Category, Model, Attribute, Framework, NetworkDevice, \
-    IdcModel, NetZone, Rack, AdminRecord, Server, ServerModel, ContainerService, ServerVendor, ServerAccount
+    IdcModel, NetZone, Rack, AdminRecord, Server, ServerModel, ContainerService, ServerVendor, AssetIpInfo
 from apps.asset.serializers import IdcSerializer, AssetAccountSerializer, AssetVendorSerializer, RoleSerializer, \
     CategorySerializer, ModelSerializer, AttributeSerializer, FrameworkSerializer, NetworkDeviceSerializer, \
     IdcModelSerializer, NetZoneSerializer, CmdbRackSerializer, AdminRecordSerializer, ServerSerializer, \
-    ServerModelSerializer, ContainerServiceSerializer, ServerVendorSerializer, ServerAccountSerializer
+    ServerModelSerializer, ContainerServiceSerializer, ServerVendorSerializer, AssetIpInfoSerializer
 from utils.cmdb_import import search_cmdb_vendor_id, search_cmdb_idc_id, search_cmdb_netzone_id, search_cmdb_role_id, \
     search_cmdb_idc_model_id, search_cmdb_cabinet_id, search_cmdb_category_id, search_cmdb_attribute_id, \
     search_cmdb_framework_id, returndate, csv_device_staus, pandas_read_file, old_import_parse
@@ -97,7 +97,7 @@ class ResourceManageExcelView(APIView):
 
 class DeviceAccountView(APIView):
     def post(self, request):
-        post_params = request.POST.dict()
+        post_params = request.data
         device = NetworkDevice.objects.get(id=post_params['asset_id'])
         account_list = json.loads(post_params['account'])
         device.account.set(account_list)
@@ -246,14 +246,13 @@ class CmdbNetzoneModelViewSet(CustomViewBase):
     """
     处理  GET POST , 处理 /api/post/<pk>/ GET PUT PATCH DELETE
     """
-    queryset = NetZone.objects.all().order_by('-id')
+    queryset = NetZone.objects.all().order_by('id')
     serializer_class = NetZoneSerializer
-    permission_classes = ()
-    authentication_classes = ()
-    pagination_class = LargeResultsSetPagination
     # 配置搜索功能
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    # 如果要允许对某些字段进行过滤，可以使用filter_fields属性。
     filter_fields = '__all__'
+    pagination_class = LargeResultsSetPagination
     # 设置搜索的关键字
     search_fields = '__all__'
 
@@ -280,12 +279,13 @@ class CmdbIdcModelViewSet(CustomViewBase):
     queryset = IdcModel.objects.all().order_by('id')
     queryset = IdcModelSerializer.setup_eager_loading(queryset)
     serializer_class = IdcModelSerializer
-    # permission_classes = (permissions.IsAuthenticated,)
-    permission_classes = ()
-    pagination_class = LargeResultsSetPagination
-    # 配置搜索功能
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
-    filter_fields = '__all__'
+    # permission_classes = (permissions.IsAuthenticated,)
+    # permission_classes = ()
+    pagination_class = LargeResultsSetPagination
+    # filterset_class = CmdbIdcModelFilter
+    # 配置搜索功能
+    filter_fields = ('id', 'name', 'idc')
 
 
 # asset account
@@ -306,21 +306,21 @@ class AccountList(CustomViewBase):
     # list_cache_key_func = QueryParamsKeyConstructor()
 
 
-class ServerAccountList(CustomViewBase):
-    """
-    处理  GET POST , 处理 /api/post/<pk>/ GET PUT PATCH DELETE
-    """
-    queryset = ServerAccount.objects.all().order_by('id')
-    serializer_class = ServerAccountSerializer
-    pagination_class = LargeResultsSetPagination
-    permission_classes = ()
-    # 配置搜索功能
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
-    # 如果要允许对某些字段进行过滤，可以使用filter_fields属性。
-    filter_fields = '__all__'
-    # 设置搜索的关键字
-    search_fields = '__all__'
-    # list_cache_key_func = QueryParamsKeyConstructor()
+# class ServerAccountList(CustomViewBase):
+#     """
+#     处理  GET POST , 处理 /api/post/<pk>/ GET PUT PATCH DELETE
+#     """
+#     queryset = ServerAccount.objects.all().order_by('id')
+#     serializer_class = ServerAccountSerializer
+#     pagination_class = LargeResultsSetPagination
+#     permission_classes = ()
+#     # 配置搜索功能
+#     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+#     # 如果要允许对某些字段进行过滤，可以使用filter_fields属性。
+#     filter_fields = '__all__'
+#     # 设置搜索的关键字
+#     search_fields = '__all__'
+#     # list_cache_key_func = QueryParamsKeyConstructor()
 
 
 class ServerVendorList(CustomViewBase):
@@ -347,7 +347,6 @@ class VendorViewSet(CustomViewBase):
     """
     queryset = Vendor.objects.all().order_by('id')
     serializer_class = AssetVendorSerializer
-    permission_classes = ()
     # 配置搜索功能
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     # 如果要允许对某些字段进行过滤，可以使用filter_fields属性。
@@ -452,21 +451,18 @@ class NetworkDeviceViewSet(CustomViewBase):
     queryset = NetworkDevice.objects.all().order_by('-id')
     queryset = NetworkDeviceSerializer.setup_eager_loading(queryset)
     serializer_class = NetworkDeviceSerializer
-    # authentication_classes = (authentication.JWTAuthentication,)
     # 配置搜索功能
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filterset_class = NetworkDeviceFilter
-    filter_fields = ('serial_num', 'manage_ip', 'bridge_mac', 'category__name', 'role__name',
-                     'name', 'vendor__name', 'idc__name', 'patch_version', 'idc_model__name', 'soft_version',
-                     'model__name', 'netzone__name', 'attribute__name', 'framework__name', 'rack__name',
-                     'u_location', 'memo', 'status', 'ha_status')
+    filter_fields = ('serial_num', 'manage_ip', 'category__name',
+                     'name', 'vendor__name', 'idc__name', 'patch_version', 'soft_version',
+                     'model__name', 'memo', 'status', 'ha_status')
     # pagination_class = LimitSet
     pagination_class = LargeResultsSetPagination
     # 设置搜索的关键字
-    search_fields = ('serial_num', 'manage_ip', 'bridge_mac', 'category__name', 'role__name',
-                     'name', 'vendor__name', 'idc__name', 'patch_version', 'idc_model__name', 'soft_version',
-                     'model__name', 'zone__name', 'attribute__name', 'framework__name', 'rack__name',
-                     'u_location', 'memo', 'status', 'ha_status')
+    search_fields = ('serial_num', 'manage_ip', 'category__name',
+                     'name', 'vendor__name', 'idc__name', 'patch_version', 'soft_version',
+                     'model__name', 'memo', 'status', 'ha_status')
 
     def get_queryset(self):
         """
@@ -474,6 +470,7 @@ class NetworkDeviceViewSet(CustomViewBase):
         :return:
         """
         expires = self.request.query_params.get('expires', None)
+        history = self.request.query_params.get('history', None)
         search_host_list = self.request.query_params.get('search_host_list', None)
         if search_host_list:
             if search_host_list.find('-') != -1:
@@ -481,6 +478,8 @@ class NetworkDeviceViewSet(CustomViewBase):
             else:
                 return self.queryset.filter(manage_ip__in=[search_host_list])
             # return self.queryset.filter(manage_ip__in=search_host_list)
+        if history:
+            return self.queryset.history.all()
         if expires == '1':
             return self.queryset.filter(expire__lt=date.today())
         elif expires == '0':
@@ -492,6 +491,24 @@ class NetworkDeviceViewSet(CustomViewBase):
     # def update(self, request, *args, **kwargs):
     #     print('更新', super().update(request, *args, **kwargs))
     #     return super().update(request, *args, **kwargs)
+
+
+class AssetIpInfoViewSet(CustomViewBase):
+    """
+    处理 网络设备绑定IP地址信息 GET POST , 处理 /api/post/<pk>/ GET PUT PATCH DELETE
+    """
+    queryset = AssetIpInfo.objects.all().order_by('id')
+    queryset = AssetIpInfoSerializer.setup_eager_loading(queryset)
+    serializer_class = AssetIpInfoSerializer
+    # permission_classes = (permissions.IsAuthenticated,)
+    # 配置搜索功能
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    # filterset_class = NetworkDeviceFilter
+    filter_fields = '__all__'
+    pagination_class = LargeResultsSetPagination
+    # 设置搜索的关键字
+    search_fields = '__all__'
+    # list_cache_key_func = QueryParamsKeyConstructor()
 
 
 class ServerFilter(django_filters.FilterSet):
@@ -617,7 +634,7 @@ class AdminRecordViewSet(CustomViewBase):
         start = self.request.query_params.get('start_time', None)
         end = self.request.query_params.get('end_time', None)
         if start and end:
-            return AdminRecord.objects.select_related('admin_login_user').filter(
+            return AdminRecord.objects.filter(
                 admin_start_time__gt=start,
                 admin_start_time__lt=end)
         return AdminRecord.objects.all()

@@ -2,7 +2,7 @@
 from rest_framework import serializers
 # import xml.etree.ElementTree as ET
 # import json
-from apps.automation.models import CollectionPlan, CollectionRule, CollectionMatchRule
+from apps.automation.models import CollectionPlan, CollectionRule, CollectionMatchRule, AutoFlow
 
 
 # 采集方案序列化
@@ -71,4 +71,13 @@ class CollectionRuleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CollectionRule
+        fields = '__all__'
+
+
+# 自动化工作流
+class AutoFlowSerializer(serializers.ModelSerializer):
+    commit_time = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', read_only=True)
+
+    class Meta:
+        model = AutoFlow
         fields = '__all__'

@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     "django_celery_beat",
     "django_celery_results.apps.CeleryResultConfig",
     "rest_framework",
+    'django_filters',
     "simple_history",
     "apps.users.apps.UsersConfig",
     "apps.system.apps.SystemConfig",
@@ -57,10 +58,9 @@ INSTALLED_APPS = [
     "apps.config_center.apps.ConfigCenterConfig",
     # "apps.route_backend.apps.RouteBackendConfig",
     "apps.int_utilization.apps.IntUtilizationConfig",
+    "apps.event.apps.EventConfig",
     # 'reversion',
     'import_export',
-    'django_filters',
-
 ]
 
 DATABASES = {
@@ -97,6 +97,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "utils.custom.middleware.CorsMiddleWare",  # 配置跨域访问支持
+    # 'utils.custom.iam.IamMiddleware',
     "simple_history.middleware.HistoryRequestMiddleware",
 ]
 
@@ -229,6 +230,15 @@ LOGGING = {
             "formatter": "standard",
             "encoding": "utf-8",
         },
+        "middleware": {
+            "level": "DEBUG",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": os.path.join(BASE_DIR, "logs", "middleware.log"),
+            "maxBytes": 1024 * 1024 * 10,  # 10 MB
+            "backupCount": 3,  # 最多备份3个
+            "formatter": "standard",
+            "encoding": "utf-8",
+        },
         "automation": {
             "level": "DEBUG",
             "class": "logging.handlers.RotatingFileHandler",
@@ -254,6 +264,10 @@ LOGGING = {
         },
         "server": {
             "handlers": ["server"],
+            "level": "DEBUG",
+        },
+        "custom_middleware": {
+            "handlers": ["middleware", "console"],
             "level": "DEBUG",
         },
         "websocket": {
@@ -330,13 +344,11 @@ CELERY_TIMEZONE = "Asia/Shanghai"  # celery 时区问题
 CELERY_TASK_TRACK_STARTED = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.0/howto/static-files/
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, "static")
-]
+# STATIC_ROOT=os.path.join(BASE_DIR, "static") #正确
 
-STATIC_URL = "/static/"
-STATIC_ROOT = os.path.join(BASE_DIR, "/static/")
-# STATIC_ROOT = "static/"
+
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 MEDIA_URL = "/media/"
@@ -375,14 +387,14 @@ REST_FRAMEWORK = {
         # "rest_framework.permissions.DjangoModelPermissions",
         # "rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly"
     ),
-    # "DEFAULT_AUTHENTICATION_CLASSES": (
-    #     # "utils.authentication.auth.CustomJWTAuthentication"
-    #     # "rest_framework.authentication.BasicAuthentication",
-    #     # "rest_framework.authentication.SessionAuthentication",
-    #     # "rest_framework.authentication.TokenAuthentication",
-    #     # "rest_framework_simplejwt.authentication.JWTAuthentication",
-    #     # "apps.api.authentication.ExpiringTokenAuthentication",
-    # ),
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        # "utils.authentication.auth.CustomJWTAuthentication"
+        # "rest_framework.authentication.BasicAuthentication",
+        # "rest_framework.authentication.SessionAuthentication",
+        # "rest_framework.authentication.TokenAuthentication",
+        # "rest_framework_simplejwt.authentication.JWTAuthentication",
+        # "apps.api.authentication.ExpiringTokenAuthentication",
+    ),
     "EXCEPTION_HANDLER": "utils.custom.exception.CustomExceptionHandler",  # 自定义的异常处理
     # "EXCEPTION_HANDLER": "apps.api.tools.custom_exception.custom_exception_handler", # 自定义的异常处理
     # 下面控制分页

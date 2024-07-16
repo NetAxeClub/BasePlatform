@@ -3,7 +3,7 @@
 
 import json
 import redis
-from backend.core.confload.confload import config
+from confload.confload import config
 
 
 class RedisOps:

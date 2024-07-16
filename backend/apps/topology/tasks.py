@@ -51,7 +51,7 @@ class TopologyTask:
 
     # 保存拓扑
     def save_graph(self, obj):
-        MongoNetOps.topology_ops(**obj)
+        MongoNetOps.topology_ops(obj)
 
     # 根据设备IP和接口返回接口速率
     def foo_speed(self, hostip, interface_name):
@@ -235,7 +235,7 @@ class TopologyTask:
             # 严格模式，只匹配相关的连线， strict 用来开关严格模式， strict=False则是开放模式
             result['links'] = self.foo_link(result['nodes'], result['links'], strict=True)
             # 存储拓扑计算结果
-            MongoNetOps.topology_ops(**result)
+            MongoNetOps.topology_ops(result)
             return True
         return False
 
@@ -276,7 +276,7 @@ class TopologyTask:
 
         result['links'] += self.foo_link(result['nodes'], result['links'], strict=True)
 
-        MongoNetOps.topology_ops(**result)
+        MongoNetOps.topology_ops(result)
 
         self.topology.save()
         return result
