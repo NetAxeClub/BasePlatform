@@ -147,7 +147,7 @@ class NetworkDeviceWebSshView(APIView):
     def get(self, request):
         get_param = request.GET.dict()
         server_obj = NetworkDevice.objects.filter(
-            manage_ip=get_param['manage_ips']).values('vendor__name', 'manage_ip', 'id').first()
+            manage_ip=get_param['manage_ip']).values('vendor__name', 'manage_ip', 'id').first()
         init_cmd = ''
         if server_obj['vendor__name'] in ['华三', '华为', '锐捷', '盛科']:
             init_cmd = 'terminal monitor'
@@ -176,8 +176,14 @@ class NewServerWebSshView(APIView):
     authentication_classes = ()
 
     def get(self, request):
+        get_param = request.GET.dict()
+        server_obj = Server.objects.filter(
+            manage_ip=get_param['manage_ip']).values('vendor__name', 'manage_ip', 'id').first()
+        init_cmd = ''
         remote_ip = request.META.get('REMOTE_ADDR')
-        return JsonResponse({'code': 200, 'data': {'remote_ip': remote_ip}})
+        return JsonResponse(
+            {'code': 200, 'data': {'init_cmd': init_cmd, 'remote_ip': remote_ip, 'id': server_obj['id']}})
+
 
     def post(self, request):
         post_data = request.POST
