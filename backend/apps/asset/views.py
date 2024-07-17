@@ -621,10 +621,10 @@ class AdminRecordViewSet(CustomViewBase):
         start = self.request.query_params.get('start_time', None)
         end = self.request.query_params.get('end_time', None)
         if start and end:
-            return AdminRecord.objects.filter(
+            return self.queryset.filter(
                 admin_start_time__gt=start,
                 admin_start_time__lt=end)
-        return AdminRecord.objects.all().order_by('-id')
+        return self.queryset
 
 
 class GatewayView(APIView):
