@@ -1,24 +1,17 @@
 import json
 import operator
 import os
+import re
 import time
 from datetime import date
 import django_filters
 from django.core.cache import cache
 from django.db.models import Count
-from django.views import View
 from django.http import JsonResponse, FileResponse, Http404, HttpResponse
-from django.views.decorators.csrf import csrf_exempt
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 from rest_framework import filters
-
-from .json_validate.address_schema import address_schema
-from .json_validate.dnat_schema import post_dnat_schema
-from .json_validate.service_schema import service_schema
-# from .json_validate import address_schema
-from .jsonschema import single_json_validate
 from apps.automation.tasks import interface_used
 from netaxe.settings import MEDIA_ROOT, DEBUG
 from utils.crypt_pwd import CryptPwd
@@ -40,7 +33,7 @@ if DEBUG:
     CELERY_QUEUE = 'dev'
 else:
     CELERY_QUEUE = 'config_backup'
-
+show_ip_mongo = MongoOps(db='Automation', coll='layer3interface')
 
 class ResourceManageExcelView(APIView):
     permission_classes = (AllowAny,)
@@ -479,7 +472,7 @@ class NetworkDeviceViewSet(CustomViewBase):
                 return self.queryset.filter(manage_ip__in=[search_host_list])
             # return self.queryset.filter(manage_ip__in=search_host_list)
         if history:
-            return self.queryset.history.all()
+            return self.queryset.history.all().order_by('-id')
         if expires == '1':
             return self.queryset.filter(expire__lt=date.today())
         elif expires == '0':
@@ -632,3 +625,28 @@ class AdminRecordViewSet(CustomViewBase):
                 admin_start_time__gt=start,
                 admin_start_time__lt=end)
         return AdminRecord.objects.all().order_by('-id')
+
+
+class GatewayView(APIView):
+    def get(self, request):
+        pattern = re.compile(r'((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})(\.((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2}|.)){3}')
+        ip = request.GET.dict()['gateway_key']
+        if pattern.search(ip):
+            if ip.find('*') >= 0:
+                tmp = show_ip_mongo.find_re({'ipaddress': re.compile(ip.strip('*'))}, fileds={'_id': 0})
+            else:
+                tmp = show_ip_mongo.find(query_dict={'ipaddress': ip.strip()}, fileds={'_id': 0})
+            if tmp:
+                hostlist = list(set([x['hostip'] for x in tmp]))
+                result = {
+                    'code': 200,
+                    'data': '-'.join(hostlist),
+                }
+                return JsonResponse(result, safe=False)
+
+        else:
+            result = {
+                'code': 400,
+                'data': '',
+            }
+            return JsonResponse(result, safe=False)

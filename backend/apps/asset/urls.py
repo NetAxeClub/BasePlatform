@@ -44,4 +44,5 @@ urlpatterns = [
     path('import_template', ResourceManageExcelView.as_view(), name='import_template'),
     path('device_account', DeviceAccountView.as_view(), name='device_account'),
     path('cmdbChart', CmdbChart.as_view(), name='device_account'),
+    path('gateway_search/', GatewayView.as_view(), name='gateway_search'),
 ]
