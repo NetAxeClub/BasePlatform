@@ -251,12 +251,12 @@ class XunMiView(APIView):
             hostip = get_param['get_interface_by_hostip']
             layer3interface_res = show_ip_mongo.find(query_dict={'hostip': hostip}, fileds={'interface': 1})
             layer2interface_res = interface_mongo.find(query_dict={'hostip': hostip}, fileds={'interface': 1})
-            result = [x['interface'] for x in layer3interface_res if layer3interface_res] + [x['interface'] for x in layer2interface_res if layer2interface_res]
+            res = [x['interface'] for x in layer3interface_res if layer3interface_res] + [x['interface'] for x in layer2interface_res if layer2interface_res]
             result = {
                 "code": 200,
-                "count": len(result),
+                "count": len(res),
                 "message": "成功",
-                "results": result
+                "results": res
             }
             return JsonResponse(result, safe=False)
 

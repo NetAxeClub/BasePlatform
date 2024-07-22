@@ -1,12 +1,15 @@
 import django_filters
+from django.http import JsonResponse
 from django_filters.rest_framework import DjangoFilterBackend
-
+from rest_framework.views import APIView
 from rest_framework import viewsets, permissions, filters, pagination
-
 from .models import InterfaceUsed
 from .serializers import InterfaceUsedNewSerializer
 from apps.api.tools.custom_viewset_base import CustomViewBase
 from apps.api.tools.custom_pagination import LargeResultsSetPagination
+from utils.db.mongo_ops import MongoOps
+show_ip_mongo = MongoOps(db='Automation', coll='layer3interface')
+interface_mongo = MongoOps(db='Automation', coll='layer2interface')
 
 
 class InterfaceUsedFilter(django_filters.FilterSet):
@@ -48,3 +51,64 @@ class InterfaceUsedNewViewSet(CustomViewBase):
         if host_id and interface_used:
             return self.queryset.filter(host_id=host_id)
         return self.queryset
+
+
+class InterfaceView(APIView):
+    def get(self, request):
+        get_param = request.GET.dict()
+        if get_param.get('get_interface_by_hostip'):
+            hostip = get_param['get_interface_by_hostip']
+            layer3interface_res = show_ip_mongo.find(query_dict={'hostip': hostip},
+                                                     fileds={'interface': 1, 'line_status': 1, '_id': 0})
+            layer2interface_res = interface_mongo.find(query_dict={'hostip': hostip},
+                                                       fileds={'interface': 1, 'status': 1, '_id': 0})
+            tmp_res = [
+                         {'name': x['interface'], 'status': x['line_status'].upper()} for x in layer3interface_res if layer3interface_res
+                     ] + [
+                {'name': x['interface'], 'status': x['status'].upper()} for x in layer2interface_res if layer2interface_res
+            ]
+            res = {}
+            # 判断堆叠
+            for i in tmp_res:
+                if i['name'].startswith('lo'):
+                    continue
+                elif i['name'].startswith('mgmt'):
+                    continue
+                elif i['name'].startswith('AggregatePort'):
+                    continue
+                elif i['name'].startswith('LoopBack'):
+                    continue
+                elif i['name'].startswith('Vlan-interface'):
+                    continue
+                elif i['name'].startswith('Route'):
+                    continue
+                _tmp_slot = i['name'].split('/')[0]
+                i['index'] = int(i['name'].split('/')[-1])
+                if str(_tmp_slot[-1]) in res.keys():
+                    res[str(_tmp_slot[-1])].append(i)
+                else:
+                    res[str(_tmp_slot[-1])] = [i]
+            # res = [x for x in tmp_res if x['status'] in ["UP", "DOWN"]]
+
+            for k, v in res.items():
+                x = 100
+                for _v in v:
+                    if _v['index'] <= len(v) / 2:
+                        _v['y'] = 100
+                        _v['x'] = x
+                        x += 50
+            for k, v in res.items():
+                x = 100
+                for _v in v:
+                    if _v['index'] > len(v) / 2:
+                        _v['y'] = 200
+                        _v['x'] = x
+                        x += 50
+
+            result = {
+                "code": 200,
+                "count": len(res),
+                "message": "成功",
+                "results": res
+            }
+            return JsonResponse(result, safe=False)

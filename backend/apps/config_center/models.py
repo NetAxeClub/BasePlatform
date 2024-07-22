@@ -93,7 +93,7 @@ class ConfigBackup(models.Model):
         max_length=100,
         null=False, default='')
     manage_ip = models.GenericIPAddressField(verbose_name='管理地址', null=False, default='0.0.0.0')
-    last_time = models.DateTimeField(auto_now=True, verbose_name='最近一次备份时间')
+    last_time = models.DateTimeField(auto_now=True, verbose_name='备份时间')
     idc_name = models.CharField(verbose_name='机房', max_length=100, null=True, default='')
     model_name = models.CharField(verbose_name='型号', max_length=100, null=True, default='')
     vendor_name = models.CharField(verbose_name='厂商', max_length=100, null=True, default='')

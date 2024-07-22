@@ -11,19 +11,19 @@
 -------------------------------------------------
 """
 import traceback
-
+from os import getenv
 from driver.cmdb_import import RestApiDriver
 from apps.automation.models import CollectionPlan
 from apps.asset.models import (NetworkDevice, Vendor, Category, Model, IdcModel, Idc, Role, Rack, Attribute, Framework,
                                NetZone, AssetIpInfo, AssetAccount, ServerModel, ServerVendor, Server)
-from os import getenv
+from utils.db.mongo_ops import MongoOps
 import logging
 import requests
 import json
 
 # log = logging.getLogger(__name__)
 log = logging.getLogger('server')
-
+log_mongo = MongoOps(db='BasePlatform', coll='CMDBSync')
 
 class CmdbImportDriver(RestApiDriver):
     """ 用于从现有第三方CMDB平台中获取资产数据导入到Netaxe 基础平台中 """
@@ -66,13 +66,11 @@ class CmdbImportDriver(RestApiDriver):
         return []
 
     def import_data(self):
-        # res = self.do_something('asset_networkdevice/', {'limit': 30000})
-        res = self.do_something('asset_networkdevice/', {'limit': 5000})
+        res = self.do_something('asset_networkdevice/', {'limit': 8000})
         sum_count = 0
         fail_count = 0
         for i in res:
             try:
-                # print(i)
                 log.info(i)
                 tmp = {
                     "manage_ip": i['manage_ip'],
@@ -197,6 +195,7 @@ class CmdbImportDriver(RestApiDriver):
             except Exception as e:
                 log.error(str(e))
                 log.error("{}-{}".format(i['manage_ip'], i['serial_num']))
+                log_mongo.insert({'manage_ip': i['manage_ip'], 'serial_num': i['serial_num'], 'error': str(e)})
                 print(traceback.print_exc())
                 fail_count += 1
         print("同步结束")

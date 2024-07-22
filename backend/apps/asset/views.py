@@ -441,7 +441,7 @@ class NetworkDeviceViewSet(CustomViewBase):
     """
     处理  GET POST , 处理 /api/post/<pk>/ GET PUT PATCH DELETE
     """
-    queryset = NetworkDevice.objects.all().order_by('-id')
+    queryset = NetworkDevice.objects.all().order_by('-uptime')
     queryset = NetworkDeviceSerializer.setup_eager_loading(queryset)
     serializer_class = NetworkDeviceSerializer
     # 配置搜索功能
