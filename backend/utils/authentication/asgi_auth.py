@@ -46,7 +46,6 @@ def get_auth_user(token):
             logger.info(str(res.json()))
             if 200 <= res.status_code < 300:
                 logger.info(res.status_code)
-                logger.info(str(res.json()))
                 return UserData(res.json()['results'])
             else:
                 return AnonymousUser()
