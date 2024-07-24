@@ -69,7 +69,7 @@ class InterfaceView(APIView):
             ]
             res = {}
             try:
-            # 判断堆叠
+                # 判断堆叠
                 for i in tmp_res:
                     if i['name'].startswith('lo'):
                         continue
@@ -85,29 +85,35 @@ class InterfaceView(APIView):
                         continue
                     elif i['name'].startswith('Vsi'):
                         continue
+                    elif i['name'].startswith('MEth'):
+                        continue
                     _tmp_slot = i['name'].split('/')[0]
                     i['index'] = int(i['name'].split('/')[-1])
+                    i['speed'] = str(i['name'].split('/')[0][:-1])
                     if str(_tmp_slot[-1]) in res.keys():
-                        res[str(_tmp_slot[-1])].append(i)
+                        if i['speed'] in res[str(_tmp_slot[-1])].keys():
+                            res[str(_tmp_slot[-1])][i['speed']].append(i)
+                        else:
+                            res[str(_tmp_slot[-1])][i['speed']] = [i]
                     else:
-                        res[str(_tmp_slot[-1])] = [i]
+                        res[str(_tmp_slot[-1])] = {}
+                        res[str(_tmp_slot[-1])][i['speed']] = [i]
                 # res = [x for x in tmp_res if x['status'] in ["UP", "DOWN"]]
-
-                for k, v in res.items():
-                    x = 100
-                    for _v in v:
-                        if _v['index'] <= len(v) / 2:
-                            _v['y'] = 100
-                            _v['x'] = x
-                            x += 50
-                for k, v in res.items():
-                    x = 100
-                    for _v in v:
-                        if _v['index'] > len(v) / 2:
-                            _v['y'] = 200
-                            _v['x'] = x
-                            x += 50
-
+                for key in res.keys():  # slot
+                    y_list = [i * 100 for i in range(1, len(res[key].keys()) + 1)]
+                    for k, y in zip(res[key].keys(), y_list):
+                        x = 100
+                        for interface in res[key][k]:  # 接口前缀
+                            if interface['index'] <= 24:
+                                interface['y'] = 1 * y
+                                interface['x'] = x
+                                x += 50
+                        for interface in res[key][k]:  # 接口前缀
+                            if interface['index'] > 24:
+                                interface['y'] = 1 * y
+                                interface['x'] = x
+                                x += 50
+                print(res)
                 result = {
                     "code": 200,
                     "count": len(res),

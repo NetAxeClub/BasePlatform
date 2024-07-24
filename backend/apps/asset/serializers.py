@@ -326,6 +326,6 @@ class AdminRecordSerializer(serializers.ModelSerializer):
     def setup_eager_loading(queryset):
         """ Perform necessary eager loading of data. """
         # select_related for "to-one" relationships
-        queryset = queryset.select_related('admin_login_user')
+        # queryset = queryset.select_related('admin_login_user')
 
         return queryset
