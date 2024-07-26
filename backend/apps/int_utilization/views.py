@@ -153,7 +153,7 @@ class InterfaceView(APIView):
                     #         elif interface['index'] > 24:
                     #             interface['y'] = 1 * y
                     #             interface['x'] = x
-                                x += 50
+                    #             x += 50
                 # for i in res.keys():
                 #     print(i, res[i])
                 result = {
