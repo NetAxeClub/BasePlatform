@@ -75,6 +75,8 @@ class InterfaceView(APIView):
                         continue
                     elif i['name'].startswith('mgmt'):
                         continue
+                    elif i['name'].startswith('M-GigabitEthernet'):
+                        continue
                     elif i['name'].startswith('AggregatePort'):
                         continue
                     elif i['name'].startswith('LoopBack'):
@@ -99,21 +101,61 @@ class InterfaceView(APIView):
                         res[str(_tmp_slot[-1])] = {}
                         res[str(_tmp_slot[-1])][i['speed']] = [i]
                 # res = [x for x in tmp_res if x['status'] in ["UP", "DOWN"]]
-                for key in res.keys():  # slot
-                    y_list = [i * 100 for i in range(1, len(res[key].keys()) + 1)]
-                    for k, y in zip(res[key].keys(), y_list):
+                for slot in res.keys():  # slot
+                    # for k in res[slot].keys():
+                    y_list = [i for i in range(1, len(res[slot].keys()) + 1)]  # 端口类型分类
+                    for k, _y in zip(res[slot].keys(), y_list):
                         x = 100
-                        for interface in res[key][k]:  # 接口前缀
-                            if interface['index'] <= 24:
+                        y = 100
+                        for interface in res[slot][k]:  # 接口前缀
+                            if _y == 1 and interface['index'] <= 24:
                                 interface['y'] = 1 * y
                                 interface['x'] = x
                                 x += 50
-                        for interface in res[key][k]:  # 接口前缀
-                            if interface['index'] > 24:
+                        x = 100
+                        for interface in res[slot][k]:  # 接口前缀
+                            if _y == 1 and interface['index'] > 24:
+                                interface['y'] = 2 * y
+                                interface['x'] = x
+                                x += 50
+                        x = 100
+                        for interface in res[slot][k]:  # 接口前缀
+                            if _y == 2 and len(res[slot][k]) <= 24:
                                 interface['y'] = 1 * y
                                 interface['x'] = x
                                 x += 50
-                print(res)
+                        x = 100
+                        for interface in res[slot][k]:  # 接口前缀
+                            if _y == 2 and len(res[slot][k]) > 24:
+                                interface['y'] = 2 * y
+                                interface['x'] = x
+                                x += 50
+                    # y_list = [i * 100 for i in range(1, len(res[slot].keys()) + 1)]
+                    # for k, y in zip(res[slot].keys(), y_list):
+                    #     print(k)
+                    #     x = 100
+                    #     for interface in res[slot][k]:  # 接口前缀
+                    #         if interface['index'] <= 24:
+                    #             interface['y'] = 1 * y
+                    #             interface['x'] = x
+                    #             x += 50
+                    #         elif interface['index'] > 24:
+                    #             interface['y'] = 1 * y
+                    #             interface['x'] = x
+                    #             x += 50
+                    # for k, y in zip(res[slot].keys(), y_list):
+                    #     x = 100
+                    #     for interface in res[slot][k]:  # 接口前缀
+                    #         if interface['index'] <= 24:
+                    #             interface['y'] = 1 * y
+                    #             interface['x'] = x
+                    #             x += 50
+                    #         elif interface['index'] > 24:
+                    #             interface['y'] = 1 * y
+                    #             interface['x'] = x
+                                x += 50
+                # for i in res.keys():
+                #     print(i, res[i])
                 result = {
                     "code": 200,
                     "count": len(res),
