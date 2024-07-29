@@ -692,7 +692,8 @@ class MainIn:
                                                         'zone',
                                                         'rack').prefetch_related('bind_ip', 'account').filter(
             status=0).values(
-            'name', 'idc__name', 'serial_num', 'manage_ip', 'status', 'chassis', 'slot', 'idc_model__name', 'rack__name')
+            'name', 'idc__name', 'serial_num', 'manage_ip', 'status', 'chassis', 'slot', 'idc_model__name',
+            'u_location_start', 'u_location_end','rack__name')
         MongoNetOps.post_cmdb(all_devs)
         return
 

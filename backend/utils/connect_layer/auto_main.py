@@ -1206,6 +1206,292 @@ Warning: {{ error | re(".*") }}
         else:
             return []
 
+    @staticmethod
+    def dnat_proc_new(path):
+        data_to_parse = default_storage.open(path).readnat_proc_newd()
+        data_to_parse = data_to_parse.decode('utf-8')
+        ttp_template = """
+<vars>
+default_values = {
+    "ID": "",
+    "FROM": "",
+    "FROM_IP": "",
+    "TO": "",
+    "TO_IP": "",
+    "TRANSTO": "",
+    "TRANSTO_IP": "",
+    "PORT": "",
+    "SERVICE": "",
+    "DESC": "",
+    "disable": "",
+    "LOADBALANCE": "",
+    "LOG": "",
+    "TRACK_TCP": "",
+    "TRACK_PING": "",
+    "POOLNAME": "",
+}
+</vars>
+<macro>
+def check_data(data):
+    results = []  ## 结果集合
+    ID_LIST = []  ## 所有ID集合
+    PARSE_ID = [] ## 解析出来的ID结合
+    NO_PARSE = [] ## 没有解析出来的ID集合
+    ## print(data) 这里可以直接打印用于方法调试
+    ##print(data)
+    ##print('data', data[0]['counts']['count'])
+    ##print(data[0]['dnat'][-1])
+    if data != [{}]:
+        ## 所有ID的集合
+        if 'count' not in data[0]['counts'].keys():
+            return ([], [])
+        if isinstance(data[0]['counts']['count'], dict):
+            data[0]['counts']['count'] = [data[0]['counts']['count']]
+        for i in data[0]['counts']['count']:
+            ID_LIST.append(i['ID'])
+        ## 解析结果的集合
+        if isinstance(data[0]['dnat'], list):
+            for _data in data[0]['dnat']:
+                if _data != {}:
+                    if isinstance(_data['rule'], dict):
+                        _data['rule'] = [_data['rule']]
+                    if _data['rule']:
+                        for i in _data['rule']:
+                            if i['ID']:
+                                results.append(i)
+                                PARSE_ID.append(i['ID'])
+        else:
+            for i in data[0]['dnat']['rule']:
+                results.append(i)
+                PARSE_ID.append(i['ID'])
+        ## 找出没有解析出来的ID
+        for out_id in ID_LIST:
+            if out_id not in PARSE_ID:
+                NO_PARSE.append(out_id)
+    return (results, NO_PARSE)
+</macro>
+<group name="counts">
+ip vrouter "trust-vr"{{_start_}}
+## 专门用来计算个数
+<group name="count">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} {{ ignore(".*") }}
+</group>
+exit{{_end_}}
+</group>
+<group name="dnat">
+ip vrouter "trust-vr"{{_start_}}
+## FROM ANY TO IP
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to ip {{ TO_IP }} service "{{ SERVICE }}" trans-to ip {{ TRANSTO_IP }} port {{ PORT }}
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to ip {{ TO_IP }} service "{{ SERVICE }}" trans-to ip {{ TRANSTO_IP }} {{LOG|re("log")}} description "{{DESC}}" 
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to ip {{ TO_IP }} service "{{ SERVICE }}" trans-to ip {{ TRANSTO_IP }} track-tcp {{ TRACK_TCP }} description "{{DESC}}" 
+</group>
+## FROM ANY TO ADDRESS-BOOK
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to address-book "{{ TO }}" service "{{ SERVICE }}" trans-to ip {{ TRANSTO_IP }} port {{ PORT }}
+</group>
+## description
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to ip {{ TO_IP }} service "{{ SERVICE }}" trans-to ip {{ TRANSTO_IP }} port {{ PORT }} description "{{DESC}}" 
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to ip {{ TO_IP }} service "{{ SERVICE }}" trans-to ip {{ TRANSTO_IP }} description "{{DESC}}" 
+</group>
+<group name="rule" default="default_values">
+## service 和 slb 都带有空格的情况
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to ip {{ TO_IP }} service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to slb-server-pool "{{ POOLNAME | re("\S+(\s\S+)?") }}"
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to ip {{ TO_IP }} service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to ip {{ TRANSTO_IP }}
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to address-book "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to slb-server-pool "{{ POOLNAME | re("\S+(\s\S+)?") }}" {{ LOG|re("log") }} description "{{DESC}}" 
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to address-book "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to address-book "{{ TRANSTO | re("\S+(\s\S+)?") }}" port {{ PORT }} {{ LOADBALANCE|re("load-balance") }}
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to ip {{ TO_IP }} service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to ip {{ TRANSTO_IP }} port {{ PORT }} {{ disable|re("disable")}}  description "{{DESC}}" 
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to address-book "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to ip {{ TRANSTO_IP }} port {{ PORT }} description "{{DESC}}"
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to ip {{ TO_IP }} service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to ip {{ TRANSTO_IP }} {{ disable }} 
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to address-book "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to ip {{ TRANSTO_IP }} 
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to address-book "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to address-book "{{ TRANSTO | re("\S+(\s\S+)?") }}" port {{ PORT }} track-tcp {{ TRACK_TCP }} {{TRACK_PING|re("track-ping")}} 
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to ip {{ TO_IP }} service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to slb-server-pool "{{ POOLNAME | re("\S+(\s\S+)?") }}" {{ disable|re("disable")}} 
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to address-book "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to ip {{ TRANSTO_IP }} port {{ PORT }} track-tcp {{ TRACK_TCP }} {{ disable|re("disable")}} 
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to address-book "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to address-book "{{ TRANSTO | re("\S+(\s\S+)?") }}" track-tcp {{ TRACK_TCP }} description "{{DESC}}"
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to ip {{ TO_IP }} service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to address-book "{{ TRANSTO | re("\S+(\s\S+)?") }}" description "{{DESC}}" 
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to ip {{ TO_IP }} service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to address-book "{{ TRANSTO | re("\S+(\s\S+)?") }}" 
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to ip {{ TO_IP }} service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to ip {{ TRANSTO_IP }} description "{{ DESC | re("\S+(\s\S+)?")}}" 
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to address-book "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to slb-server-pool "{{ POOLNAME | re("\S+(\s\S+)?") }}" 
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to address-book "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to slb-server-pool "{{ POOLNAME | re("\S+(\s\S+)?") }}" description "{{ DESC | re("\S+(\s\S+)?")}}" 
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to address-book "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to address-book "{{ TRANSTO | re("\S+(\s\S+)?") }}" port {{ PORT }} 
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to address-book "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to ip {{ TRANSTO_IP }} description "{{ DESC | re("\S+(\s\S+)?")}}"
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to ip {{ TO_IP }} service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to slb-server-pool "{{ POOLNAME | re("\S+(\s\S+)?") }}" description "{{ DESC | re("\S+(\s\S+)?")}}"
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to ip {{ TO_IP }} service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to ip {{ TRANSTO_IP }} {{ disable|re("disable")}} description "{{ DESC | re("\S+(\s\S+)?")}}"
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from ip {{FROM_IP}} to ip {{ TO_IP }} service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to ip {{ TRANSTO_IP }} {{ disable|re("disable")}} description "{{ DESC | re("\S+(\s\S+)?")}}"
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from ip {{FROM_IP}} to ip {{ TO_IP }} service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to slb-server-pool "{{ POOLNAME | re("\S+(\s\S+)?") }}"
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to ip {{ TO_IP }} service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to ip {{ TRANSTO_IP }} port {{PORT}} {{ disable|re("disable")}}
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from ip {{FROM_IP}} to ip {{ TO_IP }} service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to ip {{ TRANSTO_IP }} description "{{ DESC | re("\S+(\s\S+)?")}}"
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to ip {{ TO_IP }} service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to ip {{ TRANSTO_IP }} port {{PORT}} description "{{ DESC | re("\S+(\s\S+)?")}}"
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from ip {{FROM_IP}} to ip {{ TO_IP }} service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to ip {{ TRANSTO_IP }} port {{PORT}} description "{{ DESC | re("\S+(\s\S+)?")}}"
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from ip {{FROM_IP}} to ip {{ TO_IP }} service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to ip {{ TRANSTO_IP }}
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to address-book "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to address-book "{{ TRANSTO | re("\S+(\s\S+)?") }}" {{LOADBALANCE|re("load-balance")}}
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to ip {{ TO_IP }} service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to ip {{ TRANSTO_IP }} port {{PORT}} {{LOG|re("log")}} 
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from address-book "{{ FROM }}" to address-book "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to ip {{ TRANSTO_IP }} port {{PORT}} {{LOG|re("log")}} {{disable|re("disable")}} 
+</group>
+<group name="rule" default="default_values">
+## 5.4
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from "{{ FROM }}" to "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to "{{ TRANSTO | re("\S+(\s\S+)?") }}" port {{PORT}} description "{{DESC}}" 
+</group>
+<group name="rule" default="default_values">
+## 5.5R2
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from "{{ FROM }}" to "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to "{{ TRANSTO | re("\S+(\s\S+)?") }}" description "{{DESC}}" 
+</group>
+<group name="rule" default="default_values">
+## 5.5R2
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from "{{ FROM }}" to "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to "{{ TRANSTO | re("\S+(\s\S+)?") }}" {{TRACK_PING|re("track-ping")}}
+</group>
+<group name="rule" default="default_values">
+## 5.5R2
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from "{{ FROM }}" to "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to "{{ TRANSTO | re("\S+(\s\S+)?") }}" 
+</group>
+<group name="rule" default="default_values">
+## 5.5R2
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from "{{ FROM }}" to "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to "{{ TRANSTO | re("\S+(\s\S+)?") }}" track-tcp {{ TRACK_TCP }}
+</group>
+<group name="rule" default="default_values">
+## 5.5R2
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from "{{ FROM }}" to "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to "{{ TRANSTO | re("\S+(\s\S+)?") }}" port {{PORT}} track-tcp {{ TRACK_TCP }}
+</group>
+<group name="rule" default="default_values">
+## 5.5R2
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from "{{ FROM }}" to "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to "{{ TRANSTO | re("\S+(\s\S+)?") }}" port {{PORT}}
+</group>
+<group name="rule" default="default_values">
+## 5.5R2
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from "{{ FROM }}" to "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to "{{ TRANSTO | re("\S+(\s\S+)?") }}" {{disable|re("disable")}} 
+</group>
+<group name="rule" default="default_values">
+## 5.5R2
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from "{{ FROM }}" to "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to "{{ TRANSTO | re("\S+(\s\S+)?") }}" track-tcp {{ TRACK_TCP }} {{TRACK_PING|re("track-ping")}} {{LOG|re("log")}}
+</group>
+<group name="rule" default="default_values">
+## 5.5R2
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from "{{ FROM }}" to "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to "{{ TRANSTO | re("\S+(\s\S+)?") }}" port {{PORT}} track-tcp {{ TRACK_TCP }} {{ ignore(".*") }}
+</group>
+<group name="rule" default="default_values">
+## 5.5R2
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from "{{ FROM }}" to "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to "{{ TRANSTO | re("\S+(\s\S+)?") }}" port {{PORT}} {{LOG|re("log")}} {{disable|re("disable")}} {{ ignore(".*") }}
+</group>
+<group name="rule" default="default_values">
+## 5.5R2
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from "{{ FROM }}" to "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to "{{ TRANSTO | re("\S+(\s\S+)?") }}" port {{PORT}} {{LOADBALANCE|re("load-balance")}} track-tcp {{ TRACK_TCP }} {{TRACK_PING|re("track-ping")}} description "{{DESC}}" 
+</group>
+<group name="rule" default="default_values">
+## 5.5R2
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from "{{ FROM }}" to "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to "{{ TRANSTO | re("\S+(\s\S+)?") }}" port {{PORT}} {{LOADBALANCE|re("load-balance")}} 
+</group>
+<group name="rule" default="default_values">
+## 5.5R2
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from "{{ FROM }}" to "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to "{{ TRANSTO | re("\S+(\s\S+)?") }}" track-tcp {{ TRACK_TCP }} {{TRACK_PING|re("track-ping")}}
+</group>
+<group name="rule" default="default_values">
+## 5.5R2
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from "{{ FROM }}" to "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to "{{ TRANSTO | re("\S+(\s\S+)?") }}" port {{PORT}} {{LOADBALANCE|re("load-balance")}} description "{{DESC}}" 
+</group>
+<group name="rule" default="default_values">
+## 5.0  id 64 service "4549 "  172.16.56。251  服务名最后有空格
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from "{{ FROM }}" to "{{ TO }}" service "{{ SERVICE | re("\S+(\s)?") }}" trans-to "{{ TRANSTO | re("\S+(\s\S+)?") }}" port {{PORT}} track-tcp {{ TRACK_TCP }} 
+</group>
+<group name="rule" default="default_values">
+## 5.0  id 37 service "4549 "  172.16.56。251  服务名最后有空格
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from "{{ FROM }}" to "{{ TO }}" service "{{ SERVICE | re("\S+(\s)?") }}" trans-to "{{ TRANSTO | re("\S+(\s\S+)?") }}" port {{PORT}}
+</group>
+<group name="rule" default="default_values">
+## 5.0 
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from "{{ FROM }}" to "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to "{{ TRANSTO | re("\S+(\s\S+)?") }}" {{LOG|re("log")}}
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from "{{ FROM }}" to "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to "{{ TRANSTO | re("\S+(\s\S+)?") }}" {{LOADBALANCE|re("load-balance")}} track-tcp {{ TRACK_TCP }} {{TRACK_PING|re("track-ping")}}
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from "{{ FROM }}" to "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to "{{ TRANSTO | re("\S+(\s\S+)?") }}" port {{ PORT }} {{TRACK_PING|re("track-ping")}}
+</group>
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from "{{ FROM }}" to "{{ TO }}" service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to "{{ TRANSTO | re("\S+(\s\S+)?") }}" {{LOADBALANCE|re("load-balance")}}
+</group>
+## 5.5R10
+<group name="rule" default="default_values">
+{{ ignore("\s*") }}dnatrule id {{ ID|re("\d+") }} from-zone "{{ FROM_ZONE }}" from address-book "{{ FROM }}" to ip {{ TO_IP }} service "{{ SERVICE | re("\S+(\s\S+)?") }}" trans-to ip {{ TRANSTO_IP }} port {{PORT}}
+</group>
+exit{{_end_}}
+</group>
+<output macro="check_data"/>
+"""
+        parser = ttp(data=data_to_parse, template=ttp_template)
+        parser.parse()
+        # print result in JSON format
+        results = parser.result(format='json')[0]
+        # print(type(results))
+        res = json.loads(results)
+        return res
+
 
 class HuaweiS:
     @staticmethod
