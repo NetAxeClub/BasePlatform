@@ -1208,7 +1208,7 @@ Warning: {{ error | re(".*") }}
 
     @staticmethod
     def dnat_proc_new(path):
-        data_to_parse = default_storage.open(path).readnat_proc_newd()
+        data_to_parse = default_storage.open(path)
         data_to_parse = data_to_parse.decode('utf-8')
         ttp_template = """
 <vars>
