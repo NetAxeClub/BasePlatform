@@ -17,6 +17,7 @@ from apps.api.tools.custom_viewset_base import CustomViewBase
 from django.db.models import CharField, ForeignKey, GenericIPAddressField
 from utils.db.mongo_ops import MongoOps
 from driver import auto_driver_map
+from .tools.models_api import get_firewall_list
 
 xunmi_mongo = MongoOps(db='BasePlatform', coll='XunMi')
 show_ip_mongo = MongoOps(db='Automation', coll='layer3interface')
@@ -366,6 +367,27 @@ class XunMiView(APIView):
                 "code": 200,
                 "results": res,
                 "count": len(res_count)
+            }
+            return JsonResponse(result, safe=False)
+        result = {
+            "code": 400,
+            "count": 0,
+            "message": "没有匹配的数据",
+            "results": []
+        }
+        return JsonResponse(result, safe=False)
+
+
+class SecMainView(APIView):
+    def get(self, request):
+        get_param = request.GET.dict()
+        if 'get_firewall_list' in get_param.keys():
+            res = get_firewall_list()
+            result = {
+                "code": 200,
+                "count": len(res),
+                "message": "成功",
+                "results": res
             }
             return JsonResponse(result, safe=False)
         result = {

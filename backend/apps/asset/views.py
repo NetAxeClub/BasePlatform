@@ -117,6 +117,27 @@ class DeviceAccountView(APIView):
         return JsonResponse({'code': 200, 'message': '获取账户信息成功', 'results': account_list})
 
 
+class ServerAccountView(APIView):
+
+    def get(self, request):
+        get_params = request.GET.dict()
+        device = Server.objects.get(serial_num=get_params['serial_num'])
+        account_query = device.account.all()
+        serializer_data = AssetAccountSerializer(account_query, many=True)
+        account_list = []
+        _CryptPwd = CryptPwd()
+        for i in serializer_data.data:
+            account_dict = {
+                'name': i['name'],
+                'username': i['username'],
+                'protocol': i['protocol'],
+                'port': i['port'],
+                'password': _CryptPwd.decrypt_pwd(i['password'])
+            }
+            account_list.append(account_dict)
+        # serializer_data = AssetAccountSerializer(account_query, many=True)
+
+        return JsonResponse({'code': 200, 'message': '获取账户信息成功', 'results': account_list})
 class CmdbChart(APIView):
     permission_classes = ()
     authentication_classes = ()
