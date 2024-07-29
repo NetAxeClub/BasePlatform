@@ -1,3 +1,4 @@
+import json
 import operator
 from django.http import JsonResponse
 from django.apps import apps
@@ -310,7 +311,11 @@ class XunMiView(APIView):
                 if get_param[param]:
                     if param in ['limit', 'start', 'page', 'method', 'last', 'idc']:
                         continue
-                    mongo_data[param] = get_param[param]
+                    if 'memberport' in get_param.keys():
+                        if len(get_param['memberport']) > 1:
+                            mongo_data['memberport'] = {'$in': json.loads(get_param['memberport'])}
+                    else:
+                        mongo_data[param] = get_param[param]
             if get_param.get('log_time'):
                 start_time = mongo_data['log_time'] + ' 00:00:00'
                 end_time = mongo_data['log_time'] + ' 23:59:59'
@@ -321,6 +326,7 @@ class XunMiView(APIView):
             query_tmp = xunmi_mongo.find(query_dict=mongo_data, fileds={'_id': 0}, sort='log_time')
             if query_tmp:
                 mongo_data['log_time'] = query_tmp[-1]['log_time']
+
                 res = xunmi_mongo.find(query_dict=mongo_data, fileds={'_id': 0}, sort='log_time')
                 for i in res:
                     i['log_time'] = i['log_time'].strftime("%Y-%m-%d %H:%M:%S")
@@ -336,7 +342,11 @@ class XunMiView(APIView):
                 if get_param[param]:
                     if param in ['limit', 'start', 'page', 'method', 'last', 'idc']:
                         continue
-                    mongo_data[param] = get_param[param]
+                    if 'memberport' in get_param.keys():
+                        if len(get_param['memberport']) > 1:
+                            mongo_data['memberport'] = {'$in': json.loads(get_param['memberport'])}
+                    else:
+                        mongo_data[param] = get_param[param]
             if get_param.get("log_time"):
                 start_time = mongo_data['log_time'] + ' 00:00:00'
                 end_time = mongo_data['log_time'] + ' 23:59:59'
