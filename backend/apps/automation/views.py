@@ -306,24 +306,22 @@ class XunMiView(APIView):
             return JsonResponse(result, safe=False)
         # 最近一次结果
         elif get_param.get('last') == 'true':
-
             # 用于把key值为空的可以过滤掉，只保留有完整key value的字典信息
             for param in get_param.keys():
                 if get_param[param]:
                     if param in ['limit', 'start', 'page', 'method', 'last', 'idc']:
                         continue
-                    if 'memberport' in get_param.keys():
-                        if len(get_param['memberport']) > 1:
-                            mongo_data['memberport'] = {'$in': json.loads(get_param['memberport'])}
                     else:
                         mongo_data[param] = get_param[param]
+            if 'memberport' in get_param.keys():
+                if len(get_param['memberport']) > 1:
+                    mongo_data['memberport'] = {'$in': json.loads(get_param['memberport'])}
             if get_param.get('log_time'):
                 start_time = mongo_data['log_time'] + ' 00:00:00'
                 end_time = mongo_data['log_time'] + ' 23:59:59'
                 start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
                 end_time = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
                 mongo_data['log_time'] = {"$gte": start_time, "$lte": end_time}
-
             query_tmp = xunmi_mongo.find(query_dict=mongo_data, fileds={'_id': 0}, sort='log_time')
             if query_tmp:
                 mongo_data['log_time'] = query_tmp[-1]['log_time']
@@ -343,11 +341,11 @@ class XunMiView(APIView):
                 if get_param[param]:
                     if param in ['limit', 'start', 'page', 'method', 'last', 'idc']:
                         continue
-                    if 'memberport' in get_param.keys():
-                        if len(get_param['memberport']) > 1:
-                            mongo_data['memberport'] = {'$in': json.loads(get_param['memberport'])}
                     else:
                         mongo_data[param] = get_param[param]
+            if 'memberport' in get_param.keys():
+                if len(get_param['memberport']) > 1:
+                    mongo_data['memberport'] = {'$in': json.loads(get_param['memberport'])}
             if get_param.get("log_time"):
                 start_time = mongo_data['log_time'] + ' 00:00:00'
                 end_time = mongo_data['log_time'] + ' 23:59:59'
