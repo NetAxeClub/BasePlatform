@@ -30,3 +30,4 @@ backend/apps/base_plateform/__pycache__/
 backend/apps/int_utilization/__pycache__/
 backend/plugins/extensibles/
 backend/scripts
+backend/utils/connect_layer/NETCONF/test_netconf.py

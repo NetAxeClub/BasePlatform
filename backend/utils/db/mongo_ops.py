@@ -265,6 +265,10 @@ xunmi_mongo = MongoOps(db='BasePlatform', coll='XunMi')
 lagg_mongo = MongoOps(db='Automation', coll='AggreTable')
 compliance_mongo = MongoOps(db='Automation', coll='ConfigCompliance')
 topology_mongo = MongoOps(db='Automation', coll='topology')
+sec_policy_mongo = MongoOps(db='Automation', coll='sec_policy')
+arp_mongo = MongoOps(db='Automation', coll='ARPTable')
+mac_mongo = MongoOps(db='Automation', coll='MACTable')
+h3c_sec_policy_mongo = MongoOps(db='NETCONF', coll='h3c_sec_policy')
 
 
 class MongoNetOps(object):
@@ -652,6 +656,32 @@ class MongoNetOps(object):
                 cmd=cmd,
                 version=version))
 
+    # 山石和华三安全策略匹配次数查询
+    @staticmethod
+    def query_sec_policy_count(vendor, hostip, address_book):
+        def hillstone_query(hostip, address_book):
+            _query = sec_policy_mongo.find(query_dict={
+                'hostip': hostip,
+                '$or': [
+                    {'src_addr.object': address_book}, {'dst_addr.object': address_book}
+                ]
+            })
+            return int(_query[-1]['count']) if _query else False
+
+        def h3c_query(hostip, address_book):
+            _query = h3c_sec_policy_mongo.find(query_dict={
+                'hostip': hostip,
+                '$or': [
+                    {'SrcAddrList.SrcAddrItem': address_book}, {'DestAddrList.DestAddrItem': address_book}
+                ]
+            })
+            return int(_query[-1]['Count']) if _query else False
+
+        method_map = {
+            'hillstone': hillstone_query,
+            'h3c': h3c_query,
+        }
+        return method_map[vendor](hostip, address_book)
 
 # IPAM操作集合
 class IpamOps(object):

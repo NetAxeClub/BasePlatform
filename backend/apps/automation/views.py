@@ -1,6 +1,7 @@
 import json
 import operator
 from django.http import JsonResponse
+from rest_framework.response import Response
 from django.apps import apps
 from datetime import datetime
 # from rest_framework.response import Response
@@ -11,6 +12,7 @@ from rest_framework import filters
 from rest_framework.views import APIView
 from apps.api.tools.custom_pagination import LargeResultsSetPagination
 from apps.automation.models import CollectionPlan, CollectionRule, CollectionMatchRule, AutoFlow
+from apps.asset.serializers import NetworkDeviceSerializer
 from apps.automation.serializers import (
     CollectionPlanSerializer, CollectionRuleSerializer, CollectionMatchRuleSerializer, AutoFlowSerializer)
 from apps.api.tools.custom_viewset_base import CustomViewBase
@@ -253,7 +255,9 @@ class XunMiView(APIView):
             hostip = get_param['get_interface_by_hostip']
             layer3interface_res = show_ip_mongo.find(query_dict={'hostip': hostip}, fileds={'interface': 1})
             layer2interface_res = interface_mongo.find(query_dict={'hostip': hostip}, fileds={'interface': 1})
-            res = [x['interface'] for x in layer3interface_res if layer3interface_res] + [x['interface'] for x in layer2interface_res if layer2interface_res]
+            res = [x['interface'] for x in layer3interface_res if layer3interface_res] + [x['interface'] for x in
+                                                                                          layer2interface_res if
+                                                                                          layer2interface_res]
             result = {
                 "code": 200,
                 "count": len(res),
@@ -379,15 +383,6 @@ class XunMiView(APIView):
 class SecMainView(APIView):
     def get(self, request):
         get_param = request.GET.dict()
-        if 'get_firewall_list' in get_param.keys():
-            res = get_firewall_list()
-            result = {
-                "code": 200,
-                "count": len(res),
-                "message": "成功",
-                "results": res
-            }
-            return JsonResponse(result, safe=False)
         result = {
             "code": 400,
             "count": 0,
@@ -395,3 +390,5 @@ class SecMainView(APIView):
             "results": []
         }
         return JsonResponse(result, safe=False)
+    def post(self, request):
+        pass
