@@ -66,19 +66,19 @@ class CmdbImportDriver(RestApiDriver):
         return []
 
     def import_data(self):
-        res = self.do_something('asset_networkdevice/', {'limit': 8000})
+        res = self.do_something('asset_networkdevice/', {'limit': 8000, 'status': 0})
         sum_count = 0
         fail_count = 0
         for i in res:
             try:
-                log.info(i)
+                print(i)
                 tmp = {
                     "manage_ip": i['manage_ip'],
                     "serial_num": i['serial_num'],
                     "name": i.get('name') or '',
                     "soft_version": i.get('soft_version') or '',
                     "patch_version": i.get('patch_version') or '',
-                    "u_location_start": i['u_location_start'],
+                    "u_location_start": i['u_location_start'] or 1,
                     "u_location_end": i['u_location_end'],
                     "uptime": i['uptime'],
                     "expire": i['expire'],
@@ -97,7 +97,7 @@ class CmdbImportDriver(RestApiDriver):
                     if i.get('rack_name'):
                         rack_instance, _ = Rack.objects.get_or_create(name=i['rack_name'], idc_model=idc_model_instance)
                         tmp['rack'] = rack_instance
-                vendor_instance, _ = Vendor.objects.get_or_create(name=i['vendor_name'], alias=i['vendor_alias'])
+                vendor_instance, _ = Vendor.objects.get_or_create(name=i['vendor_name'])
                 tmp['vendor'] = vendor_instance
                 if i.get('model_name'):
                     model_instance, _ = Model.objects.get_or_create(name=i['model_name'].strip(),
@@ -153,6 +153,9 @@ class CmdbImportDriver(RestApiDriver):
                     device_instance = NetworkDevice.objects.create(**tmp)
                 else:
                     device_instance = NetworkDevice.objects.get(serial_num=i['serial_num'])
+                    if device_instance.status != 0:
+                        device_instance.delete()
+                        device_instance = NetworkDevice.objects.create(**tmp)
                 if i['bind_ip']:
                     for _sub in i['bind_ip']:
                         _name, _ip = _sub.split('-')
@@ -219,12 +222,12 @@ class CmdbImportDriver(RestApiDriver):
                 AssetAccount.objects.create(**tmp)
 
     def import_server(self):
-        res = self.do_something('asset_server/', {'limit': 5000})
+        res = self.do_something('asset_server/', {'limit': 5000, 'status': 0})
         sum_count = 0
         fail_count = 0
         for i in res:
             try:
-                log.info(i)
+                # print(i)
                 tmp = {
                     "name": i.get('name') or '',
                     "serial_num": i['serial_num'],
@@ -252,35 +255,38 @@ class CmdbImportDriver(RestApiDriver):
                 # hosted_on
                 # account
                 device_quert = Server.objects.filter(serial_num=i['serial_num'])
-                if device_quert:
-                    continue
-                if i.get('u_location'):
-                    if i['u_location'].find('-') != -1:
-                        tmp['u_location_start'] = i['u_location'].strip('U').split('-')[0]
-                        tmp['u_location_end'] = i['u_location'].strip('U').split('-')[-1]
-                    else:
-                        tmp['u_location_start'] = i['u_location'].strip('U')
-                        tmp['u_location_end'] = i['u_location'].strip('U')
-                idc_instance, _ = Idc.objects.get_or_create(name=i['idc_name'])
-                tmp['idc'] = idc_instance
-                vendor_instance, _ = ServerVendor.objects.get_or_create(name=i['vendor_name'])
-                tmp['vendor'] = vendor_instance
+                # if i.get('u_location'):
+                #     if i['u_location'].find('-') != -1:
+                #         tmp['u_location_start'] = i['u_location'].split('-')[0].strip('U')
+                #         tmp['u_location_end'] = i['u_location'].split('-')[-1].strip('U')
+                #     else:
+                #         tmp['u_location_start'] = i['u_location'].strip('U')
+                #         tmp['u_location_end'] = i['u_location'].strip('U')
+                #     print(tmp['manage_ip'], tmp['u_location'])
+                #     print(tmp['u_location_start'], tmp['u_location_end'])
+                if 'idc_name' in i.keys():
+                    idc_instance, _ = Idc.objects.get_or_create(name=i['idc_name'])
+                    tmp['idc'] = idc_instance
+                if 'vendor_name' in i.keys():
+                    vendor_instance, _ = ServerVendor.objects.get_or_create(name=i['vendor_name'])
+                    tmp['vendor'] = vendor_instance
+                    if i.get('model_name'):
+                        model_instance, _ = ServerModel.objects.get_or_create(name=i['model_name'].strip(),
+                                                                              vendor=vendor_instance)
+                        tmp['model'] = model_instance
                 if i.get('idc_model_name'):
                     idc_model_instance, _ = IdcModel.objects.get_or_create(idc=idc_instance, name=i['idc_model_name'])
                     tmp['idc_model'] = idc_model_instance
                     if i.get('rack_name'):
                         rack_instance, _ = Rack.objects.get_or_create(name=i['rack_name'], idc_model=idc_model_instance)
                         tmp['rack'] = rack_instance
-                if i.get('model_name'):
-                    print(vendor_instance.name, i['model_name'], i['manage_ip'])
-                    model_instance, _ = ServerModel.objects.get_or_create(name=i['model_name'].strip(),
-                                                                          vendor=vendor_instance)
-                    tmp['model'] = model_instance
 
+                if device_quert:
+                    device_instance = Server.objects.get(serial_num=i['serial_num'])
+                    Server.objects.filter(serial_num=i['serial_num']).update(**tmp)
                 if not device_quert:
                     device_instance = Server.objects.create(**tmp)
-                else:
-                    device_instance = Server.objects.get(serial_num=i['serial_num'])
+
                 # 账户关联
                 if i.get('to_account'):
                     account_list = []
@@ -303,6 +309,7 @@ class CmdbImportDriver(RestApiDriver):
                         log.info("关联设备账户")
                 sum_count += 1
                 log.info(sum_count)
+                device_instance.save()
             except Exception as e:
                 log.error(str(e))
                 log.error("{}-{}".format(i['manage_ip'], i['serial_num']))
