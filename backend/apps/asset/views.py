@@ -35,6 +35,7 @@ else:
     CELERY_QUEUE = 'config_backup'
 show_ip_mongo = MongoOps(db='Automation', coll='layer3interface')
 
+
 class ResourceManageExcelView(APIView):
     permission_classes = (AllowAny,)
     # permission_classes = ()
@@ -138,6 +139,8 @@ class ServerAccountView(APIView):
         # serializer_data = AssetAccountSerializer(account_query, many=True)
 
         return JsonResponse({'code': 200, 'message': '获取账户信息成功', 'results': account_list})
+
+
 class CmdbChart(APIView):
     permission_classes = ()
     authentication_classes = ()
@@ -485,14 +488,20 @@ class NetworkDeviceViewSet(CustomViewBase):
         """
         expires = self.request.query_params.get('expires', None)
         history = self.request.query_params.get('history', None)
+        firewall = self.request.query_params.get('firewall', None)
+
         search_host_list = self.request.query_params.get('search_host_list', None)
-        if search_host_list:
+        if firewall:
+            print(firewall)
+            return self.queryset.filter(auto_enable=True, category__name="防火墙", status=0,
+                                        ha_status__in=[0, 1])
+        elif search_host_list:
             if search_host_list.find('-') != -1:
                 return self.queryset.filter(manage_ip__in=search_host_list.split('-'))
             else:
                 return self.queryset.filter(manage_ip__in=[search_host_list])
             # return self.queryset.filter(manage_ip__in=search_host_list)
-        if history:
+        elif history:
             return self.queryset.history.all().order_by('-id')
         if expires == '1':
             return self.queryset.filter(expire__lt=date.today())

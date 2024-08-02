@@ -88,11 +88,8 @@ class WebSSHConsumer(MySSH):
         super(WebSSHConsumer, self).__init__(*args, **kwargs)
         db.connections.close_all()
         self.path = ''.join([x for x in self.scope['path'].split('/') if x])
-        logger.debug(self.path)
         self.device_id = re.findall(r'\d+', self.path)
-        # self.server = NetworkDevice.objects.get(id=self.scope['path'].split('/')[4])
         self.server = NetworkDevice.objects.get(id=self.device_id[0])
-        # print(self.server)
         self.bind_ssh_ip = AssetIpInfo.objects.filter(device=self.scope['path'].split('/')[4], name='SSH').values()
         # 如果有关联SSH的IP，则使用关联SSH方式登录
         if self.bind_ssh_ip:
