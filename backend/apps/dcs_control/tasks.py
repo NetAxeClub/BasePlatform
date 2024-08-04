@@ -94,13 +94,13 @@ class WebSocket(object):
     def __call__(self, func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            room_group_name = kwargs.get('room_group_name')
-            if room_group_name is not None:
+            room_group_name = kwargs.get('room_group_name') or ''
+            if len(room_group_name) > 1:
                 send_ws_msg(group_name=room_group_name,
                             data=dict(method='run', data='开始执行……\n', hostip=kwargs['hostip'], status='info'))
             func(*args, **kwargs)
             # print('Ending')
-            if room_group_name is not None:
+            if len(room_group_name) > 1:
                 send_ws_msg(group_name=room_group_name,
                             data=dict(method='closed', data='执行完成……\n', hostip=kwargs['hostip'], status='success'))
 
@@ -4853,9 +4853,17 @@ class SecPolicyMain(object):
         cmds = ['show configuration']
         dev_infos = get_device_info_v2(manage_ip=host)
         if dev_infos:
-            username = dev_infos[0]['username']  # 用户名
-            password = dev_infos[0]['password']  # 密码
-            port = dev_infos[0]['port']
+            username = '' # 用户名
+            password = ''  # 密码
+            port = 22
+            if 'ssh' in dev_infos[0].keys():
+                username = dev_infos[0]['ssh']['username']  # 用户名
+                password = dev_infos[0]['ssh']['password']  # 密码
+                port = dev_infos[0]['ssh']['port']
+            if 'telnet' in dev_infos[0].keys():
+                username = dev_infos[0]['telnet']['username']  # 用户名
+                password = dev_infos[0]['telnet']['password']  # 密码
+                port = dev_infos[0]['telnet']['port']
             if dev_infos[0]['soft_version'].startswith('Version 5.0'):
                 cmds = ['show configuration']
             device_ios = 'ruijie_os'
@@ -6342,11 +6350,11 @@ def address_set(self, **post_param):
     _FirewallMain = FirewallMain(post_param['hostip'])
     # "event_id": event_id.id,  # 关联事件
     event_id = post_param.get('event_id') or None
-    # # 更新地址组
-    # if all(k in post_param for k in ("vendor", "update_device")):
-    #     if post_param['vendor'] == 'Hillstone':
-    #         _FirewallMain.refresh_hillstone_configuration()
-    #     return
+    # 更新地址组
+    if all(k in post_param for k in ("vendor", "update_device")):
+        if post_param['vendor'] == 'Hillstone':
+            _FirewallMain.refresh_hillstone_configuration()
+        return
     if post_param['vendor'] == 'H3C':
         # 首先判断具体操作
         """ 
@@ -6857,99 +6865,113 @@ def config_sec_policy(self, **post_param):
 def bulk_deny_by_address(self, **post_param):
     """
     hosts:
-    {'ans_group_name': '护网行动', 'ans_group_hosts__ans_host': '10.254.4.204',
+    {'ans_group_name': '护网行动', 'ans_group_hosts__ans_host': '1.1.1.1',
      'ans_group_hosts__ans_obj': 'wakuang_deny_ip',
      'ans_group_hosts__ans_memo': 'wakuang_deny_ip'},
-     {'ans_group_name': '护网行动', 'ans_group_hosts__ans_host': '10.254.4.159',
+     {'ans_group_name': '护网行动', 'ans_group_hosts__ans_host': '1.1.1.1',
      'ans_group_hosts__ans_obj': 'deny-hw', 'ans_group_hosts__ans_memo': 'deny-hw'}]
     :param self:
     :param post_param:
     :return:
     """
-    hosts = post_param['inventory'][0]['ans_group_hosts']
-
-    event_id = AutoEvent.objects.create(**dict(commit_user=post_param['user'],
+    print('post_param', post_param)
+    hosts = AutomationInventory.objects.prefetch_related(
+        'ans_group_hosts').filter(id=int(post_param['inventory_id'])).values('ans_group_name',
+                                                                             'ans_group_hosts__ans_host',
+                                                                             'ans_group_hosts__ans_obj',
+                                                                             'ans_group_hosts__ans_vars',
+                                                                             'ans_group_hosts__ans_memo',
+                                                                             )
+    event_id = AutoEvent.objects.create(**dict(commit_user=post_param.get('user') or '',
                                                remote_ip=post_param['remote_ip'],
                                                task=AutoFlowTasks.DENY))
+    print('hosts', hosts)
     for host in hosts:
-        if post_param.get('ip_mask'):
-            if post_param.get('add_detail_ip'):
-                post_data = {
-                    "origin": post_param['origin'],
-                    "vendor": host['ans_vars']['vendor__alias'],
-                    "add_detail_ip": True,
-                    "ip_mask": post_param['ip_mask'],
-                    "name": host['ans_obj'],
-                    "hostip": host['ans_host'],  # 这个很重要，如果有绑定ip的话，是以绑定IP来下发配置
-                    "hostid": host['ans_vars']['id'],
-                    "user": post_param['user'],
-                    "remote_ip": post_param['remote_ip'],
-                    "room_group_name": post_param.get('room_group_name'),
-                    "task_id": str(self.request.id),
-                    "task": AutoFlowTasks.DENY,
-                    "event_id": event_id.id,  # 关联事件
-                }
-                address_set.apply_async(kwargs=post_data, queue=CELERY_QUEUE,
-                                        retry=True)  # config_backup
-            elif post_param.get('del_detail_ip'):
-                post_data = {
-                    "origin": post_param['origin'],
-                    "vendor": host['ans_vars']['vendor__alias'],
-                    "del_detail_ip": True,
-                    "ip_mask": post_param['ip_mask'],
-                    "name": host['ans_obj'],
-                    "hostip": host['ans_host'],
-                    "hostid": host['ans_vars']['id'],
-                    "user": post_param['user'],
-                    "remote_ip": post_param['remote_ip'],
-                    "room_group_name": post_param.get('room_group_name'),
-                    "task_id": str(self.request.id),
-                    "task": AutoFlowTasks.DENY,
-                    "event_id": event_id.id,  # 关联事件
-                }
-                address_set.apply_async(kwargs=post_data, queue=CELERY_QUEUE,
-                                        retry=True)  # config_backup
-        if post_param.get('range_start') and post_param.get('range_end'):
-            if post_param.get('add_detail_range'):
-                post_data = {
-                    "origin": post_param['origin'],
-                    "vendor": host['ans_vars']['vendor__alias'],
-                    "add_detail_range": True,
-                    "range_start": post_param['range_start'],
-                    "range_end": post_param['range_end'],
-                    "name": host['ans_obj'],
-                    "hostip": host['ans_host'],
-                    "hostid": host['ans_vars']['id'],
-                    "user": post_param['user'],
-                    "remote_ip": post_param['remote_ip'],
-                    "room_group_name": post_param.get('room_group_name'),
-                    "task_id": str(self.request.id),
-                    "task": AutoFlowTasks.DENY,
-                    "event_id": event_id.id,  # 关联事件
-                }
-                address_set.apply_async(kwargs=post_data, queue=CELERY_QUEUE,
-                                        retry=True)  # config_backup
-            elif post_param.get('del_detail_range'):
-                post_data = {
-                    "origin": post_param['origin'],
-                    "vendor": host['ans_vars']['vendor__alias'],
-                    "del_detail_range": True,
-                    "range_start": post_param['range_start'],
-                    "range_end": post_param['range_end'],
-                    "name": host['ans_obj'],
-                    "hostip": host['ans_host'],
-                    "hostid": host['ans_vars']['id'],
-                    "user": post_param['user'],
-                    "remote_ip": post_param['remote_ip'],
-                    "room_group_name": post_param.get('room_group_name'),
-                    "task_id": str(self.request.id),
-                    "task": AutoFlowTasks.DENY,
-                    "event_id": event_id.id,  # 关联事件
-                }
-                address_set.apply_async(kwargs=post_data, queue=CELERY_QUEUE,
-                                        retry=True)  # config_backup
+        if host['ans_group_hosts__ans_vars']:
+            # json卸载主机变量
+            try:
+                host_vars = json.loads(host['ans_group_hosts__ans_vars'])
+            except:
+                b = eval(host['ans_group_hosts__ans_vars'])
+                host_vars = json.loads(b)
+            print('host_vars', host_vars)
+            if post_param.get('ip_mask'):
+                if post_param.get('add_detail_ip'):
+                    post_data = {
+                        "origin": post_param['origin'],
+                        "vendor": host_vars['vendor_alias'],
+                        "add_detail_ip": True,
+                        "ip_mask": post_param['ip_mask'],
+                        "name": host['ans_group_hosts__ans_obj'],
+                        "hostip": host_vars['manage_ip'],
+                        "hostid": host_vars['id'],
+                        "user": post_param['user'],
+                        "remote_ip": post_param['remote_ip'],
+                        "room_group_name": post_param.get('room_group_name'),
+                        "task_id": str(self.request.id),
+                        "task": AutoFlowTasks.DENY,
+                        "event_id": event_id.id,  # 关联事件
+                    }
+                    address_set.apply_async(kwargs=post_data, queue=CELERY_QUEUE,
+                                            retry=True)  # config_backup
+                elif post_param.get('del_detail_ip'):
+                    post_data = {
+                        "origin": post_param['origin'],
+                        "vendor": host_vars['vendor_alias'],
+                        "del_detail_ip": True,
+                        "ip_mask": post_param['ip_mask'],
+                        "name": host['ans_group_hosts__ans_obj'],
+                        "hostip": host_vars['manage_ip'],
+                        "hostid": host_vars['id'],
+                        "user": post_param['user'],
+                        "remote_ip": post_param['remote_ip'],
+                        "room_group_name": post_param.get('room_group_name'),
+                        "task_id": str(self.request.id),
+                        "task": AutoFlowTasks.DENY,
+                        "event_id": event_id.id,  # 关联事件
+                    }
+                    address_set.apply_async(kwargs=post_data, queue=CELERY_QUEUE,
+                                            retry=True)  # config_backup
+            if post_param.get('range_start') and post_param.get('range_end'):
+                if post_param.get('add_detail_range'):
+                    post_data = {
+                        "origin": post_param['origin'],
+                        "vendor": host_vars['vendor_alias'],
+                        "add_detail_range": True,
+                        "range_start": post_param['range_start'],
+                        "range_end": post_param['range_end'],
+                        "name": host['ans_group_hosts__ans_obj'],
+                        "hostip": host_vars['manage_ip'],
+                        "hostid": host_vars['id'],
+                        "user": post_param['user'],
+                        "remote_ip": post_param['remote_ip'],
+                        "room_group_name": post_param.get('room_group_name'),
+                        "task_id": str(self.request.id),
+                        "task": AutoFlowTasks.DENY,
+                        "event_id": event_id.id,  # 关联事件
+                    }
+                    address_set.apply_async(kwargs=post_data, queue=CELERY_QUEUE,
+                                            retry=True)  # config_backup
+                elif post_param.get('del_detail_range'):
+                    post_data = {
+                        "origin": post_param['origin'],
+                        "vendor": host_vars['vendor_alias'],
+                        "del_detail_range": True,
+                        "range_start": post_param['range_start'],
+                        "range_end": post_param['range_end'],
+                        "name": host['ans_group_hosts__ans_obj'],
+                        "hostip": host_vars['manage_ip'],
+                        "hostid": host_vars['id'],
+                        "user": post_param['user'],
+                        "remote_ip": post_param['remote_ip'],
+                        "room_group_name": post_param.get('room_group_name'),
+                        "task_id": str(self.request.id),
+                        "task": AutoFlowTasks.DENY,
+                        "event_id": event_id.id,  # 关联事件
+                    }
+                    address_set.apply_async(kwargs=post_data, queue=CELERY_QUEUE,
+                                            retry=True)  # config_backup
     return
-
 
 if __name__ == '__main__':
     pass

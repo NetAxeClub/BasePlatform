@@ -265,10 +265,10 @@ class State(object):
 
 # 自动化主机变量
 class AutoVars(models.Model):
-    ans_name = models.CharField(verbose_name='主机名', null=True, blank=True, max_length=32)
-    ans_host = models.GenericIPAddressField(verbose_name='主机IP', null=True, blank=True, max_length=32)
+    ans_name = models.CharField(verbose_name='主机名', null=True, blank=True, max_length=100)
+    ans_host = models.GenericIPAddressField(verbose_name='主机IP', null=True, blank=True, max_length=100)
     ans_vars = models.TextField(blank=True, null=True, verbose_name='主机变量')
-    ans_obj = models.CharField(blank=True, null=True, verbose_name='对象名', max_length=32)
+    ans_obj = models.CharField(blank=True, null=True, verbose_name='对象名', max_length=100)
     ans_memo = models.CharField(blank=True, null=True, verbose_name='描述', max_length=128)
     task = models.CharField(verbose_name='模块', choices=AutoTasks.CHOICES, default=AutoTasks.ADDRESS_SET, max_length=64,
                             null=False)

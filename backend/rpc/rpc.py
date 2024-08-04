@@ -75,7 +75,7 @@ def dispatcher(method, data):
 # 响应RPC请求
 def on_request(chan, method_frame, header_frame, body, userdata=None):
     n = json.loads(body)
-    print(n)
+    # print(n)
     if 'method' in n.keys():
         response = dispatcher(n['method'], n['data'])
     else:
