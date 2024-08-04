@@ -42,7 +42,7 @@ from rest_framework_simplejwt.views import (
 
 urlpatterns = [
     path('admin/', admin.site.urls, name="admin"),
-    path('admin/login/', views.extend_admin_login, name="login"),
+    # path('admin/login/', views.extend_admin_login, name="login"),
     re_path(r'^base_platform/media/(?P<path>.*)', serve, {"document_root": settings.MEDIA_ROOT}),
     # re_path(r'^captcha/', include('captcha.urls')),
     # path("swagger/",schema_view.with_ui("swagger", cache_timeout=0), name="schema-swagger-ui",),
@@ -64,4 +64,5 @@ urlpatterns = [
     path(r'base_platform/int_utilization/', include('apps.int_utilization.urls'), name="int_utilization"),
     path(r'base_platform/topology/', include('apps.topology.urls'), name="topology"),
     path(r'base_platform/system/', include('apps.system.urls'), name="system"),
+    path(r'base_platform/dcs_manage/', include('apps.dcs_control.urls'), name="dcs_control"),
 ]

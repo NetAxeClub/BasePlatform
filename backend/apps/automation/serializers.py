@@ -1,8 +1,9 @@
 # 自动化设备数据采集方案清单
 from rest_framework import serializers
 # import xml.etree.ElementTree as ET
-# import json
-from apps.automation.models import CollectionPlan, CollectionRule, CollectionMatchRule, AutoFlow
+import json
+from apps.automation.models import (CollectionPlan, CollectionRule, CollectionMatchRule,
+                                    AutoFlow, AutomationInventory, AutoVars)
 
 
 # 采集方案序列化
@@ -81,3 +82,94 @@ class AutoFlowSerializer(serializers.ModelSerializer):
     class Meta:
         model = AutoFlow
         fields = '__all__'
+
+
+# 自动化设备清单表
+class AutoVarsSerializer(serializers.ModelSerializer):
+    to_inventory = serializers.StringRelatedField(many=True, read_only=True)
+
+    @staticmethod
+    def setup_eager_loading(queryset):
+        """ Perform necessary eager loading of data. """
+        queryset = queryset.prefetch_related(
+            'to_inventory')
+        return queryset
+
+    class Meta:
+        model = AutoVars
+        fields = '__all__'
+
+
+class AnsGroupHostsField(serializers.StringRelatedField):
+
+    def to_internal_value(self, value):
+        # value = json.loads(value)
+        if isinstance(value, dict):
+            return value
+        else:
+            raise serializers.ValidationError("ans_group_hosts with name: %s 格式不正确" % value)
+
+
+# 自动化设备清单表
+class AutomationInventorySerializer(serializers.ModelSerializer):
+    ans_group_datetime = serializers.DateTimeField(read_only=True, format='%Y-%m-%d %H:%M:%S')
+    # ans_group_hosts = AutoVarsSerializer(many=True)
+    ans_group_hosts = AnsGroupHostsField(many=True)
+    # ans_group_hosts = serializers.ManyRelatedField(many=True, child_relation='ans_group_hosts')
+    # 自定义外键显示的方法，后面写get_ans_host来与之对应实现嵌套
+    ans_host = serializers.SerializerMethodField(read_only=True)
+
+    @staticmethod
+    def setup_eager_loading(queryset):
+        """ Perform necessary eager loading of data. """
+        queryset = queryset.prefetch_related(
+            'ans_group_hosts')
+        return queryset
+
+    class Meta:
+        model = AutomationInventory
+        fields = '__all__'
+
+    def get_ans_host(self, obj):
+        _vars = AutoVars.objects.prefetch_related(
+            'to_inventory').filter(to_inventory=obj.id)
+        return AutoVarsSerializer(_vars, many=True).data
+
+    def create(self, validated_data):
+        """
+        重写 create
+        """
+        ans_group_hosts = validated_data.get('ans_group_hosts')
+        validated_data.pop('ans_group_hosts')
+        instance = AutomationInventory.objects.create(**validated_data)
+        if ans_group_hosts:
+            print('ans_group_hosts', ans_group_hosts, type(ans_group_hosts))
+            if isinstance(ans_group_hosts, list) and instance:
+                dev_obj = AutomationInventory.objects.get(id=instance.id)
+                if ans_group_hosts:
+                    for _ans_group_hosts in ans_group_hosts:
+                        dev_obj.ans_group_hosts.add(AutoVars.objects.get(id=_ans_group_hosts['id']))
+                else:
+                    dev_obj.ans_group_hosts.clear()
+        return instance
+
+    def update(self, instance, validated_data):
+        """
+        重写 update
+        """
+        instance.ans_group_name = validated_data.get('ans_group_name', instance.ans_group_name)
+        instance.ans_group_vars = validated_data.get('ans_group_vars', instance.ans_group_vars)
+        instance.ans_group_memo = validated_data.get('ans_group_memo', instance.ans_group_memo)
+        instance.task = validated_data.get('task', instance.task)
+        instance.save()
+        ans_group_hosts = validated_data.get('ans_group_hosts', instance.ans_group_hosts)
+        if ans_group_hosts:
+            if isinstance(ans_group_hosts, list):
+                dev_obj = AutomationInventory.objects.get(id=instance.id)
+                dev_obj.ans_group_hosts.clear()
+                if ans_group_hosts:
+                    for _ans_group_hosts in ans_group_hosts:
+                        dev_obj.ans_group_hosts.add(AutoVars.objects.get(id=_ans_group_hosts['id']))
+                else:
+                    dev_obj.ans_group_hosts.clear()
+        return instance

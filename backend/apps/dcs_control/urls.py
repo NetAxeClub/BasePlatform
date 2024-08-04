@@ -21,5 +21,6 @@ app_name = 'dcs_control'
 
 urlpatterns = [
     path('deny_key/', views.DenyByAddrObj.as_view(), name="deny_key"),  # 一键封堵
+    path('address_set/', views.AddressSet.as_view(), name="address_set"),  # 地址对象
 
 ]

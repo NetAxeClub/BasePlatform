@@ -11,10 +11,12 @@ from django.db.models import Count
 from rest_framework import filters
 from rest_framework.views import APIView
 from apps.api.tools.custom_pagination import LargeResultsSetPagination
-from apps.automation.models import CollectionPlan, CollectionRule, CollectionMatchRule, AutoFlow
+from apps.automation.models import (CollectionPlan, CollectionRule,
+                                    CollectionMatchRule, AutoFlow, AutomationInventory, AutoVars)
 from apps.asset.serializers import NetworkDeviceSerializer
 from apps.automation.serializers import (
-    CollectionPlanSerializer, CollectionRuleSerializer, CollectionMatchRuleSerializer, AutoFlowSerializer)
+    CollectionPlanSerializer, CollectionRuleSerializer, CollectionMatchRuleSerializer,
+    AutoFlowSerializer, AutomationInventorySerializer, AutoVarsSerializer)
 from apps.api.tools.custom_viewset_base import CustomViewBase
 from django.db.models import CharField, ForeignKey, GenericIPAddressField
 from utils.db.mongo_ops import MongoOps
@@ -135,6 +137,33 @@ class CollectionRuleViewSet(CustomViewBase):
     #     else:
     #         # 校验失败，返回错误信息
     #         return Response(serializer.errors, status=200)
+
+
+# 自动化场景设备变量
+class AutoVarsViewSet(CustomViewBase):
+    """
+    处理  GET POST , 处理 /api/post/<pk>/ GET PUT PATCH DELETE
+    """
+    queryset = AutoVars.objects.all().order_by('-id')
+    queryset = AutoVarsSerializer.setup_eager_loading(queryset)
+    serializer_class = AutoVarsSerializer
+    # 配置搜索功能
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    filter_fields = '__all__'
+    pagination_class = LargeResultsSetPagination
+
+
+class AutomationInventoryViewSet(CustomViewBase):
+    """
+    处理  GET POST , 处理 /api/post/<pk>/ GET PUT PATCH DELETE
+    """
+    queryset = AutomationInventory.objects.all().order_by('-id')
+    queryset = AutomationInventorySerializer.setup_eager_loading(queryset)
+    serializer_class = AutomationInventorySerializer
+    # 配置搜索功能
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    filter_fields = '__all__'
+    pagination_class = LargeResultsSetPagination
 
 
 # 对应前端的采集规则页面
@@ -392,3 +421,5 @@ class SecMainView(APIView):
         return JsonResponse(result, safe=False)
     def post(self, request):
         pass
+
+
