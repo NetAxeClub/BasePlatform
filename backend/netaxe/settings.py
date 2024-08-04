@@ -34,10 +34,7 @@ os.environ.setdefault("DJANGO_ALLOW_ASYNC_UNSAFE", "true")
 
 # Application definition
 INSTALLED_APPS = [
-    # "captcha",
     "channels",
-    # "guardian",
-    # "multi_captcha_admin",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
