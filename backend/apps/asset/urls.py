@@ -12,7 +12,9 @@
 """
 from django.urls import path, include
 from django.views.decorators.csrf import csrf_exempt
-from rest_framework.routers import DefaultRouter
+from rest_framework_extensions.routers import (
+    ExtendedDefaultRouter as DefaultRouter
+)
 from .views import *
 
 # app_name = 'asset'
