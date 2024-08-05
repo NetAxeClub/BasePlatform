@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 
 """
-@author: 猿小天
-@contact: QQ:1638245306
-@Created on: 2021/6/6 006 10:30
 @Remark: 自定义权限
 """
 import re

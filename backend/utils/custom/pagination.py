@@ -4,7 +4,9 @@
 """
 from django.core import paginator
 from django.core.paginator import Paginator as DjangoPaginator
-from rest_framework.pagination import PageNumberPagination
+from rest_framework.pagination import PageNumberPagination, LimitOffsetPagination, BasePagination
+from rest_framework.utils.urls import replace_query_param, remove_query_param
+from collections import OrderedDict
 from rest_framework.response import Response
 
 
@@ -27,13 +29,6 @@ class CustomPagination(PageNumberPagination):
             res['msg'] = "暂无数据"
             res['results'] = []
         return Response(res)
-
-
-from rest_framework import pagination
-from rest_framework.pagination import PageNumberPagination, LimitOffsetPagination
-from collections import OrderedDict
-from rest_framework.response import Response
-from rest_framework.utils.urls import replace_query_param, remove_query_param
 
 
 class LargeResultsSetPagination(LimitOffsetPagination):
@@ -68,7 +63,7 @@ class LargeResultsSetPagination(LimitOffsetPagination):
         ]))
 
 
-class SubnetAddressPagination(pagination.BasePagination):
+class SubnetAddressPagination(BasePagination):
     limit = 256
     start_query_param = 'start'
 
