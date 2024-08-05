@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 
 """
-@author: 猿小天
-@contact: QQ:1638245306
-@Created on: 2021/8/21 021 9:48
 @Remark:
 """
 import hashlib
