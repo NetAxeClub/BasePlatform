@@ -84,9 +84,25 @@ class AutoFlowSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class AutomationInventoryField(serializers.StringRelatedField):
+
+    def to_internal_value(self, value):
+        # value = json.loads(value)
+        if isinstance(value, dict):
+            return value
+        else:
+            raise serializers.ValidationError("ans_group_hosts with name: %s 格式不正确" % value)
+
+    def to_representation(self, value):
+        """
+        Serialize tagged objects to a simple textual representation.
+        """
+        return dict(id=value.id, ans_group_name=value.ans_group_name)
+
+
 # 自动化设备清单表
 class AutoVarsSerializer(serializers.ModelSerializer):
-    to_inventory = serializers.StringRelatedField(many=True, read_only=True)
+    to_inventory = AutomationInventoryField(many=True, read_only=True)
 
     @staticmethod
     def setup_eager_loading(queryset):
@@ -149,7 +165,6 @@ class AutomationInventorySerializer(serializers.ModelSerializer):
         validated_data.pop('ans_group_hosts')
         instance = AutomationInventory.objects.create(**validated_data)
         if ans_group_hosts:
-            print('ans_group_hosts', ans_group_hosts, type(ans_group_hosts))
             if isinstance(ans_group_hosts, list) and instance:
                 dev_obj = AutomationInventory.objects.get(id=instance.id)
                 if ans_group_hosts:
