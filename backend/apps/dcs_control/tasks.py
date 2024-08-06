@@ -6895,6 +6895,7 @@ def bulk_deny_by_address(self, **post_param):
                 b = eval(host['ans_group_hosts__ans_vars'])
                 host_vars = json.loads(b)
             print('host_vars', host_vars)
+            print(type(host_vars))
             if post_param.get('ip_mask'):
                 if post_param.get('add_detail_ip'):
                     post_data = {
