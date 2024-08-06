@@ -6890,8 +6890,8 @@ def bulk_deny_by_address(self, **post_param):
         if host['ans_group_hosts__ans_vars']:
             # json卸载主机变量
             try:
-                print(host['ans_group_hosts__ans_vars'], type(host['ans_group_hosts__ans_vars']))
                 host_vars = json.loads(host['ans_group_hosts__ans_vars'])
+                print('host_vars111111', host_vars, type(host_vars))
             except Exception as e:
                 print('错误', str(e))
                 b = eval(host['ans_group_hosts__ans_vars'])
