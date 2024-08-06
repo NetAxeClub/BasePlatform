@@ -6899,7 +6899,7 @@ def bulk_deny_by_address(self, **post_param):
                 if post_param.get('add_detail_ip'):
                     post_data = {
                         "origin": post_param['origin'],
-                        "vendor": host_vars['vendor_alias'],
+                        "vendor": host_vars['vendor__alias'],
                         "add_detail_ip": True,
                         "ip_mask": post_param['ip_mask'],
                         "name": host['ans_group_hosts__ans_obj'],
@@ -6917,7 +6917,7 @@ def bulk_deny_by_address(self, **post_param):
                 elif post_param.get('del_detail_ip'):
                     post_data = {
                         "origin": post_param['origin'],
-                        "vendor": host_vars['vendor_alias'],
+                        "vendor": host_vars['vendor__alias'],
                         "del_detail_ip": True,
                         "ip_mask": post_param['ip_mask'],
                         "name": host['ans_group_hosts__ans_obj'],
@@ -6936,7 +6936,7 @@ def bulk_deny_by_address(self, **post_param):
                 if post_param.get('add_detail_range'):
                     post_data = {
                         "origin": post_param['origin'],
-                        "vendor": host_vars['vendor_alias'],
+                        "vendor": host_vars['vendor__alias'],
                         "add_detail_range": True,
                         "range_start": post_param['range_start'],
                         "range_end": post_param['range_end'],
@@ -6955,7 +6955,7 @@ def bulk_deny_by_address(self, **post_param):
                 elif post_param.get('del_detail_range'):
                     post_data = {
                         "origin": post_param['origin'],
-                        "vendor": host_vars['vendor_alias'],
+                        "vendor": host_vars['vendor__alias'],
                         "del_detail_range": True,
                         "range_start": post_param['range_start'],
                         "range_end": post_param['range_end'],
