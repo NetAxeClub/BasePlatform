@@ -109,6 +109,12 @@ class AnsGroupHostsField(serializers.StringRelatedField):
         else:
             raise serializers.ValidationError("ans_group_hosts with name: %s 格式不正确" % value)
 
+    def to_representation(self, value):
+        """
+        Serialize tagged objects to a simple textual representation.
+        """
+        return dict(id=value.id, ans_host=value.ans_host, task=value.task, ans_obj=value.ans_obj)
+
 
 # 自动化设备清单表
 class AutomationInventorySerializer(serializers.ModelSerializer):
