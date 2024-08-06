@@ -421,16 +421,28 @@ class FirewallMain(object):
                 # elif self.dev_infos['soft_version'].find('SG6000-X7180-5.5R2P7') != -1:  # 10.254.3.102
                 #     self.cmds = ['configure']
                 #     self.back_off_cmds = ['configure']
-                self.dev_info = {
-                    'device_type': 'hillstone_telnet' if 'telnet' in self.dev_infos['protocol'] else 'hillstone',
-                    'ip': host,
-                    'port': self.dev_infos['ssh']['port'],
-                    'username': self.dev_infos['ssh']['username'],
-                    'password': self.dev_infos['ssh']['password'],
-                    'timeout': 100,  # float，连接超时时间，默认为100
-                    'session_timeout': 60,  # float，每个请求的超时时间，默认为60，
-                    'encoding': 'utf-8'
-                }
+                if 'telnet' in self.dev_infos['protocol']:
+                    self.dev_info = {
+                        'device_type': 'hillstone_telnet',
+                        'ip': host,
+                        'port': self.dev_infos['telnet']['port'],
+                        'username': self.dev_infos['telnet']['username'],
+                        'password': self.dev_infos['telnet']['password'],
+                        'timeout': 100,  # float，连接超时时间，默认为100
+                        'session_timeout': 60,  # float，每个请求的超时时间，默认为60，
+                        'encoding': 'utf-8'
+                    }
+                else:
+                    self.dev_info = {
+                        'device_type': 'hillstone_telnet' if 'telnet' in self.dev_infos['protocol'] else 'hillstone',
+                        'ip': host,
+                        'port': self.dev_infos['ssh']['port'],
+                        'username': self.dev_infos['ssh']['username'],
+                        'password': self.dev_infos['ssh']['password'],
+                        'timeout': 100,  # float，连接超时时间，默认为100
+                        'session_timeout': 60,  # float，每个请求的超时时间，默认为60，
+                        'encoding': 'utf-8'
+                    }
                 if self.dev_infos.get('bind_ip__ipaddr'):
                     self.dev_infos['ip'] = self.dev_infos['bind_ip__ipaddr']
         else:
