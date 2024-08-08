@@ -28,6 +28,10 @@ from utils.cmdb_import import search_cmdb_vendor_id, search_cmdb_idc_id, search_
     search_cmdb_framework_id, returndate, csv_device_staus, pandas_read_file, old_import_parse
 from utils.db.mongo_ops import MongoNetOps, MongoOps
 from ..users.models import UserProfile
+import openpyxl
+from openpyxl.utils import get_column_letter
+from rest_framework.decorators import action
+from urllib.parse import quote
 
 if DEBUG:
     CELERY_QUEUE = 'dev'
@@ -509,6 +513,66 @@ class NetworkDeviceViewSet(CustomViewBase):
             return self.queryset.filter(expire__gt=date.today())
         else:
             return self.queryset
+
+    @action(detail=False, methods=['get'])
+    def export(self, request, *args, **kwargs):
+        # 获取过滤后的查询集
+        queryset = self.filter_queryset(self.get_queryset())
+
+        # 使用序列化器序列化数据
+        serializer = self.get_serializer(queryset, many=True)
+        serialized_data = serializer.data
+
+        # 定义需要导出的列配置
+        columns = [
+            {'label': '设备名', 'key': 'name'},
+            {'label': '供应商', 'key': 'vendor_name'},
+            {'label': '所属机房', 'key': 'idc_name'},
+            {'label': '管理IP', 'key': 'manage_ip'},
+            {'label': '设备类型', 'key': 'category_name'},
+            {'label': '所属区域', 'key': 'netzone_name'},
+            {'label': '序列号', 'key': 'serial_num'},
+            {'label': '硬件型号', 'key': 'model_name'},
+            {'label': '设备角色', 'key': 'role_name'},
+            {'label': '设备状态', 'key': 'status_name'},
+            {'label': '软件版本', 'key': 'soft_version'},
+            {'label': '机房模块', 'key': 'idc_model_name'},
+            {'label': 'HA状态', 'key': 'ha_status_name'},
+            {'label': '补丁版本', 'key': 'patch_version'},
+            {'label': '机柜', 'key': 'rack_name'},
+            {'label': '框式编号', 'key': 'slot'},
+            {'label': '上线日期', 'key': 'uptime'},
+            {'label': '维保日期', 'key': 'expire'},
+            {'label': '采集方案', 'key': 'plan_name'},
+            {'label': '备注', 'key': 'memo'},
+        ]
+
+        # 创建一个新的工作簿和工作表
+        workbook = openpyxl.Workbook()
+        worksheet = workbook.active
+        worksheet.title = "Network Devices"
+
+        # 添加列头
+        for col_num, column in enumerate(columns, 1):
+            col_letter = get_column_letter(col_num)
+            worksheet[f'{col_letter}1'] = column['label']
+
+        # 填充数据
+        for row_num, device in enumerate(serialized_data, 2):
+            for col_num, column in enumerate(columns, 1):
+                col_letter = get_column_letter(col_num)
+                worksheet[f'{col_letter}{row_num}'] = device.get(column['key'], '')
+        filename = "网络信息表.xlsx"
+
+        # URL 编码处理中文文件名
+        encoded_filename = quote(filename)
+        # 设置响应头并将中文文件名编码为URL格式
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = f'attachment; filename*=UTF-8\'\'{encoded_filename}'
+
+        workbook.save(response)
+        return response
+
 
     # 重新update方法主要用来捕获更改前的字段值并赋值给self.log
     # def update(self, request, *args, **kwargs):
