@@ -923,6 +923,25 @@ class HuaweiProc(BaseConn):
                 MongoNetOps.insert_table(
                     'Automation', self.hostip, aggre_datas, 'AggreTable')
 
+    def _netconf_aggregation(self, aggr_res):
+        if aggr_res:
+            aggre_datas = []
+            for i in aggr_res:
+                if i['ifName'].startswith('Eth-Trunk'):
+                    if isinstance(i['TrunkMemberIfs']['TrunkMemberIf'], dict):
+                        i['TrunkMemberIfs']['TrunkMemberIf'] = [i['TrunkMemberIfs']['TrunkMemberIf']]
+                    tmp = dict(
+                        hostip=self.hostip,
+                        aggregroup=i['ifName'],
+                        memberports=[x['memberIfName'] for x in i['TrunkMemberIfs']['TrunkMemberIf']],
+                        status='',
+                        mode=''
+                    )
+                    aggre_datas.append(tmp)
+            if aggre_datas:
+                MongoNetOps.insert_table(
+                    'Automation', self.hostip, aggre_datas, 'AggreTable')
+
     def _netcocnf_system_info(self, dev_sysinfo):
         if dev_sysinfo:
             if isinstance(dev_sysinfo, dict):
@@ -1414,6 +1433,7 @@ class HuaweiProc(BaseConn):
             "colleciton_stack": '_netconf_stack',
             "collection_intf_ipv4v6": '_netconf_intf_ipv4v6',
             "colleciton_arp_list": '_netconf_arp_list',
+            "collection_aggregation": '_netconf_aggregation',
             "collection_mac_bd": '_netconf_mac_bd',
             "collection_mac_vxlan": '_netconf_mac_vxlan',
             "collection_mac_vxlan_control": '_netconf_mac_vxlan_control',
