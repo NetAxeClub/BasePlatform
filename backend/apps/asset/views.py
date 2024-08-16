@@ -32,6 +32,8 @@ import openpyxl
 from openpyxl.utils import get_column_letter
 from rest_framework.decorators import action
 from urllib.parse import quote
+from io import BytesIO
+from openpyxl import Workbook
 
 if DEBUG:
     CELERY_QUEUE = 'dev'
@@ -547,7 +549,7 @@ class NetworkDeviceViewSet(CustomViewBase):
         ]
 
         # 创建一个新的工作簿和工作表
-        workbook = openpyxl.Workbook()
+        workbook = Workbook()
         worksheet = workbook.active
         worksheet.title = "Network Devices"
 
@@ -561,17 +563,21 @@ class NetworkDeviceViewSet(CustomViewBase):
             for col_num, column in enumerate(columns, 1):
                 col_letter = get_column_letter(col_num)
                 worksheet[f'{col_letter}{row_num}'] = device.get(column['key'], '')
-        filename = "网络信息表.xlsx"
 
-        # URL 编码处理中文文件名
+        # 将工作簿保存到字节流
+        output = BytesIO()
+        workbook.save(output)
+        output.seek(0)
+
+        filename = "网络信息表.xlsx"
         encoded_filename = quote(filename)
-        # 设置响应头并将中文文件名编码为URL格式
-        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+        # 设置响应头并将文件内容返回给用户
+        response = HttpResponse(output,
+                                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         response['Content-Disposition'] = f'attachment; filename*=UTF-8\'\'{encoded_filename}'
 
-        workbook.save(response)
         return response
-
 
     # 重新update方法主要用来捕获更改前的字段值并赋值给self.log
     # def update(self, request, *args, **kwargs):
