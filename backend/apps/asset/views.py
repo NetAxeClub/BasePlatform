@@ -496,7 +496,6 @@ class NetworkDeviceViewSet(CustomViewBase):
 
         search_host_list = self.request.query_params.get('search_host_list', None)
         if firewall:
-            print(firewall)
             return self.queryset.filter(auto_enable=True, category__name="防火墙", status=0,
                                         ha_status__in=[0, 1])
         elif search_host_list:
