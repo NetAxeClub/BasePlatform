@@ -18,7 +18,9 @@ import json
 class SecDeviceConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         # Join room group
-        self.room_name = self.scope['cookies']['username']
+        # self.room_name = self.scope['cookies']['username']
+        # 生产环境下验证需要config.local_dev = false 走权限拿到真实用户信息
+        self.room_name = self.scope['user'].username
         self.room_group_name = 'sec_device_%s' % self.room_name
         # self.room_group_name = 'sec_device'
         await self.channel_layer.group_add(
