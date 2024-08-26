@@ -174,7 +174,7 @@ class Config:
         }
         try:
             re = requests.post(registerUrl, params=params)
-            if (re.text == "ok"):
+            if re.text == "ok":
                 logging.info("服务注册成功。")
             else:
                 logging.error("服务注册失败 " + re.text)

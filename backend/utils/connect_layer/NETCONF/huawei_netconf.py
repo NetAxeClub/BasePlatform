@@ -975,6 +975,7 @@ class HuaweiCollection(HuaweiyangNetconfConnect):
         res = self.netconf_get(data_xml)
         print(res)
         return res['ethernet']['ethSubIfs']['ethSubIf'] if res else []
+
     def colleciton_arp_list(self):
         """
         采集ARP信息

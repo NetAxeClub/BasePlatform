@@ -268,11 +268,11 @@ LOGGING = {
             "level": "DEBUG",
         },
         "websocket": {
-            "handlers": ["websocket"],
+            "handlers": ["websocket", "console"],
             "level": "DEBUG",
         },
         "webssh": {
-            "handlers": ["webssh"],
+            "handlers": ["webssh", "console"],
             "level": "DEBUG",
         },
         "django": {
