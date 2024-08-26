@@ -38,7 +38,7 @@ def get_auth_user(token):
     if rbac_instance.status_code == 200:
         rbac_res = rbac_instance.json()
         auth_service_url = "http://{}:{}".format(rbac_res['hosts'][0]['ip'], rbac_res['hosts'][0]['port'])
-        auth_decode_url = f'{auth_service_url}/rbac/userinfo'
+        auth_decode_url = f'{auth_service_url}/rbac/userinfo/'
         headers = {'Accept': 'application/json', 'Authorization': f'{str(token)}',
                    'Content-Type': 'application/json'}
         try:
@@ -82,6 +82,7 @@ class QueryAuthMiddleware(BaseMiddleware):
 
     def populate_scope(self, scope):
         logger.info('populate_scope')
+        print('populate_scope')
         # Make sure we have a session
         if "session" not in scope:
             raise ValueError(
