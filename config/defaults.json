@@ -16,6 +16,7 @@
   "mq_port": 5672,
   "nacos": "10.254.1.1",
   "nacos_port": 31848,
+  "nacos_password": "112233",
   "queue": "base_platform",
   "exchange": "netaxe",
   "allow_origins": ["http://tmp_server_ip:9980"],

@@ -63,7 +63,7 @@ class SendRunner:
         :return:
         """
         self.server = config.service_dicovery('msg_gateway')
-        self.server_hosts = self.server.json()['hosts']
+        self.server_hosts = self.server['hosts']
         self.metadata = self.server_hosts[0]['metadata']
         for _server in self.server_hosts:
             url = "http://{}:{}/msg_gateway/send".format(_server['ip'], _server['port'])
