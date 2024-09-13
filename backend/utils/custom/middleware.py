@@ -108,21 +108,19 @@ class UserData(object):
 
 def get_auth_user(token):
     rbac_instance = config.service_dicovery('rbac')
-    if rbac_instance.status_code == 200:
-        rbac_res = rbac_instance.json()
-        auth_service_url = "http://{}:{}".format(rbac_res['hosts'][0]['ip'], rbac_res['hosts'][0]['port'])
-        auth_decode_url = f'{auth_service_url}/rbac/userinfo/'
-        headers = {'Accept': 'application/json', 'Authorization': f'{str(token)}',
-                   'Content-Type': 'application/json'}
-        try:
-            res = requests.request(method="GET", url=auth_decode_url, headers=headers)
-            if 200 <= res.status_code < 300:
-                return UserData(res.json()['results'])
-            else:
-                return AnonymousUser()
-        except Exception as e:
-            logger.error("function 'get_auth_user' error: {}".format(str(e)))
+    auth_service_url = "http://{}:{}".format(rbac_instance['hosts'][0]['ip'], rbac_instance['hosts'][0]['port'])
+    auth_decode_url = f'{auth_service_url}/rbac/userinfo/'
+    headers = {'Accept': 'application/json', 'Authorization': f'{str(token)}',
+               'Content-Type': 'application/json'}
+    try:
+        res = requests.request(method="GET", url=auth_decode_url, headers=headers)
+        if 200 <= res.status_code < 300:
+            return UserData(res.json()['results'])
+        else:
             return AnonymousUser()
+    except Exception as e:
+        logger.error("function 'get_auth_user' error: {}".format(str(e)))
+        return AnonymousUser()
 
 
 class CorsMiddleWare(MiddlewareMixin):

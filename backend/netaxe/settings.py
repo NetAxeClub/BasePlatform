@@ -247,7 +247,7 @@ LOGGING = {
         },
         'console': {
             'level': 'DEBUG',
-            'filters': ['require_debug_true'],  # 只有在Django debug为True时才在屏幕打印日志
+            # 'filters': ['require_debug_true'],  # 只有在Django debug为True时才在屏幕打印日志
             'class': 'logging.StreamHandler',
             'formatter': 'standard'
         },
@@ -284,7 +284,7 @@ LOGGING = {
             "level": "DEBUG",
         },
         "automation": {
-            "handlers": ["automation"],
+            "handlers": ["automation", "console"],
             "level": "DEBUG",
         },
         "bus_sync": {

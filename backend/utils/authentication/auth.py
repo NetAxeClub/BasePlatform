@@ -29,29 +29,26 @@ class UserData(object):
 
 def get_auth_user(token):
     rbac_instance = config.service_dicovery('rbac')
-    if rbac_instance.status_code == 200:
-        rbac_res = rbac_instance.json()
-        auth_service_url = "{}/{}".format(rbac_res['hosts'][0]['ip'], rbac_res['hosts'][0]['port'])
-        auth_decode_url = f'{auth_service_url}/rbac/userinfo'
-        headers = {'Accept': 'application/json', 'Authorization': f'Bearer {str(token)}',
-                   'Content-Type': 'application/json'}
-        try:
-            res = requests.request(method="GET", url=auth_decode_url, headers=headers)
+    auth_service_url = "{}/{}".format(rbac_instance['hosts'][0]['ip'], rbac_instance['hosts'][0]['port'])
+    auth_decode_url = f'{auth_service_url}/rbac/userinfo'
+    headers = {'Accept': 'application/json', 'Authorization': f'Bearer {str(token)}',
+               'Content-Type': 'application/json'}
+    try:
+        res = requests.request(method="GET", url=auth_decode_url, headers=headers)
 
-        except requests.ConnectionError as err:
-            raise serializers.ValidationError(f"Cannot establish connection: {err}") from err
+    except requests.ConnectionError as err:
+        raise serializers.ValidationError(f"Cannot establish connection: {err}") from err
 
-        except requests.HTTPError as err:
-            raise serializers.ValidationError(f"HTTP Error: {err}") from err
-        except Exception as err:
-            raise serializers.ValidationError(f"Error occurred: {err}") from err
+    except requests.HTTPError as err:
+        raise serializers.ValidationError(f"HTTP Error: {err}") from err
+    except Exception as err:
+        raise serializers.ValidationError(f"Error occurred: {err}") from err
 
-        if 200 <= res.status_code < 300:
-            # print(res.json())
-            return UserData(res.json())
-        else:
-            raise AuthenticationFailed
-    raise AuthenticationFailed
+    if 200 <= res.status_code < 300:
+        # print(res.json())
+        return UserData(res.json())
+    else:
+        raise AuthenticationFailed
 
 
 class CustomJWTAuthentication(JWTAuthentication):

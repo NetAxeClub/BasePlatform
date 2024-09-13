@@ -75,7 +75,7 @@ class AddressSet(APIView):
 
     def get(self, request):
         get_param = request.GET.dict()
-        print(get_param)
+        # print(get_param)
         # 获取单个设备地址组信息
         if all(k in get_param for k in ("vendor", "hostip")):
             if get_param['vendor'] == 'H3C':
