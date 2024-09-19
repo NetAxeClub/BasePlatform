@@ -29,8 +29,6 @@ services:
           context: .
           dockerfile: ./dockerfiles/backend_dockerfile
 #          dockerfile: ./dockerfiles/backend_update_dockerfile
-      ports:
-        - "5555:5555"
       command: sh init.sh
       environment:
         TZ: Asia/Shanghai
