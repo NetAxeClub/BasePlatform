@@ -15,6 +15,8 @@ import nacos
 import logging
 import logging.config
 import yaml
+import getpass
+import bcrypt
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -59,7 +61,6 @@ def load_config_files() -> dict:
         )
 
     return data
-
 
 class Config:
     _instance = None
@@ -119,6 +120,19 @@ class Config:
     def service_dicovery(self, serviceName, groupName='default', namespaceId="public"):
         res = self.client.list_naming_instance(service_name=serviceName, group_name=groupName, namespace_id=namespaceId)
         return res
+
+    def save_bcrypt_passwd(self):
+        data = {}
+        with open(CONFIG_FILENAME) as f:
+            data.update(json.load(f))
+        hashed_password = bcrypt.hashpw(self.nacos_password.encode("utf-8"), bcrypt.gensalt())
+        data['hashed_password'] = hashed_password.decode()
+        try:
+            with open(CONFIG_FILENAME, "w") as f:
+                f.write(json.dumps(data, indent=4))
+        except FileNotFoundError:
+            log.warning(f"Couldn't find {f}")
+        return True
 
 
 config = Config()
