@@ -103,7 +103,7 @@ class CMDBInventory(InventoryPlugin):
         """
         # 将host_info中的字段的数据保留，其他的都放到整形后的dict数据的data字段中去。
         # super().__init__(*args, **kwargs)
-        super().__init__(*args, **kwargs)
+        # super().__init__(*args, **kwargs)
         key_mapping = dict(
             manage_ip='hostname',
             username='username',
