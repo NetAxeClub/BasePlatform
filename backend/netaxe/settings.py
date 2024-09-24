@@ -10,6 +10,9 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.0/ref/settings/
 """
 import os
+import importlib
+import pkgutil
+import apps
 from datetime import timedelta
 from confload.confload import config
 # Build paths inside the project like this: BASE_DIR / "subdir".
@@ -32,6 +35,13 @@ ALLOWED_HOSTS = ["*"]
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "netaxe.settings")
 os.environ.setdefault("DJANGO_ALLOW_ASYNC_UNSAFE", "true")
 
+discovered_apps = [
+    name
+    for finder, name, ispkg
+    in pkgutil.iter_modules(apps.__path__, apps.__name__ + ".")
+]
+
+
 # Application definition
 INSTALLED_APPS = [
     "channels",
@@ -46,19 +56,9 @@ INSTALLED_APPS = [
     "rest_framework",
     'django_filters',
     "simple_history",
-    "apps.users.apps.UsersConfig",
-    "apps.system.apps.SystemConfig",
-    "apps.topology.apps.TopologyConfig",
-    "apps.asset.apps.AssetConfig",
-    "apps.automation.apps.AutomationConfig",
-    "apps.dcs_control.apps.DcsControlConfig",
-    "apps.config_center.apps.ConfigCenterConfig",
-    # "apps.route_backend.apps.RouteBackendConfig",
-    "apps.int_utilization.apps.IntUtilizationConfig",
-    "apps.event.apps.EventConfig",
     # 'reversion',
     'import_export',
-]
+] + discovered_apps
 
 DATABASES = {
     'default': {
