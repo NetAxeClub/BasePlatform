@@ -14,6 +14,7 @@ import asyncio
 import copy
 import os
 import re
+import logging
 from datetime import datetime, date, timedelta
 
 from django.core.cache import cache
@@ -23,6 +24,7 @@ from apps.config_center.models import ConfigCompliance
 from utils.db.mongo_ops import MongoOps, MongoNetOps
 from utils.wechat_api import send_msg_netops
 
+logger = logging.getLogger(__name__)
 CONFIG_PATH = BASE_DIR + '/media/device_config/current-configuration/'
 vendor_map = {
     'hp_comware': 'H3C',
@@ -98,7 +100,10 @@ async def config_file_verify():
                     if vendor in vendor_map.keys():
                         rules = [x for x in rules if x['vendor'] == vendor_map[vendor]]
                         # host_file = host[:-4]
-                        await sub_file_proc(_dir, host, log_time, rules)
+                        try:
+                            await sub_file_proc(_dir, host, log_time, rules)
+                        except Exception as e:
+                            logger.exception(e)
     # 重建索引
     MongoNetOps.compliance_reindex()
     #send_msg_netops"合规性检查完成\n{}".format(log_time.strftime("%Y-%m-%d %H:%M:%S")))

@@ -269,7 +269,7 @@ class ComplianceResults(APIView):
             }
             return JsonResponse(data, encoder=DateEncoder)
         if any(k in get_param for k in ("rule", "compliance")):
-            _res = MongoNetOps.compliance_result(**get_param)
+            _res = MongoNetOps.compliance_result(**{k: v for k, v in get_param.items() if v != ''})
             data = {
                 "code": 200,
                 "data": _res,
