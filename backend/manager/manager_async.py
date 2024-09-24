@@ -18,7 +18,7 @@ from bson import json_util
 from backend.bus.bus_async import AsyncMessageBus
 from backend.database.db_async import AsyncMongoOps
 from backend.calls.routes import routes
-from backend.utils.metric import run_time_async
+# from backend.utils.metric import run_time_async
 
 log = logging.getLogger(__name__)
 task_db = AsyncMongoOps('task')
@@ -29,7 +29,7 @@ class AsyncManager:
     def __init__(self):
         self.bus = AsyncMessageBus()
 
-    @run_time_async
+    # @run_time_async
     async def callback(self, body):
         """
         {'library': 'sms', 'send_args': {'phone': ['18651610'], 'content': 'test12345676kkl;'}, 'webhook': {}, 'task_id': 'd962abae-1867-4cc4-914a-c2eaeeed1233', 'task_queue': 'msg_gateway'}

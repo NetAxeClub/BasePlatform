@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 
 
 class SupportVendor:
@@ -31,7 +32,7 @@ class ConfigCompliance(models.Model):
     pattern = models.CharField(verbose_name='模式', choices=MATCH_CHOICES, max_length=50, default='match-compliance')
     regex = models.TextField(verbose_name='表达式', null=False, default='', blank=False)
     is_repair = models.BooleanField(verbose_name="是否修正", null=False, default=False, blank=False)
-    repair_cmds = models.TextField(verbose_name='修复命令', null=False, default='', blank=False)
+    repair_cmds = models.TextField(verbose_name='修复命令', null=True, default='', blank=True)
     datetime = models.DateTimeField(auto_now=True, verbose_name='创建日期')
 
     def __str__(self):
@@ -93,17 +94,16 @@ class ConfigBackup(models.Model):
         max_length=100,
         null=False, default='')
     manage_ip = models.GenericIPAddressField(verbose_name='管理地址', null=False, default='0.0.0.0')
-    last_time = models.DateTimeField(auto_now=True, verbose_name='备份时间')
+    last_time = models.DateTimeField(verbose_name='备份时间', null=False, default=timezone.now)
     idc_name = models.CharField(verbose_name='机房', max_length=100, null=True, default='')
     model_name = models.CharField(verbose_name='型号', max_length=100, null=True, default='')
     vendor_name = models.CharField(verbose_name='厂商', max_length=100, null=True, default='')
     file_path = models.CharField(verbose_name='文件路径', max_length=200, null=True, default='')
     commit = models.CharField(verbose_name='提交commit', max_length=200, null=True, default='')
-    git_type = models.CharField(verbose_name='类型', max_length=200, null=True, default='', choices=status_choices)
+    git_type = models.CharField(verbose_name='类型', max_length=200, null=True, default='', choices=type_choices)
     status = models.PositiveSmallIntegerField(
         verbose_name='状态', choices=status_choices, default=0)
     config_status = models.CharField(verbose_name='备份状态', max_length=100, null=False, default='')
-    # commit = models.CharField(verbose_name="Commit", max_length=100, null=False, default='')
 
     def __str__(self):
         return "{}-{}".format(self.manage_ip, self.last_time)
@@ -113,3 +113,25 @@ class ConfigBackup(models.Model):
         verbose_name = '配置备份表'
         db_table = 'config_backup'  # 通过db_table自定义数据表名
         indexes = [models.Index(fields=['manage_ip', 'last_time'])]
+
+
+# 配置合规检查表
+class ConfigComplianceResult(models.Model):
+    compliance = models.CharField(verbose_name="结果", null=True, blank=True, max_length=100)
+    manage_ip = models.GenericIPAddressField(verbose_name="设备IP", null=False, default='0.0.0.0')
+    hostname = models.CharField(verbose_name="设备名", null=False, default='', max_length=200)
+    vendor = models.CharField(verbose_name="厂商", null=False, default='', max_length=100)
+    log_time = models.DateTimeField(verbose_name="检查时间", null=False, default=timezone.now)
+    rule = models.CharField(verbose_name="规则名", null=False, default='', max_length=200)
+    rule_id = models.IntegerField(verbose_name="规则id", null=False, default=0)
+    regex = models.TextField(verbose_name="正则表达式", null=False, default='', max_length=200)
+
+    def __str__(self):
+        return "{}-{}".format(self.manage_ip, self.log_time)
+
+    class Meta:
+        verbose_name_plural = '配置合规结果表'
+        verbose_name = '配置合规结果表'
+        db_table = 'config_compliance_result'  # 通过db_table自定义数据表名
+        indexes = [models.Index(fields=['log_time']),
+                   models.Index(fields=['manage_ip'])]

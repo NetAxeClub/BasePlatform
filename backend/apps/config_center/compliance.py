@@ -14,24 +14,23 @@ import asyncio
 import copy
 import os
 import re
-from datetime import datetime, date, timedelta
-
+import json
+from django.utils import timezone
+import logging
 from django.core.cache import cache
-
 from netaxe.settings import BASE_DIR
-from apps.config_center.models import ConfigCompliance
-from utils.db.mongo_ops import MongoOps, MongoNetOps
-from utils.wechat_api import send_msg_netops
+from apps.config_center.models import ConfigCompliance, ConfigComplianceResult
 
+
+logger = logging.getLogger(__name__)
 CONFIG_PATH = BASE_DIR + '/media/device_config/current-configuration/'
 vendor_map = {
     'hp_comware': 'H3C',
     'huawei': 'HUAWEI',
 }
-compliance_mongo = MongoOps(db='Automation', coll='ConfigCompliance')
 
 
-async def sub_file_proc(_dir: str, host: str, log_time: datetime, rules: list):
+async def sub_file_proc(_dir: str, host: str, rules: list):
     # print("{}{}/{}".format(CONFIG_PATH, _dir, host))
     with open("{}{}/{}".format(CONFIG_PATH, _dir, host), 'r', encoding='utf8') as f:
         # print(f.read())
@@ -46,7 +45,6 @@ async def sub_file_proc(_dir: str, host: str, log_time: datetime, rules: list):
         # print(re.compile(pattern=regex, flags=re.M).findall(string=f.read()))
         vendor, host_ip = host.split('-')
         host_ip = host_ip.strip('.txt')
-
         content = copy.deepcopy(f.read())
         for rule in rules:
             # print(rule)
@@ -56,14 +54,17 @@ async def sub_file_proc(_dir: str, host: str, log_time: datetime, rules: list):
             _res = re.compile(pattern=_regex, flags=re.M).findall(string=content)
             # print(_res)
             host_name = cache.get('cmdb_' + host_ip)
+            if host_name is not None:
+                host_name = json.loads(host_name)
             _data = {
                 'compliance': '',
-                'hostip': host_ip,
-                'hostname': host_name if host_name else '',
+                'rule_id': rule['id'],
+                'manage_ip': host_ip,
+                'hostname': host_name[0]['name'] if isinstance(host_name, list) else '',
                 'vendor': vendor_map[vendor],
-                'log_time': log_time,
                 'rule': rule['name'],
                 'regex': rule['regex'],
+                'log_time': timezone.now()
             }
             # 匹配-合规 反之 不匹配-不合规
             if _pattern == 'match-compliance':
@@ -71,42 +72,38 @@ async def sub_file_proc(_dir: str, host: str, log_time: datetime, rules: list):
             # 不匹配-合规 反之 匹配-不合规
             elif _pattern == 'mismatch-compliance':
                 _data['compliance'] = '不合规' if _res else '合规'
-            # if _res:
-            #     print('匹配成功')
-            MongoNetOps.compliance_ops(**_data)
+            res_query = ConfigComplianceResult.objects.filter(manage_ip=host_ip, rule_id=rule['id'])
+            if res_query:
+                ConfigComplianceResult.objects.filter(manage_ip=host_ip, rule_id=rule['id']).update(**_data)
+            else:
+                ConfigComplianceResult.objects.create(**_data)
+
     return
 
 
 async def config_file_verify():
-    # 清理30天之前的数据 start
-    today = date.today()
-    oneday = timedelta(days=30)
-    yesterday = today - oneday
-    yesterday = datetime.strptime(str(yesterday), '%Y-%m-%d')
-    compliance_mongo.delete_many({"log_time": {"$lte": yesterday}})
     # 清理30天之前的数据 end
     dir_list = os.listdir(CONFIG_PATH)
-    rules = ConfigCompliance.objects.all().values()
-    log_time = datetime.now()
+    rules_q = ConfigCompliance.objects.all().values()
     for _dir in dir_list:
         if os.path.isdir(CONFIG_PATH + _dir):
             device_file_list = os.listdir(CONFIG_PATH + _dir)
-            # print(device_file_list)
             for host in device_file_list:
                 if host[-4:] == '.txt':
                     vendor = host.split('-')[0]
                     if vendor in vendor_map.keys():
-                        rules = [x for x in rules if x['vendor'] == vendor_map[vendor]]
-                        # host_file = host[:-4]
-                        await sub_file_proc(_dir, host, log_time, rules)
-    # 重建索引
-    MongoNetOps.compliance_reindex()
-    #send_msg_netops"合规性检查完成\n{}".format(log_time.strftime("%Y-%m-%d %H:%M:%S")))
+                        rules = [x for x in rules_q if x['vendor'] == vendor_map[vendor]]
+                        if rules:
+                            try:
+                                await sub_file_proc(_dir, host, rules)
+                            except Exception as e:
+                                logger.exception(e)
     return
 
 
 if __name__ == '__main__':
     # import asyncio
     # from apps.config_center.compliance import config_file_verify
+    # asyncio.run(config_file_verify())
     loop = asyncio.get_event_loop()
     loop.run_until_complete(config_file_verify())

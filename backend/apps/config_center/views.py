@@ -104,6 +104,17 @@ class ConfigComplianceViewSet(CustomViewBase):
     search_fields = 'name'
 
 
+class ConfigComplianceResultViewSet(CustomViewBase):
+    queryset = ConfigComplianceResult.objects.all().order_by('-id')
+    serializer_class = ConfigComplianceResultSerializer
+    # permission_classes = (permissions.IsAuthenticated,)
+    pagination_class = LargeResultsSetPagination
+    # 配置搜索功能
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    filter_fields = '__all__'
+    search_fields = ('manage_ip', 'hostname', 'rule')
+
+
 # 配置模板表
 class ConfigTemplateViewSet(CustomViewBase):
     """
@@ -269,7 +280,7 @@ class ComplianceResults(APIView):
             }
             return JsonResponse(data, encoder=DateEncoder)
         if any(k in get_param for k in ("rule", "compliance")):
-            _res = MongoNetOps.compliance_result(**get_param)
+            _res = MongoNetOps.compliance_result(**{k: v for k, v in get_param.items() if v != ''})
             data = {
                 "code": 200,
                 "data": _res,
