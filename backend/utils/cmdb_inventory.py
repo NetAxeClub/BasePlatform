@@ -85,7 +85,7 @@ def _get_inventory_element(
 
 
 class CMDBInventory(InventoryPlugin):
-    def __init__(self, devices: List[dict], *args: Any, **kwargs: Any) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         """
         根据devices的字典列表加载所有网络主机
         Args:
@@ -103,7 +103,7 @@ class CMDBInventory(InventoryPlugin):
         """
         # 将host_info中的字段的数据保留，其他的都放到整形后的dict数据的data字段中去。
         # super().__init__(*args, **kwargs)
-        # super().__init__(*args, **kwargs)
+        devices = kwargs.get('devices', [])
         key_mapping = dict(
             manage_ip='hostname',
             username='username',

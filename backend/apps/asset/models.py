@@ -282,21 +282,21 @@ class AssetAccount(models.Model):
     def __unicode__(self):
         return '%s: %s' % (self.name, self.username)
 
-    def save(self, *args, **kwargs):
-        _encrypt_password = True
-        _encrypt_en_pwd = True
-        if self.pk:
-            old_instance = AssetAccount.objects.get(id=self.id)
-            _encrypt_password = False if old_instance.password == self.password else True
-            _encrypt_en_pwd = False if old_instance.en_pwd == self.en_pwd else True
-        if _encrypt_password:
-            crypt = CryptPwd()
-            self.password = crypt.encrypt_pwd(self.password)
-        if _encrypt_en_pwd:
-            crypt = CryptPwd()
-            if self.en_pwd is not None:
-                self.en_pwd = crypt.encrypt_pwd(self.en_pwd)
-        super(AssetAccount, self).save(*args, **kwargs)
+    # def save(self, *args, **kwargs):
+    #     _encrypt_password = True
+    #     _encrypt_en_pwd = True
+    #     if self.pk:
+    #         old_instance = AssetAccount.objects.get(id=self.id)
+    #         _encrypt_password = False if old_instance.password == self.password else True
+    #         _encrypt_en_pwd = False if old_instance.en_pwd == self.en_pwd else True
+    #     if _encrypt_password:
+    #         crypt = CryptPwd()
+    #         self.password = crypt.encrypt_pwd(self.password)
+    #     if _encrypt_en_pwd:
+    #         crypt = CryptPwd()
+    #         if self.en_pwd is not None:
+    #             self.en_pwd = crypt.encrypt_pwd(self.en_pwd)
+    #     super(AssetAccount, self).save(*args, **kwargs)
 
     @property
     def decode_password(self):

@@ -6,8 +6,6 @@ from driver.driver_auto_loader import driver_auto_loader, auto_driver_auto_loade
 driver_map = driver_auto_loader()
 auto_driver_map = auto_driver_auto_loader()
 
-
-
 discovered_plugins = {
     name: importlib.import_module(name)
     for finder, name, ispkg
