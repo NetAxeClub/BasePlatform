@@ -13,7 +13,7 @@
 import logging
 import requests
 import json
-from utils.metric import run_time_sync
+# from utils.metric import run_time_sync
 from confload.confload import config
 
 log = logging.getLogger(__name__)
@@ -101,7 +101,6 @@ class SendRunner:
         #         log.debug(res)
         #         print('webhook res', res)
 
-    @run_time_sync
     def send_sms(self, user, content):
         send_args = {
              "phone": [user],
@@ -109,7 +108,6 @@ class SendRunner:
          }
         self.send('wechat', send_args)
 
-    @run_time_sync
     def send_wechat(self, channel, content):
         send_args = {
             "user": "@all",
@@ -119,7 +117,6 @@ class SendRunner:
         }
         self.send('wechat', send_args)
 
-    @run_time_sync
     def send_email(self, user, subject, content):
         send_args = {
             "user": user,

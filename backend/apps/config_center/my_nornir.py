@@ -58,7 +58,8 @@ def configure_backup(task, path) -> Result:
                  filename=f"{path}/{task.host}/{task.host.platform}-{task.host}.txt")
         return Result(
             host=task.host,
-            result=f"{task.host}"
+            result=f"{task.host}",
+            filename=f"current-configuration/{task.host}/{task.host.platform}-{task.host}.txt"
         )
 
 
@@ -66,7 +67,7 @@ def configure_backup(task, path) -> Result:
 def config_backup_nornir(devices: List[dict]) -> InitNornir:
     """
     """
-    log_time = datetime.now().strftime("%Y-%m-%d")
+    # log_time = datetime.now().strftime("%Y-%m-%d")
     with InitNornir(
             runner={
                 "plugin": "threaded",
@@ -94,6 +95,16 @@ def config_backup_nornir(devices: List[dict]) -> InitNornir:
         device = nr.filter(filter_func=lambda host: host.platform in support_platform)
         backup_res = device.run(task=configure_backup, name='配置备份', path=BACKUP_PATH)
         # print_result(backup_res)
+        # for host in backup_res.keys():
+        #     print(backup_res[host], type(backup_res[host]))
+        #     print(backup_res[host].host)
+        #     # print(backup_res[host][0].result)
+        #     # print(backup_res[host][0].filename)
+        #     print('exception')
+        #     print(backup_res[host][0].exception, type(backup_res[host][0].exception))
+        #     print_result(backup_res[host])
+        #     print('exception')
+        #     print(backup_res[host].failed)
         return backup_res
 
 

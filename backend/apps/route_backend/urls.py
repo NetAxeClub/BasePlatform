@@ -5,12 +5,13 @@ from rest_framework import routers
 
 from .views import DashboardChart, WebSshView, DeviceCollectView, AutomationChart, \
     DispatchManageView, JobCenterView, PeriodicTaskViewSet, IntervalScheduleViewSet, ServerWebSshView, \
-    NetworkDeviceWebSshView, NewServerWebSshView
+    NetworkDeviceWebSshView, NewServerWebSshView, TaskResultViewSet
 
 app_name = 'vue_backend'
 router = routers.SimpleRouter()
 router.register(r'periodic_task', PeriodicTaskViewSet)
 router.register(r'interval_schedule', IntervalScheduleViewSet)
+router.register(r'task_result', TaskResultViewSet)
 
 urlpatterns = [
     path(r'', include(router.urls)),

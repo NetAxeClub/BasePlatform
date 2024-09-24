@@ -178,6 +178,12 @@ class AccountField(serializers.Serializer):
     #         raise serializers.ValidationError("account id with name: %s not found" % value)
 
 
+class BindIpField(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    name = serializers.CharField(max_length=50)
+    ipaddr = serializers.IPAddressField(read_only=True)
+
+
 # 网络设备
 class NetworkDeviceSerializer(serializers.ModelSerializer):
     plan_name = serializers.CharField(source='plan.name', read_only=True)
@@ -192,7 +198,7 @@ class NetworkDeviceSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)
     framework_name = serializers.CharField(source='framework.name', read_only=True)
     model_name = serializers.CharField(source='model.name', read_only=True)
-    bind_ip = serializers.StringRelatedField(many=True, read_only=True)
+    bind_ip = BindIpField(many=True, read_only=True)
     # 针对choices的处理
     status_name = serializers.CharField(source='get_status_display', read_only=True)
     ha_status_name = serializers.CharField(source='get_ha_status_display', read_only=True)

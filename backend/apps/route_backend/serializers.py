@@ -25,6 +25,7 @@ class IntervalSerializer(serializers.ModelSerializer):
         model = IntervalSchedule
         fields = ('every', 'period', 'id')
 
+
 class IntervalScheduleSerializer(serializers.ModelSerializer):
     class Meta:
         model = IntervalSchedule
