@@ -536,13 +536,25 @@ def datas_to_cache():
     def cmdb_to_cache():
         cmdb_res = cmdb_mongo.find(query_dict={'status': 0}, fileds={'_id': 0, 'manage_ip': 1, 'name': 1})
         cmdb_result = dict()
+        cmdb_ip_result = dict()
         for _asset in cmdb_res:
             if _asset['name'] is not None:
                 if _asset['name'] in cmdb_result.keys():
                     cmdb_result[_asset['name']].append(_asset)
                 else:
                     cmdb_result[_asset['name']] = [_asset]
+            if _asset['manage_ip'] != '0.0.0.0':
+                if _asset['manage_ip'] in cmdb_ip_result.keys():
+                    cmdb_ip_result[_asset['manage_ip']].append(_asset)
+                else:
+                    cmdb_ip_result[_asset['manage_ip']] = [_asset]
         for _asset in cmdb_result.keys():
+            cache.set(
+                "cmdb_" + _asset,
+                json.dumps(
+                    cmdb_result[_asset]),
+                3600 * 12)
+        for _asset in cmdb_ip_result.keys():
             cache.set(
                 "cmdb_" + _asset,
                 json.dumps(

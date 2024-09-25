@@ -1,5 +1,5 @@
 from django.db import models
-
+from datetime import datetime
 
 class SupportVendor:
     CHOICES = (
@@ -113,3 +113,25 @@ class ConfigBackup(models.Model):
         verbose_name = '配置备份表'
         db_table = 'config_backup'  # 通过db_table自定义数据表名
         indexes = [models.Index(fields=['manage_ip', 'last_time'])]
+
+
+# 配置合规检查表
+class ConfigComplianceResult(models.Model):
+    compliance_choices = (('match-compliance', 'match-compliance'), ('mismatch-compliance', 'mismatch-compliance'))
+    compliance = models.CharField(verbose_name="结果", null=False, default='match-compliance', max_length=100, choices=compliance_choices)
+    manage_ip = models.GenericIPAddressField(verbose_name="设备IP", null=False, default='0.0.0.0')
+    hostname = models.CharField(verbose_name="设备名", null=False, default='', max_length=200)
+    vendor = models.CharField(verbose_name="厂商", null=False, default='', max_length=100)
+    log_time = models.DateTimeField(verbose_name="检查时间", auto_now=True, null=False)
+    rule = models.CharField(verbose_name="规则名", null=False, default='', max_length=200)
+    regex = models.TextField(verbose_name="正则表达式", null=False, default='', max_length=200)
+
+    def __str__(self):
+        return "{}-{}".format(self.manage_ip, self.log_time)
+
+    class Meta:
+        verbose_name_plural = '配置合规结果表'
+        verbose_name = '配置合规结果表'
+        db_table = 'config_compliance_result'  # 通过db_table自定义数据表名
+        indexes = [models.Index(fields=['log_time']),
+                   models.Index(fields=['manage_ip'])]
