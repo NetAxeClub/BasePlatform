@@ -70,7 +70,12 @@ async def sub_file_proc(_dir: str, host: str, rules: list):
             elif _pattern == 'mismatch-compliance':
                 _data['compliance'] = '不合规' if _res else '合规'
             print(_data)
-            ConfigComplianceResult.objects.update_or_create(defaults=_data, manage_ip=host_ip, rule=rule['name'])
+            res_query = ConfigComplianceResult.objects.filter(manage_ip=host_ip, rule=rule['name'])
+            if res_query:
+                ConfigComplianceResult.objects.filter(manage_ip=host_ip, rule=rule['name']).update(**_data)
+            else:
+                ConfigComplianceResult.objects.create(**_data)
+
     return
 
 
