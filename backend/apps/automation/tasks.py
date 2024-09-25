@@ -558,7 +558,7 @@ def datas_to_cache():
             cache.set(
                 "cmdb_" + _asset,
                 json.dumps(
-                    cmdb_result[_asset]),
+                    cmdb_ip_result[_asset]),
                 3600 * 12)
 
     # arp 以 arp_ + ip 作为key
