@@ -14,6 +14,7 @@ import asyncio
 import copy
 import os
 import re
+import json
 import logging
 from django.core.cache import cache
 from netaxe.settings import BASE_DIR
@@ -52,10 +53,12 @@ async def sub_file_proc(_dir: str, host: str, rules: list):
             _res = re.compile(pattern=_regex, flags=re.M).findall(string=content)
             # print(_res)
             host_name = cache.get('cmdb_' + host_ip)
+            if host_name is not None:
+                host_name = json.loads(host_name)
             _data = {
                 'compliance': '',
                 'manage_ip': host_ip,
-                'hostname': host_name if host_name else '',
+                'hostname': host_name[0]['name'] if host_name else '',
                 'vendor': vendor_map[vendor],
                 'rule': rule['name'],
                 'regex': rule['regex'],
