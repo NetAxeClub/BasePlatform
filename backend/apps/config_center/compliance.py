@@ -63,14 +63,14 @@ async def sub_file_proc(_dir: str, host: str, rules: list):
                 'rule': rule['name'],
                 'regex': rule['regex'],
             }
-            print(_data)
             # 匹配-合规 反之 不匹配-不合规
             if _pattern == 'match-compliance':
                 _data['compliance'] = '合规' if _res else '不合规'
             # 不匹配-合规 反之 匹配-不合规
             elif _pattern == 'mismatch-compliance':
                 _data['compliance'] = '不合规' if _res else '合规'
-            ConfigComplianceResult.objects.update_or_create(**_data)
+            print(_data)
+            ConfigComplianceResult.objects.update_or_create(defaults=_data, manage_ip=host_ip, rule=rule['name'])
     return
 
 
@@ -97,5 +97,6 @@ async def config_file_verify():
 if __name__ == '__main__':
     # import asyncio
     # from apps.config_center.compliance import config_file_verify
+    # asyncio.run(config_file_verify())
     loop = asyncio.get_event_loop()
     loop.run_until_complete(config_file_verify())
