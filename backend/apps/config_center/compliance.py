@@ -63,7 +63,7 @@ async def sub_file_proc(_dir: str, host: str, rules: list):
                 'rule': rule['name'],
                 'regex': rule['regex'],
             }
-            # print(_data)
+            print(_data)
             # 匹配-合规 反之 不匹配-不合规
             if _pattern == 'match-compliance':
                 _data['compliance'] = '合规' if _res else '不合规'
