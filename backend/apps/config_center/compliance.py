@@ -58,7 +58,7 @@ async def sub_file_proc(_dir: str, host: str, rules: list):
             _data = {
                 'compliance': '',
                 'manage_ip': host_ip,
-                'hostname': host_name[0]['name'] if host_name else '',
+                'hostname': host_name[0]['name'] if isinstance(host_name, list) else '',
                 'vendor': vendor_map[vendor],
                 'rule': rule['name'],
                 'regex': rule['regex'],
