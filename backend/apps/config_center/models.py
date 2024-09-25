@@ -117,8 +117,7 @@ class ConfigBackup(models.Model):
 
 # 配置合规检查表
 class ConfigComplianceResult(models.Model):
-    compliance_choices = (('match-compliance', 'match-compliance'), ('mismatch-compliance', 'mismatch-compliance'))
-    compliance = models.CharField(verbose_name="结果", null=False, default='match-compliance', max_length=100, choices=compliance_choices)
+    compliance = models.CharField(verbose_name="结果", null=True, blank=True, max_length=100)
     manage_ip = models.GenericIPAddressField(verbose_name="设备IP", null=False, default='0.0.0.0')
     hostname = models.CharField(verbose_name="设备名", null=False, default='', max_length=200)
     vendor = models.CharField(verbose_name="厂商", null=False, default='', max_length=100)
