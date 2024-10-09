@@ -951,7 +951,7 @@ def collect_info_sub(**kwargs):
 
 # 采集规则主任务
 @shared_task(base=AxeTask, once={'graceful': True})
-def collcet_device_by_rule():
+def collect_device_by_rule():
     """采集规则主任务"""
     rule_query = CollectionRule.objects.prefetch_related(
         'match_rule').values('id', 'operation', 'module', 'method', 'execute', 'plugin')
