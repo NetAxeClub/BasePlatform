@@ -81,9 +81,9 @@ class Config:
         for k, v in self.data.items():
             log.info("[Config set] key:%s, value:%s" % (k, v))
             setattr(self, k, v)
-        if not self.local_dev:
-            self.client = nacos.NacosClient(server_addresses=f"{self.nacos}:{self.nacos_port}", username="nacos",
-                                            password=self.nacos_password, log_level="INFO")
+        # if not self.local_dev:
+        self.client = nacos.NacosClient(server_addresses=f"{self.nacos}:{self.nacos_port}", username="nacos",
+                                        password=self.nacos_password, log_level="INFO")
 
     # 单例模式
     def __new__(cls):

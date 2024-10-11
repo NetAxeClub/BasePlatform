@@ -401,42 +401,18 @@ class IntervalScheduleViewSet(CustomViewBase):
     search_fields = '__all__'
 
 
-# class ServerCmdbExpand(View):
-#     def get(self, request):
-#         get_param = request.GET.dict()
-#         # 查看设备管理账户信息
-#         if all(k in get_param for k in ("id", "password")):
-#             server_id = get_param["id"]
-#             account_tmp = ServerAccount.objects.filter(
-#                 server__id=server_id).values(
-#                 'account', 'account__username',
-#                 'account__password')
-#             _CryptPwd = CryptPwd()
-#             result = []
-#             for tmp in account_tmp:
-#                 result.append(dict(
-#                     account=tmp['account'],
-#                     account__username=tmp['account__username'],
-#                     account__password=_CryptPwd.decrypt_pwd(tmp['account__password']),
-#                 ))
-#             res = json.dumps({'results': result,
-#                               'code': 200})
-#             return HttpResponse(res, content_type="application/json")
-#         if all(k in get_param for k in ("id", "change_pwd")):
-#             server_id = get_param["id"]
-#             set_password = get_param["change_pwd"]
-#             account_tmp = ServerAccount.objects.filter(
-#                 server__id=server_id).values('account_id', 'account__name').first()
-#             if account_tmp:
-#                 _CryptPwd = CryptPwd()
-#                 _account = AssetAccount.objects.get(
-#                     id=account_tmp['account_id'], name=account_tmp['account__name'])
-#                 _account.password = _CryptPwd.encrypt_pwd(set_password)
-#                 _account.save()
-#                 res = json.dumps({'results': 'ok',
-#                                   'code': 200})
-#                 return HttpResponse(res, content_type="application/json")
-#             else:
-#                 res = json.dumps({'results': '没有关联账户',
-#                                   'code': 400})
-#                 return HttpResponse(res, content_type="application/json")
+class TaskResultViewSet(CustomViewBase):
+    """
+    处理  GET POST , 处理 /api/post/<pk>/ GET PUT PATCH DELETE
+    """
+    queryset = TaskResult.objects.all().order_by('id')
+    serializer_class = TaskResultSerializer
+    permission_classes = ()
+    authentication_classes = ()
+    # 配置搜索功能
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    # 如果要允许对某些字段进行过滤，可以使用filter_fields属性。
+    filter_fields = '__all__'
+    pagination_class = LimitSet
+    # 设置搜索的关键字
+    search_fields = ('date_done', 'result', 'status', 'task_id', 'task_name', 'traceback')
