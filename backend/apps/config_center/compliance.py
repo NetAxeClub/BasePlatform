@@ -15,6 +15,7 @@ import copy
 import os
 import re
 import json
+from datetime import datetime
 import logging
 from django.core.cache import cache
 from netaxe.settings import BASE_DIR
@@ -57,11 +58,13 @@ async def sub_file_proc(_dir: str, host: str, rules: list):
                 host_name = json.loads(host_name)
             _data = {
                 'compliance': '',
+                'rule_id': rule['id'],
                 'manage_ip': host_ip,
                 'hostname': host_name[0]['name'] if isinstance(host_name, list) else '',
                 'vendor': vendor_map[vendor],
                 'rule': rule['name'],
                 'regex': rule['regex'],
+                'log_time': datetime.now()
             }
             # 匹配-合规 反之 不匹配-不合规
             if _pattern == 'match-compliance':
@@ -70,9 +73,9 @@ async def sub_file_proc(_dir: str, host: str, rules: list):
             elif _pattern == 'mismatch-compliance':
                 _data['compliance'] = '不合规' if _res else '合规'
             print(_data)
-            res_query = ConfigComplianceResult.objects.filter(manage_ip=host_ip, rule=rule['name'])
+            res_query = ConfigComplianceResult.objects.filter(manage_ip=host_ip, rule_id=rule['id'])
             if res_query:
-                ConfigComplianceResult.objects.filter(manage_ip=host_ip, rule=rule['name']).update(**_data)
+                ConfigComplianceResult.objects.filter(manage_ip=host_ip, rule_id=rule['id']).update(**_data)
             else:
                 ConfigComplianceResult.objects.create(**_data)
 
