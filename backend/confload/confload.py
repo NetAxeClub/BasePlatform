@@ -54,7 +54,6 @@ def load_config_files() -> dict:
         except FileNotFoundError:
             log.warning(f"Couldn't find {fname}")
 
-
     if not data:
         raise RuntimeError(
             f"Could not find either {DEFAULTS_FILENAME} or {CONFIG_FILENAME}"
