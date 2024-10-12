@@ -1,5 +1,5 @@
 from django.db import models
-from datetime import datetime
+from django.utils import timezone
 
 class SupportVendor:
     CHOICES = (
@@ -121,7 +121,7 @@ class ConfigComplianceResult(models.Model):
     manage_ip = models.GenericIPAddressField(verbose_name="设备IP", null=False, default='0.0.0.0')
     hostname = models.CharField(verbose_name="设备名", null=False, default='', max_length=200)
     vendor = models.CharField(verbose_name="厂商", null=False, default='', max_length=100)
-    log_time = models.DateTimeField(verbose_name="检查时间", null=False)
+    log_time = models.DateTimeField(verbose_name="检查时间", null=False, default=timezone.localtime())
     rule = models.CharField(verbose_name="规则名", null=False, default='', max_length=200)
     rule_id = models.IntegerField(verbose_name="规则id", null=False, default=0)
     regex = models.TextField(verbose_name="正则表达式", null=False, default='', max_length=200)

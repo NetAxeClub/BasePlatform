@@ -15,7 +15,7 @@ import copy
 import os
 import re
 import json
-from datetime import datetime
+from django.utils import timezone
 import logging
 from django.core.cache import cache
 from netaxe.settings import BASE_DIR
@@ -64,7 +64,7 @@ async def sub_file_proc(_dir: str, host: str, rules: list):
                 'vendor': vendor_map[vendor],
                 'rule': rule['name'],
                 'regex': rule['regex'],
-                'log_time': datetime.now()
+                'log_time': timezone.localtime()
             }
             # 匹配-合规 反之 不匹配-不合规
             if _pattern == 'match-compliance':
