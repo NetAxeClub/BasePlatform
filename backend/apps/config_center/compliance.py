@@ -64,7 +64,7 @@ async def sub_file_proc(_dir: str, host: str, rules: list):
                 'vendor': vendor_map[vendor],
                 'rule': rule['name'],
                 'regex': rule['regex'],
-                'log_time': timezone.localtime()
+                'log_time': timezone.now()
             }
             # 匹配-合规 反之 不匹配-不合规
             if _pattern == 'match-compliance':
@@ -72,7 +72,6 @@ async def sub_file_proc(_dir: str, host: str, rules: list):
             # 不匹配-合规 反之 匹配-不合规
             elif _pattern == 'mismatch-compliance':
                 _data['compliance'] = '不合规' if _res else '合规'
-            print(_data)
             res_query = ConfigComplianceResult.objects.filter(manage_ip=host_ip, rule_id=rule['id'])
             if res_query:
                 ConfigComplianceResult.objects.filter(manage_ip=host_ip, rule_id=rule['id']).update(**_data)
