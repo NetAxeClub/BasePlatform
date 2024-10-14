@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
 
+
 class SupportVendor:
     CHOICES = (
         ('H3C', 'H3C'),
@@ -93,17 +94,16 @@ class ConfigBackup(models.Model):
         max_length=100,
         null=False, default='')
     manage_ip = models.GenericIPAddressField(verbose_name='管理地址', null=False, default='0.0.0.0')
-    last_time = models.DateTimeField(auto_now=True, verbose_name='备份时间')
+    last_time = models.DateTimeField(verbose_name='备份时间', null=False, default=timezone.now)
     idc_name = models.CharField(verbose_name='机房', max_length=100, null=True, default='')
     model_name = models.CharField(verbose_name='型号', max_length=100, null=True, default='')
     vendor_name = models.CharField(verbose_name='厂商', max_length=100, null=True, default='')
     file_path = models.CharField(verbose_name='文件路径', max_length=200, null=True, default='')
     commit = models.CharField(verbose_name='提交commit', max_length=200, null=True, default='')
-    git_type = models.CharField(verbose_name='类型', max_length=200, null=True, default='', choices=status_choices)
+    git_type = models.CharField(verbose_name='类型', max_length=200, null=True, default='', choices=type_choices)
     status = models.PositiveSmallIntegerField(
         verbose_name='状态', choices=status_choices, default=0)
     config_status = models.CharField(verbose_name='备份状态', max_length=100, null=False, default='')
-    # commit = models.CharField(verbose_name="Commit", max_length=100, null=False, default='')
 
     def __str__(self):
         return "{}-{}".format(self.manage_ip, self.last_time)
@@ -121,7 +121,7 @@ class ConfigComplianceResult(models.Model):
     manage_ip = models.GenericIPAddressField(verbose_name="设备IP", null=False, default='0.0.0.0')
     hostname = models.CharField(verbose_name="设备名", null=False, default='', max_length=200)
     vendor = models.CharField(verbose_name="厂商", null=False, default='', max_length=100)
-    log_time = models.DateTimeField(verbose_name="检查时间", null=False, default=timezone.localtime())
+    log_time = models.DateTimeField(verbose_name="检查时间", null=False, default=timezone.now)
     rule = models.CharField(verbose_name="规则名", null=False, default='', max_length=200)
     rule_id = models.IntegerField(verbose_name="规则id", null=False, default=0)
     regex = models.TextField(verbose_name="正则表达式", null=False, default='', max_length=200)
