@@ -20,6 +20,7 @@ backend/apps/automation/tools/__pycache__/
 backend/apps/config_center/__pycache__/
 backend/apps/route_backend/__pycache__/
 backend/apps/monitor
+backend/apps/support/
 backend/apps/support
 backend/__pycache__/
 backend/media/automation

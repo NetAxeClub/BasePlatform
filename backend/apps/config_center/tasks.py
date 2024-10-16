@@ -19,7 +19,7 @@ from django.core.files.storage import default_storage
 from utils.db.mongo_ops import MongoOps
 from service_mesh import msg_gateway_runner
 
-config_mongo = MongoOps(db='netops', coll='ConfigBackupStatistics')
+config_mongo = MongoOps(db='metric', coll='level2')
 
 if DEBUG:
     CELERY_QUEUE = 'dev'
@@ -43,6 +43,14 @@ def config_backup(**kwargs):
     time_use = int(int(end_time - start_time) / 60)
     fail_host_list = [x for x in result.failed_hosts.keys()]
     fail_host = '\n'.join([x for x in result.failed_hosts.keys()])
+    config_mongo.insert({
+        'name': 'config_backup_status',
+        'data': {
+            'success': len([x['manage_ip'] for x in hosts if x['manage_ip'] not in fail_host_list]),
+            'failed': len(fail_host_list)
+        },
+        'log_time': log_time
+    })
     msg_gateway_runner.send_wechat(channel="netdevops",
                                    content=f"配置备份完成，耗时:{time_use}分\n备份失败设备:\n{fail_host}")
     success_host_list = [x['manage_ip'] for x in hosts if x not in fail_host_list]
@@ -103,6 +111,15 @@ def config_backup(**kwargs):
                                         ).update(
                 config_status='SUCCESS', git_type='add', commit=commit, file_path=untracked_host
             )
+    config_mongo.insert({
+        'name': 'config_backup_git_status',
+        'data': {
+            'change': len(changed_files),
+            'add': len(untracked_files),
+            'commit': commit
+        },
+        'log_time': log_time
+    })
     msg_gateway_runner.send_wechat(channel='netdevops',
                                    content=f"配置备份推送完成\n变更配置文件数:{len(changed_files)}\n新增配置文件数:{len(untracked_files)}\ncommit:{commit}")
     config_safe_baseline_check.apply_async(kwargs={}, queue=CELERY_QUEUE,
