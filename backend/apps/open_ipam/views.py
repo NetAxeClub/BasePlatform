@@ -8,7 +8,7 @@ from django.db.models import Count
 # from asgiref.sync import sync_to_async, async_to_sync
 # from django.db.models import Count
 # from django.db.models import Count, Sum
-from django.db.models.query import RawQuerySet
+# from django.db.models.query import RawQuerySet
 from django.http import JsonResponse, HttpResponse
 # from django.views import View
 from django_filters.rest_framework import DjangoFilterBackend
@@ -25,7 +25,8 @@ from rest_framework.views import APIView
 
 from .models import Subnet, IpAddress, TagsModel
 from .serializers import HostsResponseSerializer, SubnetSerializer, IpAddressSerializer, \
-    TagsModelSerializer, TagCountSerializer
+    TagsModelSerializer
+# TagCountSerializer
 from utils.ipam_pagenations import HostsListPagination
 from utils.ipam_utils import IpAmForNetwork
 import ipaddr
