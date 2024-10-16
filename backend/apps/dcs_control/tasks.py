@@ -324,7 +324,7 @@ def get_firewall_zone(**kwargs):
     hostip = kwargs['hostip']
     if vendor == "Hillstone":
         res = MongoOps(db='Automation', coll='hillstone_zone') \
-            .find(query_dict=dict(hostip=hostip), fileds={'_id': 0})
+            .find(query_dict=dict(hostip=hostip), fields={'_id': 0})
     elif vendor == 'H3C':
         _FirewallMain = FirewallMain(hostip)
         res = _FirewallMain.get_h3c_sec_zone()
@@ -640,7 +640,7 @@ class FirewallMain(object):
         elif kwargs.get('del_object'):
             self.cmds += ['no address ' + kwargs['name']]
             self.back_off_cmds += ['address ' + kwargs['name']]
-            res = address_mongo.find(query_dict=dict(hostip=kwargs['hostip'], name=kwargs['name']), fileds={'_id': 0})
+            res = address_mongo.find(query_dict=dict(hostip=kwargs['hostip'], name=kwargs['name']), fields={'_id': 0})
             if not res:
                 raise RuntimeError("hillstone_address_detail" + ' 未获取到现有的配置，无法生成回退命令')
             for i in res:
@@ -1228,7 +1228,7 @@ class FirewallMain(object):
         elif kwargs.get('del_object'):
             self.cmds += [F"no {name}"]
             self.back_off_cmds += [F"{name}"]
-            res = service_mongo.find(query_dict=dict(hostip=kwargs['hostip'], name=kwargs['name']), fileds={'_id': 0})
+            res = service_mongo.find(query_dict=dict(hostip=kwargs['hostip'], name=kwargs['name']), fields={'_id': 0})
             if not res:
                 raise RuntimeError("hillstone_service_detail" + ' 未获取到现有的配置，无法生成回退命令')
             for i in res[0]['items']:
@@ -4704,7 +4704,7 @@ class FirewallMain(object):
 
     def get_hillstone_address_obj(self, **kwargs):
         res = MongoOps(db='Automation', coll='hillstone_address') \
-            .find(query_dict=dict(hostip=self.host), fileds={'_id': 0})
+            .find(query_dict=dict(hostip=self.host), fields={'_id': 0})
         return res
 
 
@@ -5599,7 +5599,7 @@ def edit_sec_policy(**kwargs):
                 cmds += ['policy-global', 'move ' + rule_id + ' top']
             old_sec_policy = MongoOps(db='Automation', coll='sec_policy').find(
                 query_dict=dict(hostip=hostip, id=rule_id),
-                fileds={'_id': 0})
+                fields={'_id': 0})
             """
             old_sec_policy 数据大致如下：
             vendor: 'hillstone',

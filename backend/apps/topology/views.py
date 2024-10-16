@@ -66,7 +66,7 @@ class TopologyShow(APIView):
                 return JsonResponse(dict(code=400, msg='没有拓扑数据'), content_type="application/json", safe=False)
         if get_param.get('get_interface_by_manage_ip'):
             content = interface_mongo.find(query_dict={"hostip": get_param['get_interface_by_manage_ip']},
-                                           fileds={"_id": 0})
+                                           fields={"_id": 0})
             if content:
                 return JsonResponse(dict(code=200, data=content, msg='success'), content_type="application/json",
                                     safe=False)

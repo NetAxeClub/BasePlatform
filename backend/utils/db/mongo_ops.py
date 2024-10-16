@@ -138,61 +138,61 @@ class MongoOps:
         result = self.coll.update_one(filter=filter, update=update)
         return result
 
-    def find(self, query_dict=None, fileds=None, sort=None):
+    def find(self, query_dict=None, fields=None, sort=None):
         """
         获取所有日志记录
         :param sort:
-        :param fileds:
+        :param fields:
         :param query_dict: 字典形式，比如：{"name": "xxx"}
-        example: fileds={'_id': 0, 'node_ip': 1}  只显示node_ip  指定字段
+        example: fields={'_id': 0, 'node_ip': 1}  只显示node_ip  指定字段
         :type query_dict: dict
         :return: 所有日志记录
         :rtype: list
         """
-        if fileds and sort:
-            r = self.coll.find(query_dict, fileds).sort(sort, 1)
-        elif fileds:
-            r = self.coll.find(query_dict, fileds)
+        if fields and sort:
+            r = self.coll.find(query_dict, fields).sort(sort, 1)
+        elif fields:
+            r = self.coll.find(query_dict, fields)
         elif query_dict:
             r = self.coll.find(query_dict)
         else:
             r = self.coll.find()
         return list(r)
 
-    def find_page_query(self, query_dict=None, fileds=None, sort=None, page_size=10, page_num=1):
+    def find_page_query(self, query_dict=None, fields=None, sort=None, page_size=10, page_num=1):
         """
                 获取所有日志记录
                 :param sort:
-                :param fileds:
+                :param fields:
                 :param query_dict: 字典形式，比如：{"name": "xxx"}
-                example: fileds={'_id': 0, 'node_ip': 1}  只显示node_ip  指定字段
+                example: fields={'_id': 0, 'node_ip': 1}  只显示node_ip  指定字段
                 :type query_dict: dict
                 :return: 所有日志记录
                 :rtype: list
                 """
-        skip = page_size * (page_num)
+        skip = page_size * (page_num - 1)
         # 字段排序// -1 为倒序，1 为正序
-        if fileds and sort:
-            r = self.coll.find(query_dict, fileds).sort(sort, -1).limit(page_size).skip(skip)
-        elif fileds:
-            r = self.coll.find(query_dict, fileds).limit(page_size).skip(skip)
+        if fields and sort:
+            r = self.coll.find(query_dict, fields).sort(sort, -1).limit(page_size).skip(skip)
+        elif fields:
+            r = self.coll.find(query_dict, fields).limit(page_size).skip(skip)
         elif query_dict:
             r = self.coll.find(query_dict).limit(page_size).skip(skip)
         else:
             r = self.coll.find().limit(page_size).skip(skip)
         return list(r)
 
-    def find_re(self, kwargs, fileds=None, sort=None):
+    def find_re(self, kwargs, fields=None, sort=None):
         """
         正则匹配  kwargs :{'name': re.compile(e)}
-        example: fileds={'_id': 0, 'node_ip': 1}  只显示node_ip
+        example: fields={'_id': 0, 'node_ip': 1}  只显示node_ip
         :return: 所有日志记录
         :rtype: list
         """
-        if fileds and sort:
-            r = self.coll.find(kwargs, fileds).sort(sort, 1)
-        elif fileds:
-            r = self.coll.find(kwargs, fileds)
+        if fields and sort:
+            r = self.coll.find(kwargs, fields).sort(sort, 1)
+        elif fields:
+            r = self.coll.find(kwargs, fields)
         else:
             r = self.coll.find(kwargs)
         return list(r)
@@ -279,14 +279,14 @@ class MongoNetOps(object):
 
     @staticmethod
     def get_topology(name):
-        _query = topology_mongo.find(query_dict={'name': name}, fileds={'_id': 0})
+        _query = topology_mongo.find(query_dict={'name': name}, fields={'_id': 0})
         if _query:
             return _query[0]
         return []
 
     @staticmethod
     def topology_ops(data):
-        _query = topology_mongo.find(query_dict={'name': data['name']}, fileds={'_id': 0})
+        _query = topology_mongo.find(query_dict={'name': data['name']}, fields={'_id': 0})
         if _query:
             topology_mongo.delete_many(query={'name': data['name']})
             topology_mongo.insert(data)
@@ -296,7 +296,7 @@ class MongoNetOps(object):
 
     @staticmethod
     def compliance_result(**kwargs):
-        res = compliance_mongo.find(query_dict=kwargs, fileds={'_id': 0})
+        res = compliance_mongo.find(query_dict=kwargs, fields={'_id': 0})
         return res
 
     @staticmethod
@@ -376,7 +376,7 @@ class MongoNetOps(object):
         # 先查系统预定义服务
         predefined_res = predefined_mongo.find(query_dict={"protocol": protocol, "hostip": hostip,
                                                            "dstport_start": start_port,
-                                                           "dstport_end": end_port}, fileds={'_id': 0})
+                                                           "dstport_end": end_port}, fields={'_id': 0})
         if predefined_res:
             return predefined_res[0]
         # 单个端口的情况下
@@ -387,7 +387,7 @@ class MongoNetOps(object):
                                                                  'dst-port-min': start_port,
                                                                  'protocol': protocol.lower()
                                                              }
-                                                         }}, fileds={'_id': 0})
+                                                         }}, fields={'_id': 0})
             if service_res:
                 return service_res[0]
         else:
@@ -398,7 +398,7 @@ class MongoNetOps(object):
                                                                  'dst-port-max': end_port,
                                                                  'protocol': protocol.lower()
                                                              }
-                                                         }}, fileds={'_id': 0})
+                                                         }}, fields={'_id': 0})
             if service_res:
                 return service_res[0]
 
@@ -427,7 +427,7 @@ class MongoNetOps(object):
                                                              'StartSrcPort': '1',
                                                              'EndSrcPort': '65535'
                                                          }
-                                                     }}, fileds={'_id': 0})
+                                                     }}, fields={'_id': 0})
         if service_res:
             return service_res[0]
 
@@ -438,7 +438,7 @@ class MongoNetOps(object):
         vendor = kwargs.get('vendor')
         hostip = kwargs.get('hostip')
         my_mongo = MongoOps(db='Automation', coll='hillstone_address')
-        res = my_mongo.find_re({"ip.ip": {"$regex": ipaddress}}, fileds={'_id': 0})
+        res = my_mongo.find_re({"ip.ip": {"$regex": ipaddress}}, fields={'_id': 0})
         my_mongo.close_client()
         return res
 
@@ -449,7 +449,7 @@ class MongoNetOps(object):
         params = {
             'location': {'$elemMatch': {'start': {'$lte': _ip.value}, 'end': {'$gte': _ip.value}}}}
         my_mongo = MongoOps(db='Automation', coll='layer3interface')
-        res = my_mongo.find(query_dict=params, fileds={'_id': 0})
+        res = my_mongo.find(query_dict=params, fields={'_id': 0})
         return list(set([x['hostip'] for x in res])) if res else []
 
     # 查询dnat归属
@@ -548,7 +548,7 @@ class MongoNetOps(object):
                 params = {
                     'local_ip': {'$elemMatch': {'start_int': {'$lte': _ip.value}, 'end_int': {'$gte': _ip.value}}}}
         my_mongo = MongoOps(db='Automation', coll='DNAT')
-        res_info = my_mongo.find(query_dict=params, fileds={'_id': 0})
+        res_info = my_mongo.find(query_dict=params, fields={'_id': 0})
         return res_info
 
     @staticmethod
@@ -591,7 +591,7 @@ class MongoNetOps(object):
         :return:
         """
         lldp_mongo = MongoOps(db='Automation', coll='LLDPTable')
-        query_tmp = lldp_mongo.find(query_dict=data, fileds={'_id': 0})
+        query_tmp = lldp_mongo.find(query_dict=data, fields={'_id': 0})
         if query_tmp:
             return query_tmp if isinstance(query_tmp, list) else []
         else:
@@ -606,10 +606,10 @@ class MongoNetOps(object):
         :return:
         """
         my_mongo = MongoOps(db='BasePlatform', coll='XunMi')
-        query_tmp = my_mongo.find(query_dict=data, fileds={'_id': 0}, sort='log_time')
+        query_tmp = my_mongo.find(query_dict=data, fields={'_id': 0}, sort='log_time')
         if query_tmp:
             data['log_time'] = query_tmp[-1]['log_time']
-            res = my_mongo.find(query_dict=data, fileds={'_id': 0}, sort='log_time')
+            res = my_mongo.find(query_dict=data, fields={'_id': 0}, sort='log_time')
             return res if isinstance(res, list) else []
         else:
             return []
@@ -623,10 +623,10 @@ class MongoNetOps(object):
         """
         my_mongo = MongoOps(db='BasePlatform', coll='XunMi')
         mongo_data = dict(server_ip_address=ipaddress)
-        tmp = my_mongo.find(query_dict=mongo_data, fileds={'_id': 0}, sort='log_time')
+        tmp = my_mongo.find(query_dict=mongo_data, fields={'_id': 0}, sort='log_time')
         if tmp:
             mongo_data['log_time'] = tmp[-1]['log_time']
-            res = my_mongo.find(query_dict=mongo_data, fileds={'_id': 0}, sort='log_time')
+            res = my_mongo.find(query_dict=mongo_data, fields={'_id': 0}, sort='log_time')
             if res:
                 for i in res:
                     # print(i)
@@ -692,7 +692,7 @@ class IpamOps(object):
     @staticmethod
     def get_total_ip():
         total_ip_mongo = MongoOps(db='Automation', coll='Total_ip_list')
-        res = total_ip_mongo.find(fileds={'_id': 0})
+        res = total_ip_mongo.find(fields={'_id': 0})
         if res:
             return res
         else:
@@ -803,7 +803,7 @@ class IpamOps(object):
     @staticmethod
     def get_bulk(coll):
         my_mongo = MongoOps(db='IPAMData', coll=coll)
-        res = my_mongo.find(fileds={'_id': 0})
+        res = my_mongo.find(fields={'_id': 0})
         if res:
             return res
         else:
@@ -891,7 +891,7 @@ class XunMiOps(object):
     @staticmethod
     def get_cmdb(data):
         my_mongo = MongoOps(db='XunMiData', coll='networkdevice')
-        res = my_mongo.find(query_dict=data, fileds={'_id': 0})
+        res = my_mongo.find(query_dict=data, fields={'_id': 0})
         if res:
             return res
         else:
@@ -928,12 +928,12 @@ class XunMiOps(object):
     @staticmethod
     def all_total_ip_list():
         xunmi_total_ip_mongo = MongoOps(db='XunMiData', coll='xunmi_total_ip')
-        return xunmi_total_ip_mongo.find(fileds={'_id': 0})
+        return xunmi_total_ip_mongo.find(fields={'_id': 0})
 
     @staticmethod
     def all_success_ip_list():
         xunmi_success_ip_mongo = MongoOps(db='XunMiData', coll='xunmi_success_ip')
-        return xunmi_success_ip_mongo.find(fileds={'_id': 0})
+        return xunmi_success_ip_mongo.find(fields={'_id': 0})
 
     @staticmethod
     def post_success_ip_list(data):
@@ -988,7 +988,7 @@ class XunMiOps(object):
     @staticmethod
     def total_server_ip():
         total_ip_mongo = MongoOps(db='XunMiData', coll='xunmi_total_ip')
-        res = total_ip_mongo.find(fileds={'_id': 0})
+        res = total_ip_mongo.find(fields={'_id': 0})
         if res:
             return res
         else:
@@ -1002,7 +1002,7 @@ class XunMiOps(object):
         data = dict(
             server_ip_address=server_ip,
         )
-        tmp = my_mongo.find_re(data, fileds={'_id': 0}, sort='log_time')
+        tmp = my_mongo.find_re(data, fields={'_id': 0}, sort='log_time')
         if tmp:
             res = tmp[-1]
 

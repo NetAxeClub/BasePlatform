@@ -248,7 +248,7 @@ class HillstoneProc(BaseConn):
         address_map = dict()
         address_res = address_mongo.find(
             query_dict=dict(
-                hostip=self.hostip), fileds={
+                hostip=self.hostip), fields={
                 "_id": 0})
         if address_res:
             for _addr in address_res:
@@ -286,7 +286,7 @@ class HillstoneProc(BaseConn):
                     # src_addr = ','.join(tmp_src_addr)
                     if 'object' in i['src_addr'].keys():
                         # src_addr = i['src_addr']['object']
-                        # _addr_res = address_mongo.find(query_dict=dict(address=src_addr, hostip=host), fileds={'_id': 0})
+                        # _addr_res = address_mongo.find(query_dict=dict(address=src_addr, hostip=host), fields={'_id': 0})
                         src_addr.append(dict(object=i['src_addr']['object']))
                         if i['src_addr']['object'] in address_map.keys():
                             _addr_res = address_map[i['src_addr']['object']]
@@ -564,7 +564,7 @@ class HillstoneProc(BaseConn):
                 for _ser_port in _servgroup:
                     # _tmp = service_mongo.find(
                     #     query_dict=dict(hostip=hostip, service=str(_ser_port['Service'])),
-                    #     fileds={"_id": 0, 'Port': 1, 'Protocol': 1})
+                    #     fields={"_id": 0, 'Port': 1, 'Protocol': 1})
                     if _ser_port['service'] in self.service_predefined_map.keys():
                         _tmp = self.service_predefined_map[_ser_port['service']]
                         for _sub_global_port in _tmp:
@@ -621,7 +621,7 @@ class HillstoneProc(BaseConn):
             # 判断是否服务
             elif i['SERVICE'] in self.service_map.keys():
                 # _global_port = service_mongo.find(query_dict=dict(hostip=hostip, service=str(i['SERVICE'])),
-                # fileds={"_id": 0, 'Port': 1, 'Protocol': 1})
+                # fields={"_id": 0, 'Port': 1, 'Protocol': 1})
                 _tmp = self.service_map[i['SERVICE']]
                 for _tmp_port in _tmp:
                     if all(k in _tmp_port for k in (
@@ -949,7 +949,7 @@ class HillstoneProc(BaseConn):
                                                    ) for x in _global_ip['range']])
                 elif i['TRANSTO_EIP']:
                     _tmp_int = layer3_mongo.find(
-                        query_dict={'interface': i['EGRESS_INTERFACE'], 'hostip': self.hostip}, fileds={'_id': 0})
+                        query_dict={'interface': i['EGRESS_INTERFACE'], 'hostip': self.hostip}, fields={'_id': 0})
                     if _tmp_int:
                         _tmp_int = _tmp_int[0]
                         _tmp_ip = IPNetwork('{}/{}'.format(_tmp_int['ipaddress'], _tmp_int['ipmask']))
@@ -1231,7 +1231,7 @@ class HillstoneProc(BaseConn):
         try:
             # 获取系统预定义服务集合
             service_predefined_res = service_predefined_mongo.find(query_dict=dict(hostip=self.hostip),
-                                                                   fileds={"_id": 0})
+                                                                   fields={"_id": 0})
             # 系统预定义服务映射集
             if service_predefined_res:
                 for _service_predefined in service_predefined_res:
@@ -1243,7 +1243,7 @@ class HillstoneProc(BaseConn):
                             _service_predefined]
             # 地址数据映射集
             # address_res = address_mongo.find(
-            #     query_dict=dict(hostip=self.hostip), fileds={"_id": 0})
+            #     query_dict=dict(hostip=self.hostip), fields={"_id": 0})
             # if address_res:
             #     for _addr in address_res:
             #         if _addr['name'] in self.address_map.keys():
@@ -1252,20 +1252,20 @@ class HillstoneProc(BaseConn):
             #             self.address_map[_addr['name']] = [_addr]
             # 服务组数据映射集 假设服务组不存在重名，直接map映射进字典
             # servgroup_res = servgroup_mongo.find(
-            #     query_dict=dict(hostip=self.hostip), fileds={"_id": 0})
+            #     query_dict=dict(hostip=self.hostip), fields={"_id": 0})
             # if servgroup_res:
             #     for _sergroup in servgroup_res:
             #         self.servgroup_map[_sergroup['servgroup']] = _sergroup['services']
             # 服务对象数据映射集 假设服务不存在重名，直接map映射进字典
             # service_res = service_mongo.find(
-            #     query_dict=dict(hostip=self.hostip), fileds={"_id": 0})
+            #     query_dict=dict(hostip=self.hostip), fields={"_id": 0})
             # if service_res:
             #     for _service in service_res:
             #         self.service_map[_service['name']] = _service['items']
 
             # slb_res = slb_server_mongo.find(
             #     query_dict=dict(
-            #         hostip=self.hostip), fileds={
+            #         hostip=self.hostip), fields={
             #         "_id": 0})
             # if slb_res:
             #     for _slb in slb_res:

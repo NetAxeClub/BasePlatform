@@ -106,13 +106,13 @@ class AsyncManager:
         return resp
 
     async def query_task(self, **kwargs):
-        r = await task_db.find(query_dict=kwargs, fileds={'_id': 0})
+        r = await task_db.find(query_dict=kwargs, fields={'_id': 0})
         res = Response(code=200, data=r, status='success', msg='success').dict()
         resp = jsonable_encoder(res)
         return resp
 
     async def all_task(self, query, page, page_size):
-        r, count = await task_db.page_query(query_dict=query, fileds={'_id': 0}, page_size=page_size, page=page)
+        r, count = await task_db.page_query(query_dict=query, fields={'_id': 0}, page_size=page_size, page=page)
         res = Response(code=200, results=r, status='success', msg='success', count=count).dict()
         resp = jsonable_encoder(res)
         return resp

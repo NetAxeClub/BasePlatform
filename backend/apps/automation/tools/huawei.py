@@ -125,7 +125,7 @@ class HuaweiProc(BaseConn):
                             dict(object=i['source-ip']['address-set']))
                         _tmp = address_mongo.find(
                             query_dict=dict(hostip=self.hostip, name=i['source-ip']['address-set']),
-                            fileds={'_id': 0, 'elements': 1})
+                            fields={'_id': 0, 'elements': 1})
                         if _tmp:
                             for element in _tmp:
                                 if isinstance(element['elements'], dict):
@@ -157,7 +157,7 @@ class HuaweiProc(BaseConn):
                                      for x in i['source-ip']['address-set']]
                         for add_set in i['source-ip']['address-set']:
                             _tmp = address_mongo.find(query_dict=dict(hostip=self.hostip, name=add_set),
-                                                      fileds={'_id': 0, 'elements': 1})
+                                                      fields={'_id': 0, 'elements': 1})
                             if _tmp:
                                 for element in _tmp:
                                     if isinstance(element['elements'], dict):
@@ -222,7 +222,7 @@ class HuaweiProc(BaseConn):
                             dict(object=i['destination-ip']['address-set']))
                         _tmp = address_mongo.find(
                             query_dict=dict(hostip=self.hostip, name=i['destination-ip']['address-set']),
-                            fileds={'_id': 0, 'elements': 1})
+                            fields={'_id': 0, 'elements': 1})
                         if _tmp:
                             for element in _tmp:
                                 if isinstance(element['elements'], dict):
@@ -254,7 +254,7 @@ class HuaweiProc(BaseConn):
                                      for x in i['destination-ip']['address-set']]
                         for add_set in i['destination-ip']['address-set']:
                             _tmp = address_mongo.find(query_dict=dict(hostip=self.hostip, name=add_set),
-                                                      fileds={'_id': 0, 'elements': 1})
+                                                      fields={'_id': 0, 'elements': 1})
                             if _tmp:
                                 for element in _tmp:
                                     if isinstance(element['elements'], dict):
@@ -1081,7 +1081,7 @@ class HuaweiProc(BaseConn):
                                 if 'address-set' in i['source-ip'].keys():
                                     _local_q = address_mongo.find(
                                         query_dict={'hostip': self.hostip, 'name': i['source-ip']['address-set']},
-                                        fileds={'_id': 0})
+                                        fields={'_id': 0})
                                     if _local_q:
                                         _items = _local_q[0]['elements']
                                         if isinstance(_items, dict):
@@ -1112,7 +1112,7 @@ class HuaweiProc(BaseConn):
                                 if 'address-set' in i['destination-ip'].keys():
                                     _local_q = address_mongo.find(
                                         query_dict={'hostip': self.hostip, 'name': i['destination-ip']['address-set']},
-                                        fileds={'_id': 0})
+                                        fields={'_id': 0})
                                     if _local_q:
                                         _items = _local_q[0]['elements']
                                         if isinstance(_items, dict):
@@ -1244,7 +1244,7 @@ class HuaweiProc(BaseConn):
                                 if action == 'nat-address-group' and i.get('nat-address-group'):
                                     _global_q = nat_address_mongo.find(
                                         query_dict={'hostip': self.hostip, 'name': i['nat-address-group']},
-                                        fileds={'_id': 0})
+                                        fields={'_id': 0})
                                     if _global_q:
                                         _items = _global_q[0]['section']
                                         if isinstance(_items, dict):
