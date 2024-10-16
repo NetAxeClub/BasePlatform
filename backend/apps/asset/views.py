@@ -27,8 +27,6 @@ from utils.cmdb_import import search_cmdb_vendor_id, search_cmdb_idc_id, search_
     search_cmdb_idc_model_id, search_cmdb_cabinet_id, search_cmdb_category_id, search_cmdb_attribute_id, \
     search_cmdb_framework_id, returndate, csv_device_staus, pandas_read_file, old_import_parse
 from utils.db.mongo_ops import MongoNetOps, MongoOps
-from ..users.models import UserProfile
-import openpyxl
 from openpyxl.utils import get_column_letter
 from rest_framework.decorators import action
 from urllib.parse import quote
@@ -40,7 +38,7 @@ if DEBUG:
 else:
     CELERY_QUEUE = 'config_backup'
 show_ip_mongo = MongoOps(db='Automation', coll='layer3interface')
-
+metric_mongo = MongoOps(db='metric', coll='level2')
 
 class ResourceManageExcelView(APIView):
     permission_classes = (AllowAny,)
@@ -182,6 +180,14 @@ class CmdbChart(APIView):
             result = {
                 "code": 200,
                 "data": cmdb_category_list
+            }
+            return JsonResponse(result, safe=False)
+        # 配置备份按日期分类
+        if 'config_backup' in get_params:
+            res = metric_mongo.find(query_dict={'name': 'config_backup_status'}, fileds={'_id': 0})
+            result = {
+                "code": 200,
+                "data": [[x['data'], x['log_time']] for x in res]
             }
             return JsonResponse(result, safe=False)
         # 设备维保日期
