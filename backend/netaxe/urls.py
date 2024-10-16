@@ -65,4 +65,5 @@ urlpatterns = [
     path(r'base_platform/topology/', include('apps.topology.urls'), name="topology"),
     path(r'base_platform/system/', include('apps.system.urls'), name="system"),
     path(r'base_platform/dcs_manage/', include('apps.dcs_control.urls'), name="dcs_control"),
+    path(r'base_platform/ipam/', include('apps.open_ipam.urls'), name="ipam"),
 ]
