@@ -184,7 +184,7 @@ class CmdbChart(APIView):
             return JsonResponse(result, safe=False)
         # 配置备份按日期分类
         if 'config_backup' in get_params:
-            res = metric_mongo.find(query_dict={'name': 'config_backup_status'}, fileds={'_id': 0})
+            res = metric_mongo.find(query_dict={'name': 'config_backup_status'}, fields={'_id': 0})
             result = {
                 "code": 200,
                 "data": [[x['data'], x['log_time']] for x in res]
@@ -738,9 +738,9 @@ class GatewayView(APIView):
         ip = request.GET.dict()['gateway_key']
         if pattern.search(ip):
             if ip.find('*') >= 0:
-                tmp = show_ip_mongo.find_re({'ipaddress': re.compile(ip.strip('*'))}, fileds={'_id': 0})
+                tmp = show_ip_mongo.find_re({'ipaddress': re.compile(ip.strip('*'))}, fields={'_id': 0})
             else:
-                tmp = show_ip_mongo.find(query_dict={'ipaddress': ip.strip()}, fileds={'_id': 0})
+                tmp = show_ip_mongo.find(query_dict={'ipaddress': ip.strip()}, fields={'_id': 0})
             if tmp:
                 hostlist = list(set([x['hostip'] for x in tmp]))
                 result = {
