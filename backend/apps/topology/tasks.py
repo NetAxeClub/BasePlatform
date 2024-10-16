@@ -55,21 +55,21 @@ class TopologyTask:
 
     # 根据设备IP和接口返回接口速率
     def foo_speed(self, hostip, interface_name):
-        tmp = interface_mongo.find(query_dict={"hostip": hostip, "interface": interface_name}, fileds={"_id": 0})
+        tmp = interface_mongo.find(query_dict={"hostip": hostip, "interface": interface_name}, fields={"_id": 0})
         speed = tmp[0]['speed'] if tmp else '1G'
         return self.speed_map[speed] if speed in self.speed_map.keys() else 1
 
     # 根据IP 和接口返回当前接口三层IP信息
     def foo_layer3_ip(self, hostip, interface_name):
-        tmp = layer3int_mongo.find(query_dict={"hostip": hostip, "interface": interface_name}, fileds={"_id": 0})
+        tmp = layer3int_mongo.find(query_dict={"hostip": hostip, "interface": interface_name}, fields={"_id": 0})
         # 如果没有IP，则查询是否聚合口，再查聚合口IP
         if not tmp:
             tmp_1 = lagg_mongo.find(query_dict={"hostip": hostip, "memberports": {"$in": [interface_name]}},
-                                    fileds={"_id": 0, "aggregroup": 1})
+                                    fields={"_id": 0, "aggregroup": 1})
             if tmp:
                 aggre_interface = tmp_1[0]['aggregroup']
                 tmp_2 = layer3int_mongo.find(query_dict={"hostip": hostip, "interface": aggre_interface},
-                                             fileds={"_id": 0})
+                                             fields={"_id": 0})
                 if tmp_2:
                     return aggre_interface + ' ' + tmp_2[0]['ipaddress'] + '/' + tmp_2[0]['ipmask'] if tmp else ''
         # print('tmp', tmp)
@@ -149,7 +149,7 @@ class TopologyTask:
         links = []
         # 遍历节点
         for node in nodes:
-            neighbor_q = lldp_mongo.find(query_dict={"hostip": node['manage_ip']}, fileds={"_id": 0})
+            neighbor_q = lldp_mongo.find(query_dict={"hostip": node['manage_ip']}, fields={"_id": 0})
             if neighbor_q:
                 # 遍历节点的LLDP信息
                 for _neighbor in neighbor_q:
@@ -257,7 +257,7 @@ class TopologyTask:
         # 完善/更新节点信息
         for host in self.host_q['nodes']:
             host['image'] = "AC.png"
-            tmp_info = cmdb_mongo.find(query_dict={"manage_ip": host['manage_ip']}, fileds={"_id": 0})
+            tmp_info = cmdb_mongo.find(query_dict={"manage_ip": host['manage_ip']}, fields={"_id": 0})
             if tmp_info:
                 tmp_info = tmp_info[0]
                 host['name'] = tmp_info['name']

@@ -334,19 +334,19 @@ def interface_used(device_ip=None):
         hosts = [device_ip]
     else:
         # 获取设备列表然后去重
-        host_list = interface_mongo.find(fileds={'_id': 0, 'hostip': 1})
+        host_list = interface_mongo.find(fields={'_id': 0, 'hostip': 1})
         # 所有待分析接口利用率的网络设备
         hosts = list(set([x['hostip'] for x in host_list]))
     for host in hosts:
         # 获取接口cmdb信息
         host_cmdb = cmdb_mongo.find(query_dict=dict(manage_ip=host, status=0),
-                                    fileds={'_id': 0, 'slot': 1, 'chassis': 1})
+                                    fields={'_id': 0, 'slot': 1, 'chassis': 1})
         chassis_res = list(set([x['chassis'] for x in host_cmdb]))
         slot_res = list(set([x['slot'] for x in host_cmdb]))
         # 获取接口2层列表
         tmp = interface_mongo.find(
             query_dict=dict(
-                hostip=host), fileds={
+                hostip=host), fields={
                 '_id': 0})
         # 获取接口speed去重后的指标
         speed_list = list(set([x['speed'] for x in tmp])
@@ -484,22 +484,22 @@ def standard_analysis_main():
     mac_kwargs = {'macaddress': re.compile('(\\w+-\\w+-\\w+)')}
     total_arp_tmp = arp_mongo.find_re(
         mac_kwargs,
-        fileds={
+        fields={
             '_id': 0,
             'ipaddress': 1})
     total_arp_res = [x['ipaddress'] for x in total_arp_tmp]
-    total_layer3ip_tmp = show_ip_mongo.find(fileds={'_id': 0, 'ipaddress': 1})
+    total_layer3ip_tmp = show_ip_mongo.find(fields={'_id': 0, 'ipaddress': 1})
     total_layer3ip_res = [x['ipaddress'] for x in total_layer3ip_tmp]
     public_scan_tmp = MongoOps(
         db='logs',
         coll='scan_port_res').find_re(
         mac_kwargs,
-        fileds={
+        fields={
             '_id': 0,
             'global_ip': 1})
     public_scan_res = [x['global_ip'] for x in public_scan_tmp]
     total_ip_tmp = list(set(total_arp_res)) + list(set(total_layer3ip_res)) + list(set(public_scan_res))
-    # total_ip_tmp = MongoOps(db='Automation', coll='ARPTable').find(fileds={'_id': 0, 'ipaddress': 1})
+    # total_ip_tmp = MongoOps(db='Automation', coll='ARPTable').find(fields={'_id': 0, 'ipaddress': 1})
     # total_ip_res = list(set([x['ipaddress'] for x in total_ip_tmp]))
     # result = OrderedDict()
     # # 多字典合并去重
@@ -534,7 +534,7 @@ def datas_to_cache():
 
     # cmdb 以 name 作为key
     def cmdb_to_cache():
-        cmdb_res = cmdb_mongo.find(query_dict={'status': 0}, fileds={'_id': 0, 'manage_ip': 1, 'name': 1})
+        cmdb_res = cmdb_mongo.find(query_dict={'status': 0}, fields={'_id': 0, 'manage_ip': 1, 'name': 1})
         cmdb_result = dict()
         cmdb_ip_result = dict()
         for _asset in cmdb_res:
@@ -564,7 +564,7 @@ def datas_to_cache():
     # arp 以 arp_ + ip 作为key
     def arp_to_cache():
         # arp_mongo = MongoOps(db='Automation', coll='ARPTable')
-        arp_res = arp_mongo.find(fileds={'_id': 0, 'log_time': 0})
+        arp_res = arp_mongo.find(fields={'_id': 0, 'log_time': 0})
         arp_result = dict()
         for _arp in arp_res:
             if _arp['ipaddress'] in arp_result.keys():
@@ -578,7 +578,7 @@ def datas_to_cache():
     def mac_to_cache():
         # mac_mongo = MongoOps(db='Automation', coll='MACTable')
         mac_res = mac_mongo.find(
-            fileds={
+            fields={
                 '_id': 0,
                 'idc_name': 1,
                 'interface': 1,
@@ -603,7 +603,7 @@ def datas_to_cache():
     # lagg 以 hostip aggregroup 作为key
     def lagg_to_cache():
         # lagg_mongo = MongoOps(db='Automation', coll='AggreTable')
-        lagg_res = lagg_mongo.find(fileds=tables['AggreTable'])
+        lagg_res = lagg_mongo.find(fields=tables['AggreTable'])
         lagg_result = dict()
         for _lagg in lagg_res:
             if _lagg['hostip'] + '_' + \
@@ -623,7 +623,7 @@ def datas_to_cache():
     # lldp 以 hostip local_interface 作为key
     def lldp_to_cache():
         # lldp_mongo = MongoOps(db='Automation', coll='LLDPTable')
-        lldp_res = lldp_mongo.find(fileds=tables['LLDPTable'])
+        lldp_res = lldp_mongo.find(fields=tables['LLDPTable'])
         lldp_result = dict()
         for _lldp in lldp_res:
             if _lldp['hostip'] + '_' + \
@@ -643,7 +643,7 @@ def datas_to_cache():
     # layer3interface以 hostip ipaddress 作为key
     def layer3interface_to_cache():
         # show_ip_mongo = MongoOps(db='Automation', coll='layer3interface')
-        show_ip_res = show_ip_mongo.find(fileds=tables['layer3interface'])
+        show_ip_res = show_ip_mongo.find(fields=tables['layer3interface'])
         show_ip_result = dict()
         for _show_ip in show_ip_res:
             if _show_ip['hostip'] + '_' + \
@@ -714,7 +714,7 @@ class MainIn:
     async def tracking_format(ip_address, hostip,
                               log_time, memberport, macaddress) -> None:
         hostinfo = cmdb_mongo.find(query_dict=dict(manage_ip=hostip, status=0),
-                                   fileds={'_id': 0, 'idc__name': 1, 'name': 1, 'serial_num': 1, 'idc_model__name': 1,
+                                   fields={'_id': 0, 'idc__name': 1, 'name': 1, 'serial_num': 1, 'idc_model__name': 1,
                                            'rack__name': 1, 'u_location_start': 1, 'u_location_end': 1})
         node_location = ','.join([str(
             x.get('idc_model__name')) +
@@ -904,12 +904,12 @@ def collect_device_main(**kwargs):
     logger.info('子任务执行结果查询结束')
     # 采集失败任务数量
     failed_logs_mongo = MongoOps(db='Automation', coll='collect_failed_logs')
-    failed_res = failed_logs_mongo.find(fileds={'_id': 0})  # type int
+    failed_res = failed_logs_mongo.find(fields={'_id': 0})  # type int
     failed_res_list = [x['ip'] for x in failed_res]
     # netconf 失败数
     failed_netconf_mongo = MongoOps(db='Automation', coll='netconf_failed')
     failed_netconf_res = failed_netconf_mongo.find(
-        fileds={'_id': 0})  # type int
+        fields={'_id': 0})  # type int
     failed_netconf_list = [x['ip'] for x in failed_netconf_res]
     # 结果发送微信、邮箱
     total_time = (time.time() - start_time) / 60
@@ -1085,7 +1085,7 @@ async def xunmi_operation(**kwargs):
                             else:
                                 lldp_res = lldp_mongo.find(
                                     query_dict=dict(hostip=lagg_res['hostip'], local_interface=port),
-                                    fileds={'_id': 0, 'neighborsysname': 1})
+                                    fields={'_id': 0, 'neighborsysname': 1})
                             if lldp_res:
                                 if lldp_res[0]['neighborsysname']:
                                     tmp_neighbor_ip = cache.get('cmdb_{}'.format(lldp_res[0]['neighborsysname']))
@@ -1096,7 +1096,7 @@ async def xunmi_operation(**kwargs):
                                         tmp_neighbor_ip = cmdb_mongo.find(
                                             query_dict=dict(
                                                 name=lldp_res[0]['neighborsysname'], status=0),
-                                            fileds={'_id': 0, 'manage_ip': 1})
+                                            fields={'_id': 0, 'manage_ip': 1})
                                     if tmp_neighbor_ip:
                                         neighbor_hostip = tmp_neighbor_ip[0]['manage_ip']
                                         _ip_res = cache.get(
@@ -1139,13 +1139,13 @@ async def xunmi_operation(**kwargs):
                         lldp_res = json.loads(lldp_res)
                         if lldp_res[0]['neighborsysname']:
                             tmp_neighbor_ip = cmdb_mongo.find(query_dict=dict(
-                                name=lldp_res[0]['neighborsysname'], status=0), fileds={'_id': 0, 'manage_ip': 1})
+                                name=lldp_res[0]['neighborsysname'], status=0), fields={'_id': 0, 'manage_ip': 1})
                             if tmp_neighbor_ip:
                                 # 需要把需要定位的IP和设备管理IP作为参数查询layer3interface，目的是校验
                                 neighbor_hostip = tmp_neighbor_ip[0]['manage_ip']
                                 _ip_res = show_ip_mongo.find(
                                     query_dict=dict(ipaddress=ip_address, hostip=neighbor_hostip),
-                                    fileds={'_id': 0})
+                                    fields={'_id': 0})
                                 if _ip_res:
                                     tmp_result.append(dict(host=arp['hostip'],
                                                            interface=arp['interface'],
@@ -1208,7 +1208,7 @@ def tracking_main():
     except Exception as e:
         logger.error("重建寻觅表索引失败:{}".format(str(e)))
     total_ip_mongo = MongoOps(db='Automation', coll='Total_ip_list')
-    total_ip_res = total_ip_mongo.find(fileds={'_id': 0})
+    total_ip_res = total_ip_mongo.find(fields={'_id': 0})
     for ip_address in range(0, len(total_ip_res), 20):
         # asyncio.run(tracking_sub(*total_ip_res[ip_address:ip_address + 20]))
         tracking_sub.apply_async(args=total_ip_res[ip_address:ip_address + 20], queue='xunmi', retry=True)
@@ -1226,7 +1226,7 @@ class AutomationMongo(object):
     @staticmethod
     def insert_path(hostip, fsm_flag, paths, version, hostname):
         my_mongo = MongoOps(db='Automation', coll='collect_textfsm_info')
-        tmp = my_mongo.find(query_dict=dict(ip=hostip), fileds={'_id': 0})
+        tmp = my_mongo.find(query_dict=dict(ip=hostip), fields={'_id': 0})
         if tmp:
             my_mongo.update(filter=dict(ip=hostip), update={"$set": {'fsm_flag': fsm_flag, 'hostname': hostname,
                                                                      'paths': paths, 'version': version}})
@@ -1254,7 +1254,7 @@ class AutomationMongo(object):
     @staticmethod
     def insert_support_netconf(hostip, vendor):
         netconf_mongo = MongoOps(db='Automation', coll='support_netconf')
-        tmp = netconf_mongo.find(query_dict=dict(ip=hostip), fileds={'_id': 0})
+        tmp = netconf_mongo.find(query_dict=dict(ip=hostip), fields={'_id': 0})
         if tmp:
             netconf_mongo.update(
                 filter=dict(
@@ -1274,7 +1274,7 @@ class AutomationMongo(object):
                 ip=hostip,
                 vendor=vendor,
                 msg=msg, exce=exce),
-            fileds={
+            fields={
                 '_id': 0})
         if tmp:
             netconf_mongo.delete_many(
@@ -1289,7 +1289,7 @@ class AutomationMongo(object):
     @staticmethod
     def get_support_netconf(hostip):
         netconf_mongo = MongoOps(db='Automation', coll='support_netconf')
-        tmp = netconf_mongo.find(query_dict=dict(ip=hostip), fileds={'_id': 0})
+        tmp = netconf_mongo.find(query_dict=dict(ip=hostip), fields={'_id': 0})
         if tmp:
             return True
         else:
@@ -2591,7 +2591,7 @@ class StandardFSMAnalysis(object):
         address_map = dict()
         address_res = address_mongo.find(
             query_dict=dict(
-                hostip=host), fileds={
+                hostip=host), fields={
                 "_id": 0})
         if address_res:
             for _addr in address_res:
@@ -2630,7 +2630,7 @@ class StandardFSMAnalysis(object):
                     # src_addr = ','.join(tmp_src_addr)
                     if 'object' in i['src_addr'].keys():
                         # src_addr = i['src_addr']['object']
-                        # _addr_res = address_mongo.find(query_dict=dict(address=src_addr, hostip=host), fileds={'_id': 0})
+                        # _addr_res = address_mongo.find(query_dict=dict(address=src_addr, hostip=host), fields={'_id': 0})
                         src_addr.append(dict(object=i['src_addr']['object']))
                         if i['src_addr']['object'] in address_map.keys():
                             _addr_res = address_map[i['src_addr']['object']]
@@ -2936,7 +2936,7 @@ class StandardFSMAnalysis(object):
             # 获取系统预定义服务集合
             service_predefined_name = []
             service_predefined_res = service_predefined_mongo.find(query_dict=dict(hostip=hostip),
-                                                                   fileds={"_id": 0})
+                                                                   fields={"_id": 0})
             # 系统预定义服务映射集
             service_predefined_map = dict()
             if service_predefined_res:
@@ -2950,7 +2950,7 @@ class StandardFSMAnalysis(object):
             # 地址数据映射集
             address_map = dict()
             address_res = address_mongo.find(
-                query_dict=dict(hostip=hostip), fileds={"_id": 0})
+                query_dict=dict(hostip=hostip), fields={"_id": 0})
             if address_res:
                 for _addr in address_res:
                     if _addr['name'] in address_map.keys():
@@ -2960,7 +2960,7 @@ class StandardFSMAnalysis(object):
             # 服务组数据映射集 假设服务组不存在重名，直接map映射进字典
             servgroup_map = dict()
             servgroup_res = servgroup_mongo.find(
-                query_dict=dict(hostip=hostip), fileds={"_id": 0})
+                query_dict=dict(hostip=hostip), fields={"_id": 0})
             if servgroup_res:
                 for _sergroup in servgroup_res:
                     servgroup_map[_sergroup['servgroup']
@@ -2968,7 +2968,7 @@ class StandardFSMAnalysis(object):
             # 服务对象数据映射集 假设服务不存在重名，直接map映射进字典
             service_map = dict()
             service_res = service_mongo.find(
-                query_dict=dict(hostip=hostip), fileds={"_id": 0})
+                query_dict=dict(hostip=hostip), fields={"_id": 0})
             if service_res:
                 for _service in service_res:
                     service_map[_service['name']] = _service['items']
@@ -2976,7 +2976,7 @@ class StandardFSMAnalysis(object):
             slb_map = dict()
             slb_res = slb_server_mongo.find(
                 query_dict=dict(
-                    hostip=hostip), fileds={
+                    hostip=hostip), fields={
                     "_id": 0})
             if slb_res:
                 for _slb in slb_res:
@@ -3115,7 +3115,7 @@ class StandardFSMAnalysis(object):
                     for _ser_port in _servgroup:
                         # _tmp = service_mongo.find(
                         #     query_dict=dict(hostip=hostip, service=str(_ser_port['Service'])),
-                        #     fileds={"_id": 0, 'Port': 1, 'Protocol': 1})
+                        #     fields={"_id": 0, 'Port': 1, 'Protocol': 1})
                         if _ser_port['service'] in service_predefined_map.keys():
                             _tmp = service_predefined_map[_ser_port['service']]
                             for _sub_global_port in _tmp:
@@ -3172,7 +3172,7 @@ class StandardFSMAnalysis(object):
                 # 判断是否服务
                 elif i['SERVICE'] in service_map.keys():
                     # _global_port = service_mongo.find(query_dict=dict(hostip=hostip, service=str(i['SERVICE'])),
-                    # fileds={"_id": 0, 'Port': 1, 'Protocol': 1})
+                    # fields={"_id": 0, 'Port': 1, 'Protocol': 1})
                     _tmp = service_map[i['SERVICE']]
                     for _tmp_port in _tmp:
                         if all(k in _tmp_port for k in (
@@ -3705,7 +3705,7 @@ class StandardFSMAnalysis(object):
                         src_addr.append(
                             dict(object=i['source-ip']['address-set']))
                         _tmp = address_mongo.find(query_dict=dict(hostip=host, name=i['source-ip']['address-set']),
-                                                  fileds={'_id': 0, 'elements': 1})
+                                                  fields={'_id': 0, 'elements': 1})
                         if _tmp:
                             for element in _tmp:
                                 if isinstance(element['elements'], dict):
@@ -3737,7 +3737,7 @@ class StandardFSMAnalysis(object):
                                      for x in i['source-ip']['address-set']]
                         for add_set in i['source-ip']['address-set']:
                             _tmp = address_mongo.find(query_dict=dict(hostip=host, name=add_set),
-                                                      fileds={'_id': 0, 'elements': 1})
+                                                      fields={'_id': 0, 'elements': 1})
                             if _tmp:
                                 for element in _tmp:
                                     if isinstance(element['elements'], dict):
@@ -3801,7 +3801,7 @@ class StandardFSMAnalysis(object):
                         dst_addr.append(
                             dict(object=i['destination-ip']['address-set']))
                         _tmp = address_mongo.find(query_dict=dict(hostip=host, name=i['destination-ip']['address-set']),
-                                                  fileds={'_id': 0, 'elements': 1})
+                                                  fields={'_id': 0, 'elements': 1})
                         if _tmp:
                             for element in _tmp:
                                 if isinstance(element['elements'], dict):
@@ -3833,7 +3833,7 @@ class StandardFSMAnalysis(object):
                                      for x in i['destination-ip']['address-set']]
                         for add_set in i['destination-ip']['address-set']:
                             _tmp = address_mongo.find(query_dict=dict(hostip=host, name=add_set),
-                                                      fileds={'_id': 0, 'elements': 1})
+                                                      fields={'_id': 0, 'elements': 1})
                             if _tmp:
                                 for element in _tmp:
                                     if isinstance(element['elements'], dict):
@@ -4009,7 +4009,7 @@ class StandardFSMAnalysis(object):
                         src_addr.append(dict(object=src_item))
                         src_addr_res = address_mongo.find(
                             query_dict=dict(hostip=host, Name=src_item),
-                            fileds={'_id': 0, 'elements': 1})
+                            fields={'_id': 0, 'elements': 1})
                         if src_addr_res:
                             for _src_addr in src_addr_res:
                                 if 'elements' not in _src_addr.keys():
@@ -4049,7 +4049,7 @@ class StandardFSMAnalysis(object):
                     src_addr_res = address_mongo.find(
                         query_dict=dict(
                             hostip=host, Name=i['SrcAddrList']['SrcAddrItem']),
-                        fileds={'_id': 0, 'elements': 1})
+                        fields={'_id': 0, 'elements': 1})
                     if src_addr_res:
                         for _src_addr in src_addr_res:
                             if 'elements' not in _src_addr.keys():
@@ -4091,7 +4091,7 @@ class StandardFSMAnalysis(object):
                         dst_addr.append(dict(object=dst_item))
                         dst_addr_res = address_mongo.find(
                             query_dict=dict(hostip=host, Name=dst_item),
-                            fileds={'_id': 0, 'elements': 1})
+                            fields={'_id': 0, 'elements': 1})
                         if dst_addr_res:
                             for _dst_addr in dst_addr_res:
                                 if 'elements' not in _dst_addr.keys():
@@ -4131,7 +4131,7 @@ class StandardFSMAnalysis(object):
                     dst_addr_res = address_mongo.find(
                         query_dict=dict(
                             hostip=host, Name=i['DestAddrList']['DestAddrItem']),
-                        fileds={'_id': 0, 'elements': 1})
+                        fields={'_id': 0, 'elements': 1})
                     if dst_addr_res:
                         for _dst_addr in dst_addr_res:
                             if 'elements' not in _dst_addr.keys():
