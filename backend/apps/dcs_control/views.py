@@ -100,7 +100,7 @@ class AddressSet(APIView):
                 return HttpResponse(res, content_type="application/json")
             elif get_param['vendor'] == 'Hillstone':
                 _res = MongoOps(db='Automation', coll='hillstone_address') \
-                    .find(query_dict=dict(hostip=get_param['hostip']), fileds={'_id': 0})
+                    .find(query_dict=dict(hostip=get_param['hostip']), fields={'_id': 0})
                 if _res:
                     return JsonResponse({'results': _res, 'count': len(_res), 'code': 200})
                 else:

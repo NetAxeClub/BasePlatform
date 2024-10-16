@@ -59,9 +59,9 @@ class InterfaceView(APIView):
         if get_param.get('get_interface_by_hostip'):
             hostip = get_param['get_interface_by_hostip']
             layer3interface_res = show_ip_mongo.find(query_dict={'hostip': hostip},
-                                                     fileds={'interface': 1, 'line_status': 1, '_id': 0})
+                                                     fields={'interface': 1, 'line_status': 1, '_id': 0})
             layer2interface_res = interface_mongo.find(query_dict={'hostip': hostip},
-                                                       fileds={'interface': 1, 'status': 1, '_id': 0})
+                                                       fields={'interface': 1, 'status': 1, '_id': 0})
             tmp_res = [
                          {'name': x['interface'], 'status': x['line_status'].upper()} for x in layer3interface_res if layer3interface_res
                      ] + [

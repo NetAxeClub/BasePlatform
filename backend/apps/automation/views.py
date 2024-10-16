@@ -282,8 +282,8 @@ class XunMiView(APIView):
         mongo_data = dict()
         if get_param.get('get_interface_by_hostip'):
             hostip = get_param['get_interface_by_hostip']
-            layer3interface_res = show_ip_mongo.find(query_dict={'hostip': hostip}, fileds={'interface': 1})
-            layer2interface_res = interface_mongo.find(query_dict={'hostip': hostip}, fileds={'interface': 1})
+            layer3interface_res = show_ip_mongo.find(query_dict={'hostip': hostip}, fields={'interface': 1})
+            layer2interface_res = interface_mongo.find(query_dict={'hostip': hostip}, fields={'interface': 1})
             res = [x['interface'] for x in layer3interface_res if layer3interface_res] + [x['interface'] for x in
                                                                                           layer2interface_res if
                                                                                           layer2interface_res]
@@ -355,11 +355,11 @@ class XunMiView(APIView):
                 start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
                 end_time = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
                 mongo_data['log_time'] = {"$gte": start_time, "$lte": end_time}
-            query_tmp = xunmi_mongo.find(query_dict=mongo_data, fileds={'_id': 0}, sort='log_time')
+            query_tmp = xunmi_mongo.find(query_dict=mongo_data, fields={'_id': 0}, sort='log_time')
             if query_tmp:
                 mongo_data['log_time'] = query_tmp[-1]['log_time']
 
-                res = xunmi_mongo.find(query_dict=mongo_data, fileds={'_id': 0}, sort='log_time')
+                res = xunmi_mongo.find(query_dict=mongo_data, fields={'_id': 0}, sort='log_time')
                 for i in res:
                     i['log_time'] = i['log_time'].strftime("%Y-%m-%d %H:%M:%S")
                 result = {
@@ -385,14 +385,14 @@ class XunMiView(APIView):
                 start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
                 end_time = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
                 mongo_data['log_time'] = {"$gte": start_time, "$lte": end_time}
-            res = xunmi_mongo.find_page_query(fileds={'_id': 0}, sort='log_time',
+            res = xunmi_mongo.find_page_query(fields={'_id': 0}, sort='log_time',
                                               query_dict=mongo_data,
                                               page_size=int(get_param.get("limit")),
                                               page_num=int(get_param.get("start")) // 10)
             for i in res:
                 i['log_time'] = i['log_time'].strftime("%Y-%m-%d %H:%M:%S")
 
-            res_count = MongoOps(db='netops', coll='XunMi').find(fileds={'_id': 0}, sort='log_time',
+            res_count = MongoOps(db='netops', coll='XunMi').find(fields={'_id': 0}, sort='log_time',
                                                                  query_dict=mongo_data)
             result = {
                 "code": 200,
