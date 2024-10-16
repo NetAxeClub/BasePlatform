@@ -24,13 +24,13 @@ class TagsModelSerializer(ValidatedModelSerializer):
         # read_only_fields = ('created', 'modified')
 
 
-class TagCountSerializer(serializers.Serializer):
-    # id = serializers.IntegerField()
-    tag = serializers.CharField()
-    count = serializers.IntegerField()
-
-    class Meta:
-        model = IpAddress
+# class TagCountSerializer(serializers.Serializer):
+#     # id = serializers.IntegerField()
+#     tag = serializers.CharField()
+#     count = serializers.IntegerField()
+#
+#     class Meta:
+#         model = IpAddress
 
 
 class IpAddressSerializer(ValidatedModelSerializer):
