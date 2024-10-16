@@ -122,8 +122,7 @@ def config_backup(**kwargs):
     })
     msg_gateway_runner.send_wechat(channel='netdevops',
                                    content=f"配置备份推送完成\n变更配置文件数:{len(changed_files)}\n新增配置文件数:{len(untracked_files)}\ncommit:{commit}")
-    config_safe_baseline_check.apply_async(kwargs={}, queue=CELERY_QUEUE,
-                                           retry=True)
+    config_safe_baseline_check.apply_async(kwargs={}, queue=CELERY_QUEUE, retry=True)
     return
 
 
