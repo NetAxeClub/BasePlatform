@@ -56,7 +56,7 @@ class BatManMongo(object):
     @staticmethod
     def insert_failed_logs(hostip, device_type, info):
         my_mongo = MongoOps(db='Automation', coll='collect_failed_logs')
-        tmp = my_mongo.find(query_dict=dict(ip=hostip), fileds={'_id': 0})
+        tmp = my_mongo.find(query_dict=dict(ip=hostip), fields={'_id': 0})
         if tmp:
             my_mongo.update(filter=dict(ip=hostip), update={"$set": {'device_type': device_type, 'info': info}})
         else:

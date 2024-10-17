@@ -252,7 +252,7 @@ class HillstoneBase(object):
         host = kwargs['hostip']
         name = kwargs['edit_address_obj']['name']
         old_res = MongoOps(db='Automation', coll='hillstone_address').find(query_dict=dict(hostip=host, name=name),
-                                                                           fileds={'_id': 0})
+                                                                           fields={'_id': 0})
         if old_res:
             old_res = old_res[0]
             # print('old_res', old_res)
@@ -519,7 +519,7 @@ class HillstoneBase(object):
         host = kwargs['hostip']
         name = kwargs['edit_service_obj']['name']
         old_service_res = MongoOps(db='Automation', coll='hillstone_service') \
-            .find(query_dict=dict(hostip=host, name=name), fileds={'_id': 0})
+            .find(query_dict=dict(hostip=host, name=name), fields={'_id': 0})
         # print('old_service_res', old_service_res)
         if old_service_res:
             old_service_res = old_service_res[0]
