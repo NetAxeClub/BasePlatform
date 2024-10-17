@@ -217,7 +217,7 @@ class HuaweiUsgSecPolicyConf(object):
             addr_mongo = MongoOps(db='NETCONF', coll='huawei_usg_address_set')
             _res = addr_mongo.find(query_dict=dict(hostip=kwargs['hostip'],
                                                    name=kwargs['delete_address_obj']['name']),
-                                   fileds={'_id': 0})
+                                   fields={'_id': 0})
             if _res:
                 # 最终提交到设备的netconf数据
                 netconf_data = {
@@ -364,7 +364,7 @@ class HuaweiUsgSecPolicyConf(object):
             service_mongo = MongoOps(db='NETCONF', coll='huawei_usg_service_set')
             _res = service_mongo.find(query_dict=dict(hostip=kwargs['hostip'],
                                                       name=kwargs['delete_service_obj']['name']),
-                                      fileds={'_id': 0})
+                                      fields={'_id': 0})
             if _res:
                 # 最终提交到设备的netconf数据
                 netconf_data = {

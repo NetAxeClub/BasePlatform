@@ -194,7 +194,7 @@ class H3cProc(BaseConn):
                         _tmp_service_q = service_mongo.find(
                             query_dict={"hostip": self.hostip, "Name": _tmp,
                                         "InUse": "true"},
-                            fileds={'_id': 0})
+                            fields={'_id': 0})
                         for _tmp in _tmp_service_q:
                             if 'items' in _tmp.keys():
                                 for _item in _tmp['items']:
@@ -240,7 +240,7 @@ class H3cProc(BaseConn):
                         src_addr.append(dict(object=src_item))
                         src_addr_res = address_mongo.find(
                             query_dict=dict(hostip=self.hostip, Name=src_item),
-                            fileds={'_id': 0, 'ObjList': 1})
+                            fields={'_id': 0, 'ObjList': 1})
                         if src_addr_res:
                             for _src_addr in src_addr_res:
                                 if 'ObjList' not in _src_addr.keys():
@@ -284,7 +284,7 @@ class H3cProc(BaseConn):
                         dst_addr.append(dict(object=dst_item))
                         dst_addr_res = address_mongo.find(
                             query_dict=dict(hostip=self.hostip, Name=dst_item),
-                            fileds={'_id': 0, 'ObjList': 1})
+                            fields={'_id': 0, 'ObjList': 1})
                         if dst_addr_res:
                             for _dst_addr in dst_addr_res:
                                 if 'ObjList' not in _dst_addr.keys():

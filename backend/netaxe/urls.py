@@ -16,6 +16,7 @@ Including another URLconf
 from django.views.static import serve
 
 from netaxe import views, settings
+from netaxe.settings import discovered_apps
 # from drf_yasg import openapi
 from django.contrib import admin
 from django.urls import include, path, re_path
@@ -67,3 +68,12 @@ urlpatterns = [
     path(r'base_platform/dcs_manage/', include('apps.dcs_control.urls'), name="dcs_control"),
     path(r'base_platform/ipam/', include('apps.open_ipam.urls'), name="ipam"),
 ]
+
+if 'apps.support' in discovered_apps:
+    urlpatterns += [
+        path(r'base_platform/support/', include('apps.support.urls'), name="support"),
+    ]
+if 'apps.monitor' in discovered_apps:
+    urlpatterns += [
+        path(r'base_platform/monitor/', include('apps.monitor.urls'), name="monitor")
+    ]
