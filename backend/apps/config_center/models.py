@@ -12,6 +12,19 @@ class SupportVendor:
     )
 
 
+class ConfigComplianceRule(models.Model):
+    name = models.CharField(max_length=255, verbose_name="规则名", unique=True, null=False)
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children')
+
+    class Meta:
+        verbose_name = "配置合规规则表"
+        verbose_name_plural = verbose_name
+        db_table = 'config_compliance_rule'  # 通过db_table自定义数据表名
+
+    def __str__(self):
+        return self.name
+
+
 # 配置合规表
 class ConfigCompliance(models.Model):
     """配置合规"""
@@ -34,6 +47,7 @@ class ConfigCompliance(models.Model):
     is_repair = models.BooleanField(verbose_name="是否修正", null=False, default=False, blank=False)
     repair_cmds = models.TextField(verbose_name='修复命令', null=True, default='', blank=True)
     datetime = models.DateTimeField(auto_now=True, verbose_name='创建日期')
+    rule = models.ForeignKey(ConfigComplianceRule, on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
         return '%s-%s-%s' % (self.name, self.vendor, self.category)

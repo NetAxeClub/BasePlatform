@@ -1007,3 +1007,155 @@ class XunMiOps(object):
             res = tmp[-1]
 
         return res
+
+# IPAM操作集合
+class IpamMongoOps(object):
+    def __init__(self):
+        pass
+
+    # 获取全网IP数据
+    @staticmethod
+    def get_total_ip():
+        total_ip_mongo = MongoOps(db='Automation', coll='Total_ip_list')
+        res = total_ip_mongo.find(fileds={'_id': 0})
+        if res:
+            return res
+        else:
+            return False
+
+    # IPAM成功IP单条数据落库专用
+    @staticmethod
+    def post_success_ip(ip):
+        """
+        1、查询除log_time字段外，是否有完全匹配，如果有就只更新log_time字段, 如果log_time字段一致，则不进行任何操作
+        2、如果查询不到数据，则新增该字段
+        """
+        log_time = datetime.now().strftime("%Y-%m-%d")
+        my_mongo = MongoOps(db='IPAMData', coll='netops_ipam_success_ip')
+        query_tmp = my_mongo.find(query_dict={'success_ip': ip})
+        # print(query_tmp)
+        if query_tmp:
+            if query_tmp[0]['log_time'] != log_time:
+                return 'update', my_mongo.update(filter={'success_ip': ip}, update={"$set": {'log_time': log_time}})
+            else:
+                return 'equal no ops', None
+        else:
+            tmp = {}
+            tmp['log_time'] = log_time
+            tmp['success_ip'] = ip
+            return 'insert', my_mongo.insert(tmp)
+
+    # IPAM成功IP(list格式)批量写入
+    @staticmethod
+    def post_success_ip_bulk(success_ip_doc):
+        format_doc = []
+        for data in success_ip_doc:
+            tmp = {}
+            tmp['log_time'] = datetime.now().strftime("%Y-%m-%d")
+            tmp['success_ip'] = data
+            format_doc.append(tmp)
+
+        my_mongo = MongoOps(db='IPAMData', coll='netops_ipam_success_ip')
+        if len(format_doc) >= 1000:
+            my_mongo.delete()
+            my_mongo.insert_many(format_doc)
+        doc_num = my_mongo.count_documents()
+
+        return doc_num
+
+    # IPAM失败IP单条数据落库专用
+    @staticmethod
+    def post_fail_ip(ip):
+        """
+        1、查询除log_time字段外，是否有完全匹配，如果有就只更新log_time字段, 如果log_time字段一致，则不进行任何操作
+        2、如果查询不到数据，则新增该字段
+        """
+        log_time = datetime.now().strftime("%Y-%m-%d")
+        my_mongo = MongoOps(db='IPAMData', coll='netops_ipam_fail_ip')
+        query_tmp = my_mongo.find(query_dict={'fail_ip': ip})
+        # print(query_tmp)
+        if query_tmp:
+            if query_tmp[0]['log_time'] != log_time:
+                return 'update', my_mongo.update(filter={'fail_ip': ip}, update={"$set": {'log_time': log_time}})
+            else:
+                return 'equal no ops', None
+        else:
+            tmp = {}
+            tmp['log_time'] = log_time
+            tmp['fail_ip'] = ip
+            return 'insert', my_mongo.insert(tmp)
+
+    # IPAM失败IP(list格式)批量写入
+    @staticmethod
+    def post_fail_ip_bulk(fail_ip_doc):
+        format_doc = []
+        for data in fail_ip_doc:
+            tmp = {}
+            tmp['log_time'] = datetime.now().strftime("%Y-%m-%d")
+            tmp['success_ip'] = data
+            format_doc.append(tmp)
+
+        my_mongo = MongoOps(db='IPAMData', coll='ipam_fail_ip')
+        my_mongo.delete()
+        my_mongo.insert_many(format_doc)
+        doc_num = my_mongo.count_documents()
+
+        return doc_num
+
+    # IPAM更新IP单条数据落库专用
+    @staticmethod
+    def post_update_ip(ip):
+        """
+        1、查询除log_time字段外，是否有完全匹配，如果有就只更新log_time字段, 如果log_time字段一致，则不进行任何操作
+        2、如果查询不到数据，则新增该字段
+        """
+        log_time = datetime.now().strftime("%Y-%m-%d")
+        my_mongo = MongoOps(db='IPAMData', coll='netops_ipam_update_ip')
+        query_tmp = my_mongo.find(query_dict={'update_ip': ip})
+        # print(query_tmp)
+        if query_tmp:
+            if query_tmp[0]['log_time'] != log_time:
+                return 'update', my_mongo.update(filter={'update_ip': ip}, update={"$set": {'log_time': log_time}})
+            else:
+                return 'equal no ops', None
+        else:
+            tmp = {}
+            tmp['log_time'] = log_time
+            tmp['update_ip'] = ip
+            return 'insert', my_mongo.insert(tmp)
+
+    # IPAM批量读取coll内容，比如netops_ipam_success_ip、netops_ipam_fail_ip
+    @staticmethod
+    def get_bulk(coll):
+        my_mongo = MongoOps(db='IPAMData', coll=coll)
+        res = my_mongo.find(fileds={'_id': 0})
+        if res:
+            return res
+        else:
+            return False
+
+    # 获取指定coll的数据总数
+    @staticmethod
+    def get_coll_account(coll):
+        my_mongo = MongoOps(db='IPAMData', coll=coll)
+        doc_num = my_mongo.count_documents()
+        return doc_num
+
+    # 删除指定coll的所有数据
+    @staticmethod
+    def delet_coll(coll):
+        my_mongo = MongoOps(db='IPAMData', coll=coll)
+        my_mongo.delete()
+        return
+
+    # 插入同步phpipam失败的ip地址
+    @staticmethod
+    def insert_fail_ip(ip):
+        my_mongo = MongoOps(db='IPAMData', coll='sync_phpipam_fail_ip')
+        my_mongo.insert({"ip": ip})
+
+    # 插入同步phpipam失败的网段
+    @staticmethod
+    def insert_fail_subnet(subnet, e):
+        my_mongo = MongoOps(db='IPAMData', coll='sync_phpipam_fail_subnet')
+        my_mongo.insert({"subnet": subnet, 'reason': e})

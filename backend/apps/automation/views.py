@@ -412,6 +412,15 @@ class XunMiView(APIView):
 class SecMainView(APIView):
     def get(self, request):
         get_param = request.GET.dict()
+        if get_param.get("get_firewall_list"):
+            res = get_firewall_list()
+            result = {
+                "code": 200,
+                "count": 0,
+                "message": "success",
+                "results": res
+            }
+            return JsonResponse(result, safe=False)
         result = {
             "code": 400,
             "count": 0,
