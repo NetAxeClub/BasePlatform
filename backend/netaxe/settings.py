@@ -245,6 +245,15 @@ LOGGING = {
             "formatter": "standard",
             "encoding": "utf-8",
         },
+        "ipam": {
+            "level": "DEBUG",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": os.path.join(BASE_DIR, "logs", "ipam.log"),
+            "maxBytes": 1024 * 1024 * 10,  # 10 MB
+            "backupCount": 3,  # 最多备份3个
+            "formatter": "standard",
+            "encoding": "utf-8",
+        },
         'console': {
             'level': 'DEBUG',
             # 'filters': ['require_debug_true'],  # 只有在Django debug为True时才在屏幕打印日志
@@ -285,6 +294,10 @@ LOGGING = {
         },
         "automation": {
             "handlers": ["automation", "console"],
+            "level": "DEBUG",
+        },
+        "ipam": {
+            "handlers": ["ipam", "console"],
             "level": "DEBUG",
         },
         "bus_sync": {

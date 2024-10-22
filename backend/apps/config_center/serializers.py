@@ -13,7 +13,7 @@
 from rest_framework import serializers
 
 from .models import (
-    ConfigCompliance, ConfigTemplate, TTPTemplate, ConfigBackup, ConfigComplianceResult
+    ConfigCompliance, ConfigTemplate, TTPTemplate, ConfigBackup, ConfigComplianceResult, ConfigComplianceRule
 )
 
 
@@ -29,6 +29,14 @@ class ConfigBackupSerializer(serializers.ModelSerializer):
     class Meta:
         model = ConfigBackup
         fields = '__all__'
+
+
+class ConfigComplianceRuleSerializer(serializers.ModelSerializer):
+    children = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
+
+    class Meta:
+        model = ConfigComplianceRule
+        fields = ('id', 'name', 'children')
 
 
 # 配置合规表

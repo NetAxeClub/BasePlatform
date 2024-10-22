@@ -25,6 +25,7 @@ router.register(r'config_template', views.ConfigTemplateViewSet)
 router.register(r'ttp_template', views.TTPTemplateViewSet)
 router.register(r'config_backup', views.ConfigBackupViewSet)
 router.register(r'config_compliance_result', views.ConfigComplianceResultViewSet)
+router.register(r'config_compliance_rule', views.ConfigComplianceRuleViewSet)
 
 urlpatterns = [
     path(r'', include(router.urls)),

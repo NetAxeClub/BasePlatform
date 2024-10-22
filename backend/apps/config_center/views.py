@@ -92,6 +92,19 @@ class ConfigBackupViewSet(CustomViewBase):
         return self.queryset
 
 
+class ConfigComplianceRuleViewSet(CustomViewBase):
+    queryset = ConfigComplianceRule.objects.all().order_by('-id')
+    serializer_class = ConfigComplianceRuleSerializer
+
+
+    def get_queryset(self):
+        children = self.request.query_params.get('children', None)
+        if children is not None:
+            self.queryset = self.queryset.filter(children=children)
+        # compliance = ConfigCompliance.objects
+        return self.queryset
+
+
 # 配置合规表
 class ConfigComplianceViewSet(CustomViewBase):
     queryset = ConfigCompliance.objects.all().order_by('-id')
@@ -495,14 +508,24 @@ class ConfigFileView(APIView):
 
     def post(self, request):
         post_data = request.data
-        get_file_commit = _ConfigGit.get_file_content_by_commit(post_data['file_path'], post_data["commit"])
-        if get_file_commit:
-            data = {
-                "code": 200,
-                "results": get_file_commit,
-                "message": "success"
-            }
-            return JsonResponse(data)
+        if post_data["commit"]:
+            get_file_commit = _ConfigGit.get_file_content_by_commit(post_data['file_path'], post_data["commit"])
+            if get_file_commit:
+                data = {
+                    "code": 200,
+                    "results": get_file_commit,
+                    "message": "success"
+                }
+                return JsonResponse(data)
+        else:
+            with open(BASE_DIR + '/media/device_config/' + post_data['file_path'], "r") as f:
+                file_content = f.read()
+                data = {
+                    "code": 200,
+                    "results": file_content,
+                    "msg": "success"
+                }
+                return JsonResponse(data, safe=False)
         data = {
             "code": 400,
             "results": [],
