@@ -40,6 +40,7 @@ else:
 show_ip_mongo = MongoOps(db='Automation', coll='layer3interface')
 metric_mongo = MongoOps(db='metric', coll='level2')
 
+
 class ResourceManageExcelView(APIView):
     permission_classes = (AllowAny,)
     # permission_classes = ()
