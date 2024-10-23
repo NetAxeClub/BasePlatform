@@ -31,8 +31,20 @@ class ConfigBackupSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class ChildrenField(serializers.StringRelatedField):
+
+    def to_internal_value(self, value):
+        return value
+
+    def to_representation(self, value):
+        """
+        Serialize tagged objects to a simple textual representation.
+        """
+        return dict(id=value.id, name=value.name)
+
+
 class ConfigComplianceRuleSerializer(serializers.ModelSerializer):
-    children = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
+    children = ChildrenField(many=True, read_only=True)
 
     class Meta:
         model = ConfigComplianceRule
