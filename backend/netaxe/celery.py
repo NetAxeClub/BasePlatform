@@ -23,7 +23,7 @@ from django.conf import settings
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'netaxe.settings')
 
 app = Celery('netaxe')
-
+app.config_from_object(dict(result_extended=True))
 app.conf.ONCE = {
   'backend': 'celery_once.backends.Redis',
   'settings': {
