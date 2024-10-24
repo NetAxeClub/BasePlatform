@@ -5,7 +5,7 @@ from rest_framework_extensions.routers import (
 from .views import (
     CollectionPlanViewSet, CollectionRuleViewSet,
     CollectionMatchRuleViewSet, VueCollectionRule, AutomationInventoryViewSet, AutoVarsViewSet,
-    AutoFlowViewSet, AutomationChart, XunMiView, SecMainView)
+    AutoFlowViewSet, AutomationChart, XunMiView, SecMainView, DiagnoseView)
 app_name = 'automation'
 
 router = DefaultRouter()
@@ -21,5 +21,6 @@ urlpatterns = [
     path('collection_rule/', VueCollectionRule.as_view(), name="collection_rule"),
     path('automation_chart/', AutomationChart.as_view(), name="automation_chart"),
     path('address_location/', XunMiView.as_view(), name="address_location"),
-    path('sec_main/', SecMainView.as_view(), name="sec_main")
+    path('sec_main/', SecMainView.as_view(), name="sec_main"),
+    path('diagnose/', DiagnoseView.as_view(), name="diagnose")
 ]

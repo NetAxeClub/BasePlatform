@@ -253,7 +253,6 @@ class IpAmSubnetTreeView(APIView):
 # 地址操作 增删改查
 class IpAmHandelView(APIView):
     def post(self, request):
-        print("request", json.loads(request.body))
         request_data = json.loads(request.body)
         update = request_data.get('update')
         range_update = request_data.get('range_update')
