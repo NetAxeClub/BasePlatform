@@ -19,7 +19,8 @@ from apps.automation.serializers import (
     AutoFlowSerializer, AutomationInventorySerializer, AutoVarsSerializer)
 from apps.api.tools.custom_viewset_base import CustomViewBase
 from django.db.models import CharField, ForeignKey, GenericIPAddressField
-from utils.db.mongo_ops import MongoOps
+from apps.automation.tasks import DiagnoseProc
+from utils.db.mongo_ops import MongoOps, MongoNetOps
 from driver import auto_driver_map
 from .tools.models_api import get_firewall_list
 
@@ -334,7 +335,16 @@ class XunMiView(APIView):
                     {
                         'title': '记录时间',
                         'key': 'log_time'
-                    }, ]
+                    },
+                    {
+                        'title': '归属人',
+                        'key': 'server_admin'
+                    },
+                    {
+                        'title': '业务线',
+                        'key': 'server_department'
+                    },
+                ]
             }
             return JsonResponse(result, safe=False)
         # 最近一次结果
@@ -432,3 +442,25 @@ class SecMainView(APIView):
         pass
 
 
+class DiagnoseView(APIView):
+    def get(self, request):
+        get_param = request.GET.dict()
+        if 'server_ip_address' in get_param.keys():
+            _DiagnoseProc = DiagnoseProc(get_param['server_ip_address'])
+            xunmi_res = _DiagnoseProc.get_xunmi()
+            manage_ip = xunmi_res[0]['node_ip']
+            name = xunmi_res[0]['node_hostname']
+            cmdb_res = _DiagnoseProc.get_cmdb(manage_ip)
+            log_res = _DiagnoseProc.get_log(manage_ip, name)
+            lldp_res = _DiagnoseProc.get_lldp(manage_ip)
+            result = {
+                "code": 200,
+                "results": {
+                    'xunmi': xunmi_res,
+                    'cmdb': cmdb_res,
+                    'log': log_res,
+                    'lldp': lldp_res
+                },
+                "count": 1
+            }
+            return JsonResponse(result, safe=False)

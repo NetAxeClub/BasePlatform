@@ -13,6 +13,8 @@ python3 manage.py makemigrations int_utilization
 python3 manage.py migrate int_utilization
 python3 manage.py makemigrations topology
 python3 manage.py migrate topology
+python3 manage.py makemigrations open_ipam
+python3 manage.py migrate open_ipam
 python3 manage.py makemigrations
 python3 manage.py migrate
 python3 manage.py init_asset # 资产初始化
