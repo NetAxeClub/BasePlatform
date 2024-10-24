@@ -10,6 +10,7 @@ django-celery-beat==2.7.0
 django-celery-results==2.3.1
 idna==3.4
 importlib-metadata==4.8.3
+elasticsearch==7.0.0
 jmespath==0.10.0
 jsonschema==2.6.0
 Mako==1.1.6

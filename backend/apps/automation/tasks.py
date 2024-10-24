@@ -44,7 +44,6 @@ from utils.connect_layer.auto_main import HuaweiS, HillstoneFsm
 from utils.db.mongo_ops import MongoOps, MongoNetOps, XunMiOps
 from driver import discovered_plugins
 
-
 logger = logging.getLogger('automation')
 
 
@@ -705,7 +704,7 @@ class MainIn:
                                                         'rack').prefetch_related('bind_ip', 'account').filter(
             status=0).values(
             'name', 'idc__name', 'serial_num', 'manage_ip', 'status', 'chassis', 'slot', 'idc_model__name',
-            'u_location_start', 'u_location_end','rack__name')
+            'u_location_start', 'u_location_end', 'rack__name')
         MongoNetOps.post_cmdb(all_devs)
         return
 
@@ -981,7 +980,6 @@ def collect_device_by_rule():
 
 
 async def xunmi_operation(**kwargs):
-
     start_time = time.time()
     ip_address = kwargs['ipaddress']
     log_time = kwargs.get('log_time')
@@ -4266,3 +4264,35 @@ class StandardFSMAnalysis(object):
             results.append(tmp)
         my_mongo.insert_many(results)
         return
+
+
+class DiagnoseProc(object):
+    def __init__(self, ip_address):
+        self.ip_address = ip_address
+
+    def get_xunmi(self):
+        res = MongoNetOps.get_ip_info(self.ip_address)
+        return res
+
+    def get_cmdb(self, manage_ip):
+        res = NetworkDevice.objects.filter(manage_ip=manage_ip).values()
+        return res
+
+    def get_log(self, manage_ip, name):
+        res = []
+        plugin = discovered_plugins.get('plugins.extensibles.elasticsearch')
+        if plugin is not None:
+            methods = sorted([x for x in plugin.__all__])
+            for method in methods:
+                if callable(eval("discovered_plugins.get('plugins.extensibles.elasticsearch').{}".format(method))):
+                    res += eval(
+                        "discovered_plugins.get('plugins.extensibles.elasticsearch').{}".format(method))(
+                        **dict(hostip=manage_ip, severity='', time_range='', hostname=name))
+        return res
+
+    def get_lldp(self, manage_ip):
+        res = lldp_mongo.find(query_dict=dict(hostip=manage_ip), fields={'_id': 0})
+        return res
+
+    def get_monitor(self, manage_ip):
+        pass
