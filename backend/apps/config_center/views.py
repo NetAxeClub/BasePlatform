@@ -5,8 +5,10 @@ import yaml
 import io
 import django_filters
 from jinja2 import Environment, StrictUndefined, exceptions
+from django.http import FileResponse
 from datetime import date, datetime
 from django.http import JsonResponse, StreamingHttpResponse
+from django.core.files.storage import default_storage
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from rest_framework.views import APIView
@@ -499,6 +501,12 @@ class ConfigFileView(APIView):
                 "message": "获取成功"
             }
             return JsonResponse(data)
+        # 暂时没调用上
+        if 'download_file' in get_params.keys():
+            f = _ConfigGit.get_file_all_change_commmit(file_path=get_params['file_path'])
+            response = FileResponse(f, content_type='application/octet-stream')
+            response['Content-Disposition'] = f'attachment; filename={get_params["download_file"]}'
+            return response
         data = {
             "code": 400,
             "results": [],
