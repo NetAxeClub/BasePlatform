@@ -4278,7 +4278,7 @@ class DiagnoseProc(object):
 
     def get_cmdb(self, manage_ip):
         res = NetworkDevice.objects.filter(manage_ip=manage_ip).values()
-        return res
+        return list(res)
 
     def get_log(self, manage_ip, name):
         res = []
