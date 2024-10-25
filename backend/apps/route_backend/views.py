@@ -21,9 +21,12 @@ from netaxe import settings
 from netaxe.celery import app
 from utils.sftp import SFTP
 from utils.crypt_pwd import CryptPwd
+from utils.db.mongo_ops import MongoOps
 from utils.connect_layer.NETCONF.h3c_netconf import H3CinfoCollection, H3CSecPath
 from utils.connect_layer.NETCONF.huawei_netconf import HuaweiUSG, HuaweiCollection
 from .serializers import CrontabSerializer, IntervalSerializer
+
+level2_mongo = MongoOps(db='metric', coll='level2')
 
 
 class QueryParamsKeyConstructor(DefaultKeyConstructor):
@@ -255,7 +258,29 @@ class AutomationChart(APIView):
                 'data': collection_plan_list
             }
             return JsonResponse(result, safe=False)
+        if "celery_task" in get_params:
+            celery_task_list = []
+            celery_task_queryset = TaskResult.objects.values("task_name", "status", "date_done").order_by('-date_done')[:100].annotate(sum_count=Count("task_name"))
+            for i in celery_task_queryset:
+                if i['task_name'] is not None:
+                    celery_task_list.append(i)
 
+            result = {
+                'code': 200,
+                'data': celery_task_list
+            }
+            return JsonResponse(result, safe=False)
+        if "config_backup" in get_params:
+            config_backup_task_list = []
+            config_backup_queryset = TaskResult.objects.filter(task_name="apps.config_center.tasks.config_backup").values("task_name", "status", "date_done").order_by('-date_done')[:100].annotate(sum_count=Count("task_name"))
+            for i in config_backup_queryset:
+                if i['task_name'] is not None:
+                    config_backup_task_list.append(i)
+            result = {
+                'code': 200,
+                'data': config_backup_task_list
+            }
+            return JsonResponse(result, safe=False)
 
 # 调度管理
 class DispatchManageView(View):
