@@ -31,6 +31,7 @@ from django.db import connections
 from datetime import datetime, date
 from confload.confload import config
 from apps.asset.models import NetworkDevice
+from apps.asset.serializers import NetworkDeviceSerializer
 from apps.automation.models import CollectionRule, CollectionMatchRule
 from apps.int_utilization.models import InterfaceUsed
 from apps.automation.tools.h3c import H3cProc
@@ -4277,8 +4278,14 @@ class DiagnoseProc(object):
         return res
 
     def get_cmdb(self, manage_ip):
-        res = NetworkDevice.objects.filter(manage_ip=manage_ip).values()
-        return list(res)
+        res = []
+        devices = NetworkDevice.objects.filter(manage_ip=manage_ip).values()
+        if devices:
+            for device in devices:
+                instance = NetworkDevice.objects.get(pk=device['id'])
+                serializer = NetworkDeviceSerializer(instance)
+                res.append(serializer.data)
+        return res
 
     def get_log(self, manage_ip, name):
         res = []
