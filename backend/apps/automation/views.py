@@ -453,13 +453,15 @@ class DiagnoseView(APIView):
             cmdb_res = _DiagnoseProc.get_cmdb(manage_ip)
             log_res = _DiagnoseProc.get_log(manage_ip, name)
             lldp_res = _DiagnoseProc.get_lldp(manage_ip)
+            alert_res = _DiagnoseProc.get_alert(manage_ip)
             result = {
                 "code": 200,
                 "results": {
                     'xunmi': xunmi_res,
                     'cmdb': cmdb_res,
                     'log': log_res,
-                    'lldp': lldp_res
+                    'lldp': lldp_res,
+                    'alert': alert_res
                 },
                 "count": 1
             }

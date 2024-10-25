@@ -16,6 +16,7 @@ import json
 import logging
 import math
 import re
+import requests
 import asyncio
 import time
 import traceback
@@ -28,6 +29,7 @@ from django_celery_results.models import TaskResult
 from django.core.cache import cache
 from django.db import connections
 from datetime import datetime, date
+from confload.confload import config
 from apps.asset.models import NetworkDevice
 from apps.automation.models import CollectionRule, CollectionMatchRule
 from apps.int_utilization.models import InterfaceUsed
@@ -4296,3 +4298,23 @@ class DiagnoseProc(object):
 
     def get_monitor(self, manage_ip):
         pass
+
+    def get_alert(self, manage_ip):
+        alert_server = config.service_dicovery('alert_gateway')
+        server_hosts = alert_server['hosts']
+        res = []
+        if server_hosts:
+            url = "http://{}:{}/alert_gateway/event/list".format(server_hosts[0]['ip'], server_hosts[0]['port'])
+            payload = {
+                "query": json.dumps({'hostip': manage_ip}),
+                "page": 1,
+                "page_size": 100,
+            }
+            headers = {
+                'Content-Type': 'application/json'
+            }
+
+            res = requests.request("GET", url, headers=headers, params=payload)
+            if res.status_code == 200:
+                return res.json()['results']
+        return res
