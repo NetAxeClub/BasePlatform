@@ -1,7 +1,6 @@
 import json
 from django.db import models
 from django.core.validators import MaxValueValidator, MinValueValidator
-from django.utils import timezone
 from utils.crypt_pwd import CryptPwd
 from simple_history.models import HistoricalRecords
 
@@ -412,7 +411,7 @@ class NetworkDevice(models.Model):
         verbose_name='机架位起始', default=0, validators=[MaxValueValidator(50), MinValueValidator(1)])
     u_location_end = models.IntegerField(
         verbose_name='机架位结束', default=0, validators=[MaxValueValidator(50), MinValueValidator(1)])
-    uptime = models.DateField(verbose_name='上线时间', null=True, default=timezone.now)
+    uptime = models.DateField(verbose_name='上线时间', null=True, auto_now_add=True)
     expire = models.DateField(verbose_name='维保日期', null=True, blank=True)
     memo = models.TextField(verbose_name='备注', null=True, default='', blank=True)
     status = models.PositiveSmallIntegerField(
