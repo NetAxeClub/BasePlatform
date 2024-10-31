@@ -617,7 +617,6 @@ class MongoNetOps(object):
     @staticmethod
     def get_ip_info(ipaddress):
         """
-        主要给讯飞云吴頔使用，引用在projs app的view中
         :param ipaddress:
         :return:
         """

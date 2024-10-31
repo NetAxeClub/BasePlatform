@@ -39,25 +39,25 @@ class ConfigCompliance(models.Model):
         ('mismatch-compliance', 'mismatch-compliance'),  # 不匹配-合规 反之 匹配-不合规
         # ('mismatch-non-compliance', 'mismatch-non-compliance'),  # 不匹配-不合规
     )
-    name = models.CharField(verbose_name='名称', max_length=50, null=False, unique=True)
+    # name = models.CharField(verbose_name='名称', max_length=50, null=False, unique=True)
     vendor = models.CharField(verbose_name='厂商', choices=SupportVendor.CHOICES, max_length=50, default='H3C')
-    category = models.CharField(verbose_name='类型', choices=CATEGORY_CHOICES, max_length=50, default='交换机')
+    # category = models.CharField(verbose_name='类型', choices=CATEGORY_CHOICES, max_length=50, default='交换机')
     pattern = models.CharField(verbose_name='模式', choices=MATCH_CHOICES, max_length=50, default='match-compliance')
     regex = models.TextField(verbose_name='表达式', null=False, default='', blank=False)
-    is_repair = models.BooleanField(verbose_name="是否修正", null=False, default=False, blank=False)
-    repair_cmds = models.TextField(verbose_name='修复命令', null=True, default='', blank=True)
+    # is_repair = models.BooleanField(verbose_name="是否修正", null=False, default=False, blank=False)
+    # repair_cmds = models.TextField(verbose_name='修复命令', null=True, default='', blank=True)
     datetime = models.DateTimeField(auto_now=True, verbose_name='创建日期')
-    rule = models.ForeignKey(ConfigComplianceRule, on_delete=models.CASCADE, null=True, blank=True)
+    rule = models.ForeignKey("ConfigComplianceRule", on_delete=models.CASCADE,
+                             null=True, blank=True, related_name='relate_compliance')
 
     def __str__(self):
-        return '%s-%s-%s' % (self.name, self.vendor, self.category)
+        return '%s-%s-%s' % (self.vendor, self.pattern, self.datetime)
 
     class Meta:
         verbose_name_plural = '配置合规表'
         verbose_name = '配置合规表'
         db_table = 'config_compliance'  # 通过db_table自定义数据表名
         indexes = [models.Index(fields=['vendor', ]),
-                   models.Index(fields=['category', ]),
                    models.Index(fields=['datetime', ])]
 
 
@@ -111,7 +111,7 @@ class ConfigBackup(models.Model):
     last_time = models.DateTimeField(verbose_name='备份时间', null=False, default=timezone.now)
     idc_name = models.CharField(verbose_name='机房', max_length=100, null=True, default='')
     model_name = models.CharField(verbose_name='型号', max_length=100, null=True, default='')
-    vendor_name = models.CharField(verbose_name='厂商', max_length=100, null=True, default='')
+    vendor = models.CharField(verbose_name='厂商', max_length=100, null=True, default='')
     file_path = models.CharField(verbose_name='文件路径', max_length=200, null=True, default='')
     commit = models.CharField(verbose_name='提交commit', max_length=200, null=True, default='')
     git_type = models.CharField(verbose_name='类型', max_length=200, null=True, default='', choices=type_choices)
@@ -136,9 +136,10 @@ class ConfigComplianceResult(models.Model):
     hostname = models.CharField(verbose_name="设备名", null=False, default='', max_length=200)
     vendor = models.CharField(verbose_name="厂商", null=False, default='', max_length=100)
     log_time = models.DateTimeField(verbose_name="检查时间", null=False, default=timezone.now)
-    rule = models.CharField(verbose_name="规则名", null=False, default='', max_length=200)
-    rule_id = models.IntegerField(verbose_name="规则id", null=False, default=0)
-    regex = models.TextField(verbose_name="正则表达式", null=False, default='', max_length=200)
+    rule = models.CharField(verbose_name="检查项", null=False, default='', max_length=200)
+    rule_id = models.IntegerField(verbose_name="检查项id", null=False, default=0)
+    # regex = models.TextField(verbose_name="正则表达式", null=False, default='')
+    # regex_result = models.TextField(verbose_name="正则表达式", null=False, default='')
 
     def __str__(self):
         return "{}-{}".format(self.manage_ip, self.log_time)
