@@ -95,15 +95,23 @@ class ConfigBackupViewSet(CustomViewBase):
 
 
 class ConfigComplianceRuleViewSet(CustomViewBase):
+    # queryset = ConfigComplianceRule.objects.filter(parent__isnull=True).order_by('-id')
     queryset = ConfigComplianceRule.objects.all().order_by('-id')
     serializer_class = ConfigComplianceRuleSerializer
-
+    pagination_class = LargeResultsSetPagination
+    # 配置搜索功能
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    filter_fields = ('name')
+    search_fields = ('name')
 
     def get_queryset(self):
+        # tree = self.request.query_params.get('tree', None)
+        # if tree is not None:
+        #     self.queryset = self.queryset.filter(parent__isnull=True)
         children = self.request.query_params.get('children', None)
         if children is not None:
             self.queryset = self.queryset.filter(children=children)
-        # compliance = ConfigCompliance.objects
+        compliance = ConfigCompliance.objects
         return self.queryset
 
 
@@ -127,7 +135,7 @@ class ConfigComplianceResultViewSet(CustomViewBase):
     # 配置搜索功能
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filter_fields = '__all__'
-    search_fields = ('manage_ip', 'hostname', 'rule')
+    search_fields = ('manage_ip', 'hostname', 'rule', 'rule_id')
 
 
 # 配置模板表

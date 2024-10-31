@@ -175,9 +175,10 @@ def push_file():
     if files:
         for file in files:
             repo.index.add(os.path.join(repo.working_tree_dir, file))
-        author = Actor("netaxe", "netaxe@example.com")
-        committer = Actor(log_time, "netops@example.com")
-        commit = repo.index.commit(f"automation commit by {log_time}", author=author, committer=committer)
+        # author = Actor("netaxe", "netaxe@example.com")
+        # committer = Actor(log_time, "netops@example.com")
+        # commit = repo.index.commit(f"automation commit by {log_time}", author=author, committer=committer)
+        commit = repo.index.commit(f"automation commit by {log_time}")
         if repo.remotes:
             for _origin in repo.remotes:
                 repo.remote(_origin.name).push()

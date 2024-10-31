@@ -48,7 +48,7 @@ class ConfigComplianceRuleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ConfigComplianceRule
-        fields = ('id', 'name', 'children')
+        fields = ('id', 'name', 'children', 'parent')
 
 
 # 配置合规表
