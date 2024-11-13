@@ -33,7 +33,7 @@ hostname = socket.gethostname()
 if not os.path.exists(log_path):
     os.mkdir(log_path)
 log = logging.getLogger(__name__)
-config.setup_logging(max_debug=True)
+config.setup_logging(max_debug=False)
 
 
 def register_server():
