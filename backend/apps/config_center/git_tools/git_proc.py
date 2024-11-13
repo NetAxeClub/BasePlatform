@@ -5,6 +5,7 @@ from git import Actor
 from git import Repo
 from pydriller import Repository
 from netaxe.settings import BASE_DIR
+from confload.confload import config
 repo_path = os.path.join(BASE_DIR, 'media/device_config')
 
 if not os.path.exists(os.path.join(BASE_DIR, 'media/device_config')):
@@ -175,10 +176,10 @@ def push_file():
     if files:
         for file in files:
             repo.index.add(os.path.join(repo.working_tree_dir, file))
-        # author = Actor("netaxe", "netaxe@example.com")
+        author = Actor(config.git_user, config.git_user_email)
         # committer = Actor(log_time, "netops@example.com")
         # commit = repo.index.commit(f"automation commit by {log_time}", author=author, committer=committer)
-        commit = repo.index.commit(f"automation commit by {log_time}")
+        commit = repo.index.commit(f"automation commit by {log_time}", author=author)
         if repo.remotes:
             for _origin in repo.remotes:
                 repo.remote(_origin.name).push()
