@@ -136,8 +136,7 @@ def config_safe_baseline_check(**kwargs):
     start_datetime = date.today().strftime('%Y-%m-%d') + ' 00:00:00'
     end_datetime = date.today().strftime('%Y-%m-%d') + ' 23:59:59'
     rules_q = ConfigCompliance.objects.all().values()
-    res = ConfigBackup.objects.filter(last_time__range=(start_datetime, end_datetime),
-                                      manage_ip='10.254.2.151').values()
+    res = ConfigBackup.objects.filter(last_time__range=(start_datetime, end_datetime)).values()
     for host_info in res:
         vendor = host_info['file_path'].split('/')[-1].split('-')[0]
         if vendor in vendor_map.keys():
