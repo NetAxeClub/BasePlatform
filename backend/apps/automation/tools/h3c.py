@@ -5,6 +5,7 @@
 # @File    : h3c.py
 # @Software: PyCharm
 import json
+import logging
 import math
 import re
 import time
@@ -21,6 +22,9 @@ from utils.wechat_api import send_msg_netops
 from .base_connection import BaseConn
 
 __all__ = ["H3cProc"]
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 def h3c_interface_format(interface):
@@ -777,13 +781,13 @@ class H3cProc(BaseConn):
                         manage_ip=self.hostip,
                         slot=int(i['slot'])).update(soft_version=i['version'],
                                                     model=Model.objects.get(name=i['board_type'],
-                                                                                 vendor__alias='H3C'))
+                                                                            vendor__alias='H3C'))
                 else:
                     NetworkDevice.objects.filter(
                         manage_ip=self.hostip,
                         slot=int(i['slot'])).update(soft_version=i['version'],
                                                     model=Model.objects.create(name=i['board_type'],
-                                                                                    vendor__alias='H3C'))
+                                                                               vendor__alias='H3C'))
         return
 
         # 文件解析映射
@@ -1521,7 +1525,8 @@ class H3cProc(BaseConn):
         }
         if isinstance(res, list):
             if not self.addr_set:
-                send_msg_netops("华三防火墙:{}\nSNAT拼接时没有查询到地址对象集，请调整采集方法调用顺序".format(self.hostip))
+                send_msg_netops(
+                    "华三防火墙:{}\nSNAT拼接时没有查询到地址对象集，请调整采集方法调用顺序".format(self.hostip))
             # if not self.nat_addr_groups:
             #     send_msg_netops("华三防火墙:{}\nSNAT拼接时没有查询NAT地址池，请调整采集方法调用顺序".format(self.hostip))
             for i in res:
@@ -1626,7 +1631,8 @@ class H3cProc(BaseConn):
                             end_int=IPAddress(_end).value,
                             result="{}-{}".format(_start, _end))]
                     else:
-                        send_msg_netops("华三防火墙:{}\nSNAT拼接时没有查询NAT地址池，请调整采集方法调用顺序".format(self.hostip))
+                        send_msg_netops(
+                            "华三防火墙:{}\nSNAT拼接时没有查询NAT地址池，请调整采集方法调用顺序".format(self.hostip))
                 if i.get('SrvObjGrpList'):
                     _server_obj = i['SrvObjGrpList']['ServiceIpObjGroup']
                     if isinstance(_server_obj, str):
@@ -1720,16 +1726,18 @@ class H3cProc(BaseConn):
                             except SessionCloseError as e:
                                 time.sleep(3)
                                 self.device.closed()
-                                device = H3CinfoCollection(host=self.netconf_params['ip'],
-                                                           user=self.netconf_params['username'],
-                                                           password=self.netconf_params['password'],
-                                                           timeout=600)
+                                self.device = H3CinfoCollection(host=self.netconf_params['ip'],
+                                                                user=self.netconf_params['username'],
+                                                                password=self.netconf_params['password'],
+                                                                timeout=600)
                                 time.sleep(3)
                                 NetworkDevice.objects.filter(manage_ip=self.hostip).update(l2vpn=False)
-                                print("设备:{}\nnetconf方法:{}\n不被设备支持\n{}".format(self.hostip, method, str(e)))
+                                logger.error(
+                                    "设备:{}\nnetconf方法:{}\n不被设备支持\n{}".format(self.hostip, method, str(e)))
                                 # send_msg_netops("设备:{}\nnetconf方法:{}\n不被设备支持\n{}".format(self.hostip, method, str(e)))
                             except Exception as e:
-                                print("设备:{}\nnetconf方法:{}\n执行过程中异常\n{}".format(self.hostip, method, str(e)))
+                                logger.error(
+                                    "设备:{}\nnetconf方法:{}\n执行过程中异常\n{}".format(self.hostip, method, str(e)))
                 if self.arp_datas:
                     MongoNetOps.insert_table(
                         db='Automation', hostip=self.hostip, datas=self.arp_datas, tablename='ARPTable')
@@ -1744,7 +1752,7 @@ class H3cProc(BaseConn):
                 self.device = H3CSecPath(host=self.netconf_params['ip'],
                                          user=self.netconf_params['username'],
                                          password=self.netconf_params['password'],
-                                         timeout=600)
+                                         timeout=600, device_params='h3c')
                 self.methods = json.loads(self.plan['netconf_method'])
                 if self.methods:
                     for method in self.methods:
@@ -1755,15 +1763,15 @@ class H3cProc(BaseConn):
                                 # print("netconf_method:{} ==> res:{}".format(method, str(res)))
                                 self._netconf_method_map(method, res)
                             except Exception as e:
-                                send_msg_netops("设备:{}\nnetconf方法:{}\n不被设备支持\n{}".format(self.hostip, method, str(e)))
-                                print("设备:{}\nnetconf方法:{}\n不被设备支持\n{}".format(self.hostip, method, str(e)))
-                                self.device.closed()
-                                device = H3CSecPath(host=self.netconf_params['ip'],
-                                                    user=self.netconf_params['username'],
-                                                    password=self.netconf_params['password'],
-                                                    timeout=600, device_params="hpcomware")
-                                res = class_method()
-                                self._netconf_method_map(method, res)
+                                logger.error(
+                                    "设备:{} netconf方法:{} 不被设备支持\n{}".format(self.hostip, method, str(e)))
+                                # self.device.closed()
+                                # self.device = H3CSecPath(host=self.netconf_params['ip'],
+                                #                          user=self.netconf_params['username'],
+                                #                          password=self.netconf_params['password'],
+                                #                          timeout=600, device_params="h3c")
+                                # res = class_method()
+                                # self._netconf_method_map(method, res)
                 if self.arp_datas:
                     MongoNetOps.insert_table(
                         db='Automation', hostip=self.hostip, datas=self.arp_datas, tablename='ARPTable')
@@ -1773,17 +1781,21 @@ class H3cProc(BaseConn):
                 if self.snat_data:
                     MongoNetOps.insert_table(db='Automation', hostip=self.hostip, datas=self.snat_data,
                                              tablename='SNAT')
-                self.device.closed()
+                try:
+                    self.device.closed()
+                except Exception as e:
+                    logger.error("连接已经被关闭")
             else:
                 print("未被识别的netconf连接类\n设备:{}\n类:{}".format(self.hostip, self.netconf_class))
 
     # netconf执行手动任务
     def manual_netconf_run(self, method):
-        print('执行netconf采集')
+        logger.info('执行netconf采集')
+
         device = H3CinfoCollection(host=self.netconf_params['ip'],
                                    user=self.netconf_params['username'],
                                    password=self.netconf_params['password'],
-                                   timeout=600)
+                                   timeout=600, device_params='h3c')
         class_method = getattr(device, method, None)
         if class_method:
             try:
@@ -1791,11 +1803,8 @@ class H3cProc(BaseConn):
                 print("netconf_method:{} ==> res:{}".format(method, str(res)))
                 self._netconf_method_map(method, res)
             except Exception as e:
-                print("设备:{}\nnetconf方法:{}\n不被设备支持\n{}".format(self.hostip, method, str(e)))
+                logger.error("设备:{}\nnetconf方法:{}\n不被设备支持\n{}".format(self.hostip, method, str(e)))
         device.closed()
-
-
-
 
 
 if __name__ == '__main__':
