@@ -67,7 +67,6 @@ class H3CNetconf(object):
          </netconf-state>
          """
         res = self.netconf_get(data=data)
-        # print(res['netconf-state']['capabilities'].keys())
         return res['netconf-state']['capabilities']['capability']
 
     def lock(self):
