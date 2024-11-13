@@ -1492,7 +1492,7 @@ class H3CinfoCollection(H3CNetconf):
         </top>
         '''
         try:
-            res = self.netconf_get(data_xml)['top']
+            res = self.netconf_get_bulk(data_xml)['top']
         except Exception as e:
             print(e)
             data_xml = '''
@@ -1884,6 +1884,7 @@ class H3CinfoCollection(H3CNetconf):
                     if a['IfIndex'] == b['IfIndex']:
                         a.update(Name=b['Name'])
         return routelist
+
 
 # 防火墙自动化
 class H3CSecPath(H3CNetconf):
@@ -2665,7 +2666,7 @@ class H3CSecPath(H3CNetconf):
                         </SecurityPolicies>
                         </top>
                         '''
-        res = self.netconf_get(data_xml)['top']
+        res = self.netconf_get_bulk(data_xml)['top']
         if 'SecurityPolicies' not in res.keys():
             return False
         if res:
@@ -3641,6 +3642,9 @@ class H3CSecPath(H3CNetconf):
         :param mode:
         :return:
         """
+        print('get_global_nat_policy mode:', self.netconf_dict['device_params']['name'])
+        if self.netconf_dict['device_params']['name'] == "hpcomware":
+            return []
         # 默认获取DNAT
         if mode == 'DNAT':
             TransMode = '1'  # DNAT
