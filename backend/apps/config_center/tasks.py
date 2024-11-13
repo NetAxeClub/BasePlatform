@@ -122,55 +122,55 @@ def config_backup(**kwargs):
     })
     msg_gateway_runner.send_wechat(channel='netdevops',
                                    content=f"配置备份推送完成\n变更配置文件数:{len(changed_files)}\n新增配置文件数:{len(untracked_files)}\ncommit:{commit}")
-    config_safe_baseline_check.apply_async(kwargs={}, queue=CELERY_QUEUE, retry=True)
+    config_compliance.apply_async(kwargs={}, queue=CELERY_QUEUE, retry=True)
     return
 
 
 # 配置合规检查
-@shared_task(base=AxeTask, once={'graceful': True})
-def config_safe_baseline_check(**kwargs):
-    vendor_map = {
-        'hp_comware': 'H3C',
-        'huawei': 'HUAWEI',
-    }
-    start_datetime = date.today().strftime('%Y-%m-%d') + ' 00:00:00'
-    end_datetime = date.today().strftime('%Y-%m-%d') + ' 23:59:59'
-    rules_q = ConfigCompliance.objects.all().values()
-    res = ConfigBackup.objects.filter(last_time__range=(start_datetime, end_datetime)).values()
-    for host_info in res:
-        vendor = host_info['file_path'].split('/')[-1].split('-')[0]
-        if vendor in vendor_map.keys():
-            rules = [x for x in rules_q if x['vendor'] == vendor_map[vendor]]
-            data_to_parse = default_storage.open(f"device_config/{host_info['file_path']}").read()
-            data_to_parse = data_to_parse.decode('utf-8')
-            # print(data_to_parse)
-            for rule in rules:
-                _data = {
-                    'compliance': '',
-                    'rule_id': rule['id'],
-                    'manage_ip': host_info['manage_ip'],
-                    'hostname': host_info['name'],
-                    'vendor': vendor_map[vendor],
-                    'rule': rule['name'],
-                    'regex': rule['regex'],
-                    'log_time': timezone.now()
-                }
-                _regex = rule['regex']
-                _pattern = rule['pattern']  # match-compliance  mismatch-compliance
-                _res = re.compile(pattern=_regex, flags=re.M).findall(string=data_to_parse)
-                # 匹配-合规 反之 不匹配-不合规
-                if _pattern == 'match-compliance':
-                    _data['compliance'] = '合规' if _res else '不合规'
-                # 不匹配-合规 反之 匹配-不合规
-                elif _pattern == 'mismatch-compliance':
-                    _data['compliance'] = '不合规' if _res else '合规'
-                res_query = ConfigComplianceResult.objects.filter(manage_ip=host_info['manage_ip'], rule_id=rule['id'])
-                # logger.debug('res_query', res_query)
-                if res_query:
-                    ConfigComplianceResult.objects.filter(manage_ip=host_info['manage_ip'], rule_id=rule['id']).update(
-                        **_data)
-                else:
-                    ConfigComplianceResult.objects.create(**_data)
+# @shared_task(base=AxeTask, once={'graceful': True})
+# def config_safe_baseline_check(**kwargs):
+#     vendor_map = {
+#         'hp_comware': 'H3C',
+#         'huawei': 'HUAWEI',
+#     }
+#     start_datetime = date.today().strftime('%Y-%m-%d') + ' 00:00:00'
+#     end_datetime = date.today().strftime('%Y-%m-%d') + ' 23:59:59'
+#     rules_q = ConfigCompliance.objects.all().values()
+#     res = ConfigBackup.objects.filter(last_time__range=(start_datetime, end_datetime)).values()
+#     for host_info in res:
+#         vendor = host_info['file_path'].split('/')[-1].split('-')[0]
+#         if vendor in vendor_map.keys():
+#             rules = [x for x in rules_q if x['vendor'] == vendor_map[vendor]]
+#             data_to_parse = default_storage.open(f"device_config/{host_info['file_path']}").read()
+#             data_to_parse = data_to_parse.decode('utf-8')
+#             # print(data_to_parse)
+#             for rule in rules:
+#                 _data = {
+#                     'compliance': '',
+#                     'rule_id': rule['id'],
+#                     'manage_ip': host_info['manage_ip'],
+#                     'hostname': host_info['name'],
+#                     'vendor': vendor_map[vendor],
+#                     'rule': rule['name'],
+#                     'regex': rule['regex'],
+#                     'log_time': timezone.now()
+#                 }
+#                 _regex = rule['regex']
+#                 _pattern = rule['pattern']  # match-compliance  mismatch-compliance
+#                 _res = re.compile(pattern=_regex, flags=re.M).findall(string=data_to_parse)
+#                 # 匹配-合规 反之 不匹配-不合规
+#                 if _pattern == 'match-compliance':
+#                     _data['compliance'] = '合规' if _res else '不合规'
+#                 # 不匹配-合规 反之 匹配-不合规
+#                 elif _pattern == 'mismatch-compliance':
+#                     _data['compliance'] = '不合规' if _res else '合规'
+#                 res_query = ConfigComplianceResult.objects.filter(manage_ip=host_info['manage_ip'], rule_id=rule['id'])
+#                 # logger.debug('res_query', res_query)
+#                 if res_query:
+#                     ConfigComplianceResult.objects.filter(manage_ip=host_info['manage_ip'], rule_id=rule['id']).update(
+#                         **_data)
+#                 else:
+#                     ConfigComplianceResult.objects.create(**_data)
 
 
 @shared_task(base=AxeTask, once={'graceful': True})
