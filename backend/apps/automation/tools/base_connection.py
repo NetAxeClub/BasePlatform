@@ -32,7 +32,7 @@ device_type_map = {
     "Mellanox": "mellanox",
     "centec": "cisco_ios",
     "Ruijie": "ruijie_os",
-    "Maipu": "ruijie_os",
+    "Maipu": "mypower",
     "Cisco": "cisco_ios",
 }
 # fsm解析器参数映射
@@ -260,6 +260,37 @@ class BaseConn:
             print(str(e))
             raise RuntimeError('[Error 4] Exception.{}'.format(str(e)))
         return paths
+
+    def send_commands(self, cmd: str):
+        content = ''
+        try:
+            with ConnectHandler(**self.netmiko_params) as dev_connection:
+                quit_cmd = {
+                    'H3C': 'quit',
+                    'Huawei': 'quit',
+                    'Hillstone': 'exit',
+                    'Ruijie': 'exit',
+                    'centec': 'exit',
+                    'Maipu': 'exit',
+                }
+                content += dev_connection.send_command(cmd)
+                if self.vendor_alias in quit_cmd.keys():
+                    dev_connection.cleanup(command=quit_cmd[self.vendor_alias])
+                dev_connection.disconnect()
+        except NetmikoAuthenticationException as e:  # 认证失败报错记录
+            print('[Error 1] Authentication failed.{}'.format(str(e)))
+            raise RuntimeError('[Error 1] Authentication failed.{}'.format(str(e)))
+        except NetmikoTimeoutException as e:  # 登录超时报错记录
+            print('[Error 2] Connection timed out.{}'.format(str(e)))
+            raise RuntimeError('[Error 2] Connection timed out.{}'.format(str(e)))
+        except ConfigInvalidException as e:  # 配置项错误
+            print('[Error 3] ConfigInvalidException.{}'.format(str(e)))
+            raise RuntimeError('[Error 3] ConfigInvalidException.{}'.format(str(e)))
+        except Exception as e:
+            # 采集失败的记录日志
+            print(str(e))
+            raise RuntimeError('[Error 4] Exception.{}'.format(str(e)))
+        return content
 
     # 执行数据解析  这里每个厂商的解析方式不一样，采用类的继承方式实现，父类只做定义
     def _collection_analysis(self, paths: list):
