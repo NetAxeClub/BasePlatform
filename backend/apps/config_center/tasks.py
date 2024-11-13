@@ -78,7 +78,8 @@ def config_backup(**kwargs):
                 model_name=host['model__name'],
                 git_type='change', commit='', file_path='', last_time=today
             )
-        elif host['manage_ip'] in success_host_list:
+        # elif host['manage_ip'] in success_host_list:
+        else:
             ConfigBackup.objects.create(
                 name=host['name'], manage_ip=host['manage_ip'],
                 config_status='SUCCESS',
@@ -86,7 +87,6 @@ def config_backup(**kwargs):
                 model_name=host['model__name'],
                 git_type='change', commit='', file_path=result[host['manage_ip']][0].filename, last_time=today
             )
-            # 开始配置合规检查
     for change_host in changed_files:
         hostip = change_host.split('/')[1]
         host_info = [host for host in hosts if host['manage_ip'] == hostip]
@@ -97,7 +97,7 @@ def config_backup(**kwargs):
                                         vendor=host_info[0]['vendor__alias'],
                                         model_name=host_info[0]['model__name'], last_time=today
                                         ).update(
-                config_status='SUCCESS', git_type='change', commit=commit, file_path=change_host
+                config_status='SUCCESS', git_type='change', commit=commit, file_path=change_host, last_time=today
             )
     for untracked_host in untracked_files:
         hostip = untracked_host.split('/')[1]
@@ -109,7 +109,7 @@ def config_backup(**kwargs):
                                         vendor=host_info[0]['vendor__alias'],
                                         model_name=host_info[0]['model__name'], last_time=today
                                         ).update(
-                config_status='SUCCESS', git_type='add', commit=commit, file_path=untracked_host
+                config_status='SUCCESS', git_type='add', commit=commit, file_path=untracked_host, last_time=today
             )
     config_mongo.insert({
         'name': 'config_backup_git_status',
