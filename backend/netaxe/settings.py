@@ -183,7 +183,7 @@ LOGGING = {
     },
     "handlers": {
         "db": {
-            "level": "DEBUG",
+            "level": "INFO",
             "class": "logging.handlers.RotatingFileHandler",
             "filename": os.path.join(BASE_DIR, "logs", "db.log"),
             "maxBytes": 1024 * 1024 * 10,  # 10 MB
@@ -192,7 +192,7 @@ LOGGING = {
             "encoding": "utf-8",
         },
         "server": {
-            "level": "DEBUG",
+            "level": "INFO",
             "class": "logging.handlers.RotatingFileHandler",
             "filename": os.path.join(BASE_DIR, "logs", "server.log"),
             "maxBytes": 1024 * 1024 * 10,  # 10 MB
@@ -201,7 +201,7 @@ LOGGING = {
             "encoding": "utf-8",
         },
         "websocket": {
-            "level": "DEBUG",
+            "level": "INFO",
             "class": "logging.handlers.RotatingFileHandler",
             "filename": os.path.join(BASE_DIR, "logs", "websocket.log"),
             "maxBytes": 1024 * 1024 * 10,  # 10 MB
@@ -219,7 +219,7 @@ LOGGING = {
             "encoding": "utf-8",
         },
         "celery": {
-            "level": "DEBUG",
+            "level": "INFO",
             "class": "logging.handlers.RotatingFileHandler",
             "filename": os.path.join(BASE_DIR, "logs", "celery.log"),
             "maxBytes": 1024 * 1024 * 10,  # 10 MB
@@ -228,7 +228,7 @@ LOGGING = {
             "encoding": "utf-8",
         },
         "middleware": {
-            "level": "DEBUG",
+            "level": "INFO",
             "class": "logging.handlers.RotatingFileHandler",
             "filename": os.path.join(BASE_DIR, "logs", "middleware.log"),
             "maxBytes": 1024 * 1024 * 10,  # 10 MB
@@ -237,7 +237,7 @@ LOGGING = {
             "encoding": "utf-8",
         },
         "automation": {
-            "level": "DEBUG",
+            "level": "INFO",
             "class": "logging.handlers.RotatingFileHandler",
             "filename": os.path.join(BASE_DIR, "logs", "automation.log"),
             "maxBytes": 1024 * 1024 * 10,  # 10 MB
@@ -246,7 +246,7 @@ LOGGING = {
             "encoding": "utf-8",
         },
         "ipam": {
-            "level": "DEBUG",
+            "level": "INFO",
             "class": "logging.handlers.RotatingFileHandler",
             "filename": os.path.join(BASE_DIR, "logs", "ipam.log"),
             "maxBytes": 1024 * 1024 * 10,  # 10 MB
@@ -255,7 +255,7 @@ LOGGING = {
             "encoding": "utf-8",
         },
         'console': {
-            'level': 'DEBUG',
+            'level': 'INFO',
             # 'filters': ['require_debug_true'],  # 只有在Django debug为True时才在屏幕打印日志
             'class': 'logging.StreamHandler',
             'formatter': 'standard'
@@ -265,50 +265,50 @@ LOGGING = {
         # 默认的logger应用如下配置# default日志
         '': {
             'handlers': ['console'],  # 上线之后可以把'console'移除
-            'level': 'DEBUG',
+            'level': 'INFO',
             'propagate': True,  # 向不向更高级别的logger传递
         },
         "server": {
             "handlers": ["server"],
-            "level": "DEBUG",
+            "level": "INFO",
         },
         "custom_middleware": {
             "handlers": ["middleware", "console"],
-            "level": "DEBUG",
+            "level": "INFO",
         },
         "websocket": {
             "handlers": ["websocket", "console"],
-            "level": "DEBUG",
+            "level": "INFO",
         },
         "webssh": {
             "handlers": ["webssh", "console"],
-            "level": "DEBUG",
+            "level": "INFO",
         },
         "django": {
             "handlers": ["server"],
-            "level": "DEBUG",
+            "level": "INFO",
         },
         "celery": {
             "handlers": ["celery"],
-            "level": "DEBUG",
+            "level": "INFO",
         },
         "automation": {
             "handlers": ["automation", "console"],
-            "level": "DEBUG",
+            "level": "INFO",
         },
         "ipam": {
             "handlers": ["ipam", "console"],
-            "level": "DEBUG",
+            "level": "INFO",
         },
         "bus_sync": {
             "handlers": ["server"],
-            "level": "DEBUG",
+            "level": "INFO",
         },
         # 数据库相关日志
         "django.db.backends": {
             "handlers": ['db'],
             "propagate": True,
-            "level": "DEBUG",
+            "level": "INFO",
         },
         'django.utils.autoreload': {
             'handlers': [],
