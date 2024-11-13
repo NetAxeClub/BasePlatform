@@ -1,16 +1,22 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, unicode_literals
+import os
 import re
 import time
 import asyncio
+import logging
 from datetime import datetime, date, timedelta
 from celery import shared_task
 from django.template import loader
 from netaxe.celery import AxeTask
 from netaxe.settings import DEBUG
 from django.utils import timezone
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
+from netaxe.settings import BASE_DIR
+from django.db import connections
+from apps.automation.tools.base_connection import BaseConn
 from apps.automation.tools.model_api import get_device_info_v2
-# from apps.config_center.compliance import config_file_verify
 from apps.config_center.config_parse.config_parse import config_file_parse
 from apps.config_center.git_tools.git_proc import push_file
 from apps.config_center.my_nornir import config_backup_nornir
@@ -19,7 +25,10 @@ from django.core.files.storage import default_storage
 from utils.db.mongo_ops import MongoOps
 from service_mesh import msg_gateway_runner
 
+logger = logging.getLogger('automation')
 config_mongo = MongoOps(db='metric', coll='level2')
+BACKUP_PATH = BASE_DIR + '/media/device_config/current-configuration'
+
 
 if DEBUG:
     CELERY_QUEUE = 'dev'
@@ -80,6 +89,7 @@ def config_backup(**kwargs):
             )
         # elif host['manage_ip'] in success_host_list:
         else:
+            print(result)
             ConfigBackup.objects.create(
                 name=host['name'], manage_ip=host['manage_ip'],
                 config_status='SUCCESS',
@@ -246,4 +256,136 @@ def config_compliance(**kwargs):
                                 ConfigComplianceResult.objects.create(**_data)
 
 
+@shared_task(base=AxeTask, once={'graceful': True})
+def backup_device_config_sub(**kwargs):
+    connections.close_all()
+    today = kwargs['today']
+    command_map = {
+        'H3C': {'cmd': 'display current-configuration', 'expect_string': None, 'enable': False},
+        'Huawei': {'cmd': 'display current-configuration', 'expect_string': None, 'enable': False},
+        'Mellanox': {'cmd': 'show running-config', 'expect_string': None, 'enable': True},
+        'Ruijie': {'cmd': 'show running-config', 'expect_string': None, 'enable': False},
+        'centec': {'cmd': 'show running-config', 'expect_string': None, 'enable': False},
+        'Hillstone': {'cmd': 'show configuration running', 'expect_string': None, 'enable': False},
+        'inspur': {'cmd': 'show running-config', 'expect_string': None, 'enable': False},
+        'Cisco': {'cmd': 'show running-config', 'expect_string': None, 'enable': False},
+        'Maipu': {'cmd': 'show running-config', 'expect_string': ']'},
+    }
+    hostip = kwargs['manage_ip']  # 设备管理IP地址
+    if hostip == '0.0.0.0':
+        return {}
+    class_instance = BaseConn(**kwargs)
+    try:
+        content = class_instance.send_commands(cmd=command_map[kwargs['vendor__alias']]['cmd'])
+        filename = f"{BACKUP_PATH}/{hostip}/{hostip}.txt"
+        if not os.path.exists(f"{BACKUP_PATH}/{hostip}"):
+            os.makedirs(f"{BACKUP_PATH}/{hostip}")
+        path = default_storage.save(filename, ContentFile(content))
+        ConfigBackup.objects.create(
+            name=kwargs['name'], manage_ip=hostip,
+            config_status='SUCCESS',
+            status=kwargs['status'], idc_name=kwargs['idc__name'], vendor=kwargs['vendor__alias'],
+            model_name=kwargs['model__name'],
+            git_type='change', commit='', file_path=path, last_time=today
+        )
+    except RuntimeError as e:
+        ConfigBackup.objects.create(
+            name=kwargs['name'], manage_ip=hostip,
+            config_status='FAILED',
+            status=kwargs['status'], idc_name=kwargs['idc__name'], vendor=kwargs['vendor__alias'],
+            model_name=kwargs['model__name'],
+            git_type='change', commit='', file_path='', last_time=today
+        )
+        path = str(e)
+    return path
 
+
+@shared_task(base=AxeTask, once={'graceful': True})
+def backup_device_config(**kwargs):
+    log_time = datetime.now().strftime("%Y-%m-%d")
+    start_time = time.time()
+    today = timezone.now()
+    if kwargs:
+        hosts = get_device_info_v2(**kwargs)
+    else:
+        hosts = get_device_info_v2()
+
+    logger.info('获取所有设备信息结束')
+    # 参数初始化
+    net_tower_tasks = []  # 寻觅任务id集合
+    ping_result = []  # ping不通设备存储
+    start_time = time.time()
+    # 批量下发任务
+    for host in hosts:
+        # backup_device_config_sub(**host)
+        host['today'] = today
+        net_tower_tasks.append(
+            backup_device_config_sub.apply_async(
+                kwargs=host,
+                queue='config',
+                retry=True))
+
+    # 去除结果中的<EagerResult: None>
+    for task in net_tower_tasks:
+        if 'EagerResult' in str(type(task)):
+            logger.info("存在无效task")
+            net_tower_tasks.remove(task)
+
+    # 获取tasks任务数量
+    # net_tower_tasks_counters = len(net_tower_tasks)
+    # net_tower_tasks_bak = net_tower_tasks.copy()
+
+    # 等待子任务全部执行结束后执行下一步
+    while len(net_tower_tasks) != 0:
+        for i in net_tower_tasks:
+            try:
+                if i.ready():
+                    net_tower_tasks.remove(i)
+            except Exception as e:
+                logger.error(str(e))
+                net_tower_tasks.remove(i)
+        time.sleep(10)
+    logger.info('子任务全部执行结束')
+
+    # 配置解析
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(config_file_parse())
+
+    commit, changed_files, untracked_files = push_file()
+
+    for change_host in changed_files:
+        hostip = change_host.split('/')[1]
+        host_info = [host for host in hosts if host['manage_ip'] == hostip]
+        if host_info:
+            ConfigBackup.objects.filter(name=host_info[0]['name'], manage_ip=host_info[0]['manage_ip'],
+                                        status=host_info[0]['status'],
+                                        idc_name=host_info[0]['idc__name'],
+                                        vendor=host_info[0]['vendor__alias'],
+                                        model_name=host_info[0]['model__name'], last_time=today
+                                        ).update(
+                config_status='SUCCESS', git_type='change', commit=commit, file_path=change_host
+            )
+    for untracked_host in untracked_files:
+        hostip = untracked_host.split('/')[1]
+        host_info = [host for host in hosts if host['manage_ip'] == hostip]
+        if host_info:
+            ConfigBackup.objects.filter(name=host_info[0]['name'], manage_ip=host_info[0]['manage_ip'],
+                                        status=host_info[0]['status'],
+                                        idc_name=host_info[0]['idc__name'],
+                                        vendor=host_info[0]['vendor__alias'],
+                                        model_name=host_info[0]['model__name'], last_time=today
+                                        ).update(
+                config_status='SUCCESS', git_type='add', commit=commit, file_path=untracked_host
+            )
+
+    config_mongo.insert({
+        'name': 'config_backup_git_status',
+        'data': {
+            'change': len(changed_files),
+            'add': len(untracked_files),
+            'commit': commit
+        },
+        'log_time': log_time
+    })
+    config_compliance.apply_async(kwargs={}, queue=CELERY_QUEUE, retry=True)
+    return
