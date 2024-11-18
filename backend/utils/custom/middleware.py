@@ -126,7 +126,10 @@ def get_auth_user(token):
 class CorsMiddleWare(MiddlewareMixin):
     # 暂时注释掉，因为这样会导致admin后台无法登陆，因为很多原生的user model的方法无法模拟，所以注释
     def process_request(self, request):
-        if request.COOKIES.get('netops-token'):
+        if request.path.startswith('/admin/'):
+            """允许admin后台登录"""
+            pass
+        elif request.COOKIES.get('netops-token'):
             user = get_auth_user(parse.unquote(request.COOKIES['netops-token']))
             request.user = user
 
