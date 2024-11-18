@@ -89,7 +89,6 @@ def config_backup(**kwargs):
             )
         # elif host['manage_ip'] in success_host_list:
         else:
-            print(result)
             ConfigBackup.objects.create(
                 name=host['name'], manage_ip=host['manage_ip'],
                 config_status='SUCCESS',
@@ -277,7 +276,7 @@ def backup_device_config_sub(**kwargs):
     class_instance = BaseConn(**kwargs)
     try:
         content = class_instance.send_commands(cmd=command_map[kwargs['vendor__alias']]['cmd'])
-        filename = f"{BACKUP_PATH}/{hostip}/{hostip}.txt"
+        filename = f"{BACKUP_PATH}/{hostip}/{kwargs['vendor__alias']}_{hostip}.txt"
         if not os.path.exists(f"{BACKUP_PATH}/{hostip}"):
             os.makedirs(f"{BACKUP_PATH}/{hostip}")
         path = default_storage.save(filename, ContentFile(content))
@@ -387,5 +386,9 @@ def backup_device_config(**kwargs):
         },
         'log_time': log_time
     })
+    end_time = time.time()
+    time_use = int(int(end_time - start_time) / 60)
+    msg_gateway_runner.send_wechat(channel="netdevops",
+                                   content=f"配置备份完成，耗时:{time_use}分\n")
     config_compliance.apply_async(kwargs={}, queue=CELERY_QUEUE, retry=True)
     return
