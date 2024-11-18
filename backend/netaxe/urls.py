@@ -42,7 +42,8 @@ from rest_framework_simplejwt.views import (
 # )
 
 urlpatterns = [
-    path('admin/', admin.site.urls, name="admin"),
+    path('admin/login/', views.extend_admin_login),
+    path('admin/', admin.site.urls),
     # path('admin/login/', views.extend_admin_login, name="login"),
     re_path(r'^base_platform/media/(?P<path>.*)', serve, {"document_root": settings.MEDIA_ROOT}),
     # re_path(r'^captcha/', include('captcha.urls')),
