@@ -174,8 +174,8 @@ def push_file():
     untracked_files = repo.untracked_files
     files += untracked_files
     if files:
-        for file in files:
-            repo.index.add(os.path.join(repo.working_tree_dir, file))
+        gitfiles = [os.path.join(repo.working_tree_dir, x) for x in files]
+        repo.index.add(gitfiles)
         author = Actor(config.git_user, config.git_user_email)
         # committer = Actor(log_time, "netops@example.com")
         # commit = repo.index.commit(f"automation commit by {log_time}", author=author, committer=committer)
