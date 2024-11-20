@@ -8,13 +8,17 @@ from utils.db.mongo_ops import MongoNetOps, MongoOps
 from apps.dcs_control.jsonschema import single_json_validate
 from apps.dcs_control.json_validate.deny_by_addr_obj import deny_schema
 from apps.dcs_control.json_validate.address_schema import address_schema
-from apps.dcs_control.tasks import bulk_deny_by_address, address_set
+from apps.dcs_control.json_validate.dnat_schema import post_dnat_schema
+from apps.dcs_control.tasks import bulk_deny_by_address, address_set, config_dnat
+
 
 if DEBUG:
     CELERY_QUEUE = 'dev'
 else:
     CELERY_QUEUE = 'config'
 
+dnat_mongo = MongoOps(db='Automation', coll='hillstone_dnat')
+snat_mongo = MongoOps(db='Automation', coll='hillstone_snat')
 
 # 一键封堵
 class DenyByAddrObj(APIView):
@@ -154,5 +158,76 @@ class AddressSet(APIView):
                 return JsonResponse(msg, safe=False)
             return HttpResponse(json.dumps(dict(code=400, message='操作不被允许', data=[])),
                                 content_type="application/json")
+
+        return JsonResponse(dict(code=400, message='没有任何匹配'))
+
+
+class DestAddTranslate(APIView):
+    permission_classes = ()
+
+    authentication_classes = ()
+
+
+    def get(self, request):
+            get_param = request.GET.dict()
+            # print(get_param)
+            # 获取单个设备DNAT信息
+            if all(k in get_param for k in ("vendor", "hostip")):
+                if get_param['vendor'] == 'H3C':
+                    _FirewallMain = FirewallMain(get_param['hostip'])
+                    _res = _FirewallMain.get_h3c_global_dnat()
+                    if _res:
+                        return JsonResponse({'results': _res, 'count': len(_res),
+                                             'code': 200})
+                    else:
+                        return JsonResponse({'results': _res, 'count': len(_res),
+                                             'code': 400})
+                elif get_param['vendor'] == 'Huawei':
+                    _FirewallMain = FirewallMain(get_param['hostip'])
+                    _res = _FirewallMain.get_huawei_nat_server()
+                    if _res:
+                        return JsonResponse({'results': _res, 'count': len(_res),
+                                             'code': 200})
+                    else:
+                        return JsonResponse({'results': _res, 'count': len(_res),
+                                             'code': 400})
+                elif get_param['vendor'] == 'Hillstone':
+                    _res = dnat_mongo.find(query_dict=dict(hostip=get_param['hostip']), fileds={'_id': 0})
+                    if _res:
+                        return JsonResponse({'results': _res, 'count': len(_res),
+                                             'code': 200})
+                    else:
+                        return JsonResponse({'results': _res, 'count': len(_res),
+                                             'code': 400})
+            return JsonResponse({'code': 200})
+
+    # 表单验证
+    def post(self, request):
+        post_param = request.data
+        print("DNAT", post_param)
+        # 更新单个设备DNAT信息
+        if all(k in post_param for k in ("vendor", "update_device", "hostip")):
+            if post_param['vendor'] == 'Hillstone':
+                config_dnat(**post_param)
+                return HttpResponse(json.dumps({'code': 200, 'message': 'OK', 'result': 'OK'}),
+                                    content_type="application/json")
+            return JsonResponse(dict(code=400, message='操作不被允许'))
+        # DNAT操作
+        if all(k in post_param for k in ("vendor", "hostip", "hostid")):
+            schema_res, msg = single_json_validate(post_param, post_dnat_schema)
+            # json数据验证通过
+            if schema_res:
+                post_param['remote_ip'] = str(request.META.get("REMOTE_ADDR"))
+                res = config_dnat.apply_async(kwargs=post_param, queue=CELERY_QUEUE,
+                                              retry=True)  # config_backup
+                if str(res) == 'None':
+                    print('forget')
+                    res.forget()
+                    return JsonResponse({'code': 400, 'message': 'duplicate task execution', 'data': []})
+                if res:
+                    return JsonResponse({'code': 200, 'message': 'OK', 'data': str(res)})
+            else:
+                return JsonResponse(msg, safe=False)
+            return JsonResponse(dict(code=400, message='操作不被允许', data=[]))
 
         return JsonResponse(dict(code=400, message='没有任何匹配'))
