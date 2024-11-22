@@ -27,7 +27,6 @@ post_dnat_schema = {
         "edit_object": ["hostip", "id", "hostid", "vendor", "service", "from", "to", "trans_to", "name"],
         "del_object": ["hostip", "id", "hostid", "vendor", "name"],
         "sort_object": ["hostip", "id", "hostid", "insert", "name"],
-        "additionalProperties": False,
     },
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "post_dnat",
