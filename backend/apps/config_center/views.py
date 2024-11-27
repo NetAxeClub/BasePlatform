@@ -534,7 +534,7 @@ class ConfigFileView(APIView):
                 }
                 return JsonResponse(data)
         else:
-            with open(BASE_DIR + '/media/device_config/' + post_data['file_path'], "r") as f:
+            with open(BASE_DIR + '/media/' + post_data['file_path'], "r") as f:
                 file_content = f.read()
                 data = {
                     "code": 200,
