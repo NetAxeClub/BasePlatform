@@ -227,8 +227,11 @@ class HuaweiUSG(HuaweiyangNetconfConnect):
                 return [res['address-set']['addr-object']]
             else:
                 for i in res['address-set']['addr-object']:
-                    if isinstance(i['elements'], dict):
-                        i['elements'] = [i['elements']]
+                    if 'elements' in i.keys():
+                        if isinstance(i['elements'], dict):
+                            i['elements'] = [i['elements']]
+                    else:
+                        i['elements'] = []
                 return res['address-set']['addr-object']
         else:
             return None

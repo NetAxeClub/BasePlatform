@@ -93,8 +93,8 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "utils.custom.middleware.CorsMiddleWare",  # 配置跨域访问支持
-    # 'utils.custom.iam.IamMiddleware',
+    # "utils.custom.middleware.CorsMiddleWare",  # 配置跨域访问支持
+    'utils.custom.iam.IamMiddleware',
     "simple_history.middleware.HistoryRequestMiddleware",
 ]
 
@@ -192,7 +192,7 @@ LOGGING = {
             "encoding": "utf-8",
         },
         "server": {
-            "level": "INFO",
+            "level": "DEBUG",
             "class": "logging.handlers.RotatingFileHandler",
             "filename": os.path.join(BASE_DIR, "logs", "server.log"),
             "maxBytes": 1024 * 1024 * 10,  # 10 MB
@@ -285,7 +285,7 @@ LOGGING = {
             "level": "INFO",
         },
         "django": {
-            "handlers": ["server"],
+            "handlers": ["server", "console"],
             "level": "INFO",
         },
         "celery": {
@@ -454,6 +454,7 @@ AUTHENTICATION_BACKENDS = (
     # "django_auth_ldap.backend.LDAPBackend",
     # "utils.custom.backends.CustomBackend",
     "django.contrib.auth.backends.ModelBackend",
+    # "apps.user.backend.AuthBackend",
     # "guardian.backends.ObjectPermissionBackend",  # 这是guardian的
 )
 
