@@ -59,7 +59,7 @@ class IamMiddleware(MiddlewareMixin):
         logger.info(f"token: {token}")
         # if token is None:
         #     self.require_permission()
-        flag, res = self.check_permission(unquote(token), request.path, request.method.lower())
+        # flag, res = self.check_permission(unquote(token), request.path, request.method.lower())
         # if not flag:
         #     raise PermissionDenied
         # print(res)
