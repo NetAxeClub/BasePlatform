@@ -370,9 +370,9 @@ class FirewallMain(object):
                     self.dev_info = {
                         'device_type': 'huawei_usg',
                         'ip': self.dev_infos['bind_ip__ipaddr'],  # 华为防火墙必须走专用netconf地址
-                        'port': self.dev_infos['netconf_port'],
-                        'username': self.dev_infos['netconf_username'],
-                        'password': self.dev_infos['netconf_password'],
+                        'port': self.dev_infos['netconf']['port'],
+                        'username': self.dev_infos['netconf']['username'],
+                        'password': self.dev_infos['netconf']['password'],
                         'timeout': 200,  # float，连接超时时间，默认为100
                         'session_timeout': 100,  # float，每个请求的超时时间，默认为60
                         'hostname': self.dev_infos['name'],
@@ -4405,6 +4405,7 @@ class FirewallMain(object):
                 if ipv4_group:
                     for i in ipv4_group:
                         i['hostip'] = self.host
+                        i['name'] = i['Name']
                 device.closed()
                 return ipv4_group
             except Exception as e:

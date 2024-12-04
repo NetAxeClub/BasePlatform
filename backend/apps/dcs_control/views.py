@@ -12,6 +12,7 @@ from apps.dcs_control.json_validate.dnat_schema import post_dnat_schema
 from apps.dcs_control.tasks import bulk_deny_by_address, address_set, config_dnat
 
 
+
 if DEBUG:
     CELERY_QUEUE = 'dev'
 else:
@@ -19,6 +20,7 @@ else:
 
 dnat_mongo = MongoOps(db='Automation', coll='hillstone_dnat')
 snat_mongo = MongoOps(db='Automation', coll='hillstone_snat')
+
 
 # 一键封堵
 class DenyByAddrObj(APIView):
@@ -166,7 +168,6 @@ class DestAddTranslate(APIView):
     permission_classes = ()
 
     authentication_classes = ()
-
 
     def get(self, request):
             get_param = request.GET.dict()
