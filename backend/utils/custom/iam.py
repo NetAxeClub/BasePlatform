@@ -57,7 +57,8 @@ class IamMiddleware(MiddlewareMixin):
         is_allow = False
         token = request.COOKIES.get('netops-token')
         logger.info(f"cookies token: {token}")
-        if token is None:
+        logger.info(f"cookies token type: {type(token)}")
+        if token == 'None':
             token = request.HEADERS.get('netops-token')
             logger.debug(f"header token: {token}")
 
