@@ -32,6 +32,20 @@ class UserData(object):
         for key in my_dict:
             setattr(self, key, my_dict[key])
 
+def get_request_ip(request):
+    """
+    获取请求IP
+    :param request:
+    :return:
+    """
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR', '')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[-1].strip()
+        return ip
+    ip = request.META.get('REMOTE_ADDR', '') or getattr(
+        request, 'request_ip', None)
+    return ip or 'unknown'
+
 
 class IamMiddleware(MiddlewareMixin):
 
@@ -60,7 +74,7 @@ class IamMiddleware(MiddlewareMixin):
         if token is None:
             token = request.headers.get('netops-token', None)
             logger.info(f"header token: {token}")
-
+        logger.info(f"remote ip: {get_request_ip(token)}")
         # if token is None:
         #     self.require_permission()
         if token is not None:
