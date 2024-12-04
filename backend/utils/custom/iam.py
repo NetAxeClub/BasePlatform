@@ -10,6 +10,7 @@
                     2024/4/25 14:32
 -------------------------------------------------
 """
+import logging
 import traceback
 import requests
 from django.core.exceptions import PermissionDenied
@@ -19,6 +20,7 @@ from confload.confload import config
 from urllib.parse import unquote
 from urllib.parse import parse_qs
 
+logger = logging.getLogger('custom_middleware')
 
 class UserData(object):
     is_authenticated = True
@@ -54,17 +56,18 @@ class IamMiddleware(MiddlewareMixin):
         """
         is_allow = False
         token = request.COOKIES.get('netops-token')
+        logger.info(f"token: {token}")
         # if token is None:
         #     self.require_permission()
         flag, res = self.check_permission(unquote(token), request.path, request.method.lower())
         # if not flag:
         #     raise PermissionDenied
         # print(res)
-        if res['code'] == 200:
-            is_allow = res['data']['is_allow']
-            request.user = UserData(res['data']['userinfo'])
-        else:
-            request.user = AnonymousUser()
+        # if res['code'] == 200:
+        #     is_allow = res['data']['is_allow']
+        #     request.user = UserData(res['data']['userinfo'])
+        # else:
+        #     request.user = AnonymousUser()
         # if not is_allow:
         #     raise PermissionDenied
 
