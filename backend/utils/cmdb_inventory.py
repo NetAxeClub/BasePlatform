@@ -121,7 +121,8 @@ class CMDBInventory(InventoryPlugin):
             Cisco='cisco_ios',
             inspur='cisco_ios',
             Hillstone='ruijie_os',
-            Maipu='ruijie_os'
+            Maipu='ruijie_os',
+            F5='f5'
         )
         # 对数据进行整形，将整形的数据放到reshape_devices中去。
         reshape_devices = []

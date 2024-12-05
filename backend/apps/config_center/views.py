@@ -27,8 +27,8 @@ _ConfigGit = ConfigGit()
 
 def is_safe_dict(data: dict) -> bool:
     # 定义危险字符的正则表达式
-    pattern = re.compile(
-        r'<(script|iframe).*?>|([^\w\s./:%,-])', re.IGNORECASE)
+    # pattern = re.compile(r'<(script|iframe).*?>|([^\w\s./:%,-])', re.IGNORECASE)
+    pattern = re.compile(r'<(script|iframe).*?>', re.IGNORECASE)
 
     # 遍历字典中的值，使用正则表达式进行匹配验证
     for value in data.values():
