@@ -14,7 +14,7 @@ import json
 import logging
 # import traceback
 import requests
-# from django.core.exceptions import PermissionDenied
+# from rest_framework.exceptions import AuthenticationFailed
 from django.http.response import HttpResponseForbidden
 from django.utils.deprecation import MiddlewareMixin
 from django.contrib.auth.models import AnonymousUser
@@ -58,10 +58,13 @@ class IamMiddleware(MiddlewareMixin):
         infr:service:app_name:table_name:<{'name': 'aabb'}>
         """
         is_allow = False
+        if request.path.startswith('/admin/'):
+            """允许admin后台登录"""
+            return
         token = request.COOKIES.get('netops-token')
         logger.info(f"cookies token: {token}")
         if token is None:
-            token = request.headers.get('netops-token', None)
+            token = request.headers.get('Authorization', None)
             logger.info(f"header token: {token}")
         if token is None:
             response_data = {'error': 'Missing netops-token', 'code': 400, 'path': request.path, 'method': request.method}
@@ -80,9 +83,9 @@ class IamMiddleware(MiddlewareMixin):
             # raise PermissionDenied
         if res['code'] == 200:
             is_allow = res['data']['is_allow']
-            request.user = UserData(res['data']['userinfo'])
+            request.iam = UserData(res['data']['userinfo'])
         else:
-            request.user = AnonymousUser()
+            request.iam = AnonymousUser()
             response_data = {'error': 'netaxe iam policy not allowed AnonymousUser', 'code': 400, 'path': request.path, 'method': request.method}
             return HttpResponseForbidden(json.dumps(response_data), content_type='application/json')
         # if not is_allow:

@@ -28,13 +28,11 @@ class UserData(object):
 
 
 def get_auth_user(token):
-    rbac_instance = config.service_dicovery('rbac')
-    auth_service_url = "{}/{}".format(rbac_instance['hosts'][0]['ip'], rbac_instance['hosts'][0]['port'])
-    auth_decode_url = f'{auth_service_url}/rbac/userinfo'
+    auth_url = config.iam['url'] + '/userInfo/'
     headers = {'Accept': 'application/json', 'Authorization': f'Bearer {str(token)}',
                'Content-Type': 'application/json'}
     try:
-        res = requests.request(method="GET", url=auth_decode_url, headers=headers)
+        res = requests.request(method="GET", url=auth_url, headers=headers)
 
     except requests.ConnectionError as err:
         raise serializers.ValidationError(f"Cannot establish connection: {err}") from err
@@ -53,13 +51,22 @@ def get_auth_user(token):
 
 class CustomJWTAuthentication(JWTAuthentication):
 
-    def get_validated_token(self, raw_token):
-        print('get_validated_token')
-        return raw_token.decode()
-
-    def get_user(self, validated_token):
-        print('get_user')
-        return get_auth_user(validated_token)
+    # def get_validated_token(self, raw_token):
+    #     print('get_validated_token')
+    #     return raw_token.decode()
+    #
+    # def get_user(self, validated_token):
+    #     print('get_user')
+    #     return get_auth_user(validated_token)
+    def authenticate(self, request):
+        # print(request.user)
+        token = request.COOKIES.get('netops-token')
+        # print(token)
+        user, token = super().authenticate(request)
+        # if user is not None:
+        #     # 添加额外的用户属性
+        #     user.profile = User.get_profile(user)
+        return user, token
 
 
 class CustomJWTAuthenticationScheme(SimpleJWTScheme):
