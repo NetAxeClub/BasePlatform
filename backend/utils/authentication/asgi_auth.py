@@ -31,16 +31,14 @@ class UserData(object):
             setattr(self, key, my_dict[key])
 
 
-def get_auth_user(token):
+def get_auth_user(token, url, action):
     logger.info("get_auth_user")
-    abac_instance = config.service_dicovery('abac')
-    auth_service_url = "http://{}:{}".format(abac_instance['hosts'][0]['ip'], abac_instance['hosts'][0]['port'])
-    auth_decode_url = f'{auth_service_url}/abac-api/users/casbin/'
+    auth_url = config.iam['url'] + '/users/casbin/'
     headers = {'Authorization': token}
-    params = {'data': '', 'action': ''}
+    params = {'data': url, 'action': action}
     try:
-        res = requests.request(method="GET", url=auth_decode_url, headers=headers, params=params, timeout=5)
-        if 200 <= res.status_code < 300:
+        res = requests.request(method="GET", url=auth_url, headers=headers, params=params, timeout=5)
+        if res.status_code == 200:
             logger.info(res.status_code)
             return UserData(res.json()['data']['userinfo'])
         else:
@@ -54,7 +52,7 @@ def get_user(scope):
     try:
         if 'netops-token' in scope['cookies'].keys():
             logger.debug('token: {}'.format(scope['cookies']['netops-token']))
-            return get_auth_user(parse.unquote(scope['cookies']['netops-token']))
+            return get_auth_user(parse.unquote(scope['cookies']['netops-token']), scope['path'], scope['type'])
         return AnonymousUser()
     except Exception as e:
         logger.error("function 'get_user' error: {}".format(str(e)))
