@@ -61,6 +61,9 @@ class IamMiddleware(MiddlewareMixin):
         if request.path.startswith('/admin/'):
             """允许admin后台登录"""
             return
+        if request.path.startswith('/base_platform/automation/address_location'):
+            """允许寻觅后台操作"""
+            return
         token = request.COOKIES.get('netops-token')
         logger.info(f"cookies token: {token}")
         if token is None:
