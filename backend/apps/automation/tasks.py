@@ -1251,51 +1251,6 @@ class AutomationMongo(object):
                 cmd=cmd,
                 version=version))
 
-    # 新增支持netconf功能设备
-    @staticmethod
-    def insert_support_netconf(hostip, vendor):
-        netconf_mongo = MongoOps(db='Automation', coll='support_netconf')
-        tmp = netconf_mongo.find(query_dict=dict(ip=hostip), fields={'_id': 0})
-        if tmp:
-            netconf_mongo.update(
-                filter=dict(
-                    ip=hostip), update={
-                    "$set": {
-                        'vendor': vendor}})
-        else:
-            netconf_mongo.insert(dict(ip=hostip, vendor=vendor))
-        return
-
-    # 新增netconf失败记录
-    @staticmethod
-    def insert_netconf_failed_logs(hostip, vendor, msg, exce=None):
-        netconf_mongo = MongoOps(db='Automation', coll='netconf_failed')
-        tmp = netconf_mongo.find(
-            query_dict=dict(
-                ip=hostip,
-                vendor=vendor,
-                msg=msg, exce=exce),
-            fields={
-                '_id': 0})
-        if tmp:
-            netconf_mongo.delete_many(
-                query=dict(
-                    ip=hostip,
-                    vendor=vendor,
-                    msg=msg, exce=exce))
-        else:
-            netconf_mongo.insert(dict(ip=hostip, vendor=vendor, msg=msg, exce=exce))
-        return
-
-    @staticmethod
-    def get_support_netconf(hostip):
-        netconf_mongo = MongoOps(db='Automation', coll='support_netconf')
-        tmp = netconf_mongo.find(query_dict=dict(ip=hostip), fields={'_id': 0})
-        if tmp:
-            return True
-        else:
-            return False
-
     # 插入总表项集合
     @staticmethod
     def insert_table(db, hostip, datas, tablename, delete=True):

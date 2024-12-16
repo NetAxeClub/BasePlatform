@@ -261,6 +261,70 @@ class BaseConn:
             raise RuntimeError('[Error 4] Exception.{}'.format(str(e)))
         return paths
 
+    def config_commands(self, cmds: list) -> List[Dict]:
+        paths = []
+        try:
+            with ConnectHandler(**self.netmiko_params) as dev_connection:
+                prompt = dev_connection.find_prompt()  # 找出设备的prompt
+                quit_cmd = {
+                    'H3C': 'quit',
+                    'Huawei': 'quit',
+                    'Hillstone': 'exit',
+                    'Ruijie': 'exit',
+                    'centec': 'exit',
+                    'Maipu': 'exit',
+                }
+                if self.vendor_alias in ['H3C', 'Huawei']:
+                    # HRP_M<DZ.NET.IN.FW.001>
+                    hostname = re.search(r'(<\S+>)', prompt).group()
+                    if self.hostname != hostname[1:-1]:
+                        NetworkDevice.objects.filter(manage_ip=self.hostip).update(name=hostname[1:-1])
+                elif self.vendor_alias in ['Hillstone', 'Ruijie', 'centec', 'Maipu', 'Mellanox']:
+                    if self.hostname != prompt[:-1]:
+                        NetworkDevice.objects.filter(manage_ip=self.hostip).update(name=prompt[:-1])
+                # print(prompt)
+
+                content = dev_connection.send_config_set(config_commands=cmds,
+                                               exit_config_mode=False,
+                                               delay_factor=2,
+                                               max_loops=60,
+                                               strip_prompt=False,
+                                               strip_command=False,
+                                               config_mode_command='configure',
+                                               cmd_verify=True,
+                                               enter_config_mode=True, )
+                dev_connection.save_config()
+                if content:
+                    filename = 'automation/' + self.hostip  + '.txt'
+                    # 判断文件是否已经存在
+                    if default_storage.exists(filename):
+                        # 删除已经存在的文件重新生成
+                        default_storage.delete(filename)
+                    path = default_storage.save(filename, ContentFile(content))
+                    # automation/10.254.2.55/display_evpn_route_arp.txt
+                    paths.append({
+                        "path": path,
+                        "cmd_file": filename
+                    })
+            if self.vendor_alias in quit_cmd.keys():
+                # dev_connection.send_command(quit_cmd[self.vendor_alias])
+                dev_connection.cleanup(command=quit_cmd[self.vendor_alias])
+            dev_connection.disconnect()
+        except NetmikoAuthenticationException as e:  # 认证失败报错记录
+            print('[Error 1] Authentication failed.{}'.format(str(e)))
+            raise RuntimeError('[Error 1] Authentication failed.{}'.format(str(e)))
+        except NetmikoTimeoutException as e:  # 登录超时报错记录
+            print('[Error 2] Connection timed out.{}'.format(str(e)))
+            raise RuntimeError('[Error 2] Connection timed out.{}'.format(str(e)))
+        except ConfigInvalidException as e:  # 配置项错误
+            print('[Error 3] ConfigInvalidException.{}'.format(str(e)))
+            raise RuntimeError('[Error 3] ConfigInvalidException.{}'.format(str(e)))
+        except Exception as e:
+            # 采集失败的记录日志
+            print(str(e))
+            raise RuntimeError('[Error 4] Exception.{}'.format(str(e)))
+        return paths
+
     def send_commands(self, cmd: str):
         content = ''
         try:

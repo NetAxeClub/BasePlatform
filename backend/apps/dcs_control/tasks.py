@@ -62,6 +62,7 @@ service_mongo = MongoOps(db='Automation', coll='hillstone_service')
 servgroup_mongo = MongoOps(db='Automation', coll='hillstone_servgroup')
 # 系统预定义服务
 predefined_mongo = MongoOps(db='Automation', coll='hillstone_service_predefined')
+SwitchFailBackDB = MongoOps(db='Automation', coll='switch_failback')
 if DEBUG:
     CELERY_QUEUE = 'dev'
 else:
@@ -333,6 +334,136 @@ def get_firewall_zone(**kwargs):
     return res
 
 
+class SecFirewallMain:
+    def __init__(self, host):
+        self.device_type_map = {
+            "H3C": "hp_comware",
+            "Huawei": "huawei",
+            "Hillstone": "hillstone",
+            "Mellanox": "mellanox",
+            "centec": "cisco_ios",
+            "Ruijie": "ruijie_os",
+            "Maipu": "mypower",
+            "Cisco": "cisco_ios",
+        }
+        self.config_mode_command_map = {
+            "H3C": "system",
+            "Huawei": "system",
+            "Hillstone": "configure",
+            "Mellanox": "configure",
+            "centec": "configure",
+            "Ruijie": "configure",
+            "Maipu": "configure",
+            "Cisco": "configure",
+        }
+        # 下发命令
+        self.cmds = []
+        # 回退命令
+        self.back_off_cmds = []
+        self.host = host
+        self.dev_infos = get_device_info_v2(manage_ip=host)
+        if isinstance(self.dev_infos, list) and len(self.dev_infos) > 0:
+            self.dev_infos = self.dev_infos[0]
+            if 'telnet' in self.dev_infos['protocol']:
+                self.dev_info = {
+                    'device_type': f"{self.device_type_map[self.dev_infos['vendor__alias']]}_telnet",
+                    'ip': host,
+                    'port': self.dev_infos['telnet']['port'],
+                    'username': self.dev_infos['telnet']['username'],
+                    'password': self.dev_infos['telnet']['password'],
+                    'timeout': 100,  # float，连接超时时间，默认为100
+                    'session_timeout': 60,  # float，每个请求的超时时间，默认为60，
+                    'encoding': 'utf-8',
+                    'config_mode_command': self.config_mode_command_map[self.dev_infos['vendor__alias']]
+                }
+            else:
+                self.dev_info = {
+                    'device_type': self.device_type_map[self.dev_infos['vendor__alias']],
+                    'ip': host,
+                    'port': self.dev_infos['ssh']['port'],
+                    'username': self.dev_infos['ssh']['username'],
+                    'password': self.dev_infos['ssh']['password'],
+                    'timeout': 100,  # float，连接超时时间，默认为100
+                    'session_timeout': 60,  # float，每个请求的超时时间，默认为60，
+                    'encoding': 'utf-8',
+                    'config_mode_command': self.config_mode_command_map[self.dev_infos['vendor__alias']]
+                }
+            if self.dev_infos.get('bind_ip__ipaddr'):
+                self.dev_infos['ip'] = self.dev_infos['bind_ip__ipaddr']
+        else:
+            raise ValueError("FirewallMain初始化未获取到设备CMDB信息")
+
+    def flow_engine(self, *args, **kwargs):
+        # 下发命令， 回退命令， 对应类方法
+        cmds, back_off_cmds = args
+        # 获取设备实例
+        _device = NetworkDevice.objects.get(id=kwargs['device_id'])
+        # 验证通过  创建流程
+        flow_record = AutoFlow.objects.create(**kwargs)
+        # 批准执行
+        flow_record.approve()
+        log.info('开始执行SSH配置下发动作 ')
+        # 开始执行SSH配置下发动作 很关键
+        res, path, netmiko_error = BatManMain.config_cmds(*cmds, **self.dev_info)
+        if res:
+            data_to_parse = default_storage.open(path).read()
+            flow_record.task_result = data_to_parse.decode('utf-8')
+            # 设置发布生效 后面根据配置结果，判断是否需要迁移到 失败
+            flow_record.publish()
+            _ttp_info = ''  # 存储ttp解析的错误结果内容
+            ttp_method = HillstoneFsm.get_map("standard")
+            if ttp_method:
+                ttp_res = ttp_method(path=path)  # 此处是方法的实例
+                if isinstance(ttp_res, dict):
+                    # 目前山石网科的三种命令执行中的错误提示 捕获
+                    if 'unrecognized' in ttp_res.keys():
+                        flow_record.failed()
+                        if isinstance(ttp_res['unrecognized'], dict):
+                            if 'unrecognized' in ttp_res['unrecognized'].keys():
+                                if isinstance(ttp_res['unrecognized']['unrecognized'], str):
+                                    _ttp_info = 'unrecognized: ' + ttp_res['unrecognized'][
+                                        'unrecognized']
+                                elif isinstance(ttp_res['unrecognized']['unrecognized'], list):
+                                    _ttp_info = 'unrecognized: ' + ' '.join(
+                                        ttp_res['unrecognized']['unrecognized'])
+                                else:
+                                    _ttp_info = 'unrecognized: ' + str(
+                                        ttp_res['unrecognized']['unrecognized'])
+                        elif isinstance(ttp_res['unrecognized'], list):
+                            _ttp_info = 'unrecognized: ' + '\n'.join(
+                                [x['unrecognized'] for x in ttp_res['unrecognized']])
+                    elif 'errors' in ttp_res.keys():
+                        flow_record.failed()
+                        if isinstance(ttp_res['errors'], dict):
+                            _ttp_info = 'error: ' + ttp_res['errors']['error']
+                        elif isinstance(ttp_res['errors'], list):
+                            _info = '\n'.join(list(set([x['error'] for x in ttp_res['errors']])))
+                            _ttp_info = 'error: ' + _info
+                        else:
+                            _ttp_info = 'error: ' + str(ttp_res['errors']['error'])
+                    elif 'warning' in ttp_res.keys():
+                        flow_record.failed()
+                        _ttp_info = 'warning: ' + ttp_res['errors']['error']
+                flow_record.ttp = json.dumps(ttp_res)
+            flow_record.save()
+            # 判断状态迁移到失败以后的state值
+            if flow_record.state == 'Failed':
+                msg = "[操作{}失败]\n用户:{}\n设备:{}\n状态:{}\n错误:{}\n==========".format(
+                    kwargs['task'], kwargs['commit_user'], kwargs['device'], flow_record.state, _ttp_info)
+            # 判断状态迁移到成功以后的state值
+            elif flow_record.state == 'Published':
+                msg = "[操作{}成功]\n用户:{}\n设备:{}\n状态:{}\n==========".format(
+                    kwargs['task'], kwargs['commit_user'], kwargs['device'], '发布生产')
+            else:
+                msg = "[操作{}]\n用户:{}\n设备:{}\n状态:{}\n未能获取到状态信息\n==========".format(
+                    kwargs['task'], kwargs['commit_user'], kwargs['device'], flow_record.state)
+        else:
+            msg = "[操作{}失败]\n用户:{}\n设备:{}\n状态:{}\n错误:{}\n==========".format(
+                kwargs['task'], kwargs['commit_user'], kwargs['device'], flow_record.state, netmiko_error)
+        send_msg_sec_manage(msg)
+        return flow_record
+
+
 # 防火墙统一处理 集中在此处理或调度
 class FirewallMain(object):
     def __init__(self, host):
@@ -566,6 +697,7 @@ class FirewallMain(object):
         # 回调
         sec_callback(flow_record.id)
         return
+
 
     # 山石地址对象操作V2
     def hillstone_address_detail(self, **kwargs):
@@ -6742,9 +6874,10 @@ def config_dnat(self, **post_param):
             # print(_data)
             _FirewallMain.flow_engine(*[cmds, back_off_cmds, class_method], **_data)
         except RuntimeError as e:
+            print(traceback.print_exc())
             send_msg_sec_manage("安全纳管引擎\n公网DNAT发布\n任务状态：失败\n原因:生成配置过程异常\n提示:{}".format(str(e)))
         except Exception as e:
-            # print(traceback.print_exc())
+            print(traceback.print_exc())
             send_msg_sec_manage("安全纳管引擎\n公网DNAT发布\n任务状态：失败\n原因:生成配置过程异常\n提示:{}".format(str(e)))
     return
 
@@ -6988,6 +7121,58 @@ def bulk_deny_by_address(self, **post_param):
                     address_set.apply_async(kwargs=post_data, queue=CELERY_QUEUE,
                                             retry=True)  # config_backup
     return
+
+
+@shared_task(base=AxeTask, once={'graceful': True}, bind=True)
+@WebSocket()
+def config_auto_switch(self, **post_param):
+    _FirewallMain = SecFirewallMain(post_param['hostip'])
+    cmds = post_param['cmds']
+    back_off_cmds = post_param['back_off_cmds']
+    switch_failback = post_param['switch_failback']
+    # if post_param['vendor'] == 'H3C':
+    #     pass
+    # elif post_param['vendor'] == 'Huawei':
+    #     pass
+    # elif post_param['vendor'] == 'Hillstone':
+    _data = dict(
+        order_code=post_param.get('order_code') if post_param.get('order_code') else ' ',
+        task_id=post_param.get('task_id') or str(self.request.id),
+        origin=post_param.get('origin') if post_param.get('origin') else '运维平台',
+        commit_user=post_param.get('user') or '',
+        remote_ip=post_param.get('remote_ip'),
+        task=post_param.get('task') or AutoFlowTasks.AUTO_SWITCH,
+        device=post_param['hostip'],
+        device_id=post_param['hostid'],
+        kwargs=json.dumps(post_param),
+        commands=json.dumps(cmds),
+        method='SSH',
+        back_off_commands=json.dumps(back_off_cmds),
+    )
+    _FirewallMain.flow_engine(*[cmds, back_off_cmds], **_data)
+    flow_record = AutoFlow.objects.get(task_id=_data['task_id'])
+    task_result = {
+        'id': str(self.request.id),
+        'origin': flow_record.origin,
+        'task_result': flow_record.task_result,
+        'device': flow_record.device,
+        'commit_user': flow_record.commit_user,
+        'commit_time': flow_record.commit_time,
+        'method': flow_record.method,
+        'remote_ip': flow_record.remote_ip,
+        'kwargs': flow_record.kwargs,
+        'commands': flow_record.commands,
+        'back_off_commands': flow_record.back_off_commands,
+        'code': flow_record.code,
+
+    }
+    SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$push': {'task_list': task_result}})
+    if flow_record.state == 'Published':
+        if switch_failback['status'] == 'cover':
+            SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'recover'}})
+        else:
+            SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'cover'}})
+
 
 if __name__ == '__main__':
     pass

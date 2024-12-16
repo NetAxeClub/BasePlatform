@@ -1116,7 +1116,6 @@ class H3cProc(BaseConn):
                 mtu='', location=location)
             layer3datas.append(data)
             ip_interface_datas.append(i)
-        # AutomationMongo.insert_table(db='NETCONF', hostip=host, datas=ip_interface_datas, tablename='netconf_ipv4')
         if layer3datas:
             MongoNetOps.insert_table(db='Automation', hostip=self.hostip, datas=layer3datas,
                                      tablename='layer3interface')

@@ -20,7 +20,7 @@ else:
 
 dnat_mongo = MongoOps(db='Automation', coll='hillstone_dnat')
 snat_mongo = MongoOps(db='Automation', coll='hillstone_snat')
-
+sec_policy_mongo = MongoOps(db='Automation', coll='sec_policy')
 
 # 一键封堵
 class DenyByAddrObj(APIView):
@@ -232,3 +232,330 @@ class DestAddTranslate(APIView):
             return JsonResponse(dict(code=400, message='操作不被允许', data=[]))
 
         return JsonResponse(dict(code=400, message='没有任何匹配'))
+
+
+class SecPolicy(APIView):
+    permission_classes = ()
+
+    authentication_classes = ()
+
+    def get(self, request):
+        """
+
+        :param request:
+        :return:
+        """
+        get_param = request.GET.dict()
+        print(get_param)
+        if all(k in get_param for k in ("page_size", "page")):
+            res = sec_policy_mongo.find_page_query(
+                fields={'_id': 0}, page_size=int(get_param['page_size']), page_num=int(get_param['page']))
+            count = sec_policy_mongo.count_documents()
+            result = {
+                'code': 200,
+                'msg': 'success',
+                'data': res,
+                'count': count
+            }
+            return JsonResponse(result, safe=True)
+
+        # if all(k in get_param for k in ("hostip", "sec_policy")):
+        # 获取防火墙设备列表，筛选HA状态为独立设备或主设备，类型为防火墙的设备列表。
+        if 'get_firewall_sec_policy' in get_param.keys():
+            _res = MongoOps(db='Automation', coll='sec_policy') \
+                .find(query_dict=dict(hostip=get_param['get_firewall_sec_policy']), fields={'_id': 0})
+            if _res:
+                res = json.dumps({'results': _res, 'count': len(_res),
+                                  'code': 200})
+            else:
+                res = json.dumps({'results': _res, 'count': len(_res),
+                                  'code': 400})
+            return HttpResponse(res, content_type="application/json")
+        if 'get_firewall_sec_policy_id' in get_param.keys():
+            _res = MongoOps(db='Automation', coll='sec_policy') \
+                .find(query_dict=dict(hostip=get_param['get_firewall_sec_policy_id']), fields={'_id': 0,
+                                                                                               'id': 1,
+                                                                                               'name': 1})
+            if _res:
+                res = json.dumps({'results': _res, 'count': len(_res),
+                                  'code': 200})
+            else:
+                res = json.dumps({'results': _res, 'count': len(_res),
+                                  'code': 400})
+            return HttpResponse(res, content_type="application/json")
+        # 获取设备安全域列表
+        if all(k in get_param for k in ("vendor", "get_sec_zone")):
+            if get_param['vendor'] == 'H3C':
+                _FirewallMain = FirewallMain(get_param['get_address_obj'])
+                _res = _FirewallMain.get_h3c_sec_zone()
+                if isinstance(_res, list):
+                    res = json.dumps({'results': _res, 'count': len(_res),
+                                      'code': 200})
+                else:
+                    res = json.dumps({'results': [], 'count': 0,
+                                      'code': 400})
+                return HttpResponse(res, content_type="application/json")
+            elif get_param['vendor'] == 'Huawei':
+                _res = SecPolicyMain.get_huawei_sec_zone(get_param['get_sec_zone'])
+                if isinstance(_res, list):
+                    res = json.dumps({'results': _res, 'count': len(_res),
+                                      'code': 200})
+                else:
+                    res = json.dumps({'results': [], 'count': 0,
+                                      'code': 400})
+                return HttpResponse(res, content_type="application/json")
+            elif get_param['vendor'] == 'Hillstone':
+                _res = MongoOps(db='Automation', coll='Hillstone_zone') \
+                    .find(query_dict=dict(hostip=get_param['get_sec_zone'], type='L3'), fields={'_id': 0})
+                if _res:
+                    res = json.dumps({'results': _res, 'count': len(_res),
+                                      'code': 200})
+                else:
+                    res = json.dumps({'results': _res, 'count': len(_res),
+                                      'code': 400})
+                return HttpResponse(res, content_type="application/json")
+        # 获取设备地址组
+        if all(k in get_param for k in ("vendor", "get_address_obj")):
+            if get_param['vendor'] == 'H3C':
+                _FirewallMain = FirewallMain(get_param['get_address_obj'])
+                _res = _FirewallMain.get_h3c_address_obj()
+                if isinstance(_res, list):
+                    res = json.dumps({'results': _res, 'count': len(_res),
+                                      'code': 200})
+                else:
+                    res = json.dumps({'results': [], 'count': 0,
+                                      'code': 400})
+                return HttpResponse(res, content_type="application/json")
+            elif get_param['vendor'] == 'Huawei':
+                _FirewallMain = FirewallMain(get_param['get_address_obj'])
+                _res = _FirewallMain.get_huawei_address_obj()
+                if isinstance(_res, list):
+                    res = json.dumps({'results': _res, 'count': len(_res),
+                                      'code': 200})
+                else:
+                    res = json.dumps({'results': [], 'count': 0,
+                                      'code': 400})
+                return HttpResponse(res, content_type="application/json")
+            elif get_param['vendor'] == 'Hillstone':
+                _res = MongoOps(db='Automation', coll='Hillstone_address') \
+                    .find(query_dict=dict(hostip=get_param['get_address_obj']), fields={'_id': 0})
+                if _res:
+                    res = json.dumps({'results': _res, 'count': len(_res),
+                                      'code': 200})
+                else:
+                    res = json.dumps({'results': _res, 'count': len(_res),
+                                      'code': 400})
+                return HttpResponse(res, content_type="application/json")
+        # 获取设备服务组
+        if all(k in get_param for k in ("vendor", "get_service_obj")):
+            if get_param['vendor'] == 'H3C':
+                _res = SecPolicyMain.get_h3c_service_obj(get_param['get_service_obj'])
+                if isinstance(_res, list):
+                    res = json.dumps({'results': _res, 'count': len(_res),
+                                      'code': 200})
+                else:
+                    res = json.dumps({'results': [], 'count': 0,
+                                      'code': 400})
+                return HttpResponse(res, content_type="application/json")
+            elif get_param['vendor'] == 'Huawei':
+                _res = SecPolicyMain.get_huawei_service_obj(get_param['get_service_obj'])
+                if isinstance(_res, list):
+                    res = json.dumps({'results': _res, 'count': len(_res),
+                                      'code': 200})
+                else:
+                    res = json.dumps({'results': [], 'count': 0,
+                                      'code': 400})
+                return HttpResponse(res, content_type="application/json")
+            elif get_param['vendor'] == 'Hillstone':
+                _res = MongoOps(db='Automation', coll='Hillstone_servgroup') \
+                    .find(query_dict=dict(hostip=get_param['get_service_obj']), fields={'_id': 0})
+                if _res:
+                    res = json.dumps({'results': _res, 'count': len(_res),
+                                      'code': 200})
+                else:
+                    res = json.dumps({'results': _res, 'count': len(_res),
+                                      'code': 400})
+                return HttpResponse(res, content_type="application/json")
+        # 获取单个设备地址组信息
+        if all(k in get_param for k in ("vendor", "hostip")):
+            if get_param['vendor'] == 'H3C':
+                _FirewallMain = FirewallMain(get_param['hostip'])
+                _res = _FirewallMain.get_h3c_sec_policy()
+                if _res:
+                    res = json.dumps({'results': _res, 'count': len(_res),
+                                      'code': 200})
+                else:
+                    res = json.dumps({'results': _res, 'count': len(_res),
+                                      'code': 400})
+                return HttpResponse(res, content_type="application/json")
+            elif get_param['vendor'] == 'Huawei':
+                _FirewallMain = FirewallMain(get_param['hostip'])
+                _res = _FirewallMain.get_huawei_sec_policy()
+                if _res:
+                    res = json.dumps({'results': _res, 'count': len(_res),
+                                      'code': 200})
+                else:
+                    res = json.dumps({'results': _res, 'count': 0,
+                                      'code': 400})
+                return HttpResponse(res, content_type="application/json")
+            elif get_param['vendor'] == 'Hillstone':
+                _res = MongoOps(db='Automation', coll='sec_policy') \
+                    .find(query_dict=dict(hostip=get_param['hostip']), fields={'_id': 0})
+                if _res:
+                    return JsonResponse({'results': _res, 'count': len(_res), 'code': 200})
+                else:
+                    return JsonResponse({'results': _res, 'count': len(_res), 'code': 400})
+        return JsonResponse({'code': 400}, content_type="application/json")
+
+    # def post(self, request):
+    #     post_param = request.data
+    #     # 更新单个设备策略
+    #     if all(k in post_param for k in ("vendor", "update_device")):
+    #         if post_param['vendor'] == 'H3C':
+    #             _res = SecPolicyMain.get_single_h3c(post_param['update_device'])
+    #             if _res:
+    #                 return HttpResponse(json.dumps(dict(code=200)), content_type="application/json")
+    #         elif post_param['vendor'] == 'Huawei':
+    #             _res = SecPolicyMain.get_single_huawei(post_param['update_device'])
+    #             if _res:
+    #                 return HttpResponse(json.dumps(dict(code=200)), content_type="application/json")
+    #         elif post_param['vendor'] == 'Hillstone':
+    #             print("更新山石设备安全策略", post_param)
+    #             _res = SecPolicyMain.get_single_hillstone(post_param['update_device'])
+    #             if _res:
+    #                 return HttpResponse(json.dumps(dict(code=200)), content_type="application/json")
+    #         return HttpResponse(json.dumps(dict(code=400)), content_type="application/json")
+    #     # # 移动策略
+    #     # if all(k in post_param for k in ("current_id", "target_id", "vendor", "insert", "hostip")):
+    #     #     """
+    #     #     insert 可以设置为 before/after/first/last（其中 before 代表移动到目标规则之前，after 代表移动到
+    #     #     目标规则之后，first 代表移动规则至第一条，last 代表移动规则至最后一条）。当 insert 设置为
+    #     #     before/after 时，必须同时指定目标规则（即指定 key 值）；当 insert 设置为 first/last 时，不能指定
+    #     #     目标规则。
+    #     #     """
+    #     #     # print(post_param)
+    #     #     if post_param['vendor'] == 'H3C':
+    #     #         _res = SecPolicyMain.move_h3c_sec_policy(**post_param)
+    #     #         if _res:
+    #     #             return HttpResponse(json.dumps(dict(code=200)), content_type="application/json")
+    #     #         return HttpResponse(json.dumps(dict(code=400)), content_type="application/json")
+    #     #     elif post_param['vendor'] == 'Huawei':
+    #     #         if post_param['insert'] in ['first', 'last']:
+    #     #             _res = HuaweiUsgSecPolicyConf.move(hostip=post_param['hostip'],
+    #     #                                                rule_name=post_param['current_id'],
+    #     #                                                insert=post_param['insert'])
+    #     #             if _res:
+    #     #                 return HttpResponse(json.dumps(dict(code=200)), content_type="application/json")
+    #     #         else:
+    #     #             _res = HuaweiUsgSecPolicyConf.move(hostip=post_param['hostip'],
+    #     #                                                rule_name=post_param['current_id'],
+    #     #                                                target_name=post_param['target_id'],
+    #     #                                                insert=post_param['insert'])
+    #     #             if _res:
+    #     #                 return HttpResponse(json.dumps(dict(code=200)), content_type="application/json")
+    #     #         return HttpResponse(json.dumps(dict(code=400)), content_type="application/json")
+    #     #     elif post_param['vendor'] == 'Hillstone':
+    #     #         if post_param['insert'] in ['first', 'last']:
+    #     #             path, fsm_res = HillstoneSecPolicyConf.move(hostip=post_param['hostip'],
+    #     #                                                         current_id=post_param['current_id'],
+    #     #                                                         insert=post_param['insert'])
+    #     #         else:
+    #     #             path, fsm_res = HillstoneSecPolicyConf.move(hostip=post_param['hostip'],
+    #     #                                                         current_id=post_param['current_id'],
+    #     #                                                         target_id=post_param['target_id'],
+    #     #                                                         insert=post_param['insert'])
+    #     #         if path:
+    #     #             content = default_storage.open(path).read()
+    #     #             return HttpResponse(json.dumps(dict(code=200, content=content, fsm_res=fsm_res), cls=DateEncoder),
+    #     #                                 content_type="application/json")
+    #     #         else:
+    #     #             return HttpResponse(json.dumps(dict(code=400, content='', fsm_res=''), cls=DateEncoder),
+    #     #                                 content_type="application/json")
+    #     #     return HttpResponse(json.dumps(dict(code=400)), content_type="application/json")
+    #     # # 启用禁用策略 todo
+    #     # if all(k in post_param for k in ("current_id", "enable", "vendor", "hostip")):
+    #     #     print("post_param['enable']", post_param['enable'])
+    #     #     if post_param['vendor'] == 'H3C':
+    #     #         return HttpResponse(json.dumps(dict(code=400)), content_type="application/json")
+    #     #     elif post_param['vendor'] == 'Huawei':
+    #     #         return HttpResponse(json.dumps(dict(code=400)), content_type="application/json")
+    #     #     elif post_param['vendor'] == 'Hillstone':
+    #     #         path, fsm_res = HillstoneSecPolicyConf.on_off(hostip=post_param['hostip'],
+    #     #                                                       current_id=post_param['current_id'],
+    #     #                                                       enable=post_param['enable'])
+    #     #         if path:
+    #     #             content = default_storage.open(path).read()
+    #     #             return HttpResponse(json.dumps(dict(code=200, content=content, fsm_res=fsm_res), cls=DateEncoder),
+    #     #                                 content_type="application/json")
+    #     #         else:
+    #     #             return HttpResponse(json.dumps(dict(code=400, content='', fsm_res=''), cls=DateEncoder),
+    #     #                                 content_type="application/json")
+    #     #     return HttpResponse(json.dumps(dict(code=400)), content_type="application/json")
+    #     # 定位IP归属策略
+    #     if 'get_ip_owner' in post_param.keys():
+    #         _ip = IPAddress(post_param['get_ip_owner'])
+    #         params = {'or': [
+    #             {'src_ip_split': {'$elemMatch': {'start': {'$gte': _ip.value}, 'end': {'$lte': _ip.value}}}},
+    #             {'dst_ip_split': {'$elemMatch': {'start': {'$gte': _ip.value}, 'end': {'$lte': _ip.value}}}}
+    #         ]}
+    #         _res = MongoOps(db='Automation', coll='sec_policy').find(query_dict=params,
+    #                                                                  fileds={'_id': 0, 'src_ip_split': 0,
+    #                                                                          'dstc_ip_split': 0})
+    #         if _res:
+    #             res = json.dumps({'results': _res, 'count': len(_res),
+    #                               'code': 200})
+    #             return HttpResponse(res, content_type="application/json")
+    #         else:
+    #             res = json.dumps({'results': [], 'count': 0,
+    #                               'code': 400})
+    #             return HttpResponse(res, content_type="application/json")
+    #     print(request.META.get('CONTENT_TYPE'))
+    #     print(request.user)
+    #     remote_ip = request.META.get("REMOTE_ADDR")
+    #     if request.user:
+    #         user = UserProfile.objects.get(username=request.user)
+    #         if user.has_perm('automation.change_autoflow'):
+    #             # print(request.data)
+    #             # jsondata = request.body.decode('utf-8')
+    #             # print("jsondata", jsondata, type(jsondata))
+    #             # post_param = json.loads(jsondata)
+    #             post_param = request.data
+    #             print("安全策略", post_param)
+    #             # 更新单个设备安全策略信息(山石)
+    #             if all(k in post_param for k in ("vendor", "update_device", "hostip")):
+    #                 if post_param['vendor'] == 'Hillstone':
+    #                     _res = SecPolicyMain.update_hillstone_addr_service(post_param['hostip'])
+    #                     return HttpResponse(json.dumps({'code': 200, 'message': 'OK', 'result': 'OK'}),
+    #                                         content_type="application/json")
+    #                 return HttpResponse(json.dumps(dict(code=400, message='只有山石才需要异步更新信息')),
+    #                                     content_type="application/json")
+    #
+    #             # 单个地址对象新增条目(新)
+    #             if all(k in post_param for k in ("vendor", "hostip", "hostid")):
+    #                 schema_res, msg = single_json_validate(post_param, sec_policy_schema)
+    #                 print(schema_res)
+    #                 # json数据验证通过
+    #                 if schema_res:
+    #                     post_param['user'] = str(request.user.username)
+    #                     post_param['remote_ip'] = str(remote_ip)
+    #                     res = config_sec_policy.apply_async(kwargs=post_param, queue=CELERY_QUEUE,
+    #                                                         retry=True)  # config_backup
+    #                     if str(res) == 'None':
+    #                         print('forget')
+    #                         res.forget()
+    #                         return HttpResponse(json.dumps({'code': 400,
+    #                                                         'message': 'duplicate task execution', 'data': []}),
+    #                                             content_type="application/json")
+    #                     if res:
+    #                         return HttpResponse(json.dumps({'code': 200, 'message': 'OK', 'data': str(res)}),
+    #                                             content_type="application/json")
+    #                 else:
+    #                     return JsonResponse(msg, safe=False)
+    #                 return HttpResponse(json.dumps(dict(code=400, message='操作不被允许', data=[])),
+    #                                     content_type="application/json")
+    #         else:
+    #             return HttpResponse(json.dumps(dict(code=400, message='用户没有权限')), content_type="application/json")
+    #     else:
+    #         return HttpResponse(json.dumps(dict(code=400, message='没有获取到用户信息')), content_type="application/json")
+    #
+    #     return HttpResponse(json.dumps(dict(code=400, message='没有任何匹配')), content_type="application/json")
