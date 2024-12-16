@@ -184,6 +184,7 @@ class Tasks(object):
     ADDRESS_SET = '地址对象'
     SERVICE_SET = '服务对象'
     DENY = '一键封堵'
+    AUTO_SWITCH = '一键切换'
 
     CHOICES = (
         (DNAT, DNAT),
@@ -194,6 +195,7 @@ class Tasks(object):
         (DENY, DENY),
         (ADDRESS_SET, ADDRESS_SET),
         (SERVICE_SET, SERVICE_SET),
+        (AUTO_SWITCH, AUTO_SWITCH),
     )
 
 

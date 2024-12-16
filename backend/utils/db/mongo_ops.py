@@ -123,7 +123,6 @@ class MongoOps:
         result = db.test.update_one({'x': 1}, {'$inc': {'x': 3}})
         res = my_mongo.update(filter=tmp[-1], update={"$set": {'start': int(tmp[-1]['start'])})
         """
-        # self.coll.update_one(filter=filter, update=update)
         self.coll.update_many(filter=filter, update=update)
         return
 

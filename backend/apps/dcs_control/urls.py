@@ -23,4 +23,5 @@ urlpatterns = [
     path('deny_key/', views.DenyByAddrObj.as_view(), name="deny_key"),  # 一键封堵
     path('address_set/', views.AddressSet.as_view(), name="address_set"),  # 地址对象
     path('dnat/', views.DestAddTranslate.as_view(), name="dnat"),  # DNAT
+    path('sec_policy/', views.SecPolicy.as_view(), name="sec_policy"),  # 安全策略
 ]

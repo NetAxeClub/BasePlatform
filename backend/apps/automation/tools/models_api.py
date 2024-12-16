@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 # 2023/8/28
-# from django.db import connections
+from django.db import connections
 from apps.asset.models import NetworkDevice, Category
-from apps.asset.serializers import NetworkDeviceSerializer
+# from apps.asset.serializers import NetworkDeviceSerializer
 
 
 def get_firewall_list(manage_ip_list=None):

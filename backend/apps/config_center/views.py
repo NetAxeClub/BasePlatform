@@ -4,11 +4,13 @@ import re
 import yaml
 import io
 import django_filters
-from jinja2 import Environment, StrictUndefined, exceptions
+import ipaddress
+from netaddr import IPNetwork, IPAddress
+from jinja2 import Environment, StrictUndefined, exceptions, Template
 from django.http import FileResponse
 from datetime import date, datetime
 from django.http import JsonResponse, StreamingHttpResponse
-from django.core.files.storage import default_storage
+# from django.core.files.storage import default_storage
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from rest_framework.views import APIView
@@ -38,12 +40,23 @@ def is_safe_dict(data: dict) -> bool:
     return True
 
 
+def inverse_mask(cidr: str) -> str:
+    network = ipaddress.ip_network(cidr.strip(), strict=False)
+    mask = network.hostmask
+    return mask.compressed
+
+
+def format_cidr(cidr: str) -> str:
+    net = IPNetwork(cidr.strip())
+    return str(net.cidr)
+
+
 def jinja_render(data, template):
     """ Render a jinja template
     """
     if is_safe_dict(data):
         env = Environment(undefined=StrictUndefined, trim_blocks=True, lstrip_blocks=True)
-
+        env.globals.update(inverse_mask=inverse_mask, format_cidr=format_cidr)
         try:
             jinja2_tpl = env.from_string(template)
             rendered_jinja2_tpl = jinja2_tpl.render(data)

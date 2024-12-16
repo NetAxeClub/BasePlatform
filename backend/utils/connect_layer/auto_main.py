@@ -194,12 +194,8 @@ class BatManMain(object):
 
     @staticmethod
     def config_cmds(*cmds, **dev_info):
-        # paths = BatManMain.send_cmds(*['display evpn route arp'], **dev_info)
-        paths = []
+        filename = 'automation/' + dev_info['ip'] + '/' + 'config_' + str(int(time.time())) + '.txt'
         try:
-            # dev_connection = ConnectHandler(**dev_info)
-            # input = dev_connection.send_config_set(cmds)
-            # print(input)
             # 进入配置模式的命令
             config_mode_command = None
             if dev_info.get('config_mode_command'):
@@ -210,14 +206,13 @@ class BatManMain(object):
                 # prompt = dev_connection.find_prompt()  # 找出设备的prompt
                 # print(prompt)
                 # dev_connection.enable()
-                filename = 'automation/' + dev_info['ip'] + '/' + 'config' + '.txt'
                 # 判断文件是否已经存在
                 if default_storage.exists(filename):
                     # 删除已经存在的文件重新生成
                     default_storage.delete(filename)
-                tmp = default_storage.save(filename, ContentFile('test'))
+                    default_storage.save(filename, ContentFile('.'))
                 # netmiko自带log方法需要使用绝对路径存储
-                dev_connection.open_session_log(filename=BASE_DIR + '/media/' + tmp)
+                dev_connection.open_session_log(filename=BASE_DIR + '/media/' + filename)
                 # content = dev_connection.send_config_set(config_commands=cmds,
                 #                                          cmd_verify=False)
                 content = dev_connection.send_config_set(config_commands=cmds, exit_config_mode=True, delay_factor=1,
@@ -231,27 +226,23 @@ class BatManMain(object):
                 # print(content)
                 dev_connection.close_session_log()
                 dev_connection.disconnect()
-                paths.append(filename)
         #
         # except Exception as e:
         #     print(e)
         #     print(traceback.print_exc())
         except NetmikoAuthenticationException as e:  # 认证失败报错记录
             error_text = '[Error 1] Authentication failed.{}'.format(str(e))
-            print('[Error 1] {} Authentication failed.{}'.format(dev_info['ip'], str(e)))
-            BatManMongo.insert_failed_logs(hostip=dev_info['ip'], device_type=dev_info['device_type'], info=error_text)
+            logger.error(e)
+            return False, filename, error_text
         except NetmikoTimeoutException as e:  # 登录超时报错记录
             error_text = '[Error 2] Connection timed out.{}'.format(str(e))
-            print('[Error 2] {} Connection timed out.{}'.format(dev_info['ip'], str(e)))
-            BatManMongo.insert_failed_logs(hostip=dev_info['ip'], device_type=dev_info['device_type'], info=error_text)
+            logger.error(e)
+            return False, filename, error_text
         except Exception as e:  # 未知报错记录
             error_text = '[Error 3] Unknown error. {}'.format(str(e))
-            print('[Error 3] {} Unknown error. {}'.format(dev_info['ip'], str(e)))
-            # 采集失败的记录日志
-            BatManMongo.insert_failed_logs(hostip=dev_info['ip'], device_type=dev_info['device_type'], info=error_text)
-            # print(str(e))
-            return False
-        return paths
+            logger.error(e)
+            return False, filename, error_text
+        return True, filename, ''
 
     @staticmethod
     def yaml_config_cmds(**kwargs):
