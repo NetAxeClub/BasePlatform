@@ -1,6 +1,7 @@
 import json
 from rest_framework.views import APIView
 from django.http import JsonResponse, HttpResponse
+from netaddr import IPAddress
 from netaxe.settings import DEBUG
 from apps.asset.models import AssetIpInfo
 from apps.dcs_control.tasks import FirewallMain, SecPolicyMain
@@ -248,7 +249,23 @@ class SecPolicy(APIView):
         get_param = request.GET.dict()
         print(get_param)
         if all(k in get_param for k in ("page_size", "page")):
-            res = sec_policy_mongo.find_page_query(
+            _params = json.loads(get_param["query"])
+            query = {}
+            _query = {k: v for k, v in _params.items() if v}
+            print(_query)
+            if 'hostip' in _query.keys():
+                query['hostip'] = _query['hostip']
+            if 'id' in _query.keys():
+                query['id'] = _query['id']
+            if 'name' in _query.keys():
+                query['name'] = _query['name']
+            if 'src_ip' in _query.keys():
+                _ip = IPAddress(_query['src_ip'])
+                query['src_ip_split'] = {'$elemMatch': {'start': {'$gte': _ip.value}, 'end': {'$lte': _ip.value}}}
+            if 'dst_ip' in _query.keys():
+                _ip = IPAddress(_query['dst_ip'])
+                query['dst_ip_split'] = {'$elemMatch': {'start': {'$gte': _ip.value}, 'end': {'$lte': _ip.value}}}
+            res = sec_policy_mongo.find_page_query(query_dict=query,
                 fields={'_id': 0}, page_size=int(get_param['page_size']), page_num=int(get_param['page']))
             count = sec_policy_mongo.count_documents()
             result = {
@@ -407,8 +424,43 @@ class SecPolicy(APIView):
                     return JsonResponse({'results': _res, 'count': len(_res), 'code': 400})
         return JsonResponse({'code': 400}, content_type="application/json")
 
-    # def post(self, request):
-    #     post_param = request.data
+    def post(self, request):
+        post_param = request.data
+        print(post_param)
+        # 获取设备地址组
+        if all(k in post_param for k in ("vendor", "hostip", "name", "id")):
+            if post_param['vendor'] == 'H3C':
+                _FirewallMain = FirewallMain(post_param['hostip'])
+                _res = _FirewallMain.get_h3c_address_obj()
+                if isinstance(_res, list):
+                    res = json.dumps({'results': _res, 'count': len(_res),
+                                      'code': 200})
+                else:
+                    res = json.dumps({'results': [], 'count': 0,
+                                      'code': 400})
+                return HttpResponse(res, content_type="application/json")
+            elif post_param['vendor'] == 'Huawei':
+                _FirewallMain = FirewallMain(post_param['hostip'])
+                _res = _FirewallMain.get_huawei_address_obj()
+                if isinstance(_res, list):
+                    res = json.dumps({'results': _res, 'count': len(_res),
+                                      'code': 200})
+                else:
+                    res = json.dumps({'results': [], 'count': 0,
+                                      'code': 400})
+                return HttpResponse(res, content_type="application/json")
+            elif post_param['vendor'] == 'hillstone':
+                _res = MongoOps(db='Automation', coll='Hillstone_address') \
+                    .find(query_dict={'hostip': post_param['hostip'], 'id': post_param['id'], 'name': post_param['name']}, fields={'_id': 0})
+                if _res:
+                    res = json.dumps({'results': _res, 'count': len(_res),
+                                      'code': 200})
+                else:
+                    res = json.dumps({'results': _res, 'count': len(_res),
+                                      'code': 400})
+                return HttpResponse(res, content_type="application/json")
+
+        return JsonResponse({'code': 400}, content_type="application/json")
     #     # 更新单个设备策略
     #     if all(k in post_param for k in ("vendor", "update_device")):
     #         if post_param['vendor'] == 'H3C':
