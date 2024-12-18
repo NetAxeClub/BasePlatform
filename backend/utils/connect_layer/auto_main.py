@@ -9,7 +9,7 @@ import os
 import re
 import time
 import traceback
-
+import logging
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.core.files.base import ContentFile
@@ -36,6 +36,7 @@ channel_layer = get_channel_layer()
 """
 os.environ["NTC_TEMPLATES_DIR"] = BASE_DIR + '/utils/connect_layer/zetmiko/templates'
 
+logger = logging.getLogger('connect_layer')
 
 # 发送websocket消息
 def send_ws_msg(channel, group_name, data):
@@ -212,7 +213,7 @@ class BatManMain(object):
                     default_storage.delete(filename)
                     default_storage.save(filename, ContentFile('.'))
                 # netmiko自带log方法需要使用绝对路径存储
-                dev_connection.open_session_log(filename=BASE_DIR + '/media/' + filename)
+                # dev_connection.open_session_log(filename=BASE_DIR + '/media/' + filename)
                 # content = dev_connection.send_config_set(config_commands=cmds,
                 #                                          cmd_verify=False)
                 content = dev_connection.send_config_set(config_commands=cmds, exit_config_mode=True, delay_factor=1,
@@ -224,8 +225,10 @@ class BatManMain(object):
                 #     cmd='snmp-agent trap enable', confirm=True, confirm_response='Y')
                 content += dev_connection.save_config()
                 # print(content)
-                dev_connection.close_session_log()
+                # dev_connection.close_session_log()
+                default_storage.save(filename, ContentFile(content))
                 dev_connection.disconnect()
+
         #
         # except Exception as e:
         #     print(e)
