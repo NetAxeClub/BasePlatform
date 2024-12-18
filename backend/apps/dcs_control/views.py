@@ -252,7 +252,6 @@ class SecPolicy(APIView):
             _params = json.loads(get_param["query"])
             query = {}
             _query = {k: v for k, v in _params.items() if v}
-            print(_query)
             if 'hostip' in _query.keys():
                 query['hostip'] = _query['hostip']
             if 'id' in _query.keys():
@@ -261,10 +260,10 @@ class SecPolicy(APIView):
                 query['name'] = _query['name']
             if 'src_ip' in _query.keys():
                 _ip = IPAddress(_query['src_ip'])
-                query['src_ip_split'] = {'$elemMatch': {'start': {'$gte': _ip.value}, 'end': {'$lte': _ip.value}}}
+                query['src_ip_split'] = {'$elemMatch': {'start': {'$lte': _ip.value}, 'end': {'$gte': _ip.value}}}
             if 'dst_ip' in _query.keys():
                 _ip = IPAddress(_query['dst_ip'])
-                query['dst_ip_split'] = {'$elemMatch': {'start': {'$gte': _ip.value}, 'end': {'$lte': _ip.value}}}
+                query['dst_ip_split'] = {'$elemMatch': {'start': {'$lte': _ip.value}, 'end': {'$gte': _ip.value}}}
             res = sec_policy_mongo.find_page_query(query_dict=query,
                 fields={'_id': 0}, page_size=int(get_param['page_size']), page_num=int(get_param['page']))
             count = sec_policy_mongo.count_documents()
@@ -426,7 +425,7 @@ class SecPolicy(APIView):
 
     def post(self, request):
         post_param = request.data
-        print(post_param)
+        # print(post_param)
         # 获取设备地址组
         if all(k in post_param for k in ("vendor", "hostip", "name", "id")):
             if post_param['vendor'] == 'H3C':
@@ -442,7 +441,7 @@ class SecPolicy(APIView):
                         if 'object' in addr.keys():
                             # src_addr_query = _FirewallMain.get_h3c_address_obj(name=addr['object'])
                             src_addr_query = MongoOps(db='NETCONF', coll='h3c_address_set').find(
-                                query_dict=dict(hostip=post_param['hostip'], Name=addr['object']), fields={'id': 0}
+                                query_dict=dict(hostip=post_param['hostip'], Name=addr['object']), fields={'_id': 0}
                             )
                             if src_addr_query:
                                 for x in src_addr_query[0]['ObjList']:
@@ -458,7 +457,7 @@ class SecPolicy(APIView):
                         if 'object' in addr.keys():
                             # dst_addr_query = _FirewallMain.get_h3c_address_obj(name=addr['object'])
                             dst_addr_query = MongoOps(db='NETCONF', coll='h3c_address_set').find(
-                                query_dict=dict(hostip=post_param['hostip'], Name=addr['object']), fields={'id': 0}
+                                query_dict=dict(hostip=post_param['hostip'], Name=addr['object']), fields={'_id': 0}
                             )
                             if dst_addr_query:
                                 for x in dst_addr_query[0]['ObjList']:
@@ -474,7 +473,7 @@ class SecPolicy(APIView):
                         if 'object' in ser.keys():
                             # dst_addr_query = _FirewallMain.get_h3c_service_obj(name=ser['object'])
                             service_query = MongoOps(db='NETCONF', coll='h3c_service_set').find(
-                                query_dict=dict(hostip=post_param['hostip'], Name=ser['object']), fields={'id': 0}
+                                query_dict=dict(hostip=post_param['hostip'], Name=ser['object']), fields={'_id': 0}
                             )
                             print(service_query)
                 return JsonResponse({'code': 200, 'data': result, 'msg': 'ok'}, content_type="application/json")
@@ -498,7 +497,7 @@ class SecPolicy(APIView):
                     for addr in post_param['src_addr']:
                         if 'object' in addr.keys():
                             src_addr_query = MongoOps(db='Automation', coll='hillstone_address').find(
-                                query_dict=dict(hostip=post_param['hostip'], name=addr['object']), fields={'id': 0}
+                                query_dict=dict(hostip=post_param['hostip'], name=addr['object']), fields={'_id': 0}
                             )
                             if src_addr_query:
                                 for x in src_addr_query[0]['ip']:
@@ -508,11 +507,17 @@ class SecPolicy(APIView):
                                             'ip': x['ip'],
                                             'xunmi': MongoNetOps.get_xunmi_info(dict(server_ip_address=x['ip'].split('/')[0]))
                                         })
+                        if 'ip' in addr.keys():
+                            result['src_addr'].append({
+                                'name': '',
+                                'ip': addr['ip'],
+                                'xunmi': MongoNetOps.get_xunmi_info(dict(server_ip_address=addr['ip'].split('/')[0]))
+                            })
                 if post_param['dst_addr']:
                     for addr in post_param['dst_addr']:
                         if 'object' in addr.keys():
                             src_addr_query = MongoOps(db='Automation', coll='hillstone_address').find(
-                                query_dict=dict(hostip=post_param['hostip'], name=addr['object']), fields={'id': 0}
+                                query_dict=dict(hostip=post_param['hostip'], name=addr['object']), fields={'_id': 0}
                             )
                             if src_addr_query:
                                 for x in src_addr_query[0]['ip']:
@@ -522,11 +527,17 @@ class SecPolicy(APIView):
                                             'ip': x['ip'],
                                             'xunmi': MongoNetOps.get_xunmi_info(dict(server_ip_address=x['ip'].split('/')[0]))
                                         })
+                        if 'ip' in addr.keys():
+                            result['dst_addr'].append({
+                                'name': '',
+                                'ip': addr['ip'],
+                                'xunmi': MongoNetOps.get_xunmi_info(dict(server_ip_address=addr['ip'].split('/')[0]))
+                            })
                 if post_param['service']:
                     for ser in post_param['service']:
                         if 'object' in ser.keys():
                             service_query = MongoOps(db='Automation', coll='hillstone_service').find(
-                                query_dict=dict(hostip=post_param['hostip'], name=ser['object']), fields={'id': 0}
+                                query_dict=dict(hostip=post_param['hostip'], name=ser['object']), fields={'_id': 0}
                             )
                             if service_query:
                                 for x in service_query[0]['items']:
@@ -535,7 +546,6 @@ class SecPolicy(APIView):
                                         'dst-port-min': x['dst-port-min'],
                                         'protocol': x['protocol']
                                     })
-                            print(service_query)
                 return JsonResponse({'code': 200, 'data': result, 'msg': 'ok'}, content_type="application/json")
 
         return JsonResponse({'code': 400}, content_type="application/json")
