@@ -430,7 +430,7 @@ class SecPolicy(APIView):
         # 获取设备地址组
         if all(k in post_param for k in ("vendor", "hostip", "name", "id")):
             if post_param['vendor'] == 'H3C':
-                _FirewallMain = FirewallMain(post_param['hostip'])
+                # _FirewallMain = FirewallMain(post_param['hostip'])
                 # _res = _FirewallMain.get_h3c_address_obj()
                 result = {
                     'src_addr': [],
@@ -440,7 +440,10 @@ class SecPolicy(APIView):
                 if post_param['src_addr']:
                     for addr in post_param['src_addr']:
                         if 'object' in addr.keys():
-                            src_addr_query = _FirewallMain.get_h3c_address_obj(name=addr['object'])
+                            # src_addr_query = _FirewallMain.get_h3c_address_obj(name=addr['object'])
+                            src_addr_query = MongoOps(db='NETCONF', coll='h3c_address_set').find(
+                                query_dict=dict(hostip=post_param['hostip'], Name=addr['object']), fields={'id': 0}
+                            )
                             if src_addr_query:
                                 for x in src_addr_query[0]['ObjList']:
                                     if x['Type'] == 'ip':
@@ -453,7 +456,10 @@ class SecPolicy(APIView):
                 if post_param['dst_addr']:
                     for addr in post_param['dst_addr']:
                         if 'object' in addr.keys():
-                            dst_addr_query = _FirewallMain.get_h3c_address_obj(name=addr['object'])
+                            # dst_addr_query = _FirewallMain.get_h3c_address_obj(name=addr['object'])
+                            dst_addr_query = MongoOps(db='NETCONF', coll='h3c_address_set').find(
+                                query_dict=dict(hostip=post_param['hostip'], Name=addr['object']), fields={'id': 0}
+                            )
                             if dst_addr_query:
                                 for x in dst_addr_query[0]['ObjList']:
                                     if x['Type'] == 'ip':
@@ -466,8 +472,11 @@ class SecPolicy(APIView):
                 if post_param['service']:
                     for ser in post_param['service']:
                         if 'object' in ser.keys():
-                            dst_addr_query = _FirewallMain.get_h3c_service_obj(name=ser['object'])
-                            print(dst_addr_query)
+                            # dst_addr_query = _FirewallMain.get_h3c_service_obj(name=ser['object'])
+                            service_query = MongoOps(db='NETCONF', coll='h3c_service_set').find(
+                                query_dict=dict(hostip=post_param['hostip'], Name=ser['object']), fields={'id': 0}
+                            )
+                            print(service_query)
                 return JsonResponse({'code': 200, 'data': result, 'msg': 'ok'}, content_type="application/json")
             elif post_param['vendor'] == 'Huawei':
                 _FirewallMain = FirewallMain(post_param['hostip'])
