@@ -431,14 +431,44 @@ class SecPolicy(APIView):
         if all(k in post_param for k in ("vendor", "hostip", "name", "id")):
             if post_param['vendor'] == 'H3C':
                 _FirewallMain = FirewallMain(post_param['hostip'])
-                _res = _FirewallMain.get_h3c_address_obj()
-                if isinstance(_res, list):
-                    res = json.dumps({'results': _res, 'count': len(_res),
-                                      'code': 200})
-                else:
-                    res = json.dumps({'results': [], 'count': 0,
-                                      'code': 400})
-                return HttpResponse(res, content_type="application/json")
+                # _res = _FirewallMain.get_h3c_address_obj()
+                result = {
+                    'src_addr': [],
+                    'dst_addr': [],
+                    'service': []
+                }
+                if post_param['src_addr']:
+                    for addr in post_param['src_addr']:
+                        if 'object' in addr.keys():
+                            src_addr_query = _FirewallMain.get_h3c_address_obj(name=addr['object'])
+                            if src_addr_query:
+                                for x in src_addr_query[0]['ObjList']:
+                                    if x['Type'] == 'ip':
+                                        result['src_addr'].append({
+                                            'name': addr['object'],
+                                            'ip': x['HostIPv4Address'],
+                                            'xunmi': MongoNetOps.get_xunmi_info(
+                                                dict(server_ip_address=x['HostIPv4Address']))
+                                        })
+                if post_param['dst_addr']:
+                    for addr in post_param['dst_addr']:
+                        if 'object' in addr.keys():
+                            dst_addr_query = _FirewallMain.get_h3c_address_obj(name=addr['object'])
+                            if dst_addr_query:
+                                for x in dst_addr_query[0]['ObjList']:
+                                    if x['Type'] == 'ip':
+                                        result['dst_addr'].append({
+                                            'name': addr['object'],
+                                            'ip': x['HostIPv4Address'],
+                                            'xunmi': MongoNetOps.get_xunmi_info(
+                                                dict(server_ip_address=x['HostIPv4Address']))
+                                        })
+                if post_param['service']:
+                    for ser in post_param['service']:
+                        if 'object' in ser.keys():
+                            dst_addr_query = _FirewallMain.get_h3c_service_obj(name=ser['object'])
+                            print(dst_addr_query)
+                return JsonResponse({'code': 200, 'data': result, 'msg': 'ok'}, content_type="application/json")
             elif post_param['vendor'] == 'Huawei':
                 _FirewallMain = FirewallMain(post_param['hostip'])
                 _res = _FirewallMain.get_huawei_address_obj()
@@ -450,15 +480,54 @@ class SecPolicy(APIView):
                                       'code': 400})
                 return HttpResponse(res, content_type="application/json")
             elif post_param['vendor'] == 'hillstone':
-                _res = MongoOps(db='Automation', coll='Hillstone_address') \
-                    .find(query_dict={'hostip': post_param['hostip'], 'id': post_param['id'], 'name': post_param['name']}, fields={'_id': 0})
-                if _res:
-                    res = json.dumps({'results': _res, 'count': len(_res),
-                                      'code': 200})
-                else:
-                    res = json.dumps({'results': _res, 'count': len(_res),
-                                      'code': 400})
-                return HttpResponse(res, content_type="application/json")
+                result = {
+                    'src_addr': [],
+                    'dst_addr': [],
+                    'service': []
+                }
+                if post_param['src_addr']:
+                    for addr in post_param['src_addr']:
+                        if 'object' in addr.keys():
+                            src_addr_query = MongoOps(db='Automation', coll='hillstone_address').find(
+                                query_dict=dict(hostip=post_param['hostip'], name=addr['object']), fields={'id': 0}
+                            )
+                            if src_addr_query:
+                                for x in src_addr_query[0]['ip']:
+                                    if 'ip' in x.keys():
+                                        result['src_addr'].append({
+                                            'name': addr['object'],
+                                            'ip': x['ip'],
+                                            'xunmi': MongoNetOps.get_xunmi_info(dict(server_ip_address=x['ip'].split('/')[0]))
+                                        })
+                if post_param['dst_addr']:
+                    for addr in post_param['dst_addr']:
+                        if 'object' in addr.keys():
+                            src_addr_query = MongoOps(db='Automation', coll='hillstone_address').find(
+                                query_dict=dict(hostip=post_param['hostip'], name=addr['object']), fields={'id': 0}
+                            )
+                            if src_addr_query:
+                                for x in src_addr_query[0]['ip']:
+                                    if 'ip' in x.keys():
+                                        result['dst_addr'].append({
+                                            'name': addr['object'],
+                                            'ip': x['ip'],
+                                            'xunmi': MongoNetOps.get_xunmi_info(dict(server_ip_address=x['ip'].split('/')[0]))
+                                        })
+                if post_param['service']:
+                    for ser in post_param['service']:
+                        if 'object' in ser.keys():
+                            service_query = MongoOps(db='Automation', coll='hillstone_service').find(
+                                query_dict=dict(hostip=post_param['hostip'], name=ser['object']), fields={'id': 0}
+                            )
+                            if service_query:
+                                for x in service_query[0]['items']:
+                                    result['service'].append({
+                                        'name': ser['object'],
+                                        'dst-port-min': x['dst-port-min'],
+                                        'protocol': x['protocol']
+                                    })
+                            print(service_query)
+                return JsonResponse({'code': 200, 'data': result, 'msg': 'ok'}, content_type="application/json")
 
         return JsonResponse({'code': 400}, content_type="application/json")
     #     # 更新单个设备策略

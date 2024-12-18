@@ -4533,7 +4533,7 @@ class FirewallMain(object):
             device = H3CSecPath(host=self.host, user=self.dev_info['username'], password=self.dev_info['password'])
 
             try:
-                ipv4_group = device.get_ipv4_paging()
+                ipv4_group = device.get_ipv4_paging(**kwargs)
                 if ipv4_group:
                     for i in ipv4_group:
                         i['hostip'] = self.host
@@ -4569,10 +4569,9 @@ class FirewallMain(object):
     # 获取华三单个设备服务对象列表V2
     def get_h3c_service_obj(self, **kwargs):
         try:
-            device = H3CinfoCollection(host=self.host,
-                                       user=self.dev_info['username'], password=self.dev_info['password'])
+            device = H3CSecPath(host=self.host, user=self.dev_info['username'], password=self.dev_info['password'])
             try:
-                service_set = device.get_server_groups()
+                service_set = device.get_server_groups(**kwargs)
                 if service_set:
                     for i in service_set:
                         i['hostip'] = self.host
