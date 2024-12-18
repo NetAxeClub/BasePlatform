@@ -7171,6 +7171,11 @@ def config_auto_switch(self, **post_param):
             SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'recover'}})
         else:
             SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'cover'}})
+    else:
+        if switch_failback['status'] == 'cover':
+            SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'recover_failed'}})
+        else:
+            SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'cover_failed'}})
 
 
 if __name__ == '__main__':
