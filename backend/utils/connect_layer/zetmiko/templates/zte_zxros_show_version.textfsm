@@ -1,0 +1,17 @@
+Value Slot (\d+)
+Value Filldown VERSION (.+)
+Value HARDWARE (\S+)
+Value MASTER (M|S)
+
+Start
+  ^ZXR10
+  ^ZTE.+Software,\s+Version:\s+${VERSION},\s+Release\s+software
+  ^Copyright
+  ^Built
+  ^System
+  ^$$ -> SHELF
+
+SHELF
+  ^\[MPU\(${MASTER}\),\s*shelf\s*${Slot},\s*panel\s*\d+\]
+  ^Board Name\s+:\s${HARDWARE}
+  ^$$ -> Continue.Record

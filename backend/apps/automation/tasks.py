@@ -42,6 +42,7 @@ from apps.automation.tools.cisco import CiscoProc
 from apps.automation.tools.mellanox import MellanoxProc
 from apps.automation.tools.ruijie import RuijieProc
 from apps.automation.tools.centec import CentecProc
+from apps.automation.tools.zte import ZteProc
 from apps.automation.tools.model_api import get_device_info_v2
 from utils.connect_layer.auto_main import HuaweiS, HillstoneFsm
 from utils.db.mongo_ops import MongoOps, MongoNetOps, XunMiOps
@@ -825,6 +826,7 @@ def collect_device(**kwargs):
         'Ruijie': RuijieProc,
         'Maipu': MaipuProc,
         'Cisco': CiscoProc,
+        'ZTE': ZteProc,
     }
     if vendor_alias in CLASS_MAP.keys():
         class_instance = CLASS_MAP[vendor_alias](**kwargs)

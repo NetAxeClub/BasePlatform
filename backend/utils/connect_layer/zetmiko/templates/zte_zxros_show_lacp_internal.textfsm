@@ -1,0 +1,7 @@
+Value Filldown GROUP (\d+)
+Value Required PORT (\S+)
+Value Required STATE (ACTIVE|INACTIVE)
+
+Start
+  ^Smartgroup:${GROUP}
+  ^${PORT}\s+${STATE}\s+\d+\s+\d+.+ -> Record
