@@ -515,3 +515,12 @@ vyatta_vyos_show_interfaces.textfsm, .*, .*vyos.*, sh[[ow]] int[[erfaces]]
 vyatta_vyos_show_arp.textfsm, .*, .*vyos.*, sh[[ow]] a[[rp]]
 
 watchguard_firebox_show_arp.textfsm, .*, watchguard_firebox, sh[[ow]] arp
+zte_zxros_show_mpls_traffic-eng_tunnels.textfsm, .*, zte_zxros, sh[[ow]] mpls traffic-eng tunnels
+zte_zxros_show_interface_brief.textfsm, .*, zte_zxros, sh[[ow]] inter[[face]] br[[ief]]
+zte_zxros_show_isis_adjacency.textfsm, .*, zte_zxros, sh[[ow]] is[[is]] ad[[jacency]]
+zte_zxros_show_interface.textfsm, .*, zte_zxros, sh[[ow]] int[[erface]]
+zte_zxros_show_version.textfsm, .*, zte_zxros, sh[[ow]] ver[[sion]]
+zte_zxros_show_arp.textfsm, .*, zte_zxros, sh[[ow]] arp
+zte_zxros_show_mac_table.textfsm, .*, zte_zxros, sh[[ow]] mac table
+zte_zxros_show_lacp_internal.textfsm, .*, zte_zxros, sh[[ow]] lacp internal
+

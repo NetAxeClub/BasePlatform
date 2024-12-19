@@ -1,0 +1,7 @@
+Value Vlan (\d+)
+Value MACAddress (\w+.\w+.\w+)
+Value Type (\S+)
+Value Interface (\S+(\s+\S+)?)
+
+Start
+  ^${MACAddress}\s+${Vlan}\s+${Interface}\s+${Type}\s+\d+\s+\S+ -> Record
