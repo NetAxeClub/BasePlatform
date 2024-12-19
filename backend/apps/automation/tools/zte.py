@@ -148,17 +148,17 @@ class ZteProc(BaseConn):
         """
         layer2datas = []
         for i in res:
-            if i['interface'].startswith('AggregatePort'):
-                continue
-            if i['speed'] == 'Unknown' or i['speed'] == 'unknown':
-                i['speed'] = InterfaceFormat.ruijie_speed_format(
-                    i['interface'])
+            # if i['interface'].startswith('AggregatePort'):
+            #     continue
+            # if i['speed'] == 'Unknown' or i['speed'] == 'unknown':
+            #     i['speed'] = InterfaceFormat.ruijie_speed_format(
+            #         i['interface'])
             data = dict(hostip=self.hostip,
                         interface=i['interface'],
-                        status=i['status'],
+                        status=i['link_status'],
                         # speed=i['speed'],
-                        speed=InterfaceFormat.mathintspeed(i['speed']),
-                        duplex=i['duplex'],
+                        speed=i['bandwith'],
+                        duplex='',
                         description=i.get('description'))
             layer2datas.append(data)
         if layer2datas:
