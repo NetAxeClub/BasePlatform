@@ -281,7 +281,7 @@ class BaseConn:
                     hostname = re.search(r'(<\S+>)', prompt).group()
                     if self.hostname != hostname[1:-1]:
                         NetworkDevice.objects.filter(manage_ip=self.hostip).update(name=hostname[1:-1])
-                elif self.vendor_alias in ['Hillstone', 'Ruijie', 'centec', 'Maipu', 'Mellanox']:
+                elif self.vendor_alias in ['Hillstone', 'Ruijie', 'centec', 'Maipu', 'Mellanox', 'ZTE']:
                     if self.hostname != prompt[:-1]:
                         NetworkDevice.objects.filter(manage_ip=self.hostip).update(name=prompt[:-1])
                 # print(prompt)
