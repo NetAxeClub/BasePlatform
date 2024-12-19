@@ -34,6 +34,7 @@ device_type_map = {
     "Ruijie": "ruijie_os",
     "Maipu": "mypower",
     "Cisco": "cisco_ios",
+    "ZTE": "zte_zxros",
 }
 # fsm解析器参数映射
 fsm_flag_map = {
@@ -45,6 +46,7 @@ fsm_flag_map = {
     "Ruijie": "ruijie",
     "Maipu": "maipu",
     "Cisco": "cisco_ios",
+    "ZTE": "zte_zxros",
 }
 # netconf连接类映射
 netconf_class_map = {
