@@ -220,13 +220,14 @@ class BaseConn:
                     'Ruijie': 'exit',
                     'centec': 'exit',
                     'Maipu': 'exit',
+                    'ZTE': 'exit',
                 }
                 if self.vendor_alias in ['H3C', 'Huawei']:
                     # HRP_M<DZ.NET.IN.FW.001>
                     hostname = re.search(r'(<\S+>)', prompt).group()
                     if self.hostname != hostname[1:-1]:
                         NetworkDevice.objects.filter(manage_ip=self.hostip).update(name=hostname[1:-1])
-                elif self.vendor_alias in ['Hillstone', 'Ruijie', 'centec', 'Maipu', 'Mellanox']:
+                elif self.vendor_alias in ['Hillstone', 'Ruijie', 'centec', 'Maipu', 'Mellanox', 'ZTE']:
                     if self.hostname != prompt[:-1]:
                         NetworkDevice.objects.filter(manage_ip=self.hostip).update(name=prompt[:-1])
                 # print(prompt)
@@ -275,6 +276,7 @@ class BaseConn:
                     'Ruijie': 'exit',
                     'centec': 'exit',
                     'Maipu': 'exit',
+                    'ZTE': 'exit',
                 }
                 if self.vendor_alias in ['H3C', 'Huawei']:
                     # HRP_M<DZ.NET.IN.FW.001>
@@ -287,17 +289,17 @@ class BaseConn:
                 # print(prompt)
 
                 content = dev_connection.send_config_set(config_commands=cmds,
-                                               exit_config_mode=False,
-                                               delay_factor=2,
-                                               max_loops=60,
-                                               strip_prompt=False,
-                                               strip_command=False,
-                                               config_mode_command='configure',
-                                               cmd_verify=True,
-                                               enter_config_mode=True, )
+                                                         exit_config_mode=False,
+                                                         delay_factor=2,
+                                                         max_loops=60,
+                                                         strip_prompt=False,
+                                                         strip_command=False,
+                                                         config_mode_command='configure',
+                                                         cmd_verify=True,
+                                                         enter_config_mode=True, )
                 dev_connection.save_config()
                 if content:
-                    filename = 'automation/' + self.hostip  + '.txt'
+                    filename = 'automation/' + self.hostip + '.txt'
                     # 判断文件是否已经存在
                     if default_storage.exists(filename):
                         # 删除已经存在的文件重新生成
@@ -338,6 +340,7 @@ class BaseConn:
                     'Ruijie': 'exit',
                     'centec': 'exit',
                     'Maipu': 'exit',
+                    'ZTE': 'exit',
                 }
                 content += dev_connection.send_command(cmd)
                 if self.vendor_alias in quit_cmd.keys():
