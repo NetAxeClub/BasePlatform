@@ -80,15 +80,14 @@ class QueryAuthMiddleware(BaseMiddleware):
     def populate_scope(self, scope):
         logger.info('populate_scope')
         print('populate_scope')
-        print(scope)
         # Make sure we have a session
         if "session" not in scope:
             raise ValueError(
                 "AuthMiddleware cannot find session in scope. SessionMiddleware must be above it."
             )
-        # # Add it to the scope if it's not there already
-        # if "user" not in scope:
-        #     scope["user"] = get_user(scope)
+        # Add it to the scope if it's not there already
+        if "user" not in scope:
+            scope["user"] = get_user(scope)
 
     async def resolve_scope(self, scope):
         logger.info('resolve_scope')
