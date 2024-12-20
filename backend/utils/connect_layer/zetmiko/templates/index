@@ -523,4 +523,5 @@ zte_zxros_show_version.textfsm, .*, zte_zxros, sh[[ow]] ver[[sion]]
 zte_zxros_show_arp.textfsm, .*, zte_zxros, sh[[ow]] arp
 zte_zxros_show_mac_table.textfsm, .*, zte_zxros, sh[[ow]] mac table
 zte_zxros_show_lacp_internal.textfsm, .*, zte_zxros, sh[[ow]] lacp internal
+zte_zxros_show_lldp_entry.textfsm, .*, zte_zxros, sh[[ow]] lldp entry
 
