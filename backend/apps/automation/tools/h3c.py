@@ -1371,12 +1371,10 @@ class H3cProc(BaseConn):
     def _netconf_server_groups(self, res):
         if res:
             for i in res:
-                print(i)
                 self.ser_map[i['Name']] = i
                 i['hostip'] = self.hostip
             MongoNetOps.insert_table(db='NETCONF', hostip=self.hostip, datas=res,
                                      tablename='h3c_service_set')
-        print("_netconf_server_groups end")
 
     def _netconf_global_nat_policy(self, res):
         if res:

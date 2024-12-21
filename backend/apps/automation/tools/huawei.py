@@ -536,6 +536,28 @@ class HuaweiProc(BaseConn):
                 tablename='layer3interface')
         return
 
+    def _aggre_port_proc(self, res):
+        if isinstance(res, list):
+            aggre_datas = []
+            for i in res:
+                if isinstance(i['portname'], list):
+                    memberports = []
+                    for member in i['portname']:
+                        memberports.append(member)
+                else:
+                    memberports = i['memberports']
+                tmp = dict(
+                    hostip=self.hostip,
+                    aggregroup=i['trunk_num'],
+                    memberports=memberports,
+                    status=i['portstatus'],
+                    mode=i.get('mode') or ''
+                )
+                aggre_datas.append(tmp)
+            if aggre_datas:
+                MongoNetOps.insert_table(
+                    'Automation', self.hostip, aggre_datas, 'AggreTable')
+
     def _lldp_proc(self, res):
         lldp_datas = []
         for i in res:
@@ -633,7 +655,8 @@ class HuaweiProc(BaseConn):
             'display_device_manufacture-info': '_manuinfo_proc',
             'display_stack': '_stack_proc',
             'display_version': '_version_proc',
-            'display_interface': '_interfaces'
+            'display_interface': '_interfaces',
+            'display_eth-trunk': '_aggre_port_proc'
         }
         if file_name in fsm_map.keys():
             caller = methodcaller(fsm_map[file_name], res)
