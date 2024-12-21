@@ -356,6 +356,8 @@ class HuaweiProc(BaseConn):
         if isinstance(res, list):
             arp_datas = []
             for i in res:
+                if i['interface'].find('.') != -1:
+                    i['interface'] = i['interface'].split('.')[0]
                 tmp = dict(
                     hostip=self.hostip,
                     hostname=self.hostname,
