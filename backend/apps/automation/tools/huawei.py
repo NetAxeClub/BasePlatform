@@ -637,6 +637,7 @@ class HuaweiProc(BaseConn):
         """
         [{'vrp_version': '1.23.0.1', 'product_version': 'Eudemon V600R023C00SPC100', 'model': 'Eudemon1000E-F55', 'uptime': '112 days, 23 hours, 43 minutes'}]
         """
+        print(res)
         if isinstance(res, list):
             if res[0]['model'] and self.model__name is None:
                 _vendor = Vendor.objects.get(name='华为')
