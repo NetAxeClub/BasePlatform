@@ -10,6 +10,7 @@
                     2022/9/8 11:02
 -------------------------------------------------
 """
+import traceback
 from collections import OrderedDict
 from django.db import connections
 from apps.asset.models import NetworkDevice, AssetAccount
@@ -21,7 +22,7 @@ def get_device_info_v2(**kwargs):
     hosts = []
     _CryptPwd = CryptPwd()  # 密码解码
     support_vendor = [
-        'H3C', 'Huawei', 'Ruijie', 'Maipu', 'Hillstone', 'Mellanox', 'centec', 'Cisco', 'CISCO', 'cisco'
+        'H3C', 'Huawei', 'Ruijie', 'Maipu', 'Hillstone', 'Mellanox', 'centec', 'Cisco', 'CISCO', 'cisco', 'ZTE'
     ]
     if kwargs:
         kwargs['status'] = 0
@@ -68,6 +69,7 @@ def get_device_info_v2(**kwargs):
             dev['protocol'] = tmp_protocol
             hosts.append(dev)
         except Exception as e:
+            print(traceback.print_exc())
             print(e)
     result = OrderedDict()
     for item in hosts:
