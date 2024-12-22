@@ -38,6 +38,7 @@ else:
 
 @shared_task(base=AxeTask, once={'graceful': True})
 def config_backup(**kwargs):
+    """废弃"""
     log_time = datetime.now().strftime("%Y-%m-%d")
     start_time = time.time()
     msg_gateway_runner.send_wechat(channel="netdevops", content=f"配置备份开始，时间:{log_time}")
