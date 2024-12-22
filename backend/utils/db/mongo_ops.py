@@ -640,7 +640,8 @@ class MongoNetOps(object):
         my_mongo = MongoOps(db=db, coll=tablename)
         if delete:
             my_mongo.delete_many(query=dict(hostip=hostip))
-        my_mongo.insert_many(datas)
+        [my_mongo.insert(x) for x in datas]
+        # my_mongo.insert_many(datas)
         # netconf_mongo.insert_many(datas)
         return
 
