@@ -14,7 +14,8 @@ from apps.config_center.config_parse.hp_comware.ttp_parse import H3cParse
 CONFIG_PATH = BASE_DIR + '/media/device_config/current-configuration/'
 
 vendor_map = {
-    'hp_comware': H3cParse
+    'hp_comware': H3cParse,
+    'H3C': H3cParse
 }
 
 
