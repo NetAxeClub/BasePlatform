@@ -302,7 +302,6 @@ def backup_device_config_sub(**kwargs):
 
 @shared_task(base=AxeTask, once={'graceful': True})
 def backup_device_config(**kwargs):
-    log_time = datetime.now().strftime("%Y-%m-%d")
     start_time = time.time()
     today = timezone.now()
     if kwargs:
@@ -314,7 +313,6 @@ def backup_device_config(**kwargs):
     # 参数初始化
     net_tower_tasks = []  # 寻觅任务id集合
     ping_result = []  # ping不通设备存储
-    start_time = time.time()
     # 批量下发任务
     for host in hosts:
         # backup_device_config_sub(**host)
@@ -330,11 +328,9 @@ def backup_device_config(**kwargs):
         if 'EagerResult' in str(type(task)):
             logger.info("存在无效task")
             net_tower_tasks.remove(task)
-
     # 获取tasks任务数量
     # net_tower_tasks_counters = len(net_tower_tasks)
     # net_tower_tasks_bak = net_tower_tasks.copy()
-
     # 等待子任务全部执行结束后执行下一步
     while len(net_tower_tasks) != 0:
         for i in net_tower_tasks:
@@ -345,14 +341,29 @@ def backup_device_config(**kwargs):
                 logger.error(str(e))
                 net_tower_tasks.remove(i)
         time.sleep(10)
+        logger.info(len(net_tower_tasks))
     logger.info('子任务全部执行结束')
-
     # 配置解析
     loop = asyncio.get_event_loop()
     loop.run_until_complete(config_file_parse())
+    end_time = time.time()
+    time_use = int(int(end_time - start_time) / 60)
+    msg_gateway_runner.send_wechat(channel="netdevops",
+                                   content=f"配置备份完成，耗时:{time_use}分\n")
+    config_compliance.apply_async(kwargs={}, queue=CELERY_QUEUE, retry=True)
+    git_push_config.apply_async(kwargs=kwargs, queue=CELERY_QUEUE, retry=True)
+    return
 
+
+@shared_task(base=AxeTask, once={'graceful': True})
+def git_push_config(**kwargs):
+    if kwargs:
+        hosts = get_device_info_v2(**kwargs)
+    else:
+        hosts = get_device_info_v2()
+    log_time = datetime.now().strftime("%Y-%m-%d")
+    today = timezone.now()
     commit, changed_files, untracked_files = push_file()
-
     for change_host in changed_files:
         hostip = change_host.split('/')[1]
         host_info = [host for host in hosts if host['manage_ip'] == hostip]
@@ -387,9 +398,3 @@ def backup_device_config(**kwargs):
         },
         'log_time': log_time
     })
-    end_time = time.time()
-    time_use = int(int(end_time - start_time) / 60)
-    msg_gateway_runner.send_wechat(channel="netdevops",
-                                   content=f"配置备份完成，耗时:{time_use}分\n")
-    config_compliance.apply_async(kwargs={}, queue=CELERY_QUEUE, retry=True)
-    return
