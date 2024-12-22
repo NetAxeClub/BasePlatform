@@ -344,8 +344,8 @@ def backup_device_config(**kwargs):
         logger.info(len(net_tower_tasks))
     logger.info('子任务全部执行结束')
     # 配置解析
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(config_file_parse())
+    # loop = asyncio.get_event_loop()
+    # loop.run_until_complete(config_file_parse())
     end_time = time.time()
     time_use = int(int(end_time - start_time) / 60)
     msg_gateway_runner.send_wechat(channel="netdevops",
