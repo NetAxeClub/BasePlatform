@@ -9,7 +9,7 @@ import re
 # from apps.asset.models import NetworkDevice
 import traceback
 from datetime import datetime
-
+from uuid import uuid4
 from netaddr import IPNetwork, IPAddress, valid_ipv4
 from operator import methodcaller
 from apps.asset.models import Model, NetworkDevice, Vendor
@@ -22,6 +22,7 @@ layer3_mongo = MongoOps(db='Automation', coll='layer3interface')
 address_mongo = MongoOps(db='Automation', coll='hillstone_address')
 service_mongo = MongoOps(db='Automation', coll='hillstone_service')
 servgroup_mongo = MongoOps(db='Automation', coll='hillstone_servgroup')
+dnat_mongo = MongoOps(db='Automation', coll='DNAT')
 slb_server_mongo = MongoOps(
     db='Automation', coll='hillstone_slb_server')
 aggr_group_mongo = MongoOps(db='Automation', coll='AggreTable')
@@ -415,8 +416,8 @@ class HillstoneProc(BaseConn):
             tmp['src_zone'] = i.get('src-zone') if i.get('src-zone') else 'Any'
             tmp['dst_zone'] = i.get('dst-zone') if i.get('dst-zone') else 'Any'
             tmp['service'] = i.get('service')
-            tmp['src_addr'] = i.get('src_addr')  # 地址组
-            tmp['dst_addr'] = i.get('dst_addr')  # 地址组
+            tmp['src_addr'] = i.get('src_addr') or [] # 地址组
+            tmp['dst_addr'] = i.get('dst_addr') or []  # 地址组
             tmp['log'] = log
             tmp['description'] = i.get('description')
             self.sec_policy_data.append(tmp)
