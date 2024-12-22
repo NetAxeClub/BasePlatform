@@ -185,7 +185,7 @@ def push_file():
                 repo.remote(_origin.name).push()
                 o = repo.remotes.origin
                 o.pull()
-        return commit, changedFiles, untracked_files
+        return commit.hexsha, changedFiles, untracked_files
     return '', '', ''
 
 
