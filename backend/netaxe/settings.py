@@ -93,8 +93,8 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "utils.custom.middleware.CorsMiddleWare",  # 配置跨域访问支持
-    # 'utils.custom.iam.IamMiddleware',
+    # "utils.custom.middleware.CorsMiddleWare",  # 配置跨域访问支持
+    'utils.custom.iam.IamMiddleware',
     "simple_history.middleware.HistoryRequestMiddleware",
 ]
 
