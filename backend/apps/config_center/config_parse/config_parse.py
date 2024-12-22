@@ -21,7 +21,7 @@ vendor_map = {
 
 async def sub_file_proc(host_file, _dir, host):
     with open("{}{}/{}".format(CONFIG_PATH, _dir, host), 'r', encoding='utf8') as f:
-        vendor_host = host_file.split('-')
+        vendor_host = host_file.split('_')
         vendor = vendor_host[0]
         host = vendor_host[1]
         data_to_parse = f.read()
