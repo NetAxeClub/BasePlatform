@@ -203,8 +203,8 @@ def config_compliance(**kwargs):
                 # print(childrens)
                 # 按厂商分组，同一厂商的规则使用逻辑运算符 OR
                 for child in childrens:
-                    print(f"检查项：{child.name}")
-                    print(f"检查项ID：{child.id}")
+                    logger.info(f"检查项：{child.name}")
+                    logger.info(f"检查项ID：{child.id}")
                     # 跟这个检查项有关的具体匹配规则
                     # 配置文件的vendor_alias  和  规则的compliance vendor 要对的上
                     compliances = child.relate_compliance.all().values()
@@ -297,7 +297,8 @@ def backup_device_config_sub(**kwargs):
 
 @shared_task(base=AxeTask, once={'graceful': True})
 def backup_device_config(**kwargs):
-    msg_gateway_runner.send_wechat(channel="netdevops", content=f"配置备份开始，时间:{datetime.now().strftime("%Y-%m-%d")}")
+    log_time = datetime.now().strftime("%Y-%m-%d")
+    msg_gateway_runner.send_wechat(channel="netdevops", content=f"配置备份开始，时间:{log_time}")
     start_time = time.time()
     today = timezone.now()
     if kwargs:
