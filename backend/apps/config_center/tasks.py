@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, unicode_literals
-import os
 import re
 import time
 import asyncio
@@ -21,7 +20,6 @@ from apps.config_center.config_parse.config_parse import config_file_parse
 from apps.config_center.git_tools.git_proc import push_file
 from apps.config_center.my_nornir import config_backup_nornir
 from apps.config_center.models import ConfigBackup, ConfigCompliance, ConfigComplianceResult, ConfigComplianceRule
-from django.core.files.storage import default_storage
 from utils.db.mongo_ops import MongoOps
 from service_mesh import msg_gateway_runner
 
@@ -192,14 +190,13 @@ def config_compliance(**kwargs):
 
     vendor_map = ['H3C', 'HUAWEI']
     start_datetime = (date.today() - timedelta(days=1)).strftime('%Y-%m-%d') + ' 00:00:00'
-    end_datetime = (date.today() - timedelta(days=1)).strftime('%Y-%m-%d') + ' 23:59:59'
-    config_files = ConfigBackup.objects.filter(last_time__range=(start_datetime, end_datetime)).iterator()
+    end_datetime = (date.today()).strftime('%Y-%m-%d') + ' 23:59:59'
+    config_files = ConfigBackup.objects.filter(last_time__range=(start_datetime, end_datetime), config_status='SUCCESS').iterator()
     for config_file in config_files:
-        path = f"device_config/{config_file.file_path}"
-        # print(vendor, path)
         if config_file.vendor in vendor_map:
-
-            data_to_parse = default_storage.open(path).read().decode('utf-8')
+            if not default_storage.exists(config_file.file_path):
+                continue
+            data_to_parse = default_storage.open(config_file.file_path).read().decode('utf-8')
             rules = ConfigComplianceRule.objects.all().iterator()
             for rule in rules:
                 childrens = rule.children.all()
@@ -277,9 +274,7 @@ def backup_device_config_sub(**kwargs):
     class_instance = BaseConn(**kwargs)
     try:
         content = class_instance.send_commands(cmd=command_map[kwargs['vendor__alias']]['cmd'])
-        filename = f"{BACKUP_PATH}/{hostip}/{kwargs['vendor__alias']}_{hostip}.txt"
-        if not os.path.exists(f"{BACKUP_PATH}/{hostip}"):
-            os.makedirs(f"{BACKUP_PATH}/{hostip}")
+        filename = f"device_config/current-configuration/{hostip}/{kwargs['vendor__alias']}_{hostip}.txt"
         path = default_storage.save(filename, ContentFile(content))
         ConfigBackup.objects.create(
             name=kwargs['name'], manage_ip=hostip,
@@ -302,6 +297,7 @@ def backup_device_config_sub(**kwargs):
 
 @shared_task(base=AxeTask, once={'graceful': True})
 def backup_device_config(**kwargs):
+    msg_gateway_runner.send_wechat(channel="netdevops", content=f"配置备份开始，时间:{datetime.now().strftime("%Y-%m-%d")}")
     start_time = time.time()
     today = timezone.now()
     if kwargs:
@@ -312,7 +308,6 @@ def backup_device_config(**kwargs):
     logger.info('获取所有设备信息结束')
     # 参数初始化
     net_tower_tasks = []  # 寻觅任务id集合
-    ping_result = []  # ping不通设备存储
     # 批量下发任务
     for host in hosts:
         # backup_device_config_sub(**host)
