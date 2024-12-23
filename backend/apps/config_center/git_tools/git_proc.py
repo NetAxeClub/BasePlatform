@@ -1,8 +1,7 @@
 import os
 from datetime import datetime
 
-from git import Actor
-from git import Repo
+from git import Actor, Repo, Git
 from pydriller import Repository
 from netaxe.settings import BASE_DIR
 from confload.confload import config
@@ -175,7 +174,8 @@ def push_file():
     files += untracked_files
     if files:
         gitfiles = [os.path.join(repo.working_tree_dir, x) for x in files]
-        repo.index.add(gitfiles)
+        # repo.index.add(gitfiles)
+        repo.index.add('.')
         author = Actor(config.git_user, config.git_user_email)
         # committer = Actor(log_time, "netops@example.com")
         # commit = repo.index.commit(f"automation commit by {log_time}", author=author, committer=committer)
