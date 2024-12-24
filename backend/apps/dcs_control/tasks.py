@@ -7129,11 +7129,6 @@ def config_auto_switch(self, **post_param):
     cmds = post_param['cmds']
     back_off_cmds = post_param['back_off_cmds']
     switch_failback = post_param['switch_failback']
-    # if post_param['vendor'] == 'H3C':
-    #     pass
-    # elif post_param['vendor'] == 'Huawei':
-    #     pass
-    # elif post_param['vendor'] == 'Hillstone':
     _data = dict(
         order_code=post_param.get('order_code') if post_param.get('order_code') else ' ',
         task_id=post_param.get('task_id') or str(self.request.id),
