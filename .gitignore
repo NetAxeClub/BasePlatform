@@ -23,7 +23,6 @@ backend/apps/monitor
 backend/apps/support
 backend/__pycache__/
 backend/media/automation
-backend/media/device_config/current-configuration
 backend/media/ip_address_recycle/
 backend/media/upload/
 backend/conf.py
@@ -33,3 +32,4 @@ backend/apps/int_utilization/__pycache__/
 backend/plugins/extensibles/
 backend/scripts
 backend/utils/connect_layer/NETCONF/test_netconf.py
+backend/media/device_config
