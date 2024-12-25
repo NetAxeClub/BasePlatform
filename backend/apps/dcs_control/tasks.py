@@ -7138,7 +7138,7 @@ def config_auto_switch(self, **post_param):
         task=post_param.get('task') or AutoFlowTasks.AUTO_SWITCH,
         device=post_param['hostip'],
         device_id=post_param['hostid'],
-        kwargs=json.dumps(post_param),
+        # kwargs=json.dumps(post_param),
         commands=json.dumps(cmds),
         method='SSH',
         back_off_commands=json.dumps(back_off_cmds),
