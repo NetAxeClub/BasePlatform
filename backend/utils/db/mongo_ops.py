@@ -236,12 +236,14 @@ class MongoOps:
         """
         return self.coll.insert_many(documents=doc)
 
-    def count_documents(self):
+    def count_documents(self, query=None):
         """
         统计集合中的文档数
         :return:
         """
-        return self.coll.count_documents({})
+        if query is None:
+            query = {}
+        return self.coll.count_documents(query)
 
     def group_by(self, group_key):
         # groupby = group_key
