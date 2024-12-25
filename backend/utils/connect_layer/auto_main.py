@@ -1159,10 +1159,14 @@ exit {{ _end_ }}
     # 通用校验
     @staticmethod
     def standard_ttp(path):
-        # print(path)
+        """
+        path = 'automation/11.11.11.11/config_1735125342.txt'
+        from utils.connect_layer.auto_main import HillstoneFsm
+        ttp_method = HillstoneFsm.get_map("standard")
+        ttp_res = ttp_method(path=path)
+        """
         data_to_parse = default_storage.open(path).read()
         data_to_parse = data_to_parse.decode('utf-8')
-        # print(data_to_parse)
         ttp_template = """
 <group name = "results">
 <group name = "errors">
@@ -1182,6 +1186,9 @@ Warning: {{ error | re(".*") }}
 </group>
 <group name = "unrecognized">
 {{ ignore(" ") }} ^-----无法识别的关键字: {{ unrecognized | re("\S+") }}
+</group>
+<group name = "unrecognized">
+ % Unrecognized {{ unrecognized | _line_ }}
 </group>
 </group>
 """
@@ -1519,7 +1526,6 @@ class HuaweiS:
 if __name__ == '__main__':
     # Logging section ##############
     import logging
-
     # logging.basicConfig(filename="test.log", level=logging.DEBUG)
     logging.basicConfig(level=logging.DEBUG)
     logger = logging.getLogger("netmiko")
@@ -1527,7 +1533,15 @@ if __name__ == '__main__':
     # res = BatManMain.info_fsm(path='automation/10.1.1.2/show_mac-address-table.txt', fsm_platform='cisco_ios')
     # res = BatManMain.info_fsm(path='automation/10.1.1.2/show_interfaces.txt', fsm_platform='cisco_ios')
     # res = BatManMain.info_fsm(path='automation/192.168.10.1/show_cdp_neighbors_detail.txt', fsm_platform='cisco_ios')
-    res = BatManMain.info_fsm(path='automation/172.17.1.1/show_interfaces.txt', fsm_platform='cisco_ios')
+    # res = BatManMain.info_fsm(path='automation/zte/show_mac_table.txt', fsm_platform='zte_zxros')
+    # res = BatManMain.info_fsm(path='automation/zte/show_arp.txt', fsm_platform='zte_zxros')
+    # res = BatManMain.info_fsm(path='automation/zte/show_interface.txt', fsm_platform='zte_zxros')
+    # res = BatManMain.info_fsm(path='automation/zte/show_lacp_internal.txt', fsm_platform='zte_zxros')
+    # res = BatManMain.info_fsm(path='automation/zte/show_lldp_entry.txt', fsm_platform='zte_zxros')
+    # res = BatManMain.info_fsm(path='automation/huawei/display_interface.txt', fsm_platform='huawei_vrp')
+    # res = BatManMain.info_fsm(path='automation/huawei/display_eth-trunk.txt', fsm_platform='huawei_vrp')
+    # res = BatManMain.info_fsm(path='automation/huawei/display_lldp_neighbor.txt', fsm_platform='huawei_vrp')
+    res = BatManMain.info_fsm(path='automation/huawei/display_version.txt', fsm_platform='huawei_vrp')
     # res = BatManMain.info_fsm(path='automation/10.1.1.2/show_lldp_neighbors_detail.txt', fsm_platform='cisco_ios')
     if isinstance(res, list):
         for i in res:

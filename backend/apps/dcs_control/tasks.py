@@ -28,10 +28,12 @@ from functools import wraps
 import logging
 import jinja2
 import requests
+import pytz
 from asgiref.sync import async_to_sync
 from celery import shared_task
 from channels.layers import get_channel_layer
 from django.core.cache import cache
+from django.utils import timezone
 # from NetOpsV1.settings import BASE_DIR
 # from django.db.models import Q
 # from netmiko import ConnectHandler, NetmikoTimeoutException, NetmikoAuthenticationException
@@ -63,6 +65,7 @@ servgroup_mongo = MongoOps(db='Automation', coll='hillstone_servgroup')
 # 系统预定义服务
 predefined_mongo = MongoOps(db='Automation', coll='hillstone_service_predefined')
 SwitchFailBackDB = MongoOps(db='Automation', coll='switch_failback')
+SwitchFailBackTaskDB = MongoOps(db='Automation', coll='switch_failback_task')
 if DEBUG:
     CELERY_QUEUE = 'dev'
 else:
@@ -619,7 +622,7 @@ class FirewallMain(object):
             # 只有类方法是Hillstone才会用到TTP解析
             # class_method 设计初衷是给华三华为做类方法映射用的，山石默认就是Hillstone
             _ttp_info = ''  # 存储ttp解析的错误结果内容
-            if class_method == 'Hillstone':
+            if class_method == 'Hillstone' or path.endswith('.txt'):
                 ttp_method = HillstoneFsm.get_map("standard")
                 if ttp_method:
                     ttp_res = ttp_method(path=path)  # 此处是方法的实例
@@ -7138,39 +7141,57 @@ def config_auto_switch(self, **post_param):
         task=post_param.get('task') or AutoFlowTasks.AUTO_SWITCH,
         device=post_param['hostip'],
         device_id=post_param['hostid'],
-        # kwargs=json.dumps(post_param),
         commands=json.dumps(cmds),
         method='SSH',
         back_off_commands=json.dumps(back_off_cmds),
     )
     _FirewallMain.flow_engine(*[cmds, back_off_cmds], **_data)
     flow_record = AutoFlow.objects.get(task_id=_data['task_id'])
+    local_timezone = pytz.timezone('Asia/Shanghai')  # 用你想要的时区替换
     task_result = {
         'id': str(self.request.id),
         'origin': flow_record.origin,
         'task_result': flow_record.task_result,
         'device': flow_record.device,
         'commit_user': flow_record.commit_user,
-        'commit_time': flow_record.commit_time,
+        # 'commit_time': flow_record.commit_time.astimezone(local_timezone),
+        'commit_time': datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M:%S'),
         'method': flow_record.method,
         'remote_ip': flow_record.remote_ip,
         'kwargs': flow_record.kwargs,
         'commands': flow_record.commands,
         'back_off_commands': flow_record.back_off_commands,
         'code': flow_record.code,
+        'switch_failback_id': post_param['switch_failback']['id']
 
     }
-    SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$push': {'task_list': task_result}})
+    SwitchFailBackTaskDB.insert(task_result)
+    # SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$push': {'task_list': task_result}})
     if flow_record.state == 'Published':
-        if switch_failback['status'] == 'cover':
-            SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'recover'}})
+        if not post_param['batch']:
+            if switch_failback['status'] == 'cover':
+                SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'cover'}})
+
+            else:
+                SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'recover'}})
         else:
-            SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'cover'}})
+            if post_param['batch_status'] == 'cover':
+                SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'cover'}})
+            else:
+                SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'recover'}})
     else:
-        if switch_failback['status'] == 'cover':
-            SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'recover_failed'}})
+        if not post_param['batch']:
+            if switch_failback['status'] == 'cover':
+                SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'recover_failed'}})
+            else:
+                SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'cover_failed'}})
         else:
-            SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'cover_failed'}})
+            if post_param['batch_status'] == 'cover':
+                SwitchFailBackDB.update(filter={'id': switch_failback['id']},
+                                        update={'$set': {'status': 'cover_failed'}})
+            else:
+                SwitchFailBackDB.update(filter={'id': switch_failback['id']},
+                                        update={'$set': {'status': 'recover_failed'}})
 
 
 if __name__ == '__main__':
