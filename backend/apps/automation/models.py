@@ -2,6 +2,7 @@ from django.db import models
 from simple_history.models import HistoricalRecords
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
+from django.utils import timezone
 import xml.etree.ElementTree as ET
 import json
 
@@ -296,7 +297,7 @@ class AutoFlow(models.Model):
     # 后续自动化任务能够根据这个ID拿到唯一的CMDB条目
     device_id = models.IntegerField(verbose_name='设备ID', null=True, blank=True)
     commit_user = models.CharField(verbose_name='申请用户', max_length=42, null=False, default='')
-    commit_time = models.DateTimeField(auto_now=True, verbose_name='更新时间')
+    commit_time = models.DateTimeField(verbose_name='更新时间', null=False, default=timezone.localtime)
     task = models.CharField(verbose_name='任务模块', choices=Tasks.CHOICES, max_length=128, null=False, default='')
     method = models.CharField(verbose_name='配置模式', choices=Method.CHOICES, max_length=128, null=False, default='')
     class_method = models.CharField(verbose_name='类方法', null=False, max_length=128, default='')
