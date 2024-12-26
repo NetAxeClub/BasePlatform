@@ -435,6 +435,13 @@ class SecFirewallMain:
                         elif isinstance(ttp_res['unrecognized'], list):
                             _ttp_info = 'unrecognized: ' + '\n'.join(
                                 [x['unrecognized'] for x in ttp_res['unrecognized']])
+                    elif 'incomplete' in ttp_res.keys():
+                        flow_record.failed()
+                        if isinstance(ttp_res['incomplete'], dict):
+                            _ttp_info = ttp_res['incomplete']['incomplete']
+                        elif isinstance(ttp_res['incomplete'], list):
+                            _ttp_info = 'incomplete: ' + '\n'.join(
+                                [x['incomplete'] for x in ttp_res['incomplete']])
                     elif 'errors' in ttp_res.keys():
                         flow_record.failed()
                         if isinstance(ttp_res['errors'], dict):
