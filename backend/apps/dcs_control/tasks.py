@@ -7170,28 +7170,28 @@ def config_auto_switch(self, **post_param):
     if flow_record.state == 'Published':
         if not post_param['batch']:
             if switch_failback['status'] == 'cover':
-                SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'cover'}})
+                SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'recover', 'last_result': flow_record.code}})
 
             else:
-                SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'recover'}})
+                SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'cover', 'last_result': flow_record.code}})
         else:
             if post_param['batch_status'] == 'cover':
-                SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'cover'}})
+                SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'cover', 'last_result': flow_record.code}})
             else:
-                SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'recover'}})
+                SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'recover', 'last_result': flow_record.code}})
     else:
         if not post_param['batch']:
             if switch_failback['status'] == 'cover':
-                SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'recover_failed'}})
+                SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'recover_failed', 'last_result': flow_record.code}})
             else:
-                SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'cover_failed'}})
+                SwitchFailBackDB.update(filter={'id': switch_failback['id']}, update={'$set': {'status': 'cover_failed', 'last_result': flow_record.code}})
         else:
             if post_param['batch_status'] == 'cover':
                 SwitchFailBackDB.update(filter={'id': switch_failback['id']},
-                                        update={'$set': {'status': 'cover_failed'}})
+                                        update={'$set': {'status': 'cover_failed', 'last_result': flow_record.code}})
             else:
                 SwitchFailBackDB.update(filter={'id': switch_failback['id']},
-                                        update={'$set': {'status': 'recover_failed'}})
+                                        update={'$set': {'status': 'recover_failed', 'last_result': flow_record.code}})
 
 
 if __name__ == '__main__':
