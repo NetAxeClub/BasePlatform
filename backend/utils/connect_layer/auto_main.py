@@ -1190,6 +1190,9 @@ Warning: {{ error | re(".*") }}
 <group name = "unrecognized">
  % Unrecognized {{ unrecognized | _line_ }}
 </group>
+<group name = "incomplete">
+ % Incomplete {{ incomplete | _line_ }}
+</group>
 </group>
 """
         # create parser object and parse data using template:
