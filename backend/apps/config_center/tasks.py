@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, unicode_literals
-import os
 import re
 import time
 import asyncio
@@ -21,7 +20,6 @@ from apps.config_center.config_parse.config_parse import config_file_parse
 from apps.config_center.git_tools.git_proc import push_file
 from apps.config_center.my_nornir import config_backup_nornir
 from apps.config_center.models import ConfigBackup, ConfigCompliance, ConfigComplianceResult, ConfigComplianceRule
-from django.core.files.storage import default_storage
 from utils.db.mongo_ops import MongoOps
 from service_mesh import msg_gateway_runner
 
@@ -38,6 +36,7 @@ else:
 
 @shared_task(base=AxeTask, once={'graceful': True})
 def config_backup(**kwargs):
+    """废弃"""
     log_time = datetime.now().strftime("%Y-%m-%d")
     start_time = time.time()
     msg_gateway_runner.send_wechat(channel="netdevops", content=f"配置备份开始，时间:{log_time}")
@@ -191,22 +190,21 @@ def config_compliance(**kwargs):
 
     vendor_map = ['H3C', 'HUAWEI']
     start_datetime = (date.today() - timedelta(days=1)).strftime('%Y-%m-%d') + ' 00:00:00'
-    end_datetime = (date.today() - timedelta(days=1)).strftime('%Y-%m-%d') + ' 23:59:59'
-    config_files = ConfigBackup.objects.filter(last_time__range=(start_datetime, end_datetime)).iterator()
+    end_datetime = (date.today()).strftime('%Y-%m-%d') + ' 23:59:59'
+    config_files = ConfigBackup.objects.filter(last_time__range=(start_datetime, end_datetime), config_status='SUCCESS').iterator()
     for config_file in config_files:
-        path = f"device_config/{config_file.file_path}"
-        # print(vendor, path)
         if config_file.vendor in vendor_map:
-
-            data_to_parse = default_storage.open(path).read().decode('utf-8')
+            if not default_storage.exists(config_file.file_path):
+                continue
+            data_to_parse = default_storage.open(config_file.file_path).read().decode('utf-8')
             rules = ConfigComplianceRule.objects.all().iterator()
             for rule in rules:
                 childrens = rule.children.all()
                 # print(childrens)
                 # 按厂商分组，同一厂商的规则使用逻辑运算符 OR
                 for child in childrens:
-                    print(f"检查项：{child.name}")
-                    print(f"检查项ID：{child.id}")
+                    logger.info(f"检查项：{child.name}")
+                    logger.info(f"检查项ID：{child.id}")
                     # 跟这个检查项有关的具体匹配规则
                     # 配置文件的vendor_alias  和  规则的compliance vendor 要对的上
                     compliances = child.relate_compliance.all().values()
@@ -276,9 +274,7 @@ def backup_device_config_sub(**kwargs):
     class_instance = BaseConn(**kwargs)
     try:
         content = class_instance.send_commands(cmd=command_map[kwargs['vendor__alias']]['cmd'])
-        filename = f"{BACKUP_PATH}/{hostip}/{kwargs['vendor__alias']}_{hostip}.txt"
-        if not os.path.exists(f"{BACKUP_PATH}/{hostip}"):
-            os.makedirs(f"{BACKUP_PATH}/{hostip}")
+        filename = f"device_config/current-configuration/{hostip}/{kwargs['vendor__alias']}_{hostip}.txt"
         path = default_storage.save(filename, ContentFile(content))
         ConfigBackup.objects.create(
             name=kwargs['name'], manage_ip=hostip,
@@ -302,6 +298,7 @@ def backup_device_config_sub(**kwargs):
 @shared_task(base=AxeTask, once={'graceful': True})
 def backup_device_config(**kwargs):
     log_time = datetime.now().strftime("%Y-%m-%d")
+    msg_gateway_runner.send_wechat(channel="netdevops", content=f"配置备份开始，时间:{log_time}")
     start_time = time.time()
     today = timezone.now()
     if kwargs:
@@ -312,8 +309,6 @@ def backup_device_config(**kwargs):
     logger.info('获取所有设备信息结束')
     # 参数初始化
     net_tower_tasks = []  # 寻觅任务id集合
-    ping_result = []  # ping不通设备存储
-    start_time = time.time()
     # 批量下发任务
     for host in hosts:
         # backup_device_config_sub(**host)
@@ -329,11 +324,9 @@ def backup_device_config(**kwargs):
         if 'EagerResult' in str(type(task)):
             logger.info("存在无效task")
             net_tower_tasks.remove(task)
-
     # 获取tasks任务数量
     # net_tower_tasks_counters = len(net_tower_tasks)
     # net_tower_tasks_bak = net_tower_tasks.copy()
-
     # 等待子任务全部执行结束后执行下一步
     while len(net_tower_tasks) != 0:
         for i in net_tower_tasks:
@@ -344,14 +337,29 @@ def backup_device_config(**kwargs):
                 logger.error(str(e))
                 net_tower_tasks.remove(i)
         time.sleep(10)
+        logger.info(len(net_tower_tasks))
     logger.info('子任务全部执行结束')
-
     # 配置解析
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(config_file_parse())
+    # loop = asyncio.get_event_loop()
+    # loop.run_until_complete(config_file_parse())
+    end_time = time.time()
+    time_use = int(int(end_time - start_time) / 60)
+    msg_gateway_runner.send_wechat(channel="netdevops",
+                                   content=f"配置备份完成，耗时:{time_use}分\n")
+    config_compliance.apply_async(kwargs={}, queue=CELERY_QUEUE, retry=True)
+    git_push_config.apply_async(kwargs=kwargs, queue=CELERY_QUEUE, retry=True)
+    return
 
+
+@shared_task(base=AxeTask, once={'graceful': True})
+def git_push_config(**kwargs):
+    if kwargs:
+        hosts = get_device_info_v2(**kwargs)
+    else:
+        hosts = get_device_info_v2()
+    log_time = datetime.now().strftime("%Y-%m-%d")
+    today = timezone.now()
     commit, changed_files, untracked_files = push_file()
-
     for change_host in changed_files:
         hostip = change_host.split('/')[1]
         host_info = [host for host in hosts if host['manage_ip'] == hostip]
@@ -386,9 +394,3 @@ def backup_device_config(**kwargs):
         },
         'log_time': log_time
     })
-    end_time = time.time()
-    time_use = int(int(end_time - start_time) / 60)
-    msg_gateway_runner.send_wechat(channel="netdevops",
-                                   content=f"配置备份完成，耗时:{time_use}分\n")
-    config_compliance.apply_async(kwargs={}, queue=CELERY_QUEUE, retry=True)
-    return
