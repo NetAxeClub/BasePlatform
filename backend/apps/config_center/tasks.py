@@ -267,6 +267,7 @@ def backup_device_config_sub(**kwargs):
         'inspur': {'cmd': 'show running-config', 'expect_string': None, 'enable': False},
         'Cisco': {'cmd': 'show running-config', 'expect_string': None, 'enable': False},
         'Maipu': {'cmd': 'show running-config', 'expect_string': ']'},
+        'ZTE': {'cmd': 'show running-config', 'expect_string': ']'},
     }
     hostip = kwargs['manage_ip']  # 设备管理IP地址
     if hostip == '0.0.0.0':
