@@ -30,6 +30,7 @@ else:
 # 分发器
 def dispatcher(method, data):
     log.info(f"method:{method}")
+    log.info(f"data:{data}")
     try:
         if method == 'get_firewall_list':
             res = get_firewall_list()
@@ -60,6 +61,7 @@ def dispatcher(method, data):
             return [{'task_id': str(res)}]
         elif method == 'get_device_info':
             res = get_device_info(**data)
+            log.info({'data': res})
             return {'data': res}
         else:
             _FirewallMain = FirewallMain(data['host'])
