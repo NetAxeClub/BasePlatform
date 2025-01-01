@@ -17,7 +17,7 @@ from pika import BasicProperties
 from netaxe.settings import DEBUG
 from bus.bus_sync import SyncMessageBus
 from apps.dcs_control.tasks import FirewallMain
-from apps.automation.tools.models_api import get_firewall_list, get_device_info
+from apps.automation.tools.models_api import get_firewall_list, get_device_name
 from apps.dcs_control.tasks import address_set, bulk_deny_by_address, get_firewall_zone, config_sec_policy
 
 log = logging.getLogger(__name__)
@@ -59,8 +59,8 @@ def dispatcher(method, data):
                 print('forget')
                 res.forget()
             return [{'task_id': str(res)}]
-        elif method == 'get_device_info':
-            res = get_device_info(**data)
+        elif method == 'get_device_name':
+            res = get_device_name(**data)
             log.info({'data': res})
             return {'data': res}
         else:

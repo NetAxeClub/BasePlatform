@@ -26,3 +26,8 @@ def get_firewall_list(manage_ip_list=None):
 def get_device_info(**kwargs):
     res = NetworkDevice.objects.filter(**kwargs).values()
     return list(res)
+
+
+def get_device_name(**kwargs):
+    res = NetworkDevice.objects.filter(**kwargs).values('manage_ip', 'name')
+    return list(res)
