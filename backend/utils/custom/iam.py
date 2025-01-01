@@ -64,6 +64,9 @@ class IamMiddleware(MiddlewareMixin):
         if request.path.startswith('/base_platform/automation/address_location'):
             """允许寻觅后台操作"""
             return
+        if request.headers.get('Form') is not None:
+            """允许服务间访问"""
+            return
         token = request.COOKIES.get('netops-token')
         logger.info(f"cookies token: {token}")
         if token is None:
