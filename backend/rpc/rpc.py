@@ -59,8 +59,8 @@ def dispatcher(method, data):
                 res.forget()
             return [{'task_id': str(res)}]
         elif method == 'get_device_info':
-            log.info(data)
-            return get_device_info(**data)
+            res = get_device_info(**data)
+            return {'data': res}
         else:
             _FirewallMain = FirewallMain(data['host'])
             func = getattr(_FirewallMain, method)
