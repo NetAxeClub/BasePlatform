@@ -454,6 +454,9 @@ class SecFirewallMain:
                     elif 'warning' in ttp_res.keys():
                         flow_record.failed()
                         _ttp_info = 'warning: ' + ttp_res['errors']['error']
+                    elif 'wrong_parameter' in ttp_res.keys():
+                        flow_record.failed()
+                        _ttp_info = 'wrong_parameter: ' + ttp_res['wrong_parameter']['wrong_parameter']
                 flow_record.ttp = json.dumps(ttp_res)
             flow_record.save()
             # 判断状态迁移到失败以后的state值
