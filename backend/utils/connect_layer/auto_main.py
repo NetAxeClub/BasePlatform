@@ -1193,6 +1193,10 @@ Warning: {{ error | re(".*") }}
 <group name = "incomplete">
  % Incomplete {{ incomplete | _line_ }}
 </group>
+<group name = "wrong_parameter">
+ % Wrong parameter found at {{ wrong_parameter | _line_ }}
+</group>
+
 </group>
 """
         # create parser object and parse data using template:
@@ -1544,7 +1548,8 @@ if __name__ == '__main__':
     # res = BatManMain.info_fsm(path='automation/huawei/display_interface.txt', fsm_platform='huawei_vrp')
     # res = BatManMain.info_fsm(path='automation/huawei/display_eth-trunk.txt', fsm_platform='huawei_vrp')
     # res = BatManMain.info_fsm(path='automation/huawei/display_lldp_neighbor.txt', fsm_platform='huawei_vrp')
-    res = BatManMain.info_fsm(path='automation/huawei/display_version.txt', fsm_platform='huawei_vrp')
+    # res = BatManMain.info_fsm(path='automation/huawei/display_version.txt', fsm_platform='huawei_vrp')
+    res = BatManMain.info_fsm(path='automation/h3c/display_ip_routing-table.txt', fsm_platform='hp_comware')
     # res = BatManMain.info_fsm(path='automation/10.1.1.2/show_lldp_neighbors_detail.txt', fsm_platform='cisco_ios')
     if isinstance(res, list):
         for i in res:

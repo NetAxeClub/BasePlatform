@@ -61,7 +61,7 @@ def dispatcher(method, data):
             return [{'task_id': str(res)}]
         elif method == 'get_device_name':
             res = get_device_name(**data)
-            log.info({'data': res})
+            # log.info({'data': res})
             return {'data': res}
         else:
             _FirewallMain = FirewallMain(data['host'])
