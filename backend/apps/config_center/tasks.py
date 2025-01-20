@@ -10,7 +10,7 @@ from django.template import loader
 from netaxe.celery import AxeTask
 from netaxe.settings import DEBUG
 from django.utils import timezone
-from django.core.files.base import ContentFile
+# from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from netaxe.settings import BASE_DIR
 from django.db import connections
@@ -275,13 +275,15 @@ def backup_device_config_sub(**kwargs):
     try:
         content = class_instance.send_commands(cmd=command_map[kwargs['vendor__alias']]['cmd'])
         filename = f"device_config/current-configuration/{hostip}/{kwargs['vendor__alias']}_{hostip}.txt"
-        path = default_storage.save(filename, ContentFile(content))
+        # path = default_storage.save(filename, ContentFile(content))
+        with default_storage.open(filename, "w") as file:
+            file.write(content)
         ConfigBackup.objects.create(
             name=kwargs['name'], manage_ip=hostip,
             config_status='SUCCESS',
             status=kwargs['status'], idc_name=kwargs['idc__name'], vendor=kwargs['vendor__alias'],
             model_name=kwargs['model__name'],
-            git_type='change', commit='', file_path=path, last_time=today
+            git_type='change', commit='', file_path=filename, last_time=today
         )
     except RuntimeError as e:
         ConfigBackup.objects.create(
