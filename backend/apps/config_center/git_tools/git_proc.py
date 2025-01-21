@@ -1,3 +1,4 @@
+import logging
 import os
 from datetime import datetime
 
@@ -6,7 +7,7 @@ from pydriller import Repository
 from netaxe.settings import BASE_DIR
 from confload.confload import config
 repo_path = os.path.join(BASE_DIR, 'media/device_config')
-
+logger = logging.getLogger(__name__)
 if not os.path.exists(os.path.join(BASE_DIR, 'media/device_config')):
     os.makedirs(os.path.join(BASE_DIR, 'media/device_config'))
     repo = Repo.init(os.path.join(repo_path))
@@ -173,7 +174,7 @@ def push_file():
     untracked_files = repo.untracked_files
     files += untracked_files
     if files:
-        gitfiles = [os.path.join(repo.working_tree_dir, x) for x in files]
+        # gitfiles = [os.path.join(repo.working_tree_dir, x) for x in files]
         # repo.index.add(gitfiles)
         repo.index.add('.')
         author = Actor(config.git_user, config.git_user_email)
@@ -186,8 +187,8 @@ def push_file():
                 o = repo.remotes.origin
                 try:
                     o.pull()
-                except:
-                    pass
+                except Exception as e:
+                    logger.error(e)
         return commit.hexsha, changedFiles, untracked_files
     return '', '', ''
 
