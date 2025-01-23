@@ -272,10 +272,9 @@ def backup_device_config_sub(**kwargs):
     if hostip == '0.0.0.0':
         return {}
     class_instance = BaseConn(**kwargs)
-    CONFIG_PATH = BASE_DIR + '/media/device_config/current-configuration/'
+    filename = BASE_DIR + f"/media/device_config/current-configuration/{hostip}/{kwargs['vendor__alias']}_{hostip}.txt"
     try:
         content = class_instance.send_commands(cmd=command_map[kwargs['vendor__alias']]['cmd'])
-        filename = BASE_DIR + f"/media/device_config/current-configuration/{hostip}/{kwargs['vendor__alias']}_{hostip}.txt"
         # path = default_storage.save(filename, ContentFile(content))
         if not os.path.exists(BASE_DIR + f"/media/device_config/current-configuration/{hostip}/"):
             os.mkdir(BASE_DIR + f"/media/device_config/current-configuration/{hostip}/")
@@ -298,8 +297,7 @@ def backup_device_config_sub(**kwargs):
             model_name=kwargs['model__name'],
             git_type='change', commit='', file_path='', last_time=today
         )
-        path = str(e)
-    return path
+    return filename
 
 
 @shared_task(base=AxeTask, once={'graceful': True})
