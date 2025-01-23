@@ -34,104 +34,104 @@ else:
     CELERY_QUEUE = 'config'
 
 
-@shared_task(base=AxeTask, once={'graceful': True})
-def config_backup(**kwargs):
-    """废弃"""
-    log_time = datetime.now().strftime("%Y-%m-%d")
-    start_time = time.time()
-    msg_gateway_runner.send_wechat(channel="netdevops", content=f"配置备份开始，时间:{log_time}")
-    today = timezone.now()
-    if kwargs:
-        hosts = get_device_info_v2(**kwargs)
-    else:
-        hosts = get_device_info_v2()
-    # 配置备份任务
-    result = config_backup_nornir(hosts)
-    end_time = time.time()
-    time_use = int(int(end_time - start_time) / 60)
-    fail_host_list = [x for x in result.failed_hosts.keys()]
-    fail_host = '\n'.join([x for x in result.failed_hosts.keys()])
-    config_mongo.insert({
-        'name': 'config_backup_status',
-        'data': {
-            'success': len([x['manage_ip'] for x in hosts if x['manage_ip'] not in fail_host_list]),
-            'failed': len(fail_host_list)
-        },
-        'log_time': log_time
-    })
-    msg_gateway_runner.send_wechat(channel="netdevops",
-                                   content=f"配置备份完成，耗时:{time_use}分\n备份失败设备:\n{fail_host}")
-    success_host_list = [x['manage_ip'] for x in hosts if x not in fail_host_list]
-    # 配置解析
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(config_file_parse())
-    # config_file_parse()
-    # 推送git
-    commit, changed_files, untracked_files = push_file()
-    if changed_files or untracked_files:
-        html_tmp = loader.render_to_string(
-            'config_center/config_backup.html',
-            dict(commit=commit, changedFiles=changed_files, untracked_files=untracked_files), None, None)
-        # html_res = str(html_tmp, "utf-8")
-        # email_addr = ['dd@dd.com']
-        # email_subject = '配置备份结果_' + datetime.now().strftime("%Y-%m-%d %H:%M")
-        # email_text_content = html_res
-        # msg_gateway_runner.send_email(user=email_addr, subject=email_subject, content=email_text_content)
-    for host in hosts:
-        if host['manage_ip'] in fail_host_list:
-            ConfigBackup.objects.create(
-                name=host['name'], manage_ip=host['manage_ip'],
-                config_status='FAILED',
-                status=host['status'], idc_name=host['idc__name'], vendor=host['vendor__alias'],
-                model_name=host['model__name'],
-                git_type='change', commit='', file_path='', last_time=today
-            )
-        # elif host['manage_ip'] in success_host_list:
-        else:
-            ConfigBackup.objects.create(
-                name=host['name'], manage_ip=host['manage_ip'],
-                config_status='SUCCESS',
-                status=host['status'], idc_name=host['idc__name'], vendor=host['vendor__alias'],
-                model_name=host['model__name'],
-                git_type='change', commit='', file_path=result[host['manage_ip']][0].filename, last_time=today
-            )
-    for change_host in changed_files:
-        hostip = change_host.split('/')[1]
-        host_info = [host for host in hosts if host['manage_ip'] == hostip]
-        if host_info:
-            ConfigBackup.objects.filter(name=host_info[0]['name'], manage_ip=host_info[0]['manage_ip'],
-                                        status=host_info[0]['status'],
-                                        idc_name=host_info[0]['idc__name'],
-                                        vendor=host_info[0]['vendor__alias'],
-                                        model_name=host_info[0]['model__name'], last_time=today
-                                        ).update(
-                config_status='SUCCESS', git_type='change', commit=commit, file_path=change_host, last_time=today
-            )
-    for untracked_host in untracked_files:
-        hostip = untracked_host.split('/')[1]
-        host_info = [host for host in hosts if host['manage_ip'] == hostip]
-        if host_info:
-            ConfigBackup.objects.filter(name=host_info[0]['name'], manage_ip=host_info[0]['manage_ip'],
-                                        status=host_info[0]['status'],
-                                        idc_name=host_info[0]['idc__name'],
-                                        vendor=host_info[0]['vendor__alias'],
-                                        model_name=host_info[0]['model__name'], last_time=today
-                                        ).update(
-                config_status='SUCCESS', git_type='add', commit=commit, file_path=untracked_host, last_time=today
-            )
-    config_mongo.insert({
-        'name': 'config_backup_git_status',
-        'data': {
-            'change': len(changed_files),
-            'add': len(untracked_files),
-            'commit': commit
-        },
-        'log_time': log_time
-    })
-    msg_gateway_runner.send_wechat(channel='netdevops',
-                                   content=f"配置备份推送完成\n变更配置文件数:{len(changed_files)}\n新增配置文件数:{len(untracked_files)}\ncommit:{commit}")
-    config_compliance.apply_async(kwargs={}, queue=CELERY_QUEUE, retry=True)
-    return
+# @shared_task(base=AxeTask, once={'graceful': True})
+# def config_backup(**kwargs):
+#     """废弃"""
+#     log_time = datetime.now().strftime("%Y-%m-%d")
+#     start_time = time.time()
+#     msg_gateway_runner.send_wechat(channel="netdevops", content=f"配置备份开始，时间:{log_time}")
+#     today = timezone.now()
+#     if kwargs:
+#         hosts = get_device_info_v2(**kwargs)
+#     else:
+#         hosts = get_device_info_v2()
+#     # 配置备份任务
+#     result = config_backup_nornir(hosts)
+#     end_time = time.time()
+#     time_use = int(int(end_time - start_time) / 60)
+#     fail_host_list = [x for x in result.failed_hosts.keys()]
+#     fail_host = '\n'.join([x for x in result.failed_hosts.keys()])
+#     config_mongo.insert({
+#         'name': 'config_backup_status',
+#         'data': {
+#             'success': len([x['manage_ip'] for x in hosts if x['manage_ip'] not in fail_host_list]),
+#             'failed': len(fail_host_list)
+#         },
+#         'log_time': log_time
+#     })
+#     msg_gateway_runner.send_wechat(channel="netdevops",
+#                                    content=f"配置备份完成，耗时:{time_use}分\n备份失败设备:\n{fail_host}")
+#     success_host_list = [x['manage_ip'] for x in hosts if x not in fail_host_list]
+#     # 配置解析
+#     loop = asyncio.get_event_loop()
+#     loop.run_until_complete(config_file_parse())
+#     # config_file_parse()
+#     # 推送git
+#     commit, changed_files, untracked_files = push_file()
+#     if changed_files or untracked_files:
+#         html_tmp = loader.render_to_string(
+#             'config_center/config_backup.html',
+#             dict(commit=commit, changedFiles=changed_files, untracked_files=untracked_files), None, None)
+#         # html_res = str(html_tmp, "utf-8")
+#         # email_addr = ['dd@dd.com']
+#         # email_subject = '配置备份结果_' + datetime.now().strftime("%Y-%m-%d %H:%M")
+#         # email_text_content = html_res
+#         # msg_gateway_runner.send_email(user=email_addr, subject=email_subject, content=email_text_content)
+#     for host in hosts:
+#         if host['manage_ip'] in fail_host_list:
+#             ConfigBackup.objects.create(
+#                 name=host['name'], manage_ip=host['manage_ip'],
+#                 config_status='FAILED',
+#                 status=host['status'], idc_name=host['idc__name'], vendor=host['vendor__alias'],
+#                 model_name=host['model__name'],
+#                 git_type='change', commit='', file_path='', last_time=today
+#             )
+#         # elif host['manage_ip'] in success_host_list:
+#         else:
+#             ConfigBackup.objects.create(
+#                 name=host['name'], manage_ip=host['manage_ip'],
+#                 config_status='SUCCESS',
+#                 status=host['status'], idc_name=host['idc__name'], vendor=host['vendor__alias'],
+#                 model_name=host['model__name'],
+#                 git_type='change', commit='', file_path=result[host['manage_ip']][0].filename, last_time=today
+#             )
+#     for change_host in changed_files:
+#         hostip = change_host.split('/')[1]
+#         host_info = [host for host in hosts if host['manage_ip'] == hostip]
+#         if host_info:
+#             ConfigBackup.objects.filter(name=host_info[0]['name'], manage_ip=host_info[0]['manage_ip'],
+#                                         status=host_info[0]['status'],
+#                                         idc_name=host_info[0]['idc__name'],
+#                                         vendor=host_info[0]['vendor__alias'],
+#                                         model_name=host_info[0]['model__name'], last_time=today
+#                                         ).update(
+#                 config_status='SUCCESS', git_type='change', commit=commit, file_path=change_host, last_time=today
+#             )
+#     for untracked_host in untracked_files:
+#         hostip = untracked_host.split('/')[1]
+#         host_info = [host for host in hosts if host['manage_ip'] == hostip]
+#         if host_info:
+#             ConfigBackup.objects.filter(name=host_info[0]['name'], manage_ip=host_info[0]['manage_ip'],
+#                                         status=host_info[0]['status'],
+#                                         idc_name=host_info[0]['idc__name'],
+#                                         vendor=host_info[0]['vendor__alias'],
+#                                         model_name=host_info[0]['model__name'], last_time=today
+#                                         ).update(
+#                 config_status='SUCCESS', git_type='add', commit=commit, file_path=untracked_host, last_time=today
+#             )
+#     config_mongo.insert({
+#         'name': 'config_backup_git_status',
+#         'data': {
+#             'change': len(changed_files),
+#             'add': len(untracked_files),
+#             'commit': commit
+#         },
+#         'log_time': log_time
+#     })
+#     msg_gateway_runner.send_wechat(channel='netdevops',
+#                                    content=f"配置备份推送完成\n变更配置文件数:{len(changed_files)}\n新增配置文件数:{len(untracked_files)}\ncommit:{commit}")
+#     config_compliance.apply_async(kwargs={}, queue=CELERY_QUEUE, retry=True)
+#     return
 
 
 # 配置合规检查
