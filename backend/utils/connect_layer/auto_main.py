@@ -302,7 +302,6 @@ class BatManMain(object):
             cmd = ' '.join(_cmd.split('_'))
             _content = default_storage.open(path).read()
             _content = _content.decode('utf-8')
-            # print(cmd)
             res = BatManFsm.get_structured_data(platform=fsm_platform,
                                                 command=cmd,
                                                 raw_output=_content)
