@@ -585,7 +585,79 @@ class NetworkDeviceViewSet(CustomViewBase):
         response['Content-Disposition'] = f'attachment; filename*=UTF-8\'\'{encoded_filename}'
 
         return response
+   
+    @action(detail=False, methods=['get'])
+    def tree_data(self, request, *args, **kwargs):
+        # Get all NetworkDevice objects with selected fields
+        queryset = self.filter_queryset(self.get_queryset()).values(
+            'id', 
+            'idc', 'idc__name',
+            'idc_model', 'idc_model__name',
+            'rack', 'rack__name'
+        ).distinct()
 
+        # Create base structure with "全部" node
+        tree_data = [{
+            'name': '全部',
+            'icon': '',
+            'id': None
+        }]
+
+        # Create dictionaries to store hierarchical data
+        idc_dict = {}
+
+        # Organize data into hierarchical structure
+        for device in queryset:
+            if device['idc'] and device['idc__name']:
+                # Handle IDC level
+                if device['idc'] not in idc_dict:
+                    idc_dict[device['idc']] = {
+                        'name': device['idc__name'],
+                        'icon': '',
+                        'type': 'room',
+                        'id': device['idc'],
+                        'children': {}
+                    }
+
+                # Handle IDC Model level
+                if device['idc_model'] and device['idc_model__name']:
+                    if device['idc_model'] not in idc_dict[device['idc']]['children']:
+                        idc_dict[device['idc']]['children'][device['idc_model']] = {
+                            'name': device['idc_model__name'],
+                            'icon': '',
+                            'type': 'model',
+                            'id': device['idc_model'],
+                            'children': []
+                        }
+
+                    # Handle Rack level
+                    if device['rack'] and device['rack__name']:
+                        rack_exists = False
+                        for rack in idc_dict[device['idc']]['children'][device['idc_model']]['children']:
+                            if rack['id'] == device['rack']:
+                                rack_exists = True
+                                break
+                        
+                        if not rack_exists:
+                            idc_dict[device['idc']]['children'][device['idc_model']]['children'].append({
+                                'name': device['rack__name'],
+                                'icon': '',
+                                'type': 'rock',
+                                'id': device['rack']
+                            })
+
+        # Convert dictionary structure to list structure
+        for idc in idc_dict.values():
+            idc['children'] = list(idc['children'].values())
+            tree_data.append(idc)
+
+        return JsonResponse(data={
+            'code': 200,
+            'data': tree_data,
+            'msg': '获取网络设备树形结构成功'
+        })
+  
+  
     # 重新update方法主要用来捕获更改前的字段值并赋值给self.log
     # def update(self, request, *args, **kwargs):
     #     print('更新', super().update(request, *args, **kwargs))
