@@ -2,7 +2,7 @@
 from __future__ import absolute_import, unicode_literals
 import re
 import time
-import asyncio
+import os
 import logging
 from datetime import datetime, date, timedelta
 from celery import shared_task
@@ -272,12 +272,17 @@ def backup_device_config_sub(**kwargs):
     if hostip == '0.0.0.0':
         return {}
     class_instance = BaseConn(**kwargs)
+    CONFIG_PATH = BASE_DIR + '/media/device_config/current-configuration/'
     try:
         content = class_instance.send_commands(cmd=command_map[kwargs['vendor__alias']]['cmd'])
-        filename = f"device_config/current-configuration/{hostip}/{kwargs['vendor__alias']}_{hostip}.txt"
+        filename = BASE_DIR + f"/media/device_config/current-configuration/{hostip}/{kwargs['vendor__alias']}_{hostip}.txt"
         # path = default_storage.save(filename, ContentFile(content))
-        with default_storage.open(filename, "w") as file:
-            file.write(content)
+        if not os.path.exists(BASE_DIR + f"/media/device_config/current-configuration/{hostip}/"):
+            os.mkdir(BASE_DIR + f"/media/device_config/current-configuration/{hostip}/")
+        # with default_storage.open(filename, "w") as file:
+        #     file.write(content)
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(content)
         ConfigBackup.objects.create(
             name=kwargs['name'], manage_ip=hostip,
             config_status='SUCCESS',
