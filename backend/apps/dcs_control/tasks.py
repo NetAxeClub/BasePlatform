@@ -454,6 +454,9 @@ class SecFirewallMain:
                     elif 'warning' in ttp_res.keys():
                         flow_record.failed()
                         _ttp_info = 'warning: ' + ttp_res['errors']['error']
+                    elif 'wrong_parameter' in ttp_res.keys():
+                        flow_record.failed()
+                        _ttp_info = 'wrong_parameter: ' + ttp_res['wrong_parameter']['wrong_parameter']
                 flow_record.ttp = json.dumps(ttp_res)
             flow_record.save()
             # 判断状态迁移到失败以后的state值
@@ -7161,8 +7164,7 @@ def config_auto_switch(self, **post_param):
         'task_result': flow_record.task_result,
         'device': flow_record.device,
         'commit_user': flow_record.commit_user,
-        # 'commit_time': flow_record.commit_time.astimezone(local_timezone),
-        'commit_time': datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M:%S'),
+        'commit_time': datetime.now(),
         'method': flow_record.method,
         'remote_ip': flow_record.remote_ip,
         'kwargs': flow_record.kwargs,

@@ -1076,8 +1076,8 @@ class H3CinfoCollection(H3CNetconf):
         data_xml = '''
         <top xmlns="http://www.h3c.com/netconf/data:1.0">
         <Package>
-        <ImageLists> <ImageList>
-        <FileName></FileName> <Model></Model>
+        <ImageLists><ImageList>
+        <FileName></FileName><Model></Model>
         <Type>1</Type>
         <Service></Service>
         <FilePlatVersion></FilePlatVersion>
