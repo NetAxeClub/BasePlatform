@@ -183,9 +183,9 @@ def push_file():
         commit = repo.index.commit(f"automation commit by {log_time}", author=author)
         if repo.remotes:
             for _origin in repo.remotes:
-                repo.remote(_origin.name).push()
-                o = repo.remotes.origin
                 try:
+                    repo.remote(_origin.name).push()
+                    o = repo.remotes.origin
                     o.pull()
                 except Exception as e:
                     logger.error(e)
