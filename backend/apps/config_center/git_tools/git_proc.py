@@ -173,23 +173,39 @@ def push_file():
     # 未跟踪的文件
     untracked_files = repo.untracked_files
     files += untracked_files
+    commit_result = []
     if files:
-        # gitfiles = [os.path.join(repo.working_tree_dir, x) for x in files]
-        # repo.index.add(gitfiles)
-        repo.index.add('.')
         author = Actor(config.git_user, config.git_user_email)
-        # committer = Actor(log_time, "netops@example.com")
-        # commit = repo.index.commit(f"automation commit by {log_time}", author=author, committer=committer)
-        commit = repo.index.commit(f"automation commit by {log_time}", author=author)
-        if repo.remotes:
-            for _origin in repo.remotes:
-                try:
-                    repo.remote(_origin.name).push()
-                    o = repo.remotes.origin
-                    o.pull()
-                except Exception as e:
-                    logger.error(e)
-        return commit.hexsha, changedFiles, untracked_files
+        gitfiles = [os.path.join(repo.working_tree_dir, x) for x in files]
+        for i in range(0, len(gitfiles), 100):
+            # 使用切片操作取出从i开始的100个元素
+            sub_git_files = gitfiles[i:i + 100]
+            repo.index.add(sub_git_files)
+            commit = repo.index.commit(f"automation commit by {log_time}", author=author)
+            if repo.remotes:
+                for _origin in repo.remotes:
+                    try:
+                        repo.remote(_origin.name).push()
+                        o = repo.remotes.origin
+                        o.pull()
+                    except Exception as e:
+                        logger.error(e)
+            commit_result.append(commit.hexsha)
+        # repo.index.add(gitfiles)
+        # repo.index.add('.')
+        # author = Actor(config.git_user, config.git_user_email)
+        # # committer = Actor(log_time, "netops@example.com")
+        # # commit = repo.index.commit(f"automation commit by {log_time}", author=author, committer=committer)
+        # commit = repo.index.commit(f"automation commit by {log_time}", author=author)
+        # if repo.remotes:
+        #     for _origin in repo.remotes:
+        #         try:
+        #             repo.remote(_origin.name).push()
+        #             o = repo.remotes.origin
+        #             o.pull()
+        #         except Exception as e:
+        #             logger.error(e)
+        return commit_result, changedFiles, untracked_files
     return '', '', ''
 
 

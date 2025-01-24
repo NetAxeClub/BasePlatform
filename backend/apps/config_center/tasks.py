@@ -272,7 +272,7 @@ def backup_device_config_sub(**kwargs):
     if hostip == '0.0.0.0':
         return {}
     class_instance = BaseConn(**kwargs)
-    filename = BASE_DIR + f"/media/device_config/current-configuration/{hostip}/{kwargs['vendor__alias']}_{hostip}.txt"
+    filename = f"device_config/current-configuration/{hostip}/{kwargs['vendor__alias']}_{hostip}.txt"
     try:
         content = class_instance.send_commands(cmd=command_map[kwargs['vendor__alias']]['cmd'])
         # path = default_storage.save(filename, ContentFile(content))
@@ -280,7 +280,7 @@ def backup_device_config_sub(**kwargs):
             os.mkdir(BASE_DIR + f"/media/device_config/current-configuration/{hostip}/")
         # with default_storage.open(filename, "w") as file:
         #     file.write(content)
-        with open(filename, "w", encoding="utf-8") as f:
+        with open(BASE_DIR + "/media/" + filename, "w", encoding="utf-8") as f:
             f.write(content)
         ConfigBackup.objects.create(
             name=kwargs['name'], manage_ip=hostip,
@@ -352,7 +352,7 @@ def backup_device_config(**kwargs):
     msg_gateway_runner.send_wechat(channel="netdevops",
                                    content=f"配置备份完成，耗时:{time_use}分\n")
     config_compliance.apply_async(kwargs={}, queue=CELERY_QUEUE, retry=True)
-    git_push_config.apply_async(kwargs=kwargs, queue=CELERY_QUEUE, retry=True)
+    # git_push_config.apply_async(kwargs=kwargs, queue=CELERY_QUEUE, retry=True)
     return
 
 
