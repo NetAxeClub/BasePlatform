@@ -16,6 +16,7 @@ from netaxe.settings import BASE_DIR
 from django.db import connections
 from apps.automation.tools.base_connection import BaseConn
 from apps.automation.tools.model_api import get_device_info_v2
+from apps.config_center.git_tools.git_proc import ConfigGit
 from apps.config_center.config_parse.config_parse import config_file_parse
 from apps.config_center.git_tools.git_proc import push_file
 from apps.config_center.my_nornir import config_backup_nornir
@@ -27,6 +28,7 @@ logger = logging.getLogger('automation')
 config_mongo = MongoOps(db='metric', coll='level2')
 BACKUP_PATH = BASE_DIR + '/media/device_config/current-configuration'
 
+_ConfigGit = ConfigGit()
 
 if DEBUG:
     CELERY_QUEUE = 'dev'
@@ -364,10 +366,17 @@ def git_push_config(**kwargs):
         hosts = get_device_info_v2()
     log_time = datetime.now().strftime("%Y-%m-%d")
     today = timezone.now()
-    commit, changed_files, untracked_files = push_file()
+    commit_results, changed_files, untracked_files = push_file()
+
     for change_host in changed_files:
         hostip = change_host.split('/')[1]
         host_info = [host for host in hosts if host['manage_ip'] == hostip]
+        commit = ''
+        for commit_hexsha in commit_results:
+            commit_info = _ConfigGit.get_commit_detail(commit_hexsha)
+            if commit_info:
+                if hostip in [x['value'].split('/')[1] for x in commit_info]:
+                    commit = commit_hexsha
         if host_info:
             ConfigBackup.objects.filter(name=host_info[0]['name'], manage_ip=host_info[0]['manage_ip'],
                                         status=host_info[0]['status'],
@@ -380,6 +389,12 @@ def git_push_config(**kwargs):
     for untracked_host in untracked_files:
         hostip = untracked_host.split('/')[1]
         host_info = [host for host in hosts if host['manage_ip'] == hostip]
+        commit = ''
+        for commit_hexsha in commit_results:
+            commit_info = _ConfigGit.get_commit_detail(commit_hexsha)
+            if commit_info:
+                if hostip in [x['value'].split('/')[1] for x in commit_info]:
+                    commit = commit_hexsha
         if host_info:
             ConfigBackup.objects.filter(name=host_info[0]['name'], manage_ip=host_info[0]['manage_ip'],
                                         status=host_info[0]['status'],
@@ -389,13 +404,13 @@ def git_push_config(**kwargs):
                                         ).update(
                 config_status='SUCCESS', git_type='add', commit=commit, file_path=untracked_host
             )
-
-    config_mongo.insert({
-        'name': 'config_backup_git_status',
-        'data': {
-            'change': len(changed_files),
-            'add': len(untracked_files),
-            'commit': commit
-        },
-        'log_time': log_time
-    })
+    for commit_hexsha in commit_results:
+        config_mongo.insert({
+            'name': 'config_backup_git_status',
+            'data': {
+                'change': len(changed_files),
+                'add': len(untracked_files),
+                'commit': commit_hexsha
+            },
+            'log_time': log_time
+        })
