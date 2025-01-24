@@ -308,7 +308,6 @@ def backup_device_config(**kwargs):
     msg_gateway_runner.send_wechat(channel="netdevops", content=f"配置备份开始，时间:{log_time}")
     start_time = time.time()
     today = timezone.now()
-    kwargs['today'] = today
     if kwargs:
         hosts = get_device_info_v2(**kwargs)
     else:
@@ -355,6 +354,7 @@ def backup_device_config(**kwargs):
     msg_gateway_runner.send_wechat(channel="netdevops",
                                    content=f"配置备份完成，耗时:{time_use}分\n")
     config_compliance.apply_async(kwargs={}, queue=CELERY_QUEUE, retry=True)
+    kwargs['today'] = today  # 传递today参数到配置git推送的方法中
     git_push_config.apply_async(kwargs=kwargs, queue=CELERY_QUEUE, retry=True)
     return
 
