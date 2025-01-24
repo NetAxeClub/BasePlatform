@@ -548,8 +548,6 @@ class ConfigFileView(APIView):
                 return JsonResponse(data)
         else:
             file_content = default_storage.open(post_data['file_path']).read().decode('utf-8')
-            # with open(BASE_DIR + '/media/' + post_data['file_path'], "r") as f:
-            #     file_content = f.read()
             data = {
                 "code": 200,
                 "results": file_content,
