@@ -347,6 +347,7 @@ class HuaweiProc(BaseConn):
             tmp['service'] = service
             tmp['src_addr'] = src_addr
             tmp['dst_addr'] = dst_addr
+            tmp['hostname'] = self.hostname
             results.append(tmp)
         sec_mongo.delete_many(query=dict(hostip=self.hostip))
         sec_mongo.insert_many(results)

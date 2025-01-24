@@ -2,7 +2,7 @@
 from __future__ import absolute_import, unicode_literals
 import re
 import time
-import asyncio
+import os
 import logging
 from datetime import datetime, date, timedelta
 from celery import shared_task
@@ -16,6 +16,7 @@ from netaxe.settings import BASE_DIR
 from django.db import connections
 from apps.automation.tools.base_connection import BaseConn
 from apps.automation.tools.model_api import get_device_info_v2
+from apps.config_center.git_tools.git_proc import ConfigGit
 from apps.config_center.config_parse.config_parse import config_file_parse
 from apps.config_center.git_tools.git_proc import push_file
 from apps.config_center.my_nornir import config_backup_nornir
@@ -27,6 +28,7 @@ logger = logging.getLogger('automation')
 config_mongo = MongoOps(db='metric', coll='level2')
 BACKUP_PATH = BASE_DIR + '/media/device_config/current-configuration'
 
+_ConfigGit = ConfigGit()
 
 if DEBUG:
     CELERY_QUEUE = 'dev'
@@ -272,12 +274,16 @@ def backup_device_config_sub(**kwargs):
     if hostip == '0.0.0.0':
         return {}
     class_instance = BaseConn(**kwargs)
+    filename = f"device_config/current-configuration/{hostip}/{kwargs['vendor__alias']}_{hostip}.txt"
     try:
         content = class_instance.send_commands(cmd=command_map[kwargs['vendor__alias']]['cmd'])
-        filename = f"device_config/current-configuration/{hostip}/{kwargs['vendor__alias']}_{hostip}.txt"
         # path = default_storage.save(filename, ContentFile(content))
-        with default_storage.open(filename, "w") as file:
-            file.write(content)
+        if not os.path.exists(BASE_DIR + f"/media/device_config/current-configuration/{hostip}/"):
+            os.mkdir(BASE_DIR + f"/media/device_config/current-configuration/{hostip}/")
+        # with default_storage.open(filename, "w") as file:
+        #     file.write(content)
+        with open(BASE_DIR + "/media/" + filename, "w", encoding="utf-8") as f:
+            f.write(content)
         ConfigBackup.objects.create(
             name=kwargs['name'], manage_ip=hostip,
             config_status='SUCCESS',
@@ -293,8 +299,7 @@ def backup_device_config_sub(**kwargs):
             model_name=kwargs['model__name'],
             git_type='change', commit='', file_path='', last_time=today
         )
-        path = str(e)
-    return path
+    return filename
 
 
 @shared_task(base=AxeTask, once={'graceful': True})
@@ -349,50 +354,57 @@ def backup_device_config(**kwargs):
     msg_gateway_runner.send_wechat(channel="netdevops",
                                    content=f"配置备份完成，耗时:{time_use}分\n")
     config_compliance.apply_async(kwargs={}, queue=CELERY_QUEUE, retry=True)
+    kwargs['today'] = today  # 传递today参数到配置git推送的方法中
     git_push_config.apply_async(kwargs=kwargs, queue=CELERY_QUEUE, retry=True)
     return
 
 
 @shared_task(base=AxeTask, once={'graceful': True})
 def git_push_config(**kwargs):
+    today = kwargs['today']
+    kwargs.pop('today')
     if kwargs:
         hosts = get_device_info_v2(**kwargs)
     else:
         hosts = get_device_info_v2()
     log_time = datetime.now().strftime("%Y-%m-%d")
-    today = timezone.now()
-    commit, changed_files, untracked_files = push_file()
-    for change_host in changed_files:
-        hostip = change_host.split('/')[1]
-        host_info = [host for host in hosts if host['manage_ip'] == hostip]
-        if host_info:
-            ConfigBackup.objects.filter(name=host_info[0]['name'], manage_ip=host_info[0]['manage_ip'],
-                                        status=host_info[0]['status'],
-                                        idc_name=host_info[0]['idc__name'],
-                                        vendor=host_info[0]['vendor__alias'],
-                                        model_name=host_info[0]['model__name'], last_time=today
-                                        ).update(
-                config_status='SUCCESS', git_type='change', commit=commit, file_path=change_host
-            )
-    for untracked_host in untracked_files:
-        hostip = untracked_host.split('/')[1]
-        host_info = [host for host in hosts if host['manage_ip'] == hostip]
-        if host_info:
-            ConfigBackup.objects.filter(name=host_info[0]['name'], manage_ip=host_info[0]['manage_ip'],
-                                        status=host_info[0]['status'],
-                                        idc_name=host_info[0]['idc__name'],
-                                        vendor=host_info[0]['vendor__alias'],
-                                        model_name=host_info[0]['model__name'], last_time=today
-                                        ).update(
-                config_status='SUCCESS', git_type='add', commit=commit, file_path=untracked_host
-            )
 
-    config_mongo.insert({
-        'name': 'config_backup_git_status',
-        'data': {
-            'change': len(changed_files),
-            'add': len(untracked_files),
-            'commit': commit
-        },
-        'log_time': log_time
-    })
+    commit_results, changed_files, untracked_files = push_file()
+
+    for commit_hexsha in commit_results:
+        commit_info = _ConfigGit.get_commit_detail(commit_hexsha)
+        commit_hosts = [x['value'].split('/')[1] for x in commit_info]
+        for change_host in changed_files:
+            hostip = change_host.split('/')[1]
+            host_info = [host for host in hosts if host['manage_ip'] == hostip]
+            if hostip in commit_hosts and host_info:
+                ConfigBackup.objects.filter(name=host_info[0]['name'], manage_ip=host_info[0]['manage_ip'],
+                                            status=host_info[0]['status'],
+                                            idc_name=host_info[0]['idc__name'],
+                                            vendor=host_info[0]['vendor__alias'],
+                                            model_name=host_info[0]['model__name'], last_time=today
+                                            ).update(
+                    config_status='SUCCESS', git_type='change', commit=commit_hexsha, file_path=change_host
+                )
+        for untracked_host in untracked_files:
+            hostip = untracked_host.split('/')[1]
+            host_info = [host for host in hosts if host['manage_ip'] == hostip]
+            if hostip in commit_hosts and host_info:
+                ConfigBackup.objects.filter(name=host_info[0]['name'], manage_ip=host_info[0]['manage_ip'],
+                                            status=host_info[0]['status'],
+                                            idc_name=host_info[0]['idc__name'],
+                                            vendor=host_info[0]['vendor__alias'],
+                                            model_name=host_info[0]['model__name'], last_time=today
+                                            ).update(
+                    config_status='SUCCESS', git_type='add', commit=commit_hexsha, file_path=untracked_host
+                )
+    for commit_hexsha in commit_results:
+        config_mongo.insert({
+            'name': 'config_backup_git_status',
+            'data': {
+                'change': len(changed_files),
+                'add': len(untracked_files),
+                'commit': commit_hexsha
+            },
+            'log_time': log_time
+        })
