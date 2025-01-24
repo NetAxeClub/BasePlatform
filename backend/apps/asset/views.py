@@ -41,6 +41,85 @@ show_ip_mongo = MongoOps(db='Automation', coll='layer3interface')
 metric_mongo = MongoOps(db='metric', coll='level2')
 
 
+class TreeDataMixin:
+    """
+    提供树形结构数据的 Mixin 类
+    用于需要展示 IDC/IDC Model/Rack 层级结构的视图
+    """
+
+    @action(detail=False, methods=['get'])
+    def tree_data(self, request, *args, **kwargs):
+        # Get all NetworkDevice objects with selected fields
+        queryset = self.filter_queryset(self.get_queryset()).values(
+            'id',
+            'idc', 'idc__name',
+            'idc_model', 'idc_model__name',
+            'rack', 'rack__name'
+        ).distinct()
+
+        # Create base structure with "全部" node
+        tree_data = [{
+            'name': '全部',
+            'icon': '',
+            'id': None
+        }]
+
+        # Create dictionaries to store hierarchical data
+        idc_dict = {}
+
+        # Organize data into hierarchical structure
+        for device in queryset:
+            if device['idc'] and device['idc__name']:
+                # Handle IDC level
+                if device['idc'] not in idc_dict:
+                    idc_dict[device['idc']] = {
+                        'name': device['idc__name'],
+                        'icon': '',
+                        'type': 'idc',
+                        'id': device['idc'],
+                        'children': {}
+                    }
+
+                # Handle IDC Model level
+                if device['idc_model'] and device['idc_model__name']:
+                    if device['idc_model'] not in idc_dict[device['idc']]['children']:
+                        idc_dict[device['idc']]['children'][device['idc_model']] = {
+                            'name': device['idc_model__name'],
+                            'icon': '',
+                            'type': 'idc_model',
+                            'id': device['idc_model'],
+                            'children': []
+                        }
+
+                    # Handle Rack level
+                    if device['rack'] and device['rack__name']:
+                        rack_exists = False
+                        for rack in idc_dict[device['idc']]['children'][device['idc_model']]['children']:
+                            # 判断是否已经存在
+                            if rack['id'] == device['rack']:
+                                rack_exists = True
+                                break
+
+                        if not rack_exists:
+                            idc_dict[device['idc']]['children'][device['idc_model']]['children'].append({
+                                'name': device['rack__name'],
+                                'icon': '',
+                                'type': 'rack',
+                                'id': device['rack']
+                            })
+
+        # Convert dictionary structure to list structure
+        for idc in idc_dict.values():
+            idc['children'] = list(idc['children'].values())
+            tree_data.append(idc)
+
+        return JsonResponse(data={
+            'code': 200,
+            'data': tree_data,
+            'msg': '获取网络设备树形结构成功'
+        })
+
+
 class ResourceManageExcelView(APIView):
     permission_classes = (AllowAny,)
     # permission_classes = ()
@@ -474,7 +553,7 @@ class NetworkDeviceFilter(django_filters.FilterSet):
         fields = '__all__'
 
 
-class NetworkDeviceViewSet(CustomViewBase):
+class NetworkDeviceViewSet(CustomViewBase, TreeDataMixin):
     """
     处理  GET POST , 处理 /api/post/<pk>/ GET PUT PATCH DELETE
     """
@@ -485,7 +564,7 @@ class NetworkDeviceViewSet(CustomViewBase):
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filterset_class = NetworkDeviceFilter
     filter_fields = ('serial_num', 'manage_ip', 'category__name',
-                     'name', 'vendor__name', 'idc__name', 'patch_version', 'soft_version',
+                     'name', 'vendor__name', 'idc', 'idc__name', 'idc_model', 'rack', 'patch_version', 'soft_version',
                      'model__name', 'memo', 'status', 'ha_status')
     # pagination_class = LimitSet
     pagination_class = LargeResultsSetPagination
@@ -585,79 +664,7 @@ class NetworkDeviceViewSet(CustomViewBase):
         response['Content-Disposition'] = f'attachment; filename*=UTF-8\'\'{encoded_filename}'
 
         return response
-   
-    @action(detail=False, methods=['get'])
-    def tree_data(self, request, *args, **kwargs):
-        # Get all NetworkDevice objects with selected fields
-        queryset = self.filter_queryset(self.get_queryset()).values(
-            'id', 
-            'idc', 'idc__name',
-            'idc_model', 'idc_model__name',
-            'rack', 'rack__name'
-        ).distinct()
 
-        # Create base structure with "全部" node
-        tree_data = [{
-            'name': '全部',
-            'icon': '',
-            'id': None
-        }]
-
-        # Create dictionaries to store hierarchical data
-        idc_dict = {}
-
-        # Organize data into hierarchical structure
-        for device in queryset:
-            if device['idc'] and device['idc__name']:
-                # Handle IDC level
-                if device['idc'] not in idc_dict:
-                    idc_dict[device['idc']] = {
-                        'name': device['idc__name'],
-                        'icon': '',
-                        'type': 'room',
-                        'id': device['idc'],
-                        'children': {}
-                    }
-
-                # Handle IDC Model level
-                if device['idc_model'] and device['idc_model__name']:
-                    if device['idc_model'] not in idc_dict[device['idc']]['children']:
-                        idc_dict[device['idc']]['children'][device['idc_model']] = {
-                            'name': device['idc_model__name'],
-                            'icon': '',
-                            'type': 'model',
-                            'id': device['idc_model'],
-                            'children': []
-                        }
-
-                    # Handle Rack level
-                    if device['rack'] and device['rack__name']:
-                        rack_exists = False
-                        for rack in idc_dict[device['idc']]['children'][device['idc_model']]['children']:
-                            if rack['id'] == device['rack']:
-                                rack_exists = True
-                                break
-                        
-                        if not rack_exists:
-                            idc_dict[device['idc']]['children'][device['idc_model']]['children'].append({
-                                'name': device['rack__name'],
-                                'icon': '',
-                                'type': 'rock',
-                                'id': device['rack']
-                            })
-
-        # Convert dictionary structure to list structure
-        for idc in idc_dict.values():
-            idc['children'] = list(idc['children'].values())
-            tree_data.append(idc)
-
-        return JsonResponse(data={
-            'code': 200,
-            'data': tree_data,
-            'msg': '获取网络设备树形结构成功'
-        })
-  
-  
     # 重新update方法主要用来捕获更改前的字段值并赋值给self.log
     # def update(self, request, *args, **kwargs):
     #     print('更新', super().update(request, *args, **kwargs))
@@ -694,7 +701,7 @@ class ServerFilter(django_filters.FilterSet):
         fields = '__all__'
 
 
-class ServerDeviceViewSet(CustomViewBase):
+class ServerDeviceViewSet(CustomViewBase, TreeDataMixin):
     """
     处理  GET POST , 处理 /api/post/<pk>/ GET PUT PATCH DELETE
     """
