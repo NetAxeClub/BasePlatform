@@ -191,22 +191,8 @@ def push_file():
                     except Exception as e:
                         logger.error(e)
             commit_result.append(commit.hexsha)
-        # repo.index.add(gitfiles)
-        # repo.index.add('.')
-        # author = Actor(config.git_user, config.git_user_email)
-        # # committer = Actor(log_time, "netops@example.com")
-        # # commit = repo.index.commit(f"automation commit by {log_time}", author=author, committer=committer)
-        # commit = repo.index.commit(f"automation commit by {log_time}", author=author)
-        # if repo.remotes:
-        #     for _origin in repo.remotes:
-        #         try:
-        #             repo.remote(_origin.name).push()
-        #             o = repo.remotes.origin
-        #             o.pull()
-        #         except Exception as e:
-        #             logger.error(e)
         return commit_result, changedFiles, untracked_files
-    return '', '', ''
+    return [], '', ''
 
 
 def test():
