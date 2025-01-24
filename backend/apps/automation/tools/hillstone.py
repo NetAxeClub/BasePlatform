@@ -416,10 +416,11 @@ class HillstoneProc(BaseConn):
             tmp['src_zone'] = i.get('src-zone') if i.get('src-zone') else 'Any'
             tmp['dst_zone'] = i.get('dst-zone') if i.get('dst-zone') else 'Any'
             tmp['service'] = i.get('service')
-            tmp['src_addr'] = i.get('src_addr') or [] # 地址组
+            tmp['src_addr'] = i.get('src_addr') or []  # 地址组
             tmp['dst_addr'] = i.get('dst_addr') or []  # 地址组
             tmp['log'] = log
             tmp['description'] = i.get('description')
+            tmp['hostname'] = self.hostname
             self.sec_policy_data.append(tmp)
         return
 

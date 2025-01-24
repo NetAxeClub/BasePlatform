@@ -422,6 +422,7 @@ class H3cProc(BaseConn):
             tmp['log'] = i['Log']
             tmp['Count'] = i.get('Count')
             tmp['description'] = i.get('Comment')
+            tmp['hostname'] = self.hostname
             results.append(tmp)
         my_mongo.insert_many(results)
         return

@@ -10,7 +10,7 @@ from jinja2 import Environment, StrictUndefined, exceptions, Template
 from django.http import FileResponse
 from datetime import date, datetime
 from django.http import JsonResponse, StreamingHttpResponse
-# from django.core.files.storage import default_storage
+from django.core.files.storage import default_storage
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from rest_framework.views import APIView
@@ -547,14 +547,15 @@ class ConfigFileView(APIView):
                 }
                 return JsonResponse(data)
         else:
-            with open(BASE_DIR + '/media/' + post_data['file_path'], "r") as f:
-                file_content = f.read()
-                data = {
-                    "code": 200,
-                    "results": file_content,
-                    "msg": "success"
-                }
-                return JsonResponse(data, safe=False)
+            file_content = default_storage.open(post_data['file_path']).read().decode('utf-8')
+            # with open(BASE_DIR + '/media/' + post_data['file_path'], "r") as f:
+            #     file_content = f.read()
+            data = {
+                "code": 200,
+                "results": file_content,
+                "msg": "success"
+            }
+            return JsonResponse(data, safe=False)
         data = {
             "code": 400,
             "results": [],
