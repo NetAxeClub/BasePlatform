@@ -361,8 +361,6 @@ def backup_device_config(**kwargs):
 
 @shared_task(base=AxeTask, once={'graceful': True})
 def git_push_config(**kwargs):
-    today = kwargs['today']
-    kwargs.pop('today')
     if kwargs:
         hosts = get_device_info_v2(**kwargs)
     else:
@@ -382,7 +380,7 @@ def git_push_config(**kwargs):
                                             status=host_info[0]['status'],
                                             idc_name=host_info[0]['idc__name'],
                                             vendor=host_info[0]['vendor__alias'],
-                                            model_name=host_info[0]['model__name'], last_time=today
+                                            model_name=host_info[0]['model__name']
                                             ).update(
                     config_status='SUCCESS', git_type='change', commit=commit_hexsha, file_path=change_host
                 )
@@ -394,7 +392,7 @@ def git_push_config(**kwargs):
                                             status=host_info[0]['status'],
                                             idc_name=host_info[0]['idc__name'],
                                             vendor=host_info[0]['vendor__alias'],
-                                            model_name=host_info[0]['model__name'], last_time=today
+                                            model_name=host_info[0]['model__name']
                                             ).update(
                     config_status='SUCCESS', git_type='add', commit=commit_hexsha, file_path=untracked_host
                 )
