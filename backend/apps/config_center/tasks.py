@@ -366,6 +366,7 @@ def git_push_config(**kwargs):
     else:
         hosts = get_device_info_v2()
     log_time = datetime.now().strftime("%Y-%m-%d")
+    today = kwargs['today']
 
     commit_results, changed_files, untracked_files = push_file()
 
@@ -380,7 +381,7 @@ def git_push_config(**kwargs):
                                             status=host_info[0]['status'],
                                             idc_name=host_info[0]['idc__name'],
                                             vendor=host_info[0]['vendor__alias'],
-                                            model_name=host_info[0]['model__name']
+                                            model_name=host_info[0]['model__name'], last_time=today
                                             ).update(
                     config_status='SUCCESS', git_type='change', commit=commit_hexsha, file_path=change_host
                 )
@@ -392,7 +393,7 @@ def git_push_config(**kwargs):
                                             status=host_info[0]['status'],
                                             idc_name=host_info[0]['idc__name'],
                                             vendor=host_info[0]['vendor__alias'],
-                                            model_name=host_info[0]['model__name']
+                                            model_name=host_info[0]['model__name'], last_time=today
                                             ).update(
                     config_status='SUCCESS', git_type='add', commit=commit_hexsha, file_path=untracked_host
                 )
