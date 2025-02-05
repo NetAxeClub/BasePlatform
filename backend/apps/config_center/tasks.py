@@ -361,13 +361,13 @@ def backup_device_config(**kwargs):
 
 @shared_task(base=AxeTask, once={'graceful': True})
 def git_push_config(**kwargs):
+    today = kwargs['today']
+    kwargs.pop('today')
     if kwargs:
         hosts = get_device_info_v2(**kwargs)
     else:
         hosts = get_device_info_v2()
     log_time = datetime.now().strftime("%Y-%m-%d")
-    today = kwargs['today']
-
     commit_results, changed_files, untracked_files = push_file()
 
     for commit_hexsha in commit_results:
