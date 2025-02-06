@@ -12,8 +12,6 @@ from apps.dcs_control.json_validate.address_schema import address_schema
 from apps.dcs_control.json_validate.dnat_schema import post_dnat_schema
 from apps.dcs_control.tasks import bulk_deny_by_address, address_set, config_dnat
 
-
-
 if DEBUG:
     CELERY_QUEUE = 'dev'
 else:
@@ -22,6 +20,7 @@ else:
 dnat_mongo = MongoOps(db='Automation', coll='hillstone_dnat')
 snat_mongo = MongoOps(db='Automation', coll='hillstone_snat')
 sec_policy_mongo = MongoOps(db='Automation', coll='sec_policy')
+
 
 # 一键封堵
 class DenyByAddrObj(APIView):
@@ -171,37 +170,37 @@ class DestAddTranslate(APIView):
     authentication_classes = ()
 
     def get(self, request):
-            get_param = request.GET.dict()
-            # print(get_param)
-            # 获取单个设备DNAT信息
-            if all(k in get_param for k in ("vendor", "hostip")):
-                if get_param['vendor'] == 'H3C':
-                    _FirewallMain = FirewallMain(get_param['hostip'])
-                    _res = _FirewallMain.get_h3c_global_dnat()
-                    if _res:
-                        return JsonResponse({'results': _res, 'count': len(_res),
-                                             'code': 200})
-                    else:
-                        return JsonResponse({'results': _res, 'count': len(_res),
-                                             'code': 400})
-                elif get_param['vendor'] == 'Huawei':
-                    _FirewallMain = FirewallMain(get_param['hostip'])
-                    _res = _FirewallMain.get_huawei_nat_server()
-                    if _res:
-                        return JsonResponse({'results': _res, 'count': len(_res),
-                                             'code': 200})
-                    else:
-                        return JsonResponse({'results': _res, 'count': len(_res),
-                                             'code': 400})
-                elif get_param['vendor'] == 'Hillstone':
-                    _res = dnat_mongo.find(query_dict=dict(hostip=get_param['hostip']), fileds={'_id': 0})
-                    if _res:
-                        return JsonResponse({'results': _res, 'count': len(_res),
-                                             'code': 200})
-                    else:
-                        return JsonResponse({'results': _res, 'count': len(_res),
-                                             'code': 400})
-            return JsonResponse({'code': 200})
+        get_param = request.GET.dict()
+        # print(get_param)
+        # 获取单个设备DNAT信息
+        if all(k in get_param for k in ("vendor", "hostip")):
+            if get_param['vendor'] == 'H3C':
+                _FirewallMain = FirewallMain(get_param['hostip'])
+                _res = _FirewallMain.get_h3c_global_dnat()
+                if _res:
+                    return JsonResponse({'results': _res, 'count': len(_res),
+                                         'code': 200})
+                else:
+                    return JsonResponse({'results': _res, 'count': len(_res),
+                                         'code': 400})
+            elif get_param['vendor'] == 'Huawei':
+                _FirewallMain = FirewallMain(get_param['hostip'])
+                _res = _FirewallMain.get_huawei_nat_server()
+                if _res:
+                    return JsonResponse({'results': _res, 'count': len(_res),
+                                         'code': 200})
+                else:
+                    return JsonResponse({'results': _res, 'count': len(_res),
+                                         'code': 400})
+            elif get_param['vendor'] == 'Hillstone':
+                _res = dnat_mongo.find(query_dict=dict(hostip=get_param['hostip']), fileds={'_id': 0})
+                if _res:
+                    return JsonResponse({'results': _res, 'count': len(_res),
+                                         'code': 200})
+                else:
+                    return JsonResponse({'results': _res, 'count': len(_res),
+                                         'code': 400})
+        return JsonResponse({'code': 200})
 
     # 表单验证
     def post(self, request):
@@ -261,12 +260,18 @@ class SecPolicy(APIView):
             if 'src_ip' in _query.keys():
                 _ip = IPAddress(_query['src_ip'])
                 query['src_ip_split'] = {'$elemMatch': {'start': {'$lte': _ip.value}, 'end': {'$gte': _ip.value}}}
+            elif _query.get('src_ip') or _query.get('dst_ip'):
+                query['src_addr.object'] = 'Any'
             if 'dst_ip' in _query.keys():
                 _ip = IPAddress(_query['dst_ip'])
                 query['dst_ip_split'] = {'$elemMatch': {'start': {'$lte': _ip.value}, 'end': {'$gte': _ip.value}}}
+            elif _query.get('src_ip') or _query.get('dst_ip'):
+                query['dst_addr.object'] = 'Any'
+            # print(query)
             res = sec_policy_mongo.find_page_query(query_dict=query,
-                fields={'_id': 0}, page_size=int(get_param['page_size']), page_num=int(get_param['page']))
-            count = sec_policy_mongo.count_documents()
+                                                   fields={'_id': 0}, page_size=int(get_param['page_size']),
+                                                   page_num=int(get_param['page']))
+            count = sec_policy_mongo.count_documents(query=query)
             result = {
                 'code': 200,
                 'msg': 'success',
@@ -500,13 +505,23 @@ class SecPolicy(APIView):
                                 query_dict=dict(hostip=post_param['hostip'], name=addr['object']), fields={'_id': 0}
                             )
                             if src_addr_query:
-                                for x in src_addr_query[0]['ip']:
-                                    if 'ip' in x.keys():
-                                        result['src_addr'].append({
-                                            'name': addr['object'],
-                                            'ip': x['ip'],
-                                            'xunmi': MongoNetOps.get_xunmi_info(dict(server_ip_address=x['ip'].split('/')[0]))
-                                        })
+                                if 'ip' in src_addr_query[0].keys():
+                                    for x in src_addr_query[0]['ip']:
+                                        if 'ip' in x.keys():
+                                            result['src_addr'].append({
+                                                'name': addr['object'],
+                                                'ip': x['ip'],
+                                                'xunmi': MongoNetOps.get_xunmi_info(
+                                                    dict(server_ip_address=x['ip'].split('/')[0]))
+                                            })
+                                if 'range' in src_addr_query[0].keys():
+                                    for x in src_addr_query[0]['range']:
+                                        if 'start' in x.keys():
+                                            result['dst_addr'].append({
+                                                'name': addr['object'],
+                                                'ip': f"{x['start']}-{x['end']}",
+                                                'xunmi': ''
+                                            })
                         if 'ip' in addr.keys():
                             result['src_addr'].append({
                                 'name': '',
@@ -520,13 +535,23 @@ class SecPolicy(APIView):
                                 query_dict=dict(hostip=post_param['hostip'], name=addr['object']), fields={'_id': 0}
                             )
                             if src_addr_query:
-                                for x in src_addr_query[0]['ip']:
-                                    if 'ip' in x.keys():
-                                        result['dst_addr'].append({
-                                            'name': addr['object'],
-                                            'ip': x['ip'],
-                                            'xunmi': MongoNetOps.get_xunmi_info(dict(server_ip_address=x['ip'].split('/')[0]))
-                                        })
+                                if 'ip' in src_addr_query[0].keys():
+                                    for x in src_addr_query[0]['ip']:
+                                        if 'ip' in x.keys():
+                                            result['dst_addr'].append({
+                                                'name': addr['object'],
+                                                'ip': x['ip'],
+                                                'xunmi': MongoNetOps.get_xunmi_info(
+                                                    dict(server_ip_address=x['ip'].split('/')[0]))
+                                            })
+                                if 'range' in src_addr_query[0].keys():
+                                    for x in src_addr_query[0]['range']:
+                                        if 'start' in x.keys():
+                                            result['dst_addr'].append({
+                                                'name': addr['object'],
+                                                'ip': f"{x['start']}-{x['end']}",
+                                                'xunmi': ''
+                                            })
                         if 'ip' in addr.keys():
                             result['dst_addr'].append({
                                 'name': '',

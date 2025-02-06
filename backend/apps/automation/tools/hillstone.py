@@ -240,7 +240,7 @@ class HillstoneProc(BaseConn):
         src_addr: {
             addr: '封锁IP'
         },
-        hostip: '172.16.75.1'
+        hostip: '1.1.1.1'
         :param host:
         :param datas:
         :return:
@@ -264,14 +264,8 @@ class HillstoneProc(BaseConn):
             tmp = dict()
             tmp['src_ip_split'] = []
             tmp['dst_ip_split'] = []
-            service = []
             src_addr = []
             dst_addr = []
-            # if i.get('service'):
-            #     if isinstance(i['service'], list):
-            #         service = [x['service'] for x in i['service']]
-            #     else:
-            #         service.append(i['service']['service'])
             log = ''
             if i.get('logs'):
                 if isinstance(i['logs'], dict):
@@ -281,13 +275,8 @@ class HillstoneProc(BaseConn):
             # 地址对象
             # src_addr = ''
             if i.get('src_addr'):
-                # tmp_src_addr = []
                 if isinstance(i['src_addr'], dict):
-                    # tmp_src_addr = [i['src_addr'][x] for x in i['src_addr'].keys()]
-                    # src_addr = ','.join(tmp_src_addr)
                     if 'object' in i['src_addr'].keys():
-                        # src_addr = i['src_addr']['object']
-                        # _addr_res = address_mongo.find(query_dict=dict(address=src_addr, hostip=host), fields={'_id': 0})
                         src_addr.append(dict(object=i['src_addr']['object']))
                         if i['src_addr']['object'] in address_map.keys():
                             _addr_res = address_map[i['src_addr']['object']]
@@ -300,6 +289,9 @@ class HillstoneProc(BaseConn):
                                     for _t_ip in _sub_src_ip['range']:
                                         tmp['src_ip_split'].append(dict(start=IPAddress(_t_ip['start']).value,
                                                                         end=IPAddress(_t_ip['end']).value))
+                        elif i['src_addr']['object'] == 'Any':
+                            tmp['src_ip_split'].append(dict(start=0,
+                                                            end=4294967295))
                     elif 'ip' in i['src_addr'].keys():
                         _ip = IPNetwork(i['src_addr']['ip'])
                         src_addr.append(dict(ip=i['src_addr']['ip']))
@@ -313,9 +305,7 @@ class HillstoneProc(BaseConn):
                                                         end=IPNetwork(end_ip).last))
 
                 elif isinstance(i['src_addr'], list):
-                    # src_addr = ','.join([x['addr'] for x in i['src_addr']])
                     for _src_tmp in i['src_addr']:
-                        # tmp_src_addr += [_src_tmp[x] for x in _src_tmp.keys()]
                         if 'object' in _src_tmp.keys():
                             src_addr.append(dict(object=_src_tmp['object']))
                             if _src_tmp['object'] in address_map.keys():
@@ -330,6 +320,9 @@ class HillstoneProc(BaseConn):
                                             tmp['src_ip_split'].append(
                                                 dict(start=IPAddress(_t_ip['start']).value,
                                                      end=IPAddress(_t_ip['end']).value))
+                            elif _src_tmp['object'] == 'Any':
+                                tmp['src_ip_split'].append(dict(start=0,
+                                                                end=4294967295))
                         elif 'ip' in _src_tmp.keys():
                             _ip = IPNetwork(_src_tmp['ip'])
                             src_addr.append(dict(ip=_src_tmp['ip']))
@@ -347,8 +340,6 @@ class HillstoneProc(BaseConn):
             if i.get('dst_addr'):
                 # tmp_dst_addr = []
                 if isinstance(i['dst_addr'], dict):
-                    # tmp_dst_addr = [i['dst_addr'][x] for x in i['dst_addr'].keys()]
-                    # dst_addr = ','.join(tmp_dst_addr)
                     if 'object' in i['dst_addr'].keys():
                         dst_addr.append(dict(object=i['dst_addr']['object']))
                         if i['dst_addr']['object'] in address_map.keys():
@@ -362,6 +353,10 @@ class HillstoneProc(BaseConn):
                                     for _t_ip in _sub_dst_ip['range']:
                                         tmp['dst_ip_split'].append(dict(start=IPAddress(_t_ip['start']).value,
                                                                         end=IPAddress(_t_ip['end']).value))
+                        elif i['dst_addr']['object'] == 'Any':
+                            tmp['dst_ip_split'].append(dict(start=0,
+                                                            end=4294967295))
+
                     elif 'ip' in i['dst_addr'].keys():
                         dst_addr.append(dict(ip=i['dst_addr']['ip']))
                         _ip = IPNetwork(i['dst_addr']['ip'])
@@ -374,9 +369,7 @@ class HillstoneProc(BaseConn):
                         tmp['dst_ip_split'].append(dict(start=IPNetwork(start_ip).first,
                                                         end=IPNetwork(end_ip).last))
                 elif isinstance(i['dst_addr'], list):
-                    # dst_addr = ','.join([x['addr'] for x in i['dst_addr']])
                     for _dst_tmp in i['dst_addr']:
-                        # tmp_dst_addr += [_dst_tmp[x] for x in _dst_tmp.keys()]
                         if 'object' in _dst_tmp.keys():
                             dst_addr.append(dict(object=_dst_tmp['object']))
                             if _dst_tmp['object'] in address_map.keys():
@@ -391,6 +384,9 @@ class HillstoneProc(BaseConn):
                                             tmp['dst_ip_split'].append(
                                                 dict(start=IPAddress(_t_ip['start']).value,
                                                      end=IPAddress(_t_ip['end']).value))
+                            elif _dst_tmp['object'] == 'Any':
+                                tmp['dst_ip_split'].append(dict(start=0,
+                                                                end=4294967295))
                         elif 'ip' in _dst_tmp.keys():
                             dst_addr.append(dict(ip=_dst_tmp['ip']))
                             _ip = IPNetwork(_dst_tmp['ip'])
@@ -403,7 +399,6 @@ class HillstoneProc(BaseConn):
                                 dict(range=start_ip + '-' + end_ip))
                             tmp['dst_ip_split'].append(dict(start=IPNetwork(start_ip).first,
                                                             end=IPNetwork(end_ip).last))
-                    # dst_addr = ','.join(tmp_dst_addr)
             enable = True
             if i.get('disable'):
                 enable = False
