@@ -112,6 +112,7 @@ def mathintspeed(value):
 
 address_mongo = MongoOps(db='NETCONF', coll='h3c_address_set')
 service_mongo = MongoOps(db='NETCONF', coll='h3c_service_set')
+sec_policy_mongo = MongoOps(db='Automation', coll='sec_policy')
 
 
 class H3cProc(BaseConn):
@@ -169,8 +170,7 @@ class H3cProc(BaseConn):
         :param datas:
         :return:
         """
-        my_mongo = MongoOps(db='Automation', coll='sec_policy')
-        my_mongo.delete_many(query=dict(hostip=self.hostip))
+        sec_policy_mongo.delete_many(query=dict(hostip=self.hostip))
         results = []
         for i in datas:
             # print(i)
@@ -405,6 +405,12 @@ class H3cProc(BaseConn):
             dst_zone = ''
             if i.get('DestZoneList'):
                 dst_zone = i['DestZoneList']['DestZoneItem']
+            if not src_addr:
+                tmp['src_ip_split'].append(dict(start=0,
+                                                end=4294967295))
+            if not dst_addr:
+                tmp['dst_ip_split'].append(dict(start=0,
+                                                end=4294967295))
             tmp['vendor'] = 'H3C'
             tmp['hostip'] = i['hostip']
             tmp['id'] = i.get('ID')
@@ -424,7 +430,7 @@ class H3cProc(BaseConn):
             tmp['description'] = i.get('Comment')
             tmp['hostname'] = self.hostname
             results.append(tmp)
-        my_mongo.insert_many(results)
+        sec_policy_mongo.insert_many(results)
         return
 
     def _arp_proc(self, res):

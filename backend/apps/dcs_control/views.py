@@ -430,12 +430,21 @@ class SecPolicy(APIView):
 
     def post(self, request):
         post_param = request.data
+        risks_port = [23, 22, 20, 21, 3306, 1521, 6379, 1433, 445, 3389, 5432]
         # print(post_param)
         # 获取设备地址组
         if all(k in post_param for k in ("vendor", "hostip", "name", "id")):
             if post_param['vendor'] == 'H3C':
                 # _FirewallMain = FirewallMain(post_param['hostip'])
                 # _res = _FirewallMain.get_h3c_address_obj()
+                type_map = {
+                    '0': 'Nested group',
+                    '1': 'protocol',
+                    '2': 'icmp',
+                    '3': 'tcp',
+                    '4': 'udp',
+                    '5': 'icmpv6',
+                }
                 result = {
                     'src_addr': [],
                     'dst_addr': [],
@@ -476,11 +485,28 @@ class SecPolicy(APIView):
                 if post_param['service']:
                     for ser in post_param['service']:
                         if 'object' in ser.keys():
-                            # dst_addr_query = _FirewallMain.get_h3c_service_obj(name=ser['object'])
                             service_query = MongoOps(db='NETCONF', coll='h3c_service_set').find(
                                 query_dict=dict(hostip=post_param['hostip'], Name=ser['object']), fields={'_id': 0}
                             )
-                            print(service_query)
+                            if service_query:
+                                for _service_query in service_query:
+                                    for items in _service_query['items']:
+                                        security_type = 'default'
+                                        port = items['EndDestPort']
+                                        if port in risks_port:
+                                            security_type = 'warning'
+                                        if items['StartDestPort'] != items['EndDestPort']:
+                                            port = f"{items['StartDestPort']}-{items['EndDestPort']}"
+                                            for i in range(int(items['StartDestPort']), int(items['EndDestPort']) + 1):
+                                                if i in risks_port:
+                                                    security_type = 'warning'
+                                        result['service'].append({
+                                            'name': _service_query['Name'],
+                                            'protocol': type_map[items['Type']] if items['Type'] in type_map.keys() else
+                                            items['Type'],
+                                            'port': port,
+                                            'type': security_type
+                                        })
                 return JsonResponse({'code': 200, 'data': result, 'msg': 'ok'}, content_type="application/json")
             elif post_param['vendor'] == 'Huawei':
                 _FirewallMain = FirewallMain(post_param['hostip'])
@@ -566,10 +592,21 @@ class SecPolicy(APIView):
                             )
                             if service_query:
                                 for x in service_query[0]['items']:
+                                    security_type = 'default'
+                                    port = x['dst-port-min']
+                                    if port in risks_port:
+                                        security_type = 'warning'
+                                    if x.get('dst-port-max') is not None:
+                                        if x.get('dst-port-max') != x['dst-port-min']:
+                                            port = f"{x['dst-port-min']}-{x['dst-port-max']}"
+                                            for i in range(int(x['dst-port-min']), int(x['dst-port-max']) + 1):
+                                                if i in risks_port:
+                                                    security_type = 'warning'
                                     result['service'].append({
                                         'name': ser['object'],
-                                        'dst-port-min': x['dst-port-min'],
-                                        'protocol': x['protocol']
+                                        'port': port,
+                                        'protocol': x['protocol'],
+                                        'type': security_type
                                     })
                 return JsonResponse({'code': 200, 'data': result, 'msg': 'ok'}, content_type="application/json")
 
