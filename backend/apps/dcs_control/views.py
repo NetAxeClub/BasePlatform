@@ -261,12 +261,12 @@ class SecPolicy(APIView):
                 _ip = IPAddress(_query['src_ip'])
                 query['src_ip_split'] = {'$elemMatch': {'start': {'$lte': _ip.value}, 'end': {'$gte': _ip.value}}}
             elif _query.get('src_ip') or _query.get('dst_ip'):
-                query['src_addr.object'] = 'Any'
+                query['src_ip_split'] = {'$elemMatch': {'start': {'$lte': 4294967295}, 'end': {'$gte': 0}}}
             if 'dst_ip' in _query.keys():
                 _ip = IPAddress(_query['dst_ip'])
                 query['dst_ip_split'] = {'$elemMatch': {'start': {'$lte': _ip.value}, 'end': {'$gte': _ip.value}}}
             elif _query.get('src_ip') or _query.get('dst_ip'):
-                query['dst_addr.object'] = 'Any'
+                query['dst_ip_split'] = {'$elemMatch': {'start': {'$lte': 4294967295}, 'end': {'$gte': 0}}}
             # print(query)
             res = sec_policy_mongo.find_page_query(query_dict=query,
                                                    fields={'_id': 0}, page_size=int(get_param['page_size']),
