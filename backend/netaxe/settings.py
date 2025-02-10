@@ -99,7 +99,6 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "netaxe.urls"
-
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
