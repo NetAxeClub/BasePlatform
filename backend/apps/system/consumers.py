@@ -70,9 +70,6 @@ class SparkChatConsumer(WebsocketConsumer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.groups is None:
-            self.groups = []
-        self.text = []
         self.api_key = config.sparkapi['api_key']
         self.api_base = config.sparkapi['api_base']
         self.client = OpenAI(api_key=self.api_key, base_url=self.api_base)
@@ -98,7 +95,7 @@ class SparkChatConsumer(WebsocketConsumer):
                     messages=[{"role": "user", "content": message}],
                     stream=True,
                     temperature=0.7,
-                    max_tokens=4096,
+                    max_tokens=6144,
                     extra_headers={"lora_id": "0"},
                     stream_options={"include_usage": True}
                 )

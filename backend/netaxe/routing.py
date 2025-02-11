@@ -25,7 +25,7 @@ application = ProtocolTypeRouter({
                 re_path(r'base_platform/ws/ssh/([0-9]+)/', WebSSHConsumer),
                 re_path(r'base_platform/ws/server_ssh/([0-9]+)/', SSHConsumer),
                 re_path(r'base_platform/ws/sec_device/', SecDeviceConsumer),  # 安全纳管状态同步
-                re_path(r'base_platform/ws/deepseek-r1/', SparkChatConsumer),  # deep seek
+                # re_path(r'base_platform/ws/deepseek-r1/', SparkChatConsumer),  # deep seek
                 # re_path(r'ws/ssh/([0-9]+)/', WebSSHConsumer),
                 # path('ws/ssh/1/', WebSshConsumer),
             ]
