@@ -280,6 +280,7 @@ class AutomationChart(APIView):
 class XunMiView(APIView):
     def get(self, request):
         get_param = request.GET.dict()
+        print(get_param)
         mongo_data = dict()
         if get_param.get('get_interface_by_hostip'):
             hostip = get_param['get_interface_by_hostip']
@@ -365,17 +366,26 @@ class XunMiView(APIView):
                 start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
                 end_time = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
                 mongo_data['log_time'] = {"$gte": start_time, "$lte": end_time}
-            query_tmp = xunmi_mongo.find(query_dict=mongo_data, fields={'_id': 0}, sort='log_time')
-            if query_tmp:
-                mongo_data['log_time'] = query_tmp[-1]['log_time']
+            if mongo_data:
+                query_tmp = xunmi_mongo.find(query_dict=mongo_data, fields={'_id': 0}, sort='log_time')
+                if query_tmp:
+                    mongo_data['log_time'] = query_tmp[-1]['log_time']
 
-                res = xunmi_mongo.find(query_dict=mongo_data, fields={'_id': 0}, sort='log_time')
-                for i in res:
-                    i['log_time'] = i['log_time'].strftime("%Y-%m-%d %H:%M:%S")
+                    res = xunmi_mongo.find(query_dict=mongo_data, fields={'_id': 0}, sort='log_time')
+                    for i in res:
+                        i['log_time'] = i['log_time'].strftime("%Y-%m-%d %H:%M:%S")
+                    result = {
+                        "code": 200,
+                        "results": res,
+                        "count": len(res)
+                    }
+                    return JsonResponse(result, safe=False)
+            else:
                 result = {
-                    "code": 200,
-                    "results": res,
-                    "count": len(res)
+                    "code": 400,
+                    "count": 0,
+                    "message": "没有匹配查询条件的数据",
+                    "results": []
                 }
                 return JsonResponse(result, safe=False)
         else:
