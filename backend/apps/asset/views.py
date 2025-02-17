@@ -49,8 +49,7 @@ class TreeDataMixin:
 
     @action(detail=False, methods=['get'])
     def tree_data(self, request, *args, **kwargs):
-        # Get all NetworkDevice objects with selected fields
-        queryset = self.filter_queryset(self.get_queryset()).values(
+        queryset = self.queryset.values(
             'id',
             'idc', 'idc__name',
             'idc_model', 'idc_model__name',
@@ -669,6 +668,7 @@ class NetworkDeviceViewSet(CustomViewBase, TreeDataMixin):
     # def update(self, request, *args, **kwargs):
     #     print('更新', super().update(request, *args, **kwargs))
     #     return super().update(request, *args, **kwargs)
+
 
 
 class AssetIpInfoViewSet(CustomViewBase):
