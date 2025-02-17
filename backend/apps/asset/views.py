@@ -3,7 +3,7 @@ import operator
 import os
 import re
 import time
-from datetime import date
+from datetime import date, datetime
 import django_filters
 from django.core.cache import cache
 from django.db.models import Count
@@ -799,16 +799,20 @@ class AdminRecordViewSet(CustomViewBase):
     # 如果要允许对某些字段进行过滤，可以使用filter_fields属性。
     filterset_class = AdminRecordFilter
     filter_fields = '__all__'
-    search_fields = '__all__'
+    # search_fields = '__all__'
+    search_fields = ('admin_login_user', 'admin_server', 'admin_remote_ip', 'admin_record_mode', 'admin_record_cmds')
     ordering_fields = '__all__'
 
     def get_queryset(self):
-        start = self.request.query_params.get('start_time', None)
-        end = self.request.query_params.get('end_time', None)
-        if start and end:
-            return self.queryset.filter(
-                admin_start_time__gt=start,
-                admin_start_time__lt=end)
+        start_time = self.request.query_params.get('start_time', None)
+        end_time = self.request.query_params.get('end_time', None)
+
+        start_dt = datetime.strptime(f"{start_time} 00:00:00", '%Y-%m-%d %H:%M:%S')
+        end_dt = datetime.strptime(f"{end_time} 23:59:59", '%Y-%m-%d %H:%M:%S')
+
+        if start_dt and end_dt:
+            return self.queryset.filter(admin_start_time__range=(start_dt, end_dt))
+
         return self.queryset
 
 

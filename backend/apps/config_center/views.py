@@ -8,7 +8,7 @@ import ipaddress
 from netaddr import IPNetwork, IPAddress
 from jinja2 import Environment, StrictUndefined, exceptions, Template
 from django.http import FileResponse
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from django.http import JsonResponse, StreamingHttpResponse
 from django.core.files.storage import default_storage
 from django_filters.rest_framework import DjangoFilterBackend
@@ -93,18 +93,53 @@ class ConfigBackupViewSet(CustomViewBase):
 
     def get_queryset(self):
         """
-        expires  比 expire多一个s ，用来筛选已过期的设备数据 lt 小于  gt 大于  lte小于等于  gte 大于等于
-        :return:
+        处理不同时间范围的查询过滤
+        支持:
+        1. 开始和结束日期范围
+        2. 指定时间单位(天/时/分)和数值的范围
+        3. 时间戳范围查询
         """
-        range_time = self.request.query_params.get('range_time', None)
+
+        # 获取查询参数
+        params = self.request.query_params
+        start_time = params.get('start_time')
+        end_time = params.get('end_time')
+        time_unit = params.get('time_unit')
+        time_num = params.get('time_num')
+        range_time = params.get('range_time')
+
+        # 处理开始和结束日期范围
+        if start_time and end_time:
+            start_dt = datetime.strptime(f"{start_time} 00:00:00", '%Y-%m-%d %H:%M:%S')
+            end_dt = datetime.strptime(f"{end_time} 23:59:59", '%Y-%m-%d %H:%M:%S')
+            self.queryset = self.filter_by_date_range(start_dt, end_dt)
+
+        # 处理时间单位和数值范围
+        if time_unit and time_num:
+            time_num = int(time_num)
+            current_time = datetime.now()
+            
+            time_delta_map = {
+                "days": lambda x: timedelta(days=x),
+                "hours": lambda x: timedelta(hours=x),
+                "minutes": lambda x: timedelta(minutes=x)
+            }
+            
+            if time_unit in time_delta_map:
+                start_time = current_time - time_delta_map[time_unit](time_num)
+                self.queryset = self.filter_by_date_range(start_time, current_time)
+
+        # 处理时间戳范围
         if range_time is not None:
             dt_object = datetime.fromtimestamp(int(int(range_time)/1000))
-            start_date = dt_object.strftime('%Y-%m-%d %H:%M:%S')
-            end_data = dt_object.strftime('%Y-%m-%d ') + "23:59:59"
-            self.queryset = self.queryset.filter(last_time__range=(
-                datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S'),
-                datetime.strptime(end_data, '%Y-%m-%d %H:%M:%S')))
+            start_dt = datetime.strptime(dt_object.strftime('%Y-%m-%d %H:%M:%S'), '%Y-%m-%d %H:%M:%S')
+            end_dt = datetime.strptime(dt_object.strftime('%Y-%m-%d ') + "23:59:59", '%Y-%m-%d %H:%M:%S')
+            self.queryset = self.filter_by_date_range(start_dt, end_dt)
+
         return self.queryset
+
+    def filter_by_date_range(self, start_dt, end_dt):
+        return self.queryset.filter(last_time__range=(start_dt, end_dt))
 
 
 class ConfigComplianceRuleViewSet(CustomViewBase):
