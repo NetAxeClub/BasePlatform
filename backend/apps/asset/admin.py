@@ -16,7 +16,7 @@ class AdminAssetAccount(admin.ModelAdmin):
 
 class AdminNetworkDevice(admin.ModelAdmin):
     """自定义设备表显示字段"""
-    list_display = ['name', 'manage_ip', 'serial_num', 'account_list']
+    list_display = ['manage_ip', 'name', 'serial_num', 'account_list']
     search_fields = ['serial_num', 'manage_ip', 'idc__name', 'category__name',
                      'name', 'vendor__name', 'patch_version',  'soft_version',
                      'model__name',  'memo', 'status', 'ha_status']
@@ -24,7 +24,7 @@ class AdminNetworkDevice(admin.ModelAdmin):
 
 class AdminServerDevice(admin.ModelAdmin):
     """自定义设备表显示字段"""
-    list_display = ['name', 'manage_ip', 'serial_num', ]
+    list_display = ['manage_ip', 'name', 'serial_num', ]
     search_fields = ['serial_num', 'manage_ip', 'idc__name', 'model__name',
                      'name', 'vendor__name', 'idc_model__name', 'rack__name',
                      'u_location_start', 'u_location_end', 'uptime', 'expire', 'memo', 'status', 'ha_status']
