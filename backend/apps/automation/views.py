@@ -353,7 +353,7 @@ class XunMiView(APIView):
             # 用于把key值为空的可以过滤掉，只保留有完整key value的字典信息
             for param in get_param.keys():
                 if get_param[param]:
-                    if param in ['limit', 'start', 'page', 'method', 'last', 'idc']:
+                    if param in ['limit', 'start', 'page', 'method', 'last', 'idc', 'page_size']:
                         continue
                     else:
                         mongo_data[param] = get_param[param]
