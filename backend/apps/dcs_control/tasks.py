@@ -4545,23 +4545,16 @@ class FirewallMain(object):
         try:
             device = H3CSecPath(host=self.host, user=self.dev_info['username'], password=self.dev_info['password'])
 
-            try:
-                ipv4_group = device.get_ipv4_paging(**kwargs)
-                if ipv4_group:
-                    for i in ipv4_group:
-                        i['hostip'] = self.host
-                        i['name'] = i['Name']
-                device.closed()
-                return ipv4_group
-            except Exception as e:
-                device.closed()
-                # print(traceback.print_exc())
-                send_msg_sec_manage("安全纳管操作华三防火墙 {} 获取地址组数据失败:{}".format(self.host, str(e)))
+            ipv4_group = device.get_ipv4_paging(**kwargs)
+            if ipv4_group:
+                for i in ipv4_group:
+                    i['hostip'] = self.host
+                    i['name'] = i['Name']
             device.closed()
-            return True
+            return ipv4_group
         except Exception as e:
             send_msg_sec_manage("安全纳管华三防火墙 {} NETCONF初始化失败:{}".format(self.host, str(e)))
-            return False
+            return []
 
     # 获取华为单个设备地址组对象列表V2
     def get_huawei_address_obj(self, **kwargs):

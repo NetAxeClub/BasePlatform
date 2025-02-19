@@ -392,7 +392,7 @@ class XunMiView(APIView):
             # 用于把key值为空的可以过滤掉，只保留有完整key value的字典信息
             for param in get_param.keys():
                 if get_param[param]:
-                    if param in ['limit', 'start', 'page', 'method', 'last', 'idc']:
+                    if param in ['limit', 'start', 'page', 'method', 'last', 'idc', 'page_size']:
                         continue
                     else:
                         mongo_data[param] = get_param[param]
@@ -405,19 +405,20 @@ class XunMiView(APIView):
                 start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
                 end_time = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
                 mongo_data['log_time'] = {"$gte": start_time, "$lte": end_time}
+            page_size = int(get_param.get("page_size", 10))
+            page = int(get_param.get("page", 1))
             res = xunmi_mongo.find_page_query(fields={'_id': 0}, sort='log_time',
                                               query_dict=mongo_data,
-                                              page_size=int(get_param.get("limit")),
-                                              page_num=int(get_param.get("start")) // 10)
+                                              page_size=page_size,
+                                              page_num=page)
+            count = xunmi_mongo.count_documents(query=mongo_data)
             for i in res:
                 i['log_time'] = i['log_time'].strftime("%Y-%m-%d %H:%M:%S")
 
-            res_count = MongoOps(db='netops', coll='XunMi').find(fields={'_id': 0}, sort='log_time',
-                                                                 query_dict=mongo_data)
             result = {
                 "code": 200,
                 "results": res,
-                "count": len(res_count)
+                "count": count
             }
             return JsonResponse(result, safe=False)
         result = {

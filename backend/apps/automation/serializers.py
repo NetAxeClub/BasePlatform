@@ -5,7 +5,6 @@ import json
 from apps.automation.models import (CollectionPlan, CollectionRule, CollectionMatchRule,
                                     AutoFlow, AutomationInventory, AutoVars)
 
-
 # 采集方案序列化
 class CollectionPlanSerializer(serializers.ModelSerializer):
 
