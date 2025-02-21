@@ -389,13 +389,11 @@ def git_push_config(**kwargs):
                                             ).update(
                     config_status='SUCCESS', git_type='add', commit=commit_hexsha, file_path=untracked_host
                 )
-    for commit_hexsha in commit_results:
-        config_mongo.insert({
-            'name': 'config_backup_git_status',
-            'data': {
-                'change': len(changed_files),
-                'add': len(untracked_files),
-                'commit': commit_hexsha
-            },
-            'log_time': log_time
-        })
+    config_mongo.insert({
+        'name': 'config_backup_git_status',
+        'data': {
+            'change': len(changed_files),
+            'add': len(untracked_files),
+        },
+        'log_time': log_time
+    })
