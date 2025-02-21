@@ -357,14 +357,17 @@ class AutoFlow(models.Model):
 
     # 执行完成 -> 失败
     def failed(self, by=None):
+        self.state = State.FAILED
         self.code = 9005
 
     # 执行失败 -> 回退
     def failed_back_off(self, by=None):
+        self.state = State.FAILED
         self.code = 9007
 
     # 执行回退 -> 失败
     def back_off_failed(self, by=None):
+        self.state = State.FAILED
         self.code = 9009
 
     def __str__(self):
