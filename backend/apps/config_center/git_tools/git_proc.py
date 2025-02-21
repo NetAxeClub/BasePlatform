@@ -84,7 +84,8 @@ class ConfigGit:
             for m in commit.modified_files:
                 tmp = {
                     'label': m.filename,
-                    'value': m.new_path
+                    'value': m.new_path,
+                    'change_type': m.change_type.name
                 }
                 result.append(tmp)
         return result
