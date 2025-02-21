@@ -219,6 +219,7 @@ class DestAddTranslate(APIView):
             # json数据验证通过
             if schema_res:
                 post_param['remote_ip'] = str(request.META.get("REMOTE_ADDR"))
+                post_param['user'] = str(request.user.username)
                 res = config_dnat.apply_async(kwargs=post_param, queue=CELERY_QUEUE,
                                               retry=True)  # config_backup
                 if str(res) == 'None':
