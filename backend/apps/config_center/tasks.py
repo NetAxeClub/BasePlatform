@@ -274,7 +274,7 @@ def backup_device_config_sub(**kwargs):
     if hostip == '0.0.0.0':
         return {}
     class_instance = BaseConn(**kwargs)
-    filename = f"device_config/current-configuration/{hostip}/{kwargs['vendor__alias']}_{hostip}.txt"
+    filename = f"current-configuration/{hostip}/{kwargs['vendor__alias']}_{hostip}.txt"
     try:
         content = class_instance.send_commands(cmd=command_map[kwargs['vendor__alias']]['cmd'])
         # path = default_storage.save(filename, ContentFile(content))
@@ -282,7 +282,7 @@ def backup_device_config_sub(**kwargs):
             os.mkdir(BASE_DIR + f"/media/device_config/current-configuration/{hostip}/")
         # with default_storage.open(filename, "w") as file:
         #     file.write(content)
-        with open(BASE_DIR + "/media/" + filename, "w", encoding="utf-8") as f:
+        with open(BASE_DIR + "/media/device_config/" + filename, "w", encoding="utf-8") as f:
             f.write(content)
         ConfigBackup.objects.create(
             name=kwargs['name'], manage_ip=hostip,
@@ -377,11 +377,7 @@ def git_push_config(**kwargs):
             hostip = change_host.split('/')[1]
             host_info = [host for host in hosts if host['manage_ip'] == hostip]
             if hostip in commit_hosts and host_info:
-                ConfigBackup.objects.filter(name=host_info[0]['name'], manage_ip=host_info[0]['manage_ip'],
-                                            status=host_info[0]['status'],
-                                            idc_name=host_info[0]['idc__name'],
-                                            vendor=host_info[0]['vendor__alias'],
-                                            model_name=host_info[0]['model__name'], last_time=today
+                ConfigBackup.objects.filter(manage_ip=host_info[0]['manage_ip'], last_time=today
                                             ).update(
                     config_status='SUCCESS', git_type='change', commit=commit_hexsha, file_path=change_host
                 )
@@ -389,11 +385,7 @@ def git_push_config(**kwargs):
             hostip = untracked_host.split('/')[1]
             host_info = [host for host in hosts if host['manage_ip'] == hostip]
             if hostip in commit_hosts and host_info:
-                ConfigBackup.objects.filter(name=host_info[0]['name'], manage_ip=host_info[0]['manage_ip'],
-                                            status=host_info[0]['status'],
-                                            idc_name=host_info[0]['idc__name'],
-                                            vendor=host_info[0]['vendor__alias'],
-                                            model_name=host_info[0]['model__name'], last_time=today
+                ConfigBackup.objects.filter(manage_ip=host_info[0]['manage_ip'], last_time=today
                                             ).update(
                     config_status='SUCCESS', git_type='add', commit=commit_hexsha, file_path=untracked_host
                 )
