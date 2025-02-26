@@ -326,7 +326,7 @@ class NetworkDevice(models.Model):
     name = models.CharField(
         verbose_name='资产名称',
         max_length=100,
-        null=False, default='')
+        null=False, default='-')
     vendor = models.ForeignKey(
         "Vendor",
         verbose_name='供应商',
@@ -358,12 +358,12 @@ class NetworkDevice(models.Model):
     soft_version = models.CharField(
         verbose_name='软件版本',
         max_length=200,
-        default='',
+        default='-',
         null=False)
     patch_version = models.CharField(
         verbose_name='补丁版本',
         max_length=200,
-        default='',
+        default='-',
         null=True)
     role = models.ForeignKey(
         "Role",
@@ -413,7 +413,7 @@ class NetworkDevice(models.Model):
         verbose_name='机架位结束', default=0, validators=[MaxValueValidator(50), MinValueValidator(1)])
     uptime = models.DateField(verbose_name='上线时间', null=True, auto_now_add=True)
     expire = models.DateField(verbose_name='维保日期', null=True, blank=True)
-    memo = models.TextField(verbose_name='备注', null=True, default='', blank=True)
+    memo = models.TextField(verbose_name='备注', null=True, default='-', blank=True)
     status = models.PositiveSmallIntegerField(
         verbose_name='状态', choices=status_choices, default=0)
     ha_status = models.PositiveSmallIntegerField(
@@ -424,6 +424,9 @@ class NetworkDevice(models.Model):
     account = models.ManyToManyField('AssetAccount', verbose_name='管理账户', blank=True)
     plan = models.ForeignKey("automation.CollectionPlan", verbose_name='采集方案',
                              blank=True, null=True, related_name='releate_device', on_delete=models.SET_NULL)
+    snmp_version = models.CharField(verbose_name="SNMP version", default="v2c", null=False, max_length=50)
+    snmp_community = models.CharField(verbose_name="SNMP community", default="-", null=False, max_length=50)
+    snmp_port = models.IntegerField(verbose_name="snmp port", default=161, null=False)
     history = HistoricalRecords()
 
     def __str__(self):
