@@ -117,7 +117,7 @@ class CmdbRackSerializer(serializers.ModelSerializer):
 
 # 机房模块
 class IdcModelSerializer(serializers.ModelSerializer):
-
+    idc_name = serializers.CharField(source='idc.name', read_only=True)
     @staticmethod
     def setup_eager_loading(queryset):
         """ Perform necessary eager loading of data. """
