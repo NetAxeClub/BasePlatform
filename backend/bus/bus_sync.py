@@ -210,7 +210,7 @@ class SyncMessageBus:
         connection.process_data_events(time_limit=None)
         return int(self.response)
 
-    def rpc_server(self, queue, routing_key, callback, durable=True, auto_delete=True):
+    def rpc_server(self, queue, routing_key, callback, durable=True, auto_delete=False):
         channel = self.get_channel()
         arguments = {"x-max-priority": 10}
         channel.exchange_declare(
