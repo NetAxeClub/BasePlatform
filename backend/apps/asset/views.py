@@ -807,10 +807,9 @@ class AdminRecordViewSet(CustomViewBase):
         start_time = self.request.query_params.get('start_time', None)
         end_time = self.request.query_params.get('end_time', None)
 
-        start_dt = datetime.strptime(f"{start_time} 00:00:00", '%Y-%m-%d %H:%M:%S')
-        end_dt = datetime.strptime(f"{end_time} 23:59:59", '%Y-%m-%d %H:%M:%S')
-
-        if start_dt and end_dt:
+        if start_time and end_time:
+            start_dt = datetime.strptime(f"{start_time} 00:00:00", '%Y-%m-%d %H:%M:%S')
+            end_dt = datetime.strptime(f"{end_time} 23:59:59", '%Y-%m-%d %H:%M:%S')
             return self.queryset.filter(admin_start_time__range=(start_dt, end_dt))
 
         return self.queryset
