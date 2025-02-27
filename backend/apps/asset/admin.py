@@ -1,4 +1,5 @@
 from django.contrib import admin
+from simple_history.admin import SimpleHistoryAdmin
 from .models import *
 
 
@@ -13,13 +14,18 @@ class AdminAssetAccount(admin.ModelAdmin):
     list_display = ['name', 'username', 'protocol', 'port']
     search_fields = ['name', 'username', 'protocol', 'port']
 
-
-class AdminNetworkDevice(admin.ModelAdmin):
-    """自定义设备表显示字段"""
+class NetworkDeviceAdmin(SimpleHistoryAdmin):
     list_display = ['manage_ip', 'name', 'serial_num', 'account_list']
     search_fields = ['serial_num', 'manage_ip', 'idc__name', 'category__name',
-                     'name', 'vendor__name', 'patch_version',  'soft_version',
-                     'model__name',  'memo', 'status', 'ha_status']
+                     'name', 'vendor__name', 'patch_version', 'soft_version',
+                     'model__name', 'memo', 'status', 'ha_status']
+
+# class AdminNetworkDevice(admin.ModelAdmin):
+#     """自定义设备表显示字段"""
+#     list_display = ['manage_ip', 'name', 'serial_num', 'account_list']
+#     search_fields = ['serial_num', 'manage_ip', 'idc__name', 'category__name',
+#                      'name', 'vendor__name', 'patch_version',  'soft_version',
+#                      'model__name',  'memo', 'status', 'ha_status']
 
 
 class AdminServerDevice(admin.ModelAdmin):
@@ -43,5 +49,5 @@ admin.site.register(ServerVendor)
 admin.site.register(ServerModel)
 admin.site.register(IdcModel, AdminIdcModel)
 admin.site.register(AssetAccount, AdminAssetAccount)
-admin.site.register(NetworkDevice, AdminNetworkDevice)
+admin.site.register(NetworkDevice, NetworkDeviceAdmin)
 admin.site.register(Server, AdminServerDevice)
