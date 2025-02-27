@@ -215,7 +215,7 @@ class NetworkDeviceSerializer(serializers.ModelSerializer):
         queryset = queryset.select_related('model',
                                            'category', 'plan',
                                            'vendor', 'role', 'attribute', 'framework', 'zone', 'rack', 'idc_model',
-                                           'idc',)
+                                           'idc', 'ssh_account', 'netconf_account')
         queryset = queryset.prefetch_related(
             'bind_ip', 'account')
         return queryset
