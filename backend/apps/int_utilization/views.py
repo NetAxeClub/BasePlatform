@@ -1,3 +1,4 @@
+import json
 import django_filters
 from django.http import JsonResponse
 from django_filters.rest_framework import DjangoFilterBackend
@@ -62,11 +63,12 @@ class InterfaceView(APIView):
                                                      fields={'interface': 1, 'line_status': 1, '_id': 0})
             layer2interface_res = interface_mongo.find(query_dict={'hostip': hostip},
                                                        fields={'interface': 1, 'status': 1, '_id': 0})
-            tmp_res = [
-                         {'name': x['interface'], 'status': x['line_status'].upper()} for x in layer3interface_res if layer3interface_res
-                     ] + [
-                {'name': x['interface'], 'status': x['status'].upper()} for x in layer2interface_res if layer2interface_res
-            ]
+
+            combined_interfaces = {x['interface']: {'status': x['line_status'].upper()} for x in layer3interface_res}
+            for x in layer2interface_res:
+                if x['interface'] not in combined_interfaces or not combined_interfaces[x['interface']]['status']:
+                    combined_interfaces[x['interface']] = {'status': x['status'].upper()}
+            tmp_res = [{'name': name, 'status': data['status']} for name, data in combined_interfaces.items()]
             res = {}
             try:
                 # 判断堆叠
@@ -139,3 +141,66 @@ class InterfaceView(APIView):
                     "results": res
                 }
                 return JsonResponse(result, safe=False)
+
+
+class BaseInterfacePortView(APIView):
+    # 接口和端口的基础接口视图
+    def get_common_response(self, get_param, mongo_collection, query_mapping):
+        if not all(k in get_param for k in ("page_size", "page", "host_ip")):
+            return JsonResponse({"code": 200, "msg": "success", "data": [], "count": 0}, safe=True)
+
+        _params = json.loads(get_param["query"])
+        query = {"hostip": get_param["host_ip"]}
+
+        _query = {k: v for k, v in _params.items() if v}
+        for param_key, query_key in query_mapping.items():
+            if param_key in _query:
+                query[query_key] = _query[param_key]
+
+        res = mongo_collection.find_page_query(
+            query_dict=query,
+            fields={'_id': 0},
+            page_size=int(get_param['page_size']),
+            page_num=int(get_param['page'])
+        )
+        count = mongo_collection.count_documents(query=query)
+
+        return JsonResponse({
+            'code': 200,
+            'msg': 'success',
+            'data': res,
+            'count': count
+        }, safe=True)
+
+
+class PortUsedView(BaseInterfacePortView):
+    # 端口视图接口
+    def get(self, request):
+        query_mapping = {
+            'interface': 'interface',
+            'up': 'up',
+            'speed': 'speed',
+            'duplex': 'duplex'
+        }
+        return self.get_common_response(
+            request.GET.dict(),
+            interface_mongo,
+            query_mapping
+        )
+
+
+class InterfaceUsedV2View(BaseInterfacePortView):
+    # 接口视图
+    def get(self, request):
+        query_mapping = {
+            'interface': 'interface',
+            'line_status': 'line_status',
+            'protocol_status': 'protocol_status',
+            'ipaddress': 'ipaddress',
+            'ipmask': 'ipmask'
+        }
+        return self.get_common_response(
+            request.GET.dict(),
+            show_ip_mongo,
+            query_mapping
+        )

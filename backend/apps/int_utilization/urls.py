@@ -4,7 +4,7 @@ from rest_framework_extensions.routers import (
 )
 
 # from apps.int_utilization import views
-from .views import InterfaceUsedNewViewSet, InterfaceView
+from .views import InterfaceUsedNewViewSet, InterfaceView, PortUsedView, InterfaceUsedV2View
 
 
 router = DefaultRouter()
@@ -13,5 +13,7 @@ router.register(r'interfaceused', InterfaceUsedNewViewSet)
 
 urlpatterns = [
     path(r'', include(router.urls)),
-    path('interface/', InterfaceView.as_view(), name="interface")
+    path('interface/', InterfaceView.as_view(), name="interface"),
+    path('portused/', PortUsedView.as_view(), name="portused"),
+    path('interfaceusedv2/', InterfaceUsedV2View.as_view(), name="interfaceusedv2")
 ]
