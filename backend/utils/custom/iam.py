@@ -58,12 +58,12 @@ class IamMiddleware(MiddlewareMixin):
         infr:service:app_name:table_name:<{'name': 'aabb'}>
         """
         is_allow = False
-        if request.path.startswith('/admin/'):
-            """允许admin后台登录"""
-            return
-        if request.path.startswith('/base_platform/automation/address_location'):
-            """允许寻觅后台操作"""
-            return
+        # if request.path.startswith('/admin/'):
+        #     """允许admin后台登录"""
+        #     return
+        # if request.path.startswith('/base_platform/automation/address_location'):
+        #     """允许寻觅后台操作"""
+        #     return
         token = request.COOKIES.get('netops-token')
         logger.info(f"cookies token: {token}")
         if token is None:
@@ -87,6 +87,8 @@ class IamMiddleware(MiddlewareMixin):
         if res['code'] == 200:
             is_allow = res['data']['is_allow']
             request.iam = UserData(res['data']['userinfo'])
+            request.user = UserData(res['data']['userinfo'])
+            # request.session = UserData(res['data']['userinfo']).__dict__
         else:
             request.iam = AnonymousUser()
             response_data = {'error': 'netaxe iam policy not allowed AnonymousUser', 'code': 400, 'path': request.path, 'method': request.method}
