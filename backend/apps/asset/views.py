@@ -54,7 +54,7 @@ class TreeDataMixin:
             'idc', 'idc__name',
             'idc_model', 'idc_model__name',
             'rack', 'rack__name'
-        ).distinct()
+        ).distinct().order_by('idc__name', 'idc_model__name', 'rack__name')
 
         # Create base structure with "全部" node
         tree_data = [{
