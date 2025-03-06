@@ -1,10 +1,13 @@
 import json
 import operator
-from django.http import JsonResponse
+from openpyxl import Workbook
+from openpyxl.utils import get_column_letter
+from urllib.parse import quote
+from io import BytesIO
+from django.http import JsonResponse, HttpResponse
 from rest_framework.response import Response
 from django.apps import apps
 from datetime import datetime
-# from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 import django_filters
 from django.db.models import Count
@@ -428,6 +431,78 @@ class XunMiView(APIView):
             "results": []
         }
         return JsonResponse(result, safe=False)
+
+    def post(self, request):
+        post_param = request.data
+        mongo_data = {}                 # mongodb 查询条件
+
+        if 'memberport' in post_param:
+            member_port_list = json.loads(post_param['memberport'])
+            if member_port_list:
+                mongo_data['memberport'] = {'$in': member_port_list}
+
+        # 构建查询条件
+        for param, value in post_param.items():
+            if value and param not in ['last', 'memberport']:
+                mongo_data[param] = value
+
+        # 查询数据
+        if post_param.get('last') and mongo_data:
+            # 获取最新一条记录的时间
+            query_tmp = xunmi_mongo.find(query_dict=mongo_data, fields={'_id': 0}, sort='log_time')
+            if query_tmp:
+                mongo_data['log_time'] = query_tmp[-1]['log_time']
+
+        # 执行查询
+        result = xunmi_mongo.find(fields={'_id': 0}, sort='log_time', query_dict=mongo_data)
+        
+        # 格式化时间
+        for item in result:
+            item['log_time'] = item['log_time'].strftime("%Y-%m-%d %H:%M:%S")
+
+        # 导出Excel配置
+        columns = [
+            {'label': '设备名称', 'key': 'node_hostname'},
+            {'label': '机房', 'key': 'idc_name'}, 
+            {'label': 'SN号', 'key': 'serial_num'},
+            {'label': '主机IP', 'key': 'node_ip'},
+            {'label': '接口', 'key': 'node_interface'},
+            {'label': '交换机位置', 'key': 'node_location'},
+            {'label': '服务器IP', 'key': 'server_ip_address'},
+            {'label': 'MAC地址', 'key': 'server_mac_address'},
+            {'label': '归属人', 'key': 'server_admin'},
+            {'label': '业务线', 'key': 'server_department'},
+            {'label': '服务器位置', 'key': 'server_location'},
+            {'label': '记录时间', 'key': 'log_time'}
+        ]
+
+        # 创建Excel
+        workbook = Workbook()
+        worksheet = workbook.active
+        worksheet.title = "Address location"
+
+        # 写入表头
+        for col_num, column in enumerate(columns, 1):
+            worksheet[f'{get_column_letter(col_num)}1'] = column['label']
+
+        # 写入数据
+        for row_num, device in enumerate(result, 2):
+            for col_num, column in enumerate(columns, 1):
+                worksheet[f'{get_column_letter(col_num)}{row_num}'] = device.get(column['key'], '')
+
+        # 输出Excel文件
+        output = BytesIO()
+        workbook.save(output)
+        output.seek(0)
+
+        filename = quote("地址寻觅.xlsx")
+        response = HttpResponse(
+            output,
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename*=UTF-8\'\'{filename}'
+
+        return response
 
 
 class SecMainView(APIView):
