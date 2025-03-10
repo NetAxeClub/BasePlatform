@@ -15,7 +15,7 @@ import requests
 import json
 # from aiohttp import TCPConnector, ClientSession
 # from backend.core.utils.metric import run_time_async
-from backend.confload.confload import config
+from confload.confload import config
 
 # from backend.core.utils.metric import run_time_sync
 
