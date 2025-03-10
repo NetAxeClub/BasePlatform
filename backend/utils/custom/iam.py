@@ -58,9 +58,9 @@ class IamMiddleware(MiddlewareMixin):
         infr:service:app_name:table_name:<{'name': 'aabb'}>
         """
         is_allow = False
-        # if request.path.startswith('/admin/'):
-        #     """允许admin后台登录"""
-        #     return
+        if request.path.startswith('/admin/'):
+            """允许admin后台登录"""
+            return
         if request.path.startswith('/base_platform/automation/address_location'):
             """允许寻觅后台操作"""
             return
