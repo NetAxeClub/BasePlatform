@@ -17,12 +17,11 @@ from django.db import connections
 from apps.automation.tools.base_connection import BaseConn
 from apps.automation.tools.model_api import get_device_info_v2
 from apps.config_center.git_tools.git_proc import ConfigGit
-from apps.config_center.config_parse.config_parse import config_file_parse
+# from apps.config_center.config_parse.config_parse import config_file_parse
 from apps.config_center.git_tools.git_proc import push_file
-from apps.config_center.my_nornir import config_backup_nornir
+# from apps.config_center.my_nornir import config_backup_nornir
 from apps.config_center.models import ConfigBackup, ConfigCompliance, ConfigComplianceResult, ConfigComplianceRule
 from utils.db.mongo_ops import MongoOps
-from service_mesh import msg_gateway_runner
 
 logger = logging.getLogger('automation')
 config_mongo = MongoOps(db='metric', coll='level2')
@@ -306,7 +305,7 @@ def backup_device_config_sub(**kwargs):
 @shared_task(base=AxeTask, once={'graceful': True})
 def backup_device_config(**kwargs):
     log_time = datetime.now().strftime("%Y-%m-%d")
-    msg_gateway_runner.send_wechat(channel="netdevops", content=f"配置备份开始，时间:{log_time}")
+    # msg_gateway_runner.send_wechat(channel="netdevops", content=f"配置备份开始，时间:{log_time}")
     start_time = time.time()
     today = timezone.now()
     if kwargs:
@@ -352,8 +351,8 @@ def backup_device_config(**kwargs):
     # loop.run_until_complete(config_file_parse())
     end_time = time.time()
     time_use = int(int(end_time - start_time) / 60)
-    msg_gateway_runner.send_wechat(channel="netdevops",
-                                   content=f"配置备份完成，耗时:{time_use}分\n")
+    # msg_gateway_runner.send_wechat(channel="netdevops",
+    #                                content=f"配置备份完成，耗时:{time_use}分\n")
     config_compliance.apply_async(kwargs={}, queue=CELERY_QUEUE, retry=True)
     git_push_config.apply_async(kwargs=dict(today=today), queue=CELERY_QUEUE, retry=True)
     return
