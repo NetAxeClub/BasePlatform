@@ -13,8 +13,11 @@
 import logging
 import requests
 import json
-# from utils.metric import run_time_sync
-from confload.confload import config
+# from aiohttp import TCPConnector, ClientSession
+# from backend.core.utils.metric import run_time_async
+from backend.confload.confload import config
+
+# from backend.core.utils.metric import run_time_sync
 
 log = logging.getLogger(__name__)
 
@@ -41,18 +44,12 @@ class SendRunner:
             "send_args": {}
         }
 
-    # 单例模式
-    # def __new__(cls):
-    #     if not cls._instance:
-    #         cls._instance = super().__new__(cls)
-    #     return cls._instance
-
-    def send(self, library, data: dict):
+    def send(self, library, data: dict, webhook=None):
         """
         {
             "library":"sms",
             "send_args": {
-                "phone": ["18651614740"],
+                "phone": ["18651614"],
                 "content": "这是一条测试短信，用于测试微服务消息网关的功能123"
             },
             "peer_queue": "alert_gateway_receive",
@@ -74,53 +71,115 @@ class SendRunner:
             headers = {
                 'Content-Type': 'application/json'
             }
-
+            if webhook is not None:
+                payload['webhook'] = webhook
             res = requests.request("POST", url, headers=headers, data=json.dumps(payload))
+            if res.status_code == 200:
+                return res.json()
+        return {}
 
-            # print(res.status_code)
-            # print(res.text)
-            # print(res.json())
-            # log.debug(res.status_code)
-            # log.debug(res.text)
-            # log.debug(res.json())
-        # if self.metadata is not None:
-        #     self.queue = self.metadata['queue']
-        #     self.routing_key = self.metadata['routing_key']
-        #     self.post_data['library'] = "sms"
-        #     self.post_data['send_args'] = data
-        #     self.post_data['task_id'] = str(uuid.uuid4())
-        # app_manager_async.send_task_to_other(queue=self.metadata['queue'],
-        #                                      routing_key=self.metadata['routing_key'],
-        #                                      data=self.post_data)
-        # headers_val = config.default_webhook_headers
-        # async with aiohttp.ClientSession() as session:
-        #     async with session.post(url=self.post_url, headers=headers_val, verify_ssl=False, timeout=10,
-        #                             data=pl) as response:
-        #         res = await response.text()  # 可以根据实际需要进行处理
-        #         log.debug('webhook res')
-        #         log.debug(res)
-        #         print('webhook res', res)
+    # async def _send(self, library, data, webhook=None):
+    #     self.server = config.service_dicovery('msg_gateway')
+    #     self.server_hosts = self.server['hosts']
+    #     self.metadata = self.server_hosts[0]['metadata']
+    #     for _server in self.server_hosts:
+    #         url = "http://{}:{}/msg_gateway/send".format(_server['ip'], _server['port'])
+    #         payload = {
+    #             "library": library,
+    #             "send_args": data
+    #         }
+    #         headers = {
+    #             'Content-Type': 'application/json'
+    #         }
+    #         if webhook is not None:
+    #             payload['webhook'] = webhook
+    #         async with ClientSession(connector=TCPConnector(verify_ssl=False)) as session:
+    #             async with session.post(url, data=json.dumps(payload), headers=headers, timeout=2) as response:
+    #                 return response.status, await response.json()
 
-    def send_sms(self, user, content):
+    def get_media(self):
+        self.server = config.service_dicovery('msg_gateway')
+        self.server_hosts = self.server['hosts']
+        self.metadata = self.server_hosts[0]['metadata']
+        for _server in self.server_hosts:
+            url = "http://{}:{}/msg_gateway/service/channels".format(_server['ip'], _server['port'])
+            headers = {
+                'Content-Type': 'application/json'
+            }
+
+            res = requests.request("GET", url, headers=headers)
+            if res.status_code == 200:
+                return res.json()
+        return {}
+
+    def get_task(self, task_id):
+        self.server = config.service_dicovery('msg_gateway')
+        self.server_hosts = self.server['hosts']
+        self.metadata = self.server_hosts[0]['metadata']
+        for _server in self.server_hosts:
+            url = "http://{}:{}/msg_gateway/task/{}".format(_server['ip'], _server['port'], task_id)
+            headers = {
+                'Content-Type': 'application/json'
+            }
+
+            res = requests.request("GET", url, headers=headers)
+            if res.status_code == 200:
+                return res.json()
+        return {}
+
+    # @run_time_sync
+    # def send_sms(self, user, content, webhook=None, priority=0):
+    #     send_args = {
+    #         "phone": [user],
+    #         "content": content,
+    #         "priority": priority
+    #     }
+    #     return self.send('sms', send_args, webhook)
+
+    def send_sms(self, user: list, content: str, webhook=None, priority=0):
         send_args = {
-             "phone": [user],
-             "content": content
-         }
-        self.send('wechat', send_args)
+            "phone": user,
+            "content": content,
+            "priority": priority,
+            "template_id": config.hw_sms_template_id
+        }
+        return self.send('hw_sms', send_args, webhook)
 
-    def send_wechat(self, channel, content):
+    # @run_time_sync
+    def send_wechat(self, channel, content, webhook=None, priority=0):
         send_args = {
             "user": "@all",
             "content": content,
             "channel": channel,
-            "type": "text"
+            "type": "text",
+            "priority": priority
         }
-        self.send('wechat', send_args)
+        return self.send('wechat', send_args, webhook)
 
-    def send_email(self, user, subject, content):
+    # @run_time_sync
+    def send_phone(self, user: str, content: str, webhook=None, priority=0):
+        send_args = {
+            "phone": user,
+            "content": content.strip().replace(' ', '').replace('\n', '').replace('\t', '').replace('\r', '').strip(),
+            "priority": priority
+        }
+        return self.send('telephone', send_args, webhook)
+
+    # @run_time_sync
+    def send_email(self, user, subject, content, webhook=None, priority=0):
         send_args = {
             "user": user,
             "content": content,
-            "subject": subject
+            "subject": subject,
+            "priority": priority
         }
-        self.send('email', send_args)
+        return self.send('email', send_args, webhook)
+
+    def send_bot(self, url, content, sign, bot_type):
+        send_args = {
+            "url": url,
+            "content": content,
+            "sign": sign if sign else None,
+            "bot_type": bot_type
+        }
+        return self.send('chat_bot', send_args)
