@@ -49,19 +49,14 @@ class DenyByAddrObj(APIView):
                 return JsonResponse({'code': 400, 'msg': 'vendor 必须是 hillstone  h3c  huawei 其中一个'})
 
     def post(self, request):
-        # print(request.META.get('CONTENT_TYPE'))
-        # print(request.user)
         post_param = request.data
-        # if post_param.get('user'):
-        user = '临时用户'
         # 一键封堵操作
         schema_res, msg = single_json_validate(post_param, deny_schema)
         # json数据验证通过
         if schema_res:
             post_param['origin'] = "DCS控制器"
-            post_param['user'] = "临时用户"
             post_param['remote_ip'] = str(request.META.get("REMOTE_ADDR"))
-            print('CELERY_QUEUE', CELERY_QUEUE)
+            post_param['user'] = str(request.user.username)
             res = bulk_deny_by_address.apply_async(kwargs=post_param, queue=CELERY_QUEUE)  # config_backup
             if str(res) == 'None':
                 print('forget')
