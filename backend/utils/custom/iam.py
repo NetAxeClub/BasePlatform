@@ -87,7 +87,6 @@ class IamMiddleware(MiddlewareMixin):
         if res['code'] == 200:
             is_allow = res['data']['is_allow']
             request.iam = UserData(res['data']['userinfo'])
-            request.user = UserData(res['data']['userinfo'])
             # request.session = UserData(res['data']['userinfo']).__dict__
         else:
             request.iam = AnonymousUser()
