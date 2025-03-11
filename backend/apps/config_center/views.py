@@ -573,7 +573,7 @@ class ConfigFileView(APIView):
     def post(self, request):
         post_data = request.data
         if post_data["commit"]:
-            get_file_commit = _ConfigGit.get_file_content_by_commit(f"device_config/{post_data['file_path']}", post_data["commit"])
+            get_file_commit = _ConfigGit.get_file_content_by_commit(post_data['file_path'], post_data["commit"])
             if get_file_commit:
                 data = {
                     "code": 200,
@@ -582,13 +582,16 @@ class ConfigFileView(APIView):
                 }
                 return JsonResponse(data)
         else:
-            file_content = default_storage.open(f"device_config/{post_data['file_path']}").read().decode('utf-8')
-            data = {
-                "code": 200,
-                "results": file_content,
-                "msg": "success"
-            }
-            return JsonResponse(data, safe=False)
+            try:
+                file_content = default_storage.open(f"device_config/{post_data['file_path']}").read().decode('utf-8')
+                data = {
+                    "code": 200,
+                    "results": file_content,
+                    "msg": "success"
+                }
+                return JsonResponse(data, safe=False)
+            except Exception as e:
+                return JsonResponse({"code": 400, "msg": str(e)}, safe=False)
         data = {
             "code": 400,
             "results": [],

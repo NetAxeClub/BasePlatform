@@ -277,28 +277,42 @@ def backup_device_config_sub(**kwargs):
     filename = f"current-configuration/{hostip}/{kwargs['vendor__alias']}_{hostip}.txt"
     try:
         content = class_instance.send_commands(cmd=command_map[kwargs['vendor__alias']]['cmd'])
-        # path = default_storage.save(filename, ContentFile(content))
         if not os.path.exists(BASE_DIR + f"/media/device_config/current-configuration/{hostip}/"):
             os.mkdir(BASE_DIR + f"/media/device_config/current-configuration/{hostip}/")
-        # with default_storage.open(filename, "w") as file:
-        #     file.write(content)
         with open(BASE_DIR + "/media/device_config/" + filename, "w", encoding="utf-8") as f:
             f.write(content)
-        ConfigBackup.objects.create(
-            name=kwargs['name'], manage_ip=hostip,
-            config_status='SUCCESS',
-            status=kwargs['status'], idc_name=kwargs['idc__name'], vendor=kwargs['vendor__alias'],
-            model_name=kwargs['model__name'],
-            git_type='change', commit='', file_path=filename, last_time=today
-        )
+        device_q = ConfigBackup.objects.filter(manage_ip=hostip)
+        if device_q:
+            ConfigBackup.objects.filter(manage_ip=hostip).update(name=kwargs['name'],
+                                                                 config_status='SUCCESS',
+                                                                 status=kwargs['status'], idc_name=kwargs['idc__name'],
+                                                                 vendor=kwargs['vendor__alias'],
+                                                                 model_name=kwargs['model__name'], file_path=filename,
+                                                                 last_time=today)
+        else:
+            ConfigBackup.objects.create(name=kwargs['name'], manage_ip=hostip,
+                                        config_status='SUCCESS',
+                                        status=kwargs['status'], idc_name=kwargs['idc__name'],
+                                        vendor=kwargs['vendor__alias'],
+                                        model_name=kwargs['model__name'], file_path=filename,
+                                        last_time=today)
+
     except RuntimeError as e:
-        ConfigBackup.objects.create(
-            name=kwargs['name'], manage_ip=hostip,
-            config_status='FAILED',
-            status=kwargs['status'], idc_name=kwargs['idc__name'], vendor=kwargs['vendor__alias'],
-            model_name=kwargs['model__name'],
-            git_type='change', commit='', file_path='', last_time=today
-        )
+        device_q = ConfigBackup.objects.filter(manage_ip=hostip)
+        if device_q:
+            ConfigBackup.objects.filter(manage_ip=hostip).update(name=kwargs['name'],
+                                                                 config_status='FAILED',
+                                                                 status=kwargs['status'], idc_name=kwargs['idc__name'],
+                                                                 vendor=kwargs['vendor__alias'],
+                                                                 model_name=kwargs['model__name'], file_path=filename,
+                                                                 last_time=today)
+        else:
+            ConfigBackup.objects.create(
+                name=kwargs['name'], manage_ip=hostip,
+                config_status='FAILED',
+                status=kwargs['status'], idc_name=kwargs['idc__name'], vendor=kwargs['vendor__alias'],
+                model_name=kwargs['model__name'], last_time=today
+            )
     return filename
 
 
@@ -361,35 +375,12 @@ def backup_device_config(**kwargs):
 @shared_task(base=AxeTask, once={'graceful': True})
 def git_push_config(**kwargs):
     today = kwargs['today']
-    # kwargs.pop('today')
-    # if kwargs:
-    #     hosts = get_device_info_v2(**kwargs)
-    # else:
-    #     hosts = get_device_info_v2()
     log_time = datetime.now().strftime("%Y-%m-%d")
     commit_results, changed_files, untracked_files = push_file()
     for commit_hexsha in commit_results:
         commit_info = _ConfigGit.get_commit_detail(commit_hexsha)
         for commit in commit_info:
-            ConfigBackup.objects.filter(last_time=today, file_path=commit['value']).update(
-                commit=commit, config_status='SUCCESS', git_type=commit['change_type'])
-        # commit_hosts = [x['value'].split('/')[1] for x in commit_info]
-        # for change_host in changed_files:
-        #     hostip = change_host.split('/')[1]
-        #     host_info = [host for host in hosts if host['manage_ip'] == hostip]
-        #     if hostip in commit_hosts and host_info:
-        #         ConfigBackup.objects.filter(manage_ip=host_info[0]['manage_ip'], last_time=today
-        #                                     ).update(
-        #             config_status='SUCCESS', git_type='change', commit=commit_hexsha, file_path=change_host
-        #         )
-        # for untracked_host in untracked_files:
-        #     hostip = untracked_host.split('/')[1]
-        #     host_info = [host for host in hosts if host['manage_ip'] == hostip]
-        #     if hostip in commit_hosts and host_info:
-        #         ConfigBackup.objects.filter(manage_ip=host_info[0]['manage_ip'], last_time=today
-        #                                     ).update(
-        #             config_status='SUCCESS', git_type='add', commit=commit_hexsha, file_path=untracked_host
-        #         )
+            ConfigBackup.objects.filter(last_time=today, file_path=commit['value']).update(config_status='SUCCESS')
     config_mongo.insert({
         'name': 'config_backup_git_status',
         'data': {
