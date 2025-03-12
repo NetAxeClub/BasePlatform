@@ -21,7 +21,7 @@ class BaseTree:
         self.tree_str = ''
         self.key = 0
         self.root_path = root_path
-        self.black_list = ['.git', '__pycache__']
+        self.black_list = ['.git', '__pycache__', '.gitignore']
 
     def _second_path(self, root_name, pathname):
         self.key += 1
