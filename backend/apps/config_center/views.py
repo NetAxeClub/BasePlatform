@@ -266,7 +266,25 @@ class GitConfig(APIView):
                     "msg": "没有获取到git配置文件目录的设备IP列表"
                 }
                 return JsonResponse(data)
-
+        if 'get_hostip_file' in get_param.keys():
+            _tree = ConfigTree()
+            _tree.produce_tree()
+            res = _tree.tree_final
+            host_list = [x for x in res[0]['children'] if x['label'] == get_param['get_hostip_file']]
+            if host_list:
+                data = {
+                    "code": 200,
+                    "data": host_list,
+                    "msg": "成功"
+                }
+                return JsonResponse(data)
+            else:
+                data = {
+                    "code": 400,
+                    "data": {},
+                    "msg": "没有获取到git配置文件目录的设备IP列表"
+                }
+                return JsonResponse(data)
         if 'get_tree' in get_param.keys():
             _tree = ConfigTree()
             _tree.produce_tree()
