@@ -9,9 +9,7 @@ from rest_framework import serializers
 from django_celery_results.models import TaskResult
 from django_celery_beat.models import PeriodicTask, IntervalSchedule, CrontabSchedule
 
-from apps.asset.models import (
-    Idc, NetZone, Role, IdcModel, Rack, Vendor, Category, Model,
-    Attribute, Framework, AssetIpInfo, AssetAccount, NetworkDevice)
+from apps.asset.models import (NetZone, IdcModel, Rack, AssetIpInfo)
 
 
 class CrontabSerializer(serializers.ModelSerializer):

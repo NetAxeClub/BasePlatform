@@ -275,6 +275,9 @@ class AssetAccount(models.Model):
         default='', blank=True,
         null=True)
 
+    def device_list_count(self):
+        return len([i for i in self.networkdevice_set.all()])
+
     def __str__(self):
         return "{}-{}-{}".format(self.name, self.protocol, self.port)
 
