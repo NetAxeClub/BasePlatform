@@ -103,6 +103,7 @@ def main(args):
         worker_rpc()
     elif worker_type == "nacos":
         nacos_init()
+        time.sleep(999999999)
 
 
 if __name__ == "__main__":
