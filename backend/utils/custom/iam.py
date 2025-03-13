@@ -65,7 +65,7 @@ class IamMiddleware(MiddlewareMixin):
             """允许寻觅后台操作"""
             return
         token = request.COOKIES.get('netops-token')
-        logger.info(f"cookies token: {token}")
+        # logger.info(f"cookies token: {token}")
         if token is None:
             token = request.headers.get('Authorization', None)
             logger.info(f"header token: {token}")
@@ -75,11 +75,6 @@ class IamMiddleware(MiddlewareMixin):
             # self.require_permission()
         flag, res = self.check_permission(unquote(token), request.path, request.method.lower())
         logger.info(f"flag: {flag}, res: {res}")
-        """[flag: True, res: {'code': 200, 'data': {'is_allow': True, 'urn': 
-        '/base_platform/asset/asset_networkdevice/', 'policy': ['superuser'], 'userinfo': {'id': 14, 'last_login': 
-        '2024-12-04 21:57:59', 'username': 'jmli12', 'nickname': 'jmli12', 'type': 'AD/LDAP', 'status': '1', 
-        'first_name': '嘉旻', 'last_name': '李', 'is_staff': True, 'is_active': True, 'date_joined': '2024-12-03 
-        15:40:05', 'mobile': None, 'email"""
         if not flag:
             response_data = {'error': 'request netaxe iam failed', 'code': 400, 'path': request.path, 'method': request.method}
             return HttpResponseForbidden(json.dumps(response_data), content_type='application/json')

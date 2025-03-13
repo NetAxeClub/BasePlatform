@@ -23,6 +23,7 @@ from multiprocessing import Process
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'netaxe.settings')
 django.setup()
 from manager import app_manager_sync
+from utils.nacos_register import nacos_init
 from rpc import RPC
 from confload.confload import config
 
@@ -100,6 +101,8 @@ def main(args):
         worker_constructor()
     elif worker_type == "rpc":
         worker_rpc()
+    elif worker_type == "nacos":
+        nacos_init()
 
 
 if __name__ == "__main__":
