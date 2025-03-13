@@ -119,6 +119,20 @@ class TreeDataMixin:
         })
 
 
+class AccountExtend:
+    @action(detail=False, methods=['post'])
+    def batch_delete(self, request):
+        post_params = request.data
+        AssetAccount.objects.filter(id__in=[x['id'] for x in post_params]).delete()
+        return JsonResponse(data={
+            'code': 200,
+            'data': [],
+            'msg': '批量删除成功'
+        })
+
+
+
+
 class ResourceManageExcelView(APIView):
     permission_classes = (AllowAny,)
     # permission_classes = ()
@@ -179,6 +193,7 @@ class DeviceAccountView(APIView):
         account_list = json.loads(post_params['account'])
         device.account.set(account_list)
         return JsonResponse({'code': 200, 'message': '关联管理账户成功'})
+
 
     def get(self, request):
         get_params = request.GET.dict()
@@ -397,11 +412,12 @@ class CmdbIdcModelViewSet(CustomViewBase):
 
 
 # asset account
-class AccountList(CustomViewBase):
+class AccountList(CustomViewBase, AccountExtend):
     """
     处理  GET POST , 处理 /api/post/<pk>/ GET PUT PATCH DELETE
     """
-    queryset = AssetAccount.objects.all().order_by('id')
+    queryset = AssetAccount.objects.all().order_by('-id')
+    queryset = AssetAccountSerializer.setup_eager_loading(queryset)
     serializer_class = AssetAccountSerializer
     pagination_class = LargeResultsSetPagination
     permission_classes = ()
@@ -412,8 +428,6 @@ class AccountList(CustomViewBase):
     # 设置搜索的关键字
     search_fields = '__all__'
     # list_cache_key_func = QueryParamsKeyConstructor()
-
-
 # class ServerAccountList(CustomViewBase):
 #     """
 #     处理  GET POST , 处理 /api/post/<pk>/ GET PUT PATCH DELETE

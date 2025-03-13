@@ -27,6 +27,18 @@ class IdcSerializer(serializers.ModelSerializer):
 
 # 账户表
 class AssetAccountSerializer(serializers.ModelSerializer):  # 指定ModelSerializer序列化model层
+    device_list = serializers.SerializerMethodField()
+
+    @staticmethod
+    def setup_eager_loading(queryset):
+        """ Perform necessary eager loading of data. """
+        # select_related for "to-one" relationships
+        queryset = queryset.prefetch_related('networkdevice_set')
+        return queryset
+
+    def get_device_list(self, obj):
+        return obj.device_list_count()
+
     class Meta:
         model = AssetAccount  # 指定要序列化的模型
         # 指定要序列化的字段
@@ -216,8 +228,7 @@ class NetworkDeviceSerializer(serializers.ModelSerializer):
         queryset = queryset.select_related('model', 'attribute',
                                            'category', 'plan',
                                            'vendor', 'role', 'attribute', 'framework', 'zone', 'rack', 'idc_model',
-                                           'idc', 'ssh_account', 'netconf_account')
-        queryset = queryset.prefetch_related(
+                                           'idc', 'ssh_account', 'netconf_account').prefetch_related(
             'bind_ip', 'account')
         return queryset
 

@@ -24,7 +24,7 @@ router.register(r'cmdb_idc', IdcViewSet)
 router.register(r'cmdb_idc_model', CmdbIdcModelViewSet)
 router.register(r'cmdb_netzone', CmdbNetzoneModelViewSet)
 router.register(r'cmdb_rack', CmdbRackModelViewSet)
-router.register(r'cmdb_account', AccountList)
+router.register(r'cmdb_account', AccountList, basename='cmdb_account')
 # router.register(r'server_account', ServerAccountList)
 router.register(r'cmdb_server_vendor', ServerVendorList)
 router.register(r'cmdb_vendor', VendorViewSet)
@@ -44,7 +44,7 @@ router.register(r'login_record', AdminRecordViewSet)
 urlpatterns = [
     path(r'', include(router.urls)),
     path('import_template', ResourceManageExcelView.as_view(), name='import_template'),
-    path('device_account', DeviceAccountView.as_view(), name='device_account'),
+    path('device_account/', DeviceAccountView, name='device_account'),
     path('server_account', ServerAccountView.as_view(), name='server_account'),
     path('cmdbChart', CmdbChart.as_view(), name='cmdbChart'),
     path('gateway_search/', GatewayView.as_view(), name='gateway_search'),
