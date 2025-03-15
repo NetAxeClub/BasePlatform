@@ -265,10 +265,10 @@ LOGGING = {
         '': {
             'handlers': ['console'],  # 上线之后可以把'console'移除
             'level': 'INFO',
-            'propagate': True,  # 向不向更高级别的logger传递
+            'propagate': False,  # 向不向更高级别的logger传递
         },
         "server": {
-            "handlers": ["server"],
+            "handlers": [],
             "level": "INFO",
         },
         "custom_middleware": {
@@ -284,7 +284,7 @@ LOGGING = {
             "level": "DEBUG",
         },
         "django": {
-            "handlers": ["server", "console"],
+            "handlers": [],
             "level": "INFO",
         },
         "celery": {
@@ -292,20 +292,16 @@ LOGGING = {
             "level": "INFO",
         },
         "automation": {
-            "handlers": ["automation", "console"],
-            "level": "INFO",
-        },
-        "ipam": {
-            "handlers": ["ipam", "console"],
+            "handlers": [],
             "level": "INFO",
         },
         "bus_sync": {
-            "handlers": ["server"],
+            "handlers": [],
             "level": "INFO",
         },
         # 数据库相关日志
         "django.db.backends": {
-            "handlers": ['db'],
+            "handlers": [],
             "propagate": True,
             "level": "INFO",
         },
