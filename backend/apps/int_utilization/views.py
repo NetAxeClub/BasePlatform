@@ -1,4 +1,5 @@
 import json
+from datetime import date, datetime, timedelta
 import django_filters
 from django.http import JsonResponse
 from django_filters.rest_framework import DjangoFilterBackend
@@ -42,17 +43,46 @@ class InterfaceUsedNewViewSet(CustomViewBase):
     ordering_fields = ('log_time', 'id')
 
     def get_queryset(self):
-        start = self.request.query_params.get('start_time', None)
-        end = self.request.query_params.get('end_time', None)
-        host_id = self.request.query_params.get('host_id', None)
-        interface_used = self.request.query_params.get('interface_used', None)
-        if start and end:
-            return self.queryset.filter(log_time__range=(start, end))
+        # 获取查询参数
+        params = self.request.query_params
+        start_time = params.get('start_time')
+        end_time = params.get('end_time')
+        time_unit = params.get('time_unit')
+        time_num = params.get('time_num')
+        range_time = params.get('range_time')
 
-        if host_id and interface_used:
-            return self.queryset.filter(host_id=host_id)
+        # 处理开始和结束日期范围
+        if start_time and end_time:
+            start_dt = datetime.strptime(f"{start_time} 00:00:00", '%Y-%m-%d %H:%M:%S')
+            end_dt = datetime.strptime(f"{end_time} 23:59:59", '%Y-%m-%d %H:%M:%S')
+            self.queryset = self.filter_by_date_range(start_dt, end_dt)
+
+        # 处理时间单位和数值范围
+        if time_unit and time_num:
+            time_num = int(time_num)
+            current_time = datetime.now()
+
+            time_delta_map = {
+                "days": lambda x: timedelta(days=x),
+                "hours": lambda x: timedelta(hours=x),
+                "minutes": lambda x: timedelta(minutes=x)
+            }
+
+            if time_unit in time_delta_map:
+                start_time = current_time - time_delta_map[time_unit](time_num)
+                self.queryset = self.filter_by_date_range(start_time, current_time)
+
+        # 处理时间戳范围
+        if range_time is not None:
+            dt_object = datetime.fromtimestamp(int(int(range_time) / 1000))
+            start_dt = datetime.strptime(dt_object.strftime('%Y-%m-%d %H:%M:%S'), '%Y-%m-%d %H:%M:%S')
+            end_dt = datetime.strptime(dt_object.strftime('%Y-%m-%d ') + "23:59:59", '%Y-%m-%d %H:%M:%S')
+            self.queryset = self.filter_by_date_range(start_dt, end_dt)
+
         return self.queryset
 
+    def filter_by_date_range(self, start_dt, end_dt):
+        return self.queryset.filter(log_time__range=(start_dt, end_dt))
 
 class InterfaceView(APIView):
     def get(self, request):
