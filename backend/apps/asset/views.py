@@ -733,6 +733,73 @@ class ServerDeviceViewSet(CustomViewBase, TreeDataMixin):
     # 设置搜索的关键字
     search_fields = ("cpu_model", "name", "manager_name", "vendor__name", "manage_ip")
 
+    def get_queryset(self):
+        search_host_list = self.request.query_params.get('search_host_list', None)
+        if search_host_list:
+            if search_host_list.find('-') != -1:
+                return self.queryset.filter(manage_ip__in=search_host_list.split('-'))
+            else:
+                return self.queryset.filter(manage_ip__in=[search_host_list])
+        else:
+            return self.queryset
+
+    @action(detail=False, methods=['get'])
+    def export(self, request, *args, **kwargs):
+        # 获取过滤后的查询集
+        queryset = self.filter_queryset(self.get_queryset())
+
+        # 使用序列化器序列化数据
+        serializer = self.get_serializer(queryset, many=True)
+        serialized_data = serializer.data
+
+        # 定义需要导出的列配置
+        columns = [
+            {'label': '设备名称', 'key': 'name'},
+            {'label': '主机IP', 'key': 'manage_ip'},
+            {'label': '序列号', 'key': 'serial_num'},
+            {'label': '供应商', 'key': 'vendor_name'},
+            {'label': '型号', 'key': 'model_name'},
+            {'label': '所属机房', 'key': 'idc_name'},
+            {'label': '机房模块', 'key': 'idc_model_name'},
+            {'label': '机柜', 'key': 'rack_name'},
+            {'label': '主机类型', 'key': 'asset_type'},
+            {'label': 'U位开始', 'key': 'u_location_start'},
+            {'label': 'U位结束', 'key': 'u_location_end'},
+            {'label': '设备状态', 'key': 'status_name'},
+            {'label': '操作系统', 'key': 'system'},
+            {'label': '归属人', 'key': 'manager_name'},
+        ]
+
+        # 创建一个新的工作簿和工作表
+        workbook = Workbook()
+        worksheet = workbook.active
+        worksheet.title = "Server Devices"
+
+        # 添加列头
+        for col_num, column in enumerate(columns, 1):
+            col_letter = get_column_letter(col_num)
+            worksheet[f'{col_letter}1'] = column['label']
+
+        # 填充数据
+        for row_num, device in enumerate(serialized_data, 2):
+            for col_num, column in enumerate(columns, 1):
+                col_letter = get_column_letter(col_num)
+                worksheet[f'{col_letter}{row_num}'] = device.get(column['key'], '')
+
+        # 将工作簿保存到字节流
+        output = BytesIO()
+        workbook.save(output)
+        output.seek(0)
+
+        filename = "服务器信息表.xlsx"
+        encoded_filename = quote(filename)
+
+        # 设置响应头并将文件内容返回给用户
+        response = HttpResponse(output, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = f'attachment; filename*=UTF-8\'\'{encoded_filename}'
+
+        return response
+
 
 class ServerModelViewSet(CustomViewBase):
     """
@@ -791,7 +858,6 @@ class ServerVendorViewSet(CustomViewBase):
 # webssh登录日志 模糊字段过滤器
 class AdminRecordFilter(django_filters.FilterSet):
     """模糊字段过滤"""
-
     admin_start_time = django_filters.CharFilter(lookup_expr='icontains')
 
     class Meta:
