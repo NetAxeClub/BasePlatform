@@ -32,6 +32,7 @@ from rest_framework.decorators import action
 from urllib.parse import quote
 from io import BytesIO
 from openpyxl import Workbook
+from django.db.models import Prefetch
 
 if DEBUG:
     CELERY_QUEUE = 'dev'
@@ -39,84 +40,6 @@ else:
     CELERY_QUEUE = 'config_backup'
 show_ip_mongo = MongoOps(db='Automation', coll='layer3interface')
 metric_mongo = MongoOps(db='metric', coll='level2')
-
-
-class TreeDataMixin:
-    """
-    提供树形结构数据的 Mixin 类
-    用于需要展示 IDC/IDC Model/Rack 层级结构的视图
-    """
-
-    @action(detail=False, methods=['get'])
-    def tree_data(self, request, *args, **kwargs):
-        queryset = self.queryset.values(
-            'id',
-            'idc', 'idc__name',
-            'idc_model', 'idc_model__name',
-            'rack', 'rack__name'
-        ).distinct().order_by('idc__name', 'idc_model__name', 'rack__name')
-
-        # Create base structure with "全部" node
-        tree_data = [{
-            'name': '全部',
-            'icon': '',
-            'id': None
-        }]
-
-        # Create dictionaries to store hierarchical data
-        idc_dict = {}
-
-        # Organize data into hierarchical structure
-        for device in queryset:
-            if device['idc'] and device['idc__name']:
-                # Handle IDC level
-                if device['idc'] not in idc_dict:
-                    idc_dict[device['idc']] = {
-                        'name': device['idc__name'],
-                        'icon': '',
-                        'type': 'idc',
-                        'id': device['idc'],
-                        'children': {}
-                    }
-
-                # Handle IDC Model level
-                if device['idc_model'] and device['idc_model__name']:
-                    if device['idc_model'] not in idc_dict[device['idc']]['children']:
-                        idc_dict[device['idc']]['children'][device['idc_model']] = {
-                            'name': device['idc_model__name'],
-                            'icon': '',
-                            'type': 'idc_model',
-                            'id': device['idc_model'],
-                            'children': []
-                        }
-
-                    # Handle Rack level
-                    if device['rack'] and device['rack__name']:
-                        rack_exists = False
-                        for rack in idc_dict[device['idc']]['children'][device['idc_model']]['children']:
-                            # 判断是否已经存在
-                            if rack['id'] == device['rack']:
-                                rack_exists = True
-                                break
-
-                        if not rack_exists:
-                            idc_dict[device['idc']]['children'][device['idc_model']]['children'].append({
-                                'name': device['rack__name'],
-                                'icon': '',
-                                'type': 'rack',
-                                'id': device['rack']
-                            })
-
-        # Convert dictionary structure to list structure
-        for idc in idc_dict.values():
-            idc['children'] = list(idc['children'].values())
-            tree_data.append(idc)
-
-        return JsonResponse(data={
-            'code': 200,
-            'data': tree_data,
-            'msg': '获取网络设备树形结构成功'
-        })
 
 
 class AccountExtend:
@@ -129,8 +52,6 @@ class AccountExtend:
             'data': [],
             'msg': '批量删除成功'
         })
-
-
 
 
 class ResourceManageExcelView(APIView):
@@ -364,6 +285,63 @@ class IdcViewSet(CustomViewBase):
     # 设置搜索的关键字
     search_fields = '__all__'
 
+    @action(detail=False, methods=['get'])
+    def tree_data(self, request, *args, **kwargs):
+        # 获取所有IDC及其关联的IDC模型和机架（只查询必要字段）
+        idc_queryset = Idc.objects.prefetch_related(
+            Prefetch('idcmodel_set',
+                     queryset=IdcModel.objects.only('name', 'id', 'idc').prefetch_related(
+                         Prefetch('rack_set', queryset=Rack.objects.only('name', 'id', 'idc_model').order_by('name'))
+                     ).order_by('name'))
+        ).only('name', 'id').order_by('name')
+
+        # Create base structure with "全部" node
+        tree_data = [{
+            'name': '全部',
+            'icon': '',
+            'id': None
+        }]
+
+        # 构建树形结构
+        for idc in idc_queryset:
+            idc_node = {
+                'name': idc.name,
+                'icon': '',
+                'type': 'idc',
+                'id': idc.id,
+                'children': []
+            }
+
+            # 处理IDC Model层级（已按name排序）
+            for idc_model in idc.idcmodel_set.all():
+                model_node = {
+                    'name': idc_model.name,
+                    'icon': '',
+                    'type': 'idc_model',
+                    'id': idc_model.id,
+                    'children': []
+                }
+
+                # 处理Rack层级（已按name排序）
+                for rack in idc_model.rack_set.all():
+                    rack_node = {
+                        'name': rack.name,
+                        'icon': '',
+                        'type': 'rack',
+                        'id': rack.id
+                    }
+                    model_node['children'].append(rack_node)
+
+                idc_node['children'].append(model_node)
+
+            tree_data.append(idc_node)
+
+        return JsonResponse(data={
+            'code': 200,
+            'data': tree_data,
+            'msg': '获取网络设备树形结构成功'
+        })
+
 
 class CmdbNetzoneModelViewSet(CustomViewBase):
     """
@@ -566,7 +544,7 @@ class NetworkDeviceFilter(django_filters.FilterSet):
         fields = '__all__'
 
 
-class NetworkDeviceViewSet(CustomViewBase, TreeDataMixin):
+class NetworkDeviceViewSet(CustomViewBase):
     """
     处理  GET POST , 处理 /api/post/<pk>/ GET PUT PATCH DELETE
     """
@@ -715,7 +693,7 @@ class ServerFilter(django_filters.FilterSet):
         fields = '__all__'
 
 
-class ServerDeviceViewSet(CustomViewBase, TreeDataMixin):
+class ServerDeviceViewSet(CustomViewBase):
     """
     处理  GET POST , 处理 /api/post/<pk>/ GET PUT PATCH DELETE
     """
