@@ -28,12 +28,12 @@ from collections import OrderedDict
 from django_celery_results.models import TaskResult
 from django.core.cache import cache
 from django.db import connections
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from confload.confload import config
 from apps.asset.models import NetworkDevice
 from apps.asset.serializers import NetworkDeviceSerializer
 from apps.automation.models import CollectionRule, CollectionMatchRule
-from apps.int_utilization.models import InterfaceUsed
+# from apps.int_utilization.models import InterfaceUsed
 from apps.automation.tools.h3c import H3cProc
 from apps.automation.tools.hillstone import HillstoneProc
 from apps.automation.tools.huawei import HuaweiProc
@@ -71,6 +71,7 @@ cmdb_mongo = MongoOps(db='Automation', coll='networkdevice')
 show_ip_mongo = MongoOps(db='Automation', coll='layer3interface')
 log_mongo = MongoOps(db='logs', coll='xumi_time_cost')
 interface_mongo = MongoOps(db='Automation', coll='layer2interface')
+interface_used_mongo = MongoOps(db='Automation', coll='Interface_used')
 
 
 def clear_his_collect_res():
@@ -313,7 +314,8 @@ def interface_used(device_ip=None):
                     post_data['host_type'] = ''.join([x['type'] for x in new_port_speed if x['sum'] == max_port])
                 logger.info('落库data:{}'.format(post_data))
                 try:
-                    InterfaceUsed.objects.create(**post_data)
+                    interface_used_mongo.insert(post_data)
+                    # InterfaceUsed.objects.create(**post_data)
                     cache.set("interface_used_" + str(post_data['host_id']),
                               json.dumps(post_data, cls=JsonEncoder), 3600 * 5)
                 except Exception as e:
@@ -1280,6 +1282,7 @@ class AutomationMongo(object):
     # 采集任务之前，清除所有采集库结果
     @staticmethod
     def clear_his_collect_res():
+        # InterfaceUsed.objects.filter(log_time__lt=datetime.now() - timedelta(days=180)).delete()
         # 清空check校验任务
         MongoOps(db='Automation', coll='tracking_task').delete()
         # 清空寻觅定位耗时记录
