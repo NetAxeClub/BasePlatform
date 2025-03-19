@@ -1,0 +1,1168 @@
+#
+ version 7.1.070, Feature 2707
+#
+ sysname B3.PO.IAAS.LF.X27M1
+#
+ clock timezone Asia/Shanghai add 08:00:00
+ clock protocol ntp
+#
+ undo copyright-info enable
+#
+ip vpn-instance IAAS-PO
+ route-distinguisher 10.255.24.55:17
+ #
+ address-family ipv4
+  vpn-target 1:17 import-extcommunity
+  vpn-target 1:17 export-extcommunity
+ #
+ address-family evpn
+  vpn-target 1:17 import-extcommunity
+  vpn-target 1:17 export-extcommunity
+#
+ip vpn-instance MGMT
+#
+ irf mac-address persistent timer
+ irf auto-update enable
+ undo irf link-delay
+ irf member 1 priority 1
+#
+ tunnel statistics vxlan auto
+ vxlan default-decapsulation source interface LoopBack0
+#
+ vxlan tunnel mac-learning disable
+#
+track 11 nqa entry admin iaas_po184.11 reaction 1
+#
+track 12 nqa entry admin iaas_po184.12 reaction 1
+#
+track 13 nqa entry admin iaas_po184.13 reaction 1
+#
+ ip unreachables enable
+ ip ttl-expires enable
+#
+ dhcp enable
+#
+ mac-address mac-move fast-update
+#
+ lldp global enable
+ lldp global tlv-enable basic-tlv management-address-tlv interface M-GigabitEthernet0/0/0
+#
+ ipv6 unreachables enable
+#
+ system-working-mode standard
+ hardware-resource switch-mode 4
+ hardware-resource routing-mode ipv6-128
+ hardware-resource vxlan l3gw24k
+ fan prefer-direction slot 1 port-to-power
+ password-recovery enable
+#
+vlan 1
+#
+ stp instance 0 root primary
+ stp bpdu-protection
+ stp global enable
+#
+monitor-link group 1
+ downlink up-delay 30
+#
+nqa entry admin iaas_po184.11
+ type icmp-echo
+  destination ip 10.103.184.11
+  frequency 1000
+  reaction 1 checked-element probe-fail threshold-type consecutive 3 action-type trigger-only
+  source ip 10.103.184.1
+  vpn-instance IAAS-PO
+#
+nqa entry admin iaas_po184.12
+ type icmp-echo
+  destination ip 10.103.184.12
+  frequency 1000
+  reaction 1 checked-element probe-fail threshold-type consecutive 3 action-type trigger-only
+  source ip 10.103.184.1
+  vpn-instance IAAS-PO
+#
+nqa entry admin iaas_po184.13
+ type icmp-echo
+  destination ip 10.103.184.13
+  frequency 1000
+  reaction 1 checked-element probe-fail threshold-type consecutive 3 action-type trigger-only
+  source ip 10.103.184.1
+  vpn-instance IAAS-PO
+#
+ nqa schedule admin iaas_po184.11 start-time now lifetime forever
+ nqa schedule admin iaas_po184.12 start-time now lifetime forever
+ nqa schedule admin iaas_po184.13 start-time now lifetime forever
+#
+ l2vpn enable
+ l2vpn drni peer-link ac-match-rule vxlan-mapping
+ vxlan tunnel arp-learning disable
+ vxlan tunnel nd-learning disable
+ evpn drni group 10.255.250.144
+ evpn drni local 10.255.24.55 remote 10.255.24.56
+ evpn global-mac 005e-edaf-fa90
+#
+vsi 170182
+ description 10.103.182.0/24
+ gateway vsi-interface 170182
+ arp suppression enable
+ ipv6 nd suppression enable
+ vxlan 170182
+ evpn encapsulation vxlan
+  route-distinguisher auto
+  vpn-target 1:17 17:170182 export-extcommunity
+  vpn-target 1:17 17:170182 import-extcommunity
+#
+vsi 170183
+ description 10.103.183.0/24
+ gateway vsi-interface 170183
+ arp suppression enable
+ ipv6 nd suppression enable
+ vxlan 170183
+ evpn encapsulation vxlan
+  route-distinguisher auto
+  vpn-target 1:17 17:170183 export-extcommunity
+  vpn-target 1:17 17:170183 import-extcommunity
+#
+vsi 170184
+ description 10.103.184.0/24
+ gateway vsi-interface 170184
+ arp suppression enable
+ ipv6 nd suppression enable
+ vxlan 170184
+ evpn encapsulation vxlan
+  route-distinguisher auto
+  vpn-target 1:17 17:170184 export-extcommunity
+  vpn-target 1:17 17:170184 import-extcommunity
+#
+vsi 170227
+ description 10.103.227.0/24
+ gateway vsi-interface 170227
+ arp suppression enable
+ ipv6 nd suppression enable
+ vxlan 170227
+ evpn encapsulation vxlan
+  route-distinguisher auto
+  vpn-target 1:17 17:170227 export-extcommunity
+  vpn-target 1:17 17:170227 import-extcommunity
+#
+vsi 170228
+ description 10.103.228.0/24
+ gateway vsi-interface 170228
+ arp suppression enable
+ ipv6 nd suppression enable
+ vxlan 170228
+ evpn encapsulation vxlan
+  route-distinguisher auto
+  vpn-target 1:17 17:170228 export-extcommunity
+  vpn-target 1:17 17:170228 import-extcommunity
+#
+interface Bridge-Aggregation1
+ link-aggregation mode dynamic
+ port drni group 1
+ stp edged-port
+ #
+ service-instance 184
+  encapsulation s-vid 184
+  xconnect vsi 170184
+#
+interface Bridge-Aggregation2
+ link-aggregation mode dynamic
+ port drni group 2
+ stp edged-port
+ #
+ service-instance 184
+  encapsulation s-vid 184
+  xconnect vsi 170184
+#
+interface Bridge-Aggregation3
+ link-aggregation mode dynamic
+ port drni group 3
+ stp edged-port
+ #
+ service-instance 184
+  encapsulation s-vid 184
+  xconnect vsi 170184
+#
+interface Bridge-Aggregation4
+ link-aggregation mode dynamic
+ port drni group 4
+ stp edged-port
+ #
+ service-instance 184
+  encapsulation s-vid 184
+  xconnect vsi 170184
+#
+interface Bridge-Aggregation5
+ link-aggregation mode dynamic
+ port drni group 5
+ stp edged-port
+ #
+ service-instance 184
+  encapsulation s-vid 184
+  xconnect vsi 170184
+#
+interface Bridge-Aggregation6
+ link-aggregation mode dynamic
+ port drni group 6
+ stp edged-port
+ #
+ service-instance 184
+  encapsulation s-vid 184
+  xconnect vsi 170184
+#
+interface Bridge-Aggregation7
+ link-aggregation mode dynamic
+ port drni group 7
+ stp edged-port
+ #
+ service-instance 182
+  encapsulation s-vid 182
+  xconnect vsi 170182
+ #
+ service-instance 183
+  encapsulation s-vid 183
+  xconnect vsi 170183
+#
+interface Bridge-Aggregation8
+ link-aggregation mode dynamic
+ port drni group 8
+ stp edged-port
+ #
+ service-instance 182
+  encapsulation s-vid 182
+  xconnect vsi 170182
+ #
+ service-instance 183
+  encapsulation s-vid 183
+  xconnect vsi 170183
+#
+interface Bridge-Aggregation9
+ link-aggregation mode dynamic
+ port drni group 9
+ stp edged-port
+ #
+ service-instance 182
+  encapsulation s-vid 182
+  xconnect vsi 170182
+ #
+ service-instance 183
+  encapsulation s-vid 183
+  xconnect vsi 170183
+#
+interface Bridge-Aggregation10
+ link-aggregation mode dynamic
+ port drni group 10
+ stp edged-port
+ #
+ service-instance 184
+  encapsulation s-vid 184
+  xconnect vsi 170184
+#
+interface Bridge-Aggregation11
+ link-aggregation mode dynamic
+ port drni group 11
+ stp edged-port
+ #
+ service-instance 227
+  encapsulation s-vid 227
+  xconnect vsi 170227
+ #
+ service-instance 228
+  encapsulation s-vid 228
+  xconnect vsi 170228
+#
+interface Bridge-Aggregation12
+ link-aggregation mode dynamic
+ port drni group 12
+ stp edged-port
+ #
+ service-instance 227
+  encapsulation s-vid 227
+  xconnect vsi 170227
+ #
+ service-instance 228
+  encapsulation s-vid 228
+  xconnect vsi 170228
+#
+interface Bridge-Aggregation13
+ link-aggregation mode dynamic
+ port drni group 13
+ stp edged-port
+ #
+ service-instance 227
+  encapsulation s-vid 227
+  xconnect vsi 170227
+ #
+ service-instance 228
+  encapsulation s-vid 228
+  xconnect vsi 170228
+#
+interface Bridge-Aggregation14
+ link-aggregation mode dynamic
+ port drni group 14
+ stp edged-port
+ #
+ service-instance 227
+  encapsulation s-vid 227
+  xconnect vsi 170227
+ #
+ service-instance 228
+  encapsulation s-vid 228
+  xconnect vsi 170228
+#
+interface Bridge-Aggregation15
+ link-aggregation mode dynamic
+ port drni group 15
+ stp edged-port
+ #
+ service-instance 227
+  encapsulation s-vid 227
+  xconnect vsi 170227
+ #
+ service-instance 228
+  encapsulation s-vid 228
+  xconnect vsi 170228
+#
+interface Bridge-Aggregation16
+ link-aggregation mode dynamic
+ port drni group 16
+ stp edged-port
+ #
+ service-instance 227
+  encapsulation s-vid 227
+  xconnect vsi 170227
+ #
+ service-instance 228
+  encapsulation s-vid 228
+  xconnect vsi 170228
+#
+interface Bridge-Aggregation17
+ link-aggregation mode dynamic
+ port drni group 17
+ stp edged-port
+ #
+ service-instance 227
+  encapsulation s-vid 227
+  xconnect vsi 170227
+ #
+ service-instance 228
+  encapsulation s-vid 228
+  xconnect vsi 170228
+#
+interface Bridge-Aggregation18
+ link-aggregation mode dynamic
+ port drni group 18
+ stp edged-port
+ #
+ service-instance 227
+  encapsulation s-vid 227
+  xconnect vsi 170227
+ #
+ service-instance 228
+  encapsulation s-vid 228
+  xconnect vsi 170228
+#
+interface Bridge-Aggregation19
+ link-aggregation mode dynamic
+ port drni group 19
+ stp edged-port
+ #
+ service-instance 227
+  encapsulation s-vid 227
+  xconnect vsi 170227
+ #
+ service-instance 228
+  encapsulation s-vid 228
+  xconnect vsi 170228
+#
+interface Bridge-Aggregation20
+ link-aggregation mode dynamic
+ port drni group 20
+ stp edged-port
+ #
+ service-instance 227
+  encapsulation s-vid 227
+  xconnect vsi 170227
+ #
+ service-instance 228
+  encapsulation s-vid 228
+  xconnect vsi 170228
+#
+interface Bridge-Aggregation21
+ link-aggregation mode dynamic
+ port drni group 21
+ stp edged-port
+ #
+ service-instance 227
+  encapsulation s-vid 227
+  xconnect vsi 170227
+ #
+ service-instance 228
+  encapsulation s-vid 228
+  xconnect vsi 170228
+#
+interface Bridge-Aggregation22
+ link-aggregation mode dynamic
+ port drni group 22
+ stp edged-port
+ #
+ service-instance 227
+  encapsulation s-vid 227
+  xconnect vsi 170227
+ #
+ service-instance 228
+  encapsulation s-vid 228
+  xconnect vsi 170228
+#
+interface Bridge-Aggregation23
+ link-aggregation mode dynamic
+ port drni group 23
+ stp edged-port
+ #
+ service-instance 227
+  encapsulation s-vid 227
+  xconnect vsi 170227
+ #
+ service-instance 228
+  encapsulation s-vid 228
+  xconnect vsi 170228
+#
+interface Bridge-Aggregation24
+ link-aggregation mode dynamic
+ port drni group 24
+ stp edged-port
+ #
+ service-instance 227
+  encapsulation s-vid 227
+  xconnect vsi 170227
+ #
+ service-instance 228
+  encapsulation s-vid 228
+  xconnect vsi 170228
+#
+interface Bridge-Aggregation25
+ link-aggregation mode dynamic
+ port drni group 25
+ stp edged-port
+ #
+ service-instance 227
+  encapsulation s-vid 227
+  xconnect vsi 170227
+ #
+ service-instance 228
+  encapsulation s-vid 228
+  xconnect vsi 170228
+#
+interface Bridge-Aggregation26
+ link-aggregation mode dynamic
+ port drni group 26
+ stp edged-port
+ #
+ service-instance 184
+  encapsulation s-vid 184
+  xconnect vsi 170184
+#
+interface Bridge-Aggregation27
+ link-aggregation mode dynamic
+ port drni group 27
+ stp edged-port
+ #
+ service-instance 184
+  encapsulation s-vid 184
+  xconnect vsi 170184
+#
+interface Bridge-Aggregation28
+ link-aggregation mode dynamic
+ port drni group 28
+ stp edged-port
+ #
+ service-instance 184
+  encapsulation s-vid 184
+  xconnect vsi 170184
+#
+interface Bridge-Aggregation29
+ link-aggregation mode dynamic
+ port drni group 29
+ stp edged-port
+ #
+ service-instance 182
+  encapsulation s-vid 182
+  xconnect vsi 170182
+ #
+ service-instance 183
+  encapsulation s-vid 183
+  xconnect vsi 170183
+ #
+ service-instance 184
+  encapsulation s-vid 184
+  xconnect vsi 170184
+#
+interface Bridge-Aggregation30
+ link-aggregation mode dynamic
+ port drni group 30
+ stp edged-port
+ #
+ service-instance 182
+  encapsulation s-vid 182
+  xconnect vsi 170182
+ #
+ service-instance 183
+  encapsulation s-vid 183
+  xconnect vsi 170183
+#
+interface Bridge-Aggregation31
+ link-aggregation mode dynamic
+ port drni group 31
+ stp edged-port
+ #
+ service-instance 182
+  encapsulation s-vid 182
+  xconnect vsi 170182
+ #
+ service-instance 183
+  encapsulation s-vid 183
+  xconnect vsi 170183
+#
+interface Bridge-Aggregation32
+ link-aggregation mode dynamic
+ port drni group 32
+ stp edged-port
+#
+interface Bridge-Aggregation33
+ link-aggregation mode dynamic
+ port drni group 33
+ stp edged-port
+#
+interface Bridge-Aggregation34
+ link-aggregation mode dynamic
+ port drni group 34
+ stp edged-port
+#
+interface Bridge-Aggregation35
+ link-aggregation mode dynamic
+ port drni group 35
+ stp edged-port
+#
+interface Bridge-Aggregation36
+ link-aggregation mode dynamic
+ port drni group 36
+ stp edged-port
+#
+interface Bridge-Aggregation37
+ link-aggregation mode dynamic
+ port drni group 37
+ stp edged-port
+#
+interface Bridge-Aggregation38
+ link-aggregation mode dynamic
+ port drni group 38
+ stp edged-port
+#
+interface Bridge-Aggregation39
+ link-aggregation mode dynamic
+ port drni group 39
+ stp edged-port
+#
+interface Bridge-Aggregation40
+ link-aggregation mode dynamic
+ port drni group 40
+ stp edged-port
+#
+interface Bridge-Aggregation41
+ link-aggregation mode dynamic
+ port drni group 41
+ stp edged-port
+#
+interface Bridge-Aggregation42
+ link-aggregation mode dynamic
+ port drni group 42
+ stp edged-port
+#
+interface Bridge-Aggregation43
+ link-aggregation mode dynamic
+ port drni group 43
+ stp edged-port
+#
+interface Bridge-Aggregation44
+ link-aggregation mode dynamic
+ port drni group 44
+ stp edged-port
+#
+interface Bridge-Aggregation45
+ link-aggregation mode dynamic
+ port drni group 45
+ stp edged-port
+#
+interface Bridge-Aggregation46
+ link-aggregation mode dynamic
+ port drni group 46
+ stp edged-port
+#
+interface Bridge-Aggregation47
+ link-aggregation mode dynamic
+ port drni group 47
+ stp edged-port
+#
+interface Bridge-Aggregation48
+ link-aggregation mode dynamic
+ port drni group 48
+ stp edged-port
+#
+interface Bridge-Aggregation53
+ port link-type trunk
+ undo port trunk permit vlan 1
+ port trunk permit vlan 2 to 4094
+ port trunk pvid vlan 4094
+ link-aggregation mode dynamic
+ port drni intra-portal-port 1
+ undo mac-address static source-check enable
+#
+interface NULL0
+#
+interface LoopBack0
+ ip address 10.255.24.55 255.255.255.255
+#
+interface LoopBack1
+ description VTEP-IP
+ ip address 10.255.250.144 255.255.255.255
+#
+interface FortyGigE1/0/49
+ port link-mode route
+ description to_B3.PO.IAAS.SP.F05_10.254.23.210_FGE1/0/7
+ ip address 100.70.17.161 255.255.255.252
+ port monitor-link group 1 uplink
+ undo mac-address static source-check enable
+#
+interface FortyGigE1/0/50
+ port link-mode route
+ description to_B3.PO.IAAS.SP.F06_10.254.23.220_FGE1/0/7
+ ip address 100.70.17.165 255.255.255.252
+ port monitor-link group 1 uplink
+ undo mac-address static source-check enable
+#
+interface FortyGigE1/0/51
+ port link-mode bridge
+#
+interface FortyGigE1/0/52
+ port link-mode bridge
+#
+interface FortyGigE1/0/53
+ port link-mode bridge
+ port link-type trunk
+ undo port trunk permit vlan 1
+ port trunk permit vlan 2 to 4094
+ port trunk pvid vlan 4094
+ undo mac-address static source-check enable
+ port link-aggregation group 53
+#
+interface FortyGigE1/0/54
+ port link-mode bridge
+ port link-type trunk
+ undo port trunk permit vlan 1
+ port trunk permit vlan 2 to 4094
+ port trunk pvid vlan 4094
+ undo mac-address static source-check enable
+ port link-aggregation group 53
+#
+interface M-GigabitEthernet0/0/0
+ ip binding vpn-instance MGMT
+ ip address 10.254.24.55 255.255.255.0
+#
+interface M-GigabitEthernet0/0/1
+ shutdown
+ dhcp client identifier hex 0230c6d733f416
+#
+interface Ten-GigabitEthernet1/0/1
+ port link-mode bridge
+ stp edged-port
+ port monitor-link group 1 downlink
+ #
+ service-instance 184
+  encapsulation s-vid 184
+  xconnect vsi 170184
+#
+interface Ten-GigabitEthernet1/0/2
+ port link-mode bridge
+ stp edged-port
+ port monitor-link group 1 downlink
+ #
+ service-instance 184
+  encapsulation s-vid 184
+  xconnect vsi 170184
+#
+interface Ten-GigabitEthernet1/0/3
+ port link-mode bridge
+ stp edged-port
+ port monitor-link group 1 downlink
+ #
+ service-instance 184
+  encapsulation s-vid 184
+  xconnect vsi 170184
+#
+interface Ten-GigabitEthernet1/0/4
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 4
+#
+interface Ten-GigabitEthernet1/0/5
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 5
+#
+interface Ten-GigabitEthernet1/0/6
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 6
+#
+interface Ten-GigabitEthernet1/0/7
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 7
+#
+interface Ten-GigabitEthernet1/0/8
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 8
+#
+interface Ten-GigabitEthernet1/0/9
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 9
+#
+interface Ten-GigabitEthernet1/0/10
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 10
+#
+interface Ten-GigabitEthernet1/0/11
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 11
+#
+interface Ten-GigabitEthernet1/0/12
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 12
+#
+interface Ten-GigabitEthernet1/0/13
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 13
+#
+interface Ten-GigabitEthernet1/0/14
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 14
+#
+interface Ten-GigabitEthernet1/0/15
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 15
+#
+interface Ten-GigabitEthernet1/0/16
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 16
+#
+interface Ten-GigabitEthernet1/0/17
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 17
+#
+interface Ten-GigabitEthernet1/0/18
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 18
+#
+interface Ten-GigabitEthernet1/0/19
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 19
+#
+interface Ten-GigabitEthernet1/0/20
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 20
+#
+interface Ten-GigabitEthernet1/0/21
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 21
+#
+interface Ten-GigabitEthernet1/0/22
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 22
+#
+interface Ten-GigabitEthernet1/0/23
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 23
+#
+interface Ten-GigabitEthernet1/0/24
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 24
+#
+interface Ten-GigabitEthernet1/0/25
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 25
+#
+interface Ten-GigabitEthernet1/0/26
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 26
+#
+interface Ten-GigabitEthernet1/0/27
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 27
+#
+interface Ten-GigabitEthernet1/0/28
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 28
+#
+interface Ten-GigabitEthernet1/0/29
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 29
+#
+interface Ten-GigabitEthernet1/0/30
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 30
+#
+interface Ten-GigabitEthernet1/0/31
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 31
+#
+interface Ten-GigabitEthernet1/0/32
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 32
+#
+interface Ten-GigabitEthernet1/0/33
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 33
+#
+interface Ten-GigabitEthernet1/0/34
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 34
+#
+interface Ten-GigabitEthernet1/0/35
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 35
+#
+interface Ten-GigabitEthernet1/0/36
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 36
+#
+interface Ten-GigabitEthernet1/0/37
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 37
+#
+interface Ten-GigabitEthernet1/0/38
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 38
+#
+interface Ten-GigabitEthernet1/0/39
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 39
+#
+interface Ten-GigabitEthernet1/0/40
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 40
+#
+interface Ten-GigabitEthernet1/0/41
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 41
+#
+interface Ten-GigabitEthernet1/0/42
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 42
+#
+interface Ten-GigabitEthernet1/0/43
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 43
+#
+interface Ten-GigabitEthernet1/0/44
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 44
+#
+interface Ten-GigabitEthernet1/0/45
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 45
+#
+interface Ten-GigabitEthernet1/0/46
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 46
+#
+interface Ten-GigabitEthernet1/0/47
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 47
+#
+interface Ten-GigabitEthernet1/0/48
+ port link-mode bridge
+ port monitor-link group 1 downlink
+ port link-aggregation group 48
+#
+interface Vsi-interface17
+ ip binding vpn-instance IAAS-PO
+ l3-vni 17
+#
+interface Vsi-interface170182
+ ip binding vpn-instance IAAS-PO
+ ip address 10.103.182.1 255.255.255.0
+ mac-address 005e-edaf-0001
+ distributed-gateway local
+ ip-prefix-route generate disable
+#
+interface Vsi-interface170183
+ ip binding vpn-instance IAAS-PO
+ ip address 10.103.183.1 255.255.255.0
+ mac-address 005e-edaf-0001
+ distributed-gateway local
+ ip-prefix-route generate disable
+#
+interface Vsi-interface170184
+ ip binding vpn-instance IAAS-PO
+ ip address 10.103.184.1 255.255.255.0
+ mac-address 005e-edaf-0001
+ distributed-gateway local
+ ip-prefix-route generate disable
+#
+interface Vsi-interface170227
+ ip binding vpn-instance IAAS-PO
+ ip address 10.103.227.1 255.255.255.0
+ mac-address 005e-edaf-0001
+ distributed-gateway local
+ ip-prefix-route generate disable
+#
+interface Vsi-interface170228
+ ip binding vpn-instance IAAS-PO
+ ip address 10.103.228.1 255.255.255.0
+ mac-address 005e-edaf-0001
+ distributed-gateway local
+ ip-prefix-route generate disable
+#
+bgp 96651
+ graceful-restart
+ router-id 10.255.24.55
+ peer 100.70.17.162 as-number 96645
+ peer 100.70.17.162 description B3.PO.IAAS.SP.F05-10.254.23.210
+ peer 100.70.17.162 bfd single-hop
+ peer 100.70.17.166 as-number 96645
+ peer 100.70.17.166 description B3.PO.IAAS.SP.F06-10.254.23.220
+ peer 100.70.17.166 bfd single-hop
+ #
+ address-family ipv4 unicast
+  network 10.255.24.55 255.255.255.255
+  network 10.255.250.144 255.255.255.255
+  peer 100.70.17.162 enable
+  peer 100.70.17.162 advertise-community
+  peer 100.70.17.162 advertise-ext-community
+  peer 100.70.17.166 enable
+  peer 100.70.17.166 advertise-community
+  peer 100.70.17.166 advertise-ext-community
+#
+bgp 96651 instance overlay
+ bgp update-delay on-startup 40
+ graceful-restart
+ router-id 10.255.24.55
+ peer 10.255.23.210 as-number 96645
+ peer 10.255.23.210 connect-interface LoopBack0
+ peer 10.255.23.210 ebgp-max-hop 3
+ peer 10.255.23.210 bfd multi-hop
+ peer 10.255.23.220 as-number 96645
+ peer 10.255.23.220 connect-interface LoopBack0
+ peer 10.255.23.220 ebgp-max-hop 3
+ peer 10.255.23.220 bfd multi-hop
+ #
+ address-family l2vpn evpn
+  peer 10.255.23.210 enable
+  peer 10.255.23.210 advertise-community
+  peer 10.255.23.220 enable
+  peer 10.255.23.220 advertise-community
+ #
+ ip vpn-instance IAAS-PO
+  #
+  address-family ipv4 unicast
+   balance 8
+   vpn-route cross multipath
+   network 10.104.32.0 255.255.240.0
+#
+ drni auto-recovery reload-delay 300
+ drni restore-delay 300
+ drni role priority 100
+ drni system-mac 30c6-d733-f416
+ drni system-number 1
+ drni keepalive ip destination 10.254.24.56 source 10.254.24.55 vpn-instance MGMT
+#
+ scheduler logfile size 16
+#
+line class aux
+ user-role network-admin
+#
+line class vty
+ user-role network-operator
+#
+line aux 0
+ authentication-mode scheme
+ user-role network-admin
+ command authorization
+ command accounting
+#
+line vty 0 63
+ authentication-mode scheme
+ user-role network-admin
+ protocol inbound ssh
+ command authorization
+ command accounting
+#
+ ip route-static vpn-instance MGMT 0.0.0.0 0 10.254.24.254 description MGMT
+ ip route-static vpn-instance IAAS-PO 10.104.32.0 20 10.103.184.13 track 13 description IAAS_PO
+ ip route-static vpn-instance IAAS-PO 10.104.32.0 20 10.103.184.11 track 11 description IAAS_PO
+ ip route-static vpn-instance IAAS-PO 10.104.32.0 20 10.103.184.12 track 12 description IAAS_PO
+#
+ info-center loghost source M-GigabitEthernet0/0/0
+ info-center loghost vpn-instance MGMT 10.254.12.215
+ info-center loghost vpn-instance MGMT 10.254.12.216
+#
+ snmp-agent
+ snmp-agent local-engineid 800063A28030C6D733F41A00000001
+ snmp-agent community read cipher $c$3$48wYHs2s/eKqHUs/ydTZ6vy3BMGw75X37HrzVEyXdj0= acl 2000
+ snmp-agent community write cipher $c$3$2P7f0Abi9JRIARrVL8za4mHaljiV4z6NbQz71DyyQmo= acl 2000
+ snmp-agent sys-info contact stc_network@iflytek.com
+ snmp-agent sys-info location HeFei.B3
+ snmp-agent sys-info version v2c
+ snmp-agent target-host trap address udp-domain 10.254.23.100 vpn-instance MGMT params securityname if1ytek#T@ccr v2c
+ snmp-agent trap enable arp
+ snmp-agent trap enable radius
+ snmp-agent trap enable stp
+ snmp-agent trap enable syslog
+ snmp-agent trap source M-GigabitEthernet0/0/0
+#
+ ssh server enable
+ ssh server acl 2000
+#
+ ntp-service enable
+ ntp-service unicast-server 10.254.0.13 vpn-instance MGMT source M-GigabitEthernet0/0/0
+ ntp-service unicast-server 10.254.2.103 vpn-instance MGMT source M-GigabitEthernet0/0/0
+#
+acl basic 2000
+ rule 10 permit vpn-instance MGMT source 10.254.0.0 0.0.255.255
+ rule 20 permit vpn-instance MGMT source 172.16.12.0 0.0.0.255
+#
+ header login %
+*****************************************************************************
+Uptime:    2023/2/7
+Address:   10.254.24.55
+Location:  B3.3-3.D09.40U
+Device:    H3C 6860-54HF
+SN:        210235A2D6H2270CG045
+
+       This is a private system operated for and by IFLYTEK.
+Authorization from IFLYTEK management is required to use this system.
+          Use by unauthorized persons is prohibited.
+***************************************************************************%
+#
+hwtacacs scheme network
+ primary authentication 10.254.0.12
+ primary authorization 10.254.0.12
+ primary accounting 10.254.0.12
+ secondary authentication 10.254.2.212
+ secondary authorization 10.254.2.212
+ secondary accounting 10.254.2.212
+ key authentication cipher $c$3$f7CiMuU+hyXwPetkU+NNu5csZOxVg/UKC5pix2+PXT+VhyMJQXtA
+ key authorization cipher $c$3$FMH4ucF1cyjQ8C/8Lengvzu6YUeG55lw2eki9ALObkkbI4+KJ+MP
+ key accounting cipher $c$3$v+FAoJiDoRFfygWuLfpKHa9nvVbozlX361BMVts83cGd2DFiK39a
+ user-name-format without-domain
+ vpn-instance MGMT
+#
+radius scheme system
+ user-name-format without-domain
+#
+domain network.local
+ authentication login hwtacacs-scheme network local
+ authorization login hwtacacs-scheme network local
+ accounting login hwtacacs-scheme network local
+ authorization command hwtacacs-scheme network local
+ accounting command hwtacacs-scheme network
+#
+domain system
+#
+ domain default enable system
+#
+role name level-0
+ description Predefined level-0 role
+#
+role name level-1
+ description Predefined level-1 role
+#
+role name level-2
+ description Predefined level-2 role
+#
+role name level-3
+ description Predefined level-3 role
+#
+role name level-4
+ description Predefined level-4 role
+#
+role name level-5
+ description Predefined level-5 role
+#
+role name level-6
+ description Predefined level-6 role
+#
+role name level-7
+ description Predefined level-7 role
+#
+role name level-8
+ description Predefined level-8 role
+#
+role name level-9
+ description Predefined level-9 role
+#
+role name level-10
+ description Predefined level-10 role
+#
+role name level-11
+ description Predefined level-11 role
+#
+role name level-12
+ description Predefined level-12 role
+#
+role name level-13
+ description Predefined level-13 role
+#
+role name level-14
+ description Predefined level-14 role
+#
+user-group system
+#
+local-user admin class manage
+ password hash $h$6$SglMtWf/neJsstdB$b4cSRfNoY9dooVLcCyhMj8PbsRT2XZ9HVB1UoLCjN8zaBrOFqgTunA12Q0xO8v2+ESQmr20h14Df5JAXlTpVMg==
+ service-type ssh terminal
+ authorization-attribute user-role network-admin
+#
+ netconf ssh server enable
+#
+return

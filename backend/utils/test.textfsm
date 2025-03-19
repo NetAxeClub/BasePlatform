@@ -1,0 +1,13 @@
+Value Required index (\d+)
+Value address (\d+.\d+.\d+.\d+)
+Value mask (\d+.\d+.\d+.\d+)
+Value Filldown addressSet (\S+)
+
+
+Start
+  ^ip\saddress-set\s${addressSet} -> ADDSET
+
+
+ADDSET
+  ^\saddress\s${index}\s${address}\smask\s${mask} -> Continue.Record
+  ^# -> Start
