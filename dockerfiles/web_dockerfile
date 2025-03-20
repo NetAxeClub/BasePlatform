@@ -1,4 +1,4 @@
-FROM node:16.20.0 as build-stage
+FROM artifacts.iflytek.com/docker-private/netops/node:16.13.1 as build-stage
 WORKDIR /app
 COPY web/ .
 RUN npm config set strict-ssl false
@@ -9,7 +9,7 @@ RUN npm run initproject -- --stage=base-platform --del=true
 RUN npm run build
 
 # production stage
-FROM nginx:1.23.1 as production-stage
+FROM artifacts.iflytek.com/docker-private/netops/nginx:stable-alpine3.17-slim as production-stage
 COPY nginx/web_nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build-stage /app/dist /app
 EXPOSE 80
