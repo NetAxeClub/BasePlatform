@@ -33,7 +33,7 @@ from confload.confload import config
 from apps.asset.models import NetworkDevice
 from apps.asset.serializers import NetworkDeviceSerializer
 from apps.automation.models import CollectionRule, CollectionMatchRule
-# from apps.int_utilization.models import InterfaceUsed
+from apps.int_utilization.models import InterfaceUsed
 from apps.automation.tools.h3c import H3cProc
 from apps.automation.tools.hillstone import HillstoneProc
 from apps.automation.tools.huawei import HuaweiProc
@@ -315,7 +315,11 @@ def interface_used(device_ip=None):
                 logger.info('落库data:{}'.format(post_data))
                 try:
                     interface_used_mongo.insert(post_data)
-                    # InterfaceUsed.objects.create(**post_data)
+                    interface_q = InterfaceUsed.objects.filter(host=post_data['host'])
+                    if interface_q:
+                        InterfaceUsed.objects.filter(host=post_data['host']).update(**post_data)
+                    else:
+                        InterfaceUsed.objects.create(**post_data)
                     cache.set("interface_used_" + str(post_data['host_id']),
                               json.dumps(post_data, cls=JsonEncoder), 3600 * 5)
                 except Exception as e:
