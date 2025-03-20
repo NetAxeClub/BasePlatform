@@ -6,7 +6,8 @@ import time
 from datetime import date, datetime
 import django_filters
 from django.core.cache import cache
-from django.db.models import Count
+from django.db.models import Count, Case, When, Value, IntegerField
+from django.db.models.expressions import RawSQL
 from django.http import JsonResponse, FileResponse, Http404, HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.permissions import AllowAny
@@ -290,9 +291,26 @@ class IdcViewSet(CustomViewBase):
         # 获取所有IDC及其关联的IDC模型和机架（只查询必要字段）
         idc_queryset = Idc.objects.prefetch_related(
             Prefetch('idcmodel_set',
-                     queryset=IdcModel.objects.only('name', 'id', 'idc').prefetch_related(
+                     queryset=IdcModel.objects.annotate(
+                         # 提取字符串中的第一个数字
+                         first_number=RawSQL("""
+                             CASE 
+                                 WHEN name REGEXP '^[0-9]' THEN CAST(SUBSTRING_INDEX(name, ' ', 1) AS SIGNED)
+                                 ELSE NULL 
+                             END
+                         """, []),
+                         # 判断name是否以数字开头
+                         starts_with_digit=RawSQL("name REGEXP '^[0-9]'", [])
+                     ).annotate(
+                         order_key=Case(
+                             When(starts_with_digit=True, then='first_number'),
+                             default=Value(999999),  # 使用一个较大的默认值确保非数字开头的排在后面
+                             output_field=IntegerField(),
+                         )
+                     ).only("name", "id", "idc").order_by('order_key', 'name').prefetch_related(
                          Prefetch('rack_set', queryset=Rack.objects.only('name', 'id', 'idc_model').order_by('name'))
-                     ).order_by('name'))
+                     )
+                     )
         ).only('name', 'id').order_by('name')
 
         # Create base structure with "全部" node
