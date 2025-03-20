@@ -106,17 +106,22 @@ class WebSSHConsumer(MySSH):
                 self.close()
                 return
         _CryptPwd = CryptPwd()
-        self.account = AssetAccount.objects.filter(
-            networkdevice=self.server, networkdevice__account__protocol='ssh'
-        ).values(
-            "networkdevice__account__username",
-            "networkdevice__account__password",
-            "networkdevice__account__protocol",
-            "networkdevice__account__port",
-        ).first()
-        self.port = self.account['networkdevice__account__port']
-        self.username = self.account['networkdevice__account__username']
-        self.password = _CryptPwd.decrypt_pwd(self.account['networkdevice__account__password'])
+        if self.server.ssh_enable == 'account' and self.server.ssh_manage == 'ssh':
+            self.username = self.server.ssh_account.username
+            self.password = _CryptPwd.decrypt_pwd(self.server.ssh_account.password)
+            self.port = self.server.ssh_port
+        else:
+            self.account = AssetAccount.objects.filter(
+                networkdevice=self.server, networkdevice__account__protocol='ssh'
+            ).values(
+                "networkdevice__account__username",
+                "networkdevice__account__password",
+                "networkdevice__account__protocol",
+                "networkdevice__account__port",
+            ).first()
+            self.port = self.account['networkdevice__account__port']
+            self.username = self.account['networkdevice__account__username']
+            self.password = _CryptPwd.decrypt_pwd(self.account['networkdevice__account__password'])
 
         try:
             # self.ssh.load_system_host_keys()
