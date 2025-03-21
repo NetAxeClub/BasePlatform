@@ -313,7 +313,12 @@ def interface_used(device_ip=None):
                     post_data['host_type'] = ''.join([x['type'] for x in new_port_speed if x['sum'] == max_port])
                 logger.info('落库data:{}'.format(post_data))
                 try:
-                    InterfaceUsed.objects.create(**post_data)
+                    # interface_used_mongo.insert(post_data)
+                    interface_q = InterfaceUsed.objects.filter(host=post_data['host'])
+                    if interface_q:
+                        InterfaceUsed.objects.filter(host=post_data['host']).update(**post_data)
+                    else:
+                        InterfaceUsed.objects.create(**post_data)
                     cache.set("interface_used_" + str(post_data['host_id']),
                               json.dumps(post_data, cls=JsonEncoder), 3600 * 5)
                 except Exception as e:
@@ -489,6 +494,7 @@ def interface_used(device_ip=None):
                             host_final_res['int_unused'] += 1
             data_to_table(**host_final_res)
             # print(host_final_res)
+
     # #send_msg_netops"完成{}个IP地址对应网络设备的接口利用率更新".format(str(len(hosts))))
     return
 
