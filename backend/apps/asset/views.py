@@ -590,7 +590,7 @@ class NetworkDeviceViewSet(CustomViewBase):
         expires = self.request.query_params.get('expires', None)
         history = self.request.query_params.get('history', None)
         firewall = self.request.query_params.get('firewall', None)
-
+        gateway_search = self.request.query_params.get('gateway_search', None)
         search_host_list = self.request.query_params.get('search_host_list', None)
         if firewall:
             return self.queryset.filter(auto_enable=True, category__name="防火墙", status=0,
@@ -600,6 +600,15 @@ class NetworkDeviceViewSet(CustomViewBase):
                 return self.queryset.filter(manage_ip__in=search_host_list.split('-'))
             else:
                 return self.queryset.filter(manage_ip__in=[search_host_list])
+        elif gateway_search:
+            pattern = re.compile(r'((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})(\.((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2}|.)){3}')
+            if pattern.search(gateway_search):
+                if gateway_search.find('*') >= 0:
+                    tmp = show_ip_mongo.find_re({'ipaddress': re.compile(gateway_search.strip('*'))}, fields={'_id': 0})
+                else:
+                    tmp = show_ip_mongo.find(query_dict={'ipaddress': gateway_search.strip()}, fields={'_id': 0})
+                if tmp:
+                    return self.queryset.filter(manage_ip__in=list(set([x['hostip'] for x in tmp])))
             # return self.queryset.filter(manage_ip__in=search_host_list)
         elif history:
             return self.queryset.history.all().order_by('-id')
