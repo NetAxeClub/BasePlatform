@@ -363,6 +363,19 @@ def interface_used(device_ip=None):
                 continue
             elif i['interface'].startswith('AggregatePort'):
                 continue
+            elif i['interface'].startswith('Eth-Trunk'):
+                continue
+            # Virtual-if0 NULL  vlan  mgmt_eth  null  smartgroup
+            elif i['interface'].startswith('Virtual-if'):
+                continue
+            elif i['interface'].startswith('NULL'):
+                continue
+            elif i['interface'].startswith('vlan'):
+                continue
+            elif i['interface'].startswith('null'):
+                continue
+            elif i['interface'].startswith('smartgroup'):
+                continue
             _tmp_slot = i['interface'].split('/')[0]
             mongo_res_slot.append(int(_tmp_slot[-1]))
         mongo_res_slot = list(set(mongo_res_slot))
@@ -476,7 +489,6 @@ def interface_used(device_ip=None):
                             host_final_res['int_unused'] += 1
             data_to_table(**host_final_res)
             # print(host_final_res)
-
     # #send_msg_netops"完成{}个IP地址对应网络设备的接口利用率更新".format(str(len(hosts))))
     return
 
