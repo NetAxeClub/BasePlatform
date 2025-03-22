@@ -64,6 +64,10 @@ class IamMiddleware(MiddlewareMixin):
         if request.path.startswith('/base_platform/automation/address_location'):
             """允许寻觅后台操作"""
             return
+        api_key = request.headers.get('x-api-key', None)
+        if api_key is not None:
+            if api_key == config.api_key:
+                return
         token = request.COOKIES.get('netops-token')
         # logger.info(f"cookies token: {token}")
         if token is None:

@@ -77,6 +77,7 @@ class Config:
         self.nacos_port = data['nacos_port']
         self.nacos_password = data['nacos_password']
         self.local_dev = data['local_dev']
+        self.api_key = data['api_key']
         for k, v in self.data.items():
             log.info("[Config set] key:%s, value:%s" % (k, v))
             setattr(self, k, v)
