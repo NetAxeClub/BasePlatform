@@ -189,7 +189,7 @@ class InterfaceFormat(object):
 
 
 # 接口利用率计算
-@shared_task(base=AxeTask)
+@shared_task(base=AxeTask, once={'graceful': True})
 def interface_used(device_ip=None):
     connections.close_all()
     """
