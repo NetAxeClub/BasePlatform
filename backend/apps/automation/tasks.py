@@ -333,152 +333,155 @@ def interface_used(device_ip=None):
         # 所有待分析接口利用率的网络设备
         hosts = list(set([x['hostip'] for x in host_list]))
     for host in hosts:
-        # 获取接口cmdb信息
-        host_cmdb = cmdb_mongo.find(query_dict=dict(manage_ip=host, status=0),
-                                    fields={'_id': 0, 'slot': 1, 'chassis': 1})
-        chassis_res = list(set([x['chassis'] for x in host_cmdb]))
-        slot_res = list(set([x['slot'] for x in host_cmdb]))
-        # 获取接口2层列表
-        tmp = interface_mongo.find(
-            query_dict=dict(
-                hostip=host), fields={
-                '_id': 0})
-        # 获取接口speed去重后的指标
-        speed_list = list(set([x['speed'] for x in tmp])
-                          )  # ['40G', '10G', '1G']
-        # 判断堆叠
-        mongo_res_slot = []
-        for i in tmp:
-            if i['interface'].startswith('lo'):
-                continue
-            elif i['interface'].startswith('mgmt'):
-                continue
-            elif i['interface'].startswith('AggregatePort'):
-                continue
-            elif i['interface'].startswith('Eth-Trunk'):
-                continue
-            # Virtual-if0 NULL  vlan  mgmt_eth  null  smartgroup
-            elif i['interface'].startswith('Virtual-if'):
-                continue
-            elif i['interface'].startswith('NULL'):
-                continue
-            elif i['interface'].startswith('vlan'):
-                continue
-            elif i['interface'].startswith('null'):
-                continue
-            elif i['interface'].startswith('smartgroup'):
-                continue
-            _tmp_slot = i['interface'].split('/')[0]
-            mongo_res_slot.append(int(_tmp_slot[-1]))
-        mongo_res_slot = list(set(mongo_res_slot))
-        if len(mongo_res_slot) == len(slot_res) and mongo_res_slot == slot_res:
-            logger.debug('匹配独立设备')
-            # 用于存储根据slot作为key ，接口列表作为value的 key-value结构
-            _tmp_res = dict()
-            for _slot in mongo_res_slot:
-                _tmp_res[_slot] = []
-                for i in tmp:
-                    _int_slot = i['interface'].split('/')[0]
-                    if _slot == int(_int_slot[-1]):
-                        _tmp_res[_slot].append(i)
-            for k_slot, v in _tmp_res.items():
-                host_final_res = dict()
-                host_final_res['int_total'] = 0
-                host_final_res['int_used'] = 0
-                host_final_res['int_unused'] = 0
-                for key in speed_list:
-                    if not key:
-                        continue
-                    if key == '1000m' or key == '1000M':
-                        key = '1G'
-                    elif key == '10000m' or key == '10000M':
-                        key = '10G'
-                    host_final_res['int_used_' + key] = 0
-                    host_final_res['int_unused_' + key] = 0
-                    for i in v:
-                        if i['status'] == 'up' or i['status'] == 'UP':
-                            if i['speed'] == key:
-                                host_final_res['int_total'] += 1  # 接口总数
-                                host_final_res['int_used_' + key] += 1  # 速率使用
-                                host_final_res['int_used'] += 1  # 总使用
-                        elif i['status'] == 'down' or i['status'] == 'DOWN':
-                            if i['speed'] == key:
-                                host_final_res['int_total'] += 1
-                                host_final_res['int_unused_' + key] += 1
-                                host_final_res['int_unused'] += 1
-                host_final_res['hostip'] = host
-                host_final_res['slot'] = k_slot
-                data_to_table(**host_final_res)
-                # interface_res_mongo.insert(host_final_res)
-        elif len(mongo_res_slot) == len(chassis_res) and mongo_res_slot == chassis_res:
-            logger.debug('匹配框式')
-            # 用于存储根据slot作为key ，接口列表作为value的 key-value结构
-            _tmp_res = dict()
-            for _slot in mongo_res_slot:
-                _tmp_res[_slot] = []
-                for i in tmp:
-                    _int_slot = i['interface'].split('/')[0]
-                    if _slot == int(_int_slot[-1]):
-                        _tmp_res[_slot].append(i)
-            for k_slot, v in _tmp_res.items():
-                host_final_res = dict()
-                host_final_res['int_total'] = 0
-                host_final_res['int_used'] = 0
-                host_final_res['int_unused'] = 0
-                for key in speed_list:
-                    if not key:
-                        continue
-                    if key == '1000m' or key == '1000M':
-                        key = '1G'
-                    elif key == '10000m' or key == '10000M':
-                        key = '10G'
-                    host_final_res['int_used_' + key] = 0
-                    host_final_res['int_unused_' + key] = 0
-                    for i in v:
-                        if i['status'] == 'up' or i['status'] == 'UP':
-                            if i['speed'] == key:
-                                host_final_res['int_total'] += 1  # 接口总数
-                                host_final_res['int_used_' + key] += 1  # 速率使用
-                                host_final_res['int_used'] += 1  # 总使用
-                        elif i['status'] == 'down' or i['status'] == 'DOWN':
-                            if i['speed'] == key:
-                                host_final_res['int_total'] += 1
-                                host_final_res['int_unused_' + key] += 1
-                                host_final_res['int_unused'] += 1
-                host_final_res['hostip'] = host
-                host_final_res['chassis'] = k_slot
-                data_to_table(**host_final_res)
-                # interface_res_mongo.insert(host_final_res)
-        else:
-            logger.info('slot不匹配')
-            host_final_res = dict()
-            host_final_res['hostip'] = host
-            host_final_res['int_total'] = 0
-            host_final_res['int_used'] = 0
-            host_final_res['int_unused'] = 0
-            for key in speed_list:
-                if not key:
+        print(host)
+        try:
+            # 获取接口cmdb信息
+            host_cmdb = cmdb_mongo.find(query_dict=dict(manage_ip=host, status=0),
+                                        fields={'_id': 0, 'slot': 1, 'chassis': 1})
+            chassis_res = list(set([x['chassis'] for x in host_cmdb]))
+            slot_res = list(set([x['slot'] for x in host_cmdb]))
+            # 获取接口2层列表
+            tmp = interface_mongo.find(
+                query_dict=dict(
+                    hostip=host), fields={
+                    '_id': 0})
+            # 获取接口speed去重后的指标
+            speed_list = list(set([x['speed'] for x in tmp])
+                              )  # ['40G', '10G', '1G']
+            # 判断堆叠
+            mongo_res_slot = []
+            for i in tmp:
+                if i['interface'].startswith('lo'):
                     continue
-                if key == '1000m' or key == '1000M':
-                    key = '1G'
-                elif key == '10000m' or key == '10000M':
-                    key = '10G'
-                host_final_res['int_used_' + key] = 0
-                host_final_res['int_unused_' + key] = 0
-                for i in tmp:
-                    if i['status'] == 'up' or i['status'] == 'UP':
-                        if i['speed'] == key:
-                            host_final_res['int_total'] += 1  # 接口总数
-                            host_final_res['int_used_' + key] += 1  # 速率使用
-                            host_final_res['int_used'] += 1  # 总使用
-                    elif i['status'] == 'down' or i['status'] == 'DOWN' or i['status'] == 'Administratively DOWN':
-                        if i['speed'] == key:
-                            host_final_res['int_total'] += 1
-                            host_final_res['int_unused_' + key] += 1
-                            host_final_res['int_unused'] += 1
-            data_to_table(**host_final_res)
-            # print(host_final_res)
-
+                elif i['interface'].startswith('mgmt'):
+                    continue
+                elif i['interface'].startswith('AggregatePort'):
+                    continue
+                elif i['interface'].startswith('Eth-Trunk'):
+                    continue
+                # Virtual-if0 NULL  vlan  mgmt_eth  null  smartgroup
+                elif i['interface'].startswith('Virtual-if'):
+                    continue
+                elif i['interface'].startswith('NULL'):
+                    continue
+                elif i['interface'].startswith('vlan'):
+                    continue
+                elif i['interface'].startswith('null'):
+                    continue
+                elif i['interface'].startswith('smartgroup'):
+                    continue
+                _tmp_slot = i['interface'].split('/')[0]
+                mongo_res_slot.append(int(_tmp_slot[-1]))
+            mongo_res_slot = list(set(mongo_res_slot))
+            if len(mongo_res_slot) == len(slot_res) and mongo_res_slot == slot_res:
+                logger.debug('匹配独立设备')
+                # 用于存储根据slot作为key ，接口列表作为value的 key-value结构
+                _tmp_res = dict()
+                for _slot in mongo_res_slot:
+                    _tmp_res[_slot] = []
+                    for i in tmp:
+                        _int_slot = i['interface'].split('/')[0]
+                        if _slot == int(_int_slot[-1]):
+                            _tmp_res[_slot].append(i)
+                for k_slot, v in _tmp_res.items():
+                    host_final_res = dict()
+                    host_final_res['int_total'] = 0
+                    host_final_res['int_used'] = 0
+                    host_final_res['int_unused'] = 0
+                    for key in speed_list:
+                        if not key:
+                            continue
+                        if key == '1000m' or key == '1000M':
+                            key = '1G'
+                        elif key == '10000m' or key == '10000M':
+                            key = '10G'
+                        host_final_res['int_used_' + key] = 0
+                        host_final_res['int_unused_' + key] = 0
+                        for i in v:
+                            if i['status'] == 'up' or i['status'] == 'UP':
+                                if i['speed'] == key:
+                                    host_final_res['int_total'] += 1  # 接口总数
+                                    host_final_res['int_used_' + key] += 1  # 速率使用
+                                    host_final_res['int_used'] += 1  # 总使用
+                            elif i['status'] == 'down' or i['status'] == 'DOWN':
+                                if i['speed'] == key:
+                                    host_final_res['int_total'] += 1
+                                    host_final_res['int_unused_' + key] += 1
+                                    host_final_res['int_unused'] += 1
+                    host_final_res['hostip'] = host
+                    host_final_res['slot'] = k_slot
+                    data_to_table(**host_final_res)
+                    # interface_res_mongo.insert(host_final_res)
+            elif len(mongo_res_slot) == len(chassis_res) and mongo_res_slot == chassis_res:
+                logger.debug('匹配框式')
+                # 用于存储根据slot作为key ，接口列表作为value的 key-value结构
+                _tmp_res = dict()
+                for _slot in mongo_res_slot:
+                    _tmp_res[_slot] = []
+                    for i in tmp:
+                        _int_slot = i['interface'].split('/')[0]
+                        if _slot == int(_int_slot[-1]):
+                            _tmp_res[_slot].append(i)
+                for k_slot, v in _tmp_res.items():
+                    host_final_res = dict()
+                    host_final_res['int_total'] = 0
+                    host_final_res['int_used'] = 0
+                    host_final_res['int_unused'] = 0
+                    for key in speed_list:
+                        if not key:
+                            continue
+                        if key == '1000m' or key == '1000M':
+                            key = '1G'
+                        elif key == '10000m' or key == '10000M':
+                            key = '10G'
+                        host_final_res['int_used_' + key] = 0
+                        host_final_res['int_unused_' + key] = 0
+                        for i in v:
+                            if i['status'] == 'up' or i['status'] == 'UP':
+                                if i['speed'] == key:
+                                    host_final_res['int_total'] += 1  # 接口总数
+                                    host_final_res['int_used_' + key] += 1  # 速率使用
+                                    host_final_res['int_used'] += 1  # 总使用
+                            elif i['status'] == 'down' or i['status'] == 'DOWN':
+                                if i['speed'] == key:
+                                    host_final_res['int_total'] += 1
+                                    host_final_res['int_unused_' + key] += 1
+                                    host_final_res['int_unused'] += 1
+                    host_final_res['hostip'] = host
+                    host_final_res['chassis'] = k_slot
+                    data_to_table(**host_final_res)
+                    # interface_res_mongo.insert(host_final_res)
+            else:
+                logger.info('slot不匹配')
+                host_final_res = dict()
+                host_final_res['hostip'] = host
+                host_final_res['int_total'] = 0
+                host_final_res['int_used'] = 0
+                host_final_res['int_unused'] = 0
+                for key in speed_list:
+                    if not key:
+                        continue
+                    if key == '1000m' or key == '1000M':
+                        key = '1G'
+                    elif key == '10000m' or key == '10000M':
+                        key = '10G'
+                    host_final_res['int_used_' + key] = 0
+                    host_final_res['int_unused_' + key] = 0
+                    for i in tmp:
+                        if i['status'] == 'up' or i['status'] == 'UP':
+                            if i['speed'] == key:
+                                host_final_res['int_total'] += 1  # 接口总数
+                                host_final_res['int_used_' + key] += 1  # 速率使用
+                                host_final_res['int_used'] += 1  # 总使用
+                        elif i['status'] == 'down' or i['status'] == 'DOWN' or i['status'] == 'Administratively DOWN':
+                            if i['speed'] == key:
+                                host_final_res['int_total'] += 1
+                                host_final_res['int_unused_' + key] += 1
+                                host_final_res['int_unused'] += 1
+                data_to_table(**host_final_res)
+                # print(host_final_res)
+        except Exception as e:
+            logger.error(e)
     # #send_msg_netops"完成{}个IP地址对应网络设备的接口利用率更新".format(str(len(hosts))))
     return
 
