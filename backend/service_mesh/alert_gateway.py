@@ -112,19 +112,39 @@ class AlertRunner:
                 return res.json()
         return {}
 
-    def get_task(self, task_id):
-        self.server = config.service_dicovery('msg_gateway')
+    def get_group_user_list(self, group_name):
+        self.server = config.service_dicovery('alert_gateway')
         self.server_hosts = self.server['hosts']
         self.metadata = self.server_hosts[0]['metadata']
         for _server in self.server_hosts:
-            url = "http://{}:{}/msg_gateway/task/{}".format(_server['ip'], _server['port'], task_id)
+            url = "http://{}:{}/alert_gateway/system/group/".format(_server['ip'], _server['port'])
+            params = {
+                'query': json.dumps({'name': group_name}),
+                'page': 1,
+                'page_size': 1000
+            }
             headers = {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'x-api-key': config.alert_gateway_api
             }
 
-            res = requests.request("GET", url, headers=headers)
+            res = requests.request("GET", url, headers=headers, params=params)
             if res.status_code == 200:
-                return res.json()
+                group_id = res.json()['data'][0]['id']
+                user_url = "http://{}:{}/alert_gateway/system/user/".format(_server['ip'], _server['port'])
+                user_params = {
+                    'query': json.dumps({'group_id': group_id}),
+                    'page': 1,
+                    'page_size': 1000
+                }
+                user_headers = {
+                    'Content-Type': 'application/json',
+                    'x-api-key': config.alert_gateway_api
+                }
+                res = requests.request("GET", user_url, headers=user_headers, params=user_params)
+                if res.status_code == 200:
+                    return res.json()['data']
+                return {}
         return {}
 
     # @run_time_sync
