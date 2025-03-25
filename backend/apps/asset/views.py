@@ -24,9 +24,7 @@ from apps.asset.serializers import IdcSerializer, AssetAccountSerializer, AssetV
     CategorySerializer, ModelSerializer, AttributeSerializer, FrameworkSerializer, NetworkDeviceSerializer, \
     IdcModelSerializer, NetZoneSerializer, CmdbRackSerializer, AdminRecordSerializer, ServerSerializer, \
     ServerModelSerializer, ContainerServiceSerializer, ServerVendorSerializer, AssetIpInfoSerializer
-from utils.cmdb_import import search_cmdb_vendor_id, search_cmdb_idc_id, search_cmdb_netzone_id, search_cmdb_role_id, \
-    search_cmdb_idc_model_id, search_cmdb_cabinet_id, search_cmdb_category_id, search_cmdb_attribute_id, \
-    search_cmdb_framework_id, returndate, csv_device_staus, pandas_read_file, old_import_parse
+from utils.cmdb_import import pandas_read_file, old_import_parse, new_import_parse
 from utils.db.mongo_ops import MongoNetOps, MongoOps
 from openpyxl.utils import get_column_letter
 from rest_framework.decorators import action
@@ -60,6 +58,39 @@ class ResourceManageExcelView(APIView):
     # permission_classes = ()
     authentication_classes = ()
 
+    # def post(self, request):
+    #     file = request.FILES.get('file')
+    #     # 获取文件位置
+    #     filename = os.path.join(MEDIA_ROOT, 'upload', file.name)
+    #     if not os.path.exists(os.path.dirname(filename)):
+    #         os.makedirs(os.path.dirname(filename))
+    #     with open(filename, 'wb') as f:
+    #         for chunk in file.chunks():
+    #             f.write(chunk)
+    #     # pandas文件内容解析
+    #     import_content_df = pandas_read_file(filename)
+    #     # print(import_content_df)
+    #     import_list = []
+    #     for i in import_content_df.values:
+    #         import_list.append(i.tolist())
+    #
+    #     import_success_list, import_exists_list, import_fail_list, detail = old_import_parse(import_list)
+    #     # print(import_success_list, import_exists_list, import_fail_list)
+    #     try:
+    #         if len(import_success_list) == len(import_list):
+    #             return JsonResponse({'code': 200, 'msg': '全部导入成功！'})
+    #         if import_exists_list:
+    #             return JsonResponse({'code': 400, 'msg': '导入失败！当前导入SN设备已存在,请校验导入数据'})
+    #         if import_fail_list:
+    #             error_msg = ''.join([i[0] + i['import_fail_reason'] for i in import_fail_list])
+    #             return JsonResponse({'code': 400, 'msg': '导入失败！请校验导入数据' + error_msg})
+    #         if detail == 'success':
+    #             return JsonResponse({'code': 200, 'msg': '导入成功！' + str(detail)})
+    #         else:
+    #             return JsonResponse({'code': 400, 'msg': '导入失败！' + str(detail)})
+    #     except Exception as e:
+    #         return JsonResponse({'code': 500, 'msg': '导入失败！{}'.format(e)})
+
     def post(self, request):
         file = request.FILES.get('file')
         # 获取文件位置
@@ -69,36 +100,30 @@ class ResourceManageExcelView(APIView):
         with open(filename, 'wb') as f:
             for chunk in file.chunks():
                 f.write(chunk)
+
         # pandas文件内容解析
         import_content_df = pandas_read_file(filename)
-        # print(import_content_df)
         import_list = []
         for i in import_content_df.values:
             import_list.append(i.tolist())
 
-        import_success_list, import_exists_list, import_fail_list, detail = old_import_parse(import_list)
-        # print(import_success_list, import_exists_list, import_fail_list)
-        try:
-            if len(import_success_list) == len(import_list):
-                return JsonResponse({'code': 200, 'msg': '全部导入成功！'})
-            if import_exists_list:
-                return JsonResponse({'code': 400, 'msg': '导入失败！当前导入SN设备已存在,请校验导入数据'})
-            if import_fail_list:
-                error_msg = ''.join([i[0] + i['import_fail_reason'] for i in import_fail_list])
-                return JsonResponse({'code': 400, 'msg': '导入失败！请校验导入数据' + error_msg})
-            if detail == 'success':
-                return JsonResponse({'code': 200, 'msg': '导入成功！' + str(detail)})
-            else:
-                return JsonResponse({'code': 400, 'msg': '导入失败！' + str(detail)})
-        except Exception as e:
-            return JsonResponse({'code': 500, 'msg': '导入失败！{}'.format(e)})
+        import_success_list, import_exists_list, import_fail_list, detail = new_import_parse(import_list)
+        
+        if detail == "success":
+            return JsonResponse({'code': 200, 'msg': '导入成功！', 
+                                 'data': {'import_success_list': import_success_list,
+                                          'import_exists_list': import_exists_list,
+                                          'import_fail_list': import_fail_list}})
+        else:
+            return JsonResponse({'code': 500, 'msg': '导入失败！{}'.format(detail)})
 
     def get(self, request):
         try:
-            file_path = os.path.join(MEDIA_ROOT, 'cmdbExcelTemplate/import-demo.xlsx')
+            file_name = "ImportNetworkTemplate.xlsx"
+            file_path = os.path.join(MEDIA_ROOT, f'cmdbExcelTemplate/{file_name}')
             response = FileResponse((open(file_path, 'rb')))
             response['Content-Type'] = 'application/octet-stream'
-            response['Content-Disposition'] = 'attachment;filename="import-demo.xlsx"'
+            response['Content-Disposition'] = f'attachment;filename="{file_name}"'
             response["Access-Control-Allow-Methods"] = "*"
             response["Access-Control-Allow-Credentials"] = True
             response['Access-Control-Allow-Headers'] = "Authorization"

@@ -3,6 +3,7 @@ import os
 from datetime import date, datetime
 from apps.asset.models import *
 import pandas as pd
+from django.db import transaction
 from utils.netops_api import netOpsApi
 
 
@@ -328,6 +329,94 @@ def old_import_parse(import_list):
     except Exception as e:
         print(e)
         return import_success_list, import_exists_list, import_fail_list, e
+
+
+def new_import_parse(import_list):
+    data_list = import_list
+    new_lst = []
+    import_fail_list = []
+    import_success_list = []
+    import_exists_list = []
+    
+    # 预收集所有序列号用于批量检查
+    all_serials = [str(item[0]).strip() for item in data_list if len(item) > 0]
+    existing_serials = set(NetworkDevice.objects.filter(serial_num__in=all_serials).values_list('serial_num', flat=True))
+
+    try:
+        with transaction.atomic():
+            devices_to_create = []
+            for index, data in enumerate(data_list):
+                if not data or len(data) < 15 or data in new_lst or type(data[1]) != str:
+                    continue
+                
+                print('----------------------', data[1].strip())
+                new_lst.append(data)
+                # SN1107500140038130	172.16.75.253	深信服	万兆接入	公网区域	生产网络	三层	合肥B3	4-3号	J05	11-11	2025-03-24	在线	路由器	教育公共综合业务防火墙
+                # 判断厂商是否存在，如 F5 Mellanox  华三  华为  山石网科  思科  成都数维  深信服  盛科  科来 锐捷
+                manege_ip = str(data[1]).strip()
+                cmdb_vendor_id = search_cmdb_vendor_id(data[2])
+                cmdb_role_id = search_cmdb_role_id(data[3])
+                cmdb_netzone_id = search_cmdb_netzone_id(data[4])
+                cmdb_attribute_id = search_cmdb_attribute_id(data[5])
+                cmdb_framework_id = search_cmdb_framework_id(data[6])
+                cmdb_idc_id = search_cmdb_idc_id(data[7])
+                cmdb_idc_model_id = search_cmdb_idc_model_id(data[8], cmdb_idc_id)
+                cmdb_cabinet_id = search_cmdb_cabinet_id(data[9], cmdb_idc_model_id)
+                
+                u_location = data[10].split('-')
+                u_location_start = u_location[0]
+                u_location_end = u_location[1] if len(u_location) > 1 else ''
+
+                status = csv_device_staus(data[12])
+                cmdb_category_id = search_cmdb_category_id(data[13])
+                memo = str(data[14]).strip()
+
+                networkdevices = {
+                    'serial_num': data[0],
+                    'manage_ip': manege_ip,
+                    'name': manege_ip,  # 系统名称必须有。用管理IP代替
+                    'vendor': Vendor.objects.filter(id=cmdb_vendor_id).first() if cmdb_vendor_id else None,
+                    'idc': Idc.objects.filter(id=cmdb_idc_id).first() if cmdb_idc_id else None,
+                    'category': Category.objects.filter(id=cmdb_category_id).first() if cmdb_category_id else None,
+                    # 'model': Model.objects.filter(id=cmdb_model_id).first() if cmdb_model_id else None,
+                    'role': Role.objects.filter(id=cmdb_role_id).first() if cmdb_role_id else None,
+                    "attribute": Attribute.objects.filter(id=cmdb_attribute_id).first() if cmdb_attribute_id else None,
+                    "framework": Framework.objects.filter(id=cmdb_framework_id).first() if cmdb_framework_id else None,
+                    'zone': NetZone.objects.filter(id=cmdb_netzone_id).first() if cmdb_netzone_id else None,
+                    'rack': Rack.objects.filter(id=cmdb_cabinet_id).first() if cmdb_cabinet_id else None,
+                    'idc_model': IdcModel.objects.filter(id=cmdb_idc_model_id).first() if cmdb_idc_model_id else None,
+                    'u_location_start': int(u_location_start),  # U位
+                    'u_location_end': int(u_location_end),  # U位
+                    'uptime': datetime.now().strftime('%Y-%m-%d'),  # 上线时间必须要，默认当前日期
+                    'expire': '2099-01-01',  # 维保时间必须有，默认3年
+                    'memo': memo,  # memo为备注信息
+                    'status': status,
+                    'auto_enable': True,
+                    'is_monitor': True
+                }
+                serial_num = str(data[0]).strip()
+                if serial_num in existing_serials:
+                    import_exists_list.append(data)
+                    continue
+                
+                try:
+                    # 构造设备对象但不立即保存
+                    device = NetworkDevice(**networkdevices)
+                    devices_to_create.append(device)
+                    import_success_list.append(data)
+                except Exception as e:
+                    print(f"数据校验失败: {e}")
+                    import_fail_list.append({'data': data, 'reason': str(e)})
+            
+            # 批量创建所有有效设备
+            if devices_to_create:
+                NetworkDevice.objects.bulk_create(devices_to_create, batch_size=100)
+        
+        return import_success_list, import_exists_list, import_fail_list, 'success'
+    except Exception as e:
+        print(f"事务执行失败: {e}")
+        # 回滚事务后返回所有失败记录
+        return [], import_exists_list, [{'data': d, 'reason': str(e)} for d in import_success_list + import_fail_list], str(e)
 
 
 def pandas_read_file(filename, **kwargs):
