@@ -33,7 +33,7 @@ from confload.confload import config
 from apps.asset.models import NetworkDevice
 from apps.asset.serializers import NetworkDeviceSerializer
 from apps.automation.models import CollectionRule, CollectionMatchRule
-# from apps.int_utilization.models import InterfaceUsed
+from apps.int_utilization.models import InterfaceUsed
 from apps.automation.tools.h3c import H3cProc
 from apps.automation.tools.hillstone import HillstoneProc
 from apps.automation.tools.huawei import HuaweiProc
@@ -189,7 +189,7 @@ class InterfaceFormat(object):
 
 
 # 接口利用率计算
-@shared_task(base=AxeTask)
+@shared_task(base=AxeTask, once={'graceful': True})
 def interface_used(device_ip=None):
     connections.close_all()
     """
@@ -197,8 +197,6 @@ def interface_used(device_ip=None):
     :return:
     """
     # 接口利用率落库mongo
-    interface_log_mongo = MongoOps(db='logs', coll='interface_used_log')
-    interface_log_mongo.delete_many()
     data_time = datetime.now()
 
     def data_to_table(**data: any) -> None:
@@ -314,24 +312,17 @@ def interface_used(device_ip=None):
                     post_data['host_type'] = ''.join([x['type'] for x in new_port_speed if x['sum'] == max_port])
                 logger.info('落库data:{}'.format(post_data))
                 try:
-                    interface_used_mongo.insert(post_data)
-                    # InterfaceUsed.objects.create(**post_data)
+                    interface_q = InterfaceUsed.objects.filter(host=post_data['host'])
+                    if interface_q:
+                        InterfaceUsed.objects.filter(host=post_data['host']).update(**post_data)
+                    else:
+                        InterfaceUsed.objects.create(**post_data)
                     cache.set("interface_used_" + str(post_data['host_id']),
                               json.dumps(post_data, cls=JsonEncoder), 3600 * 5)
                 except Exception as e:
-                    interface_log_mongo.insert(
-                        dict(
-                            hostip=hostip,
-                            msg=str(e),
-                            post_data=post_data))
+                    logger.error(e)
         except Exception as e:
-            # print(e)
-            # print(traceback.print_exc())
-            interface_log_mongo.insert(
-                dict(
-                    hostip=hostip,
-                    msg='get数据错误未得到唯一对象' +
-                        str(e)))
+            logger.error(e)
         return
 
     # 单独调试使用
@@ -365,12 +356,24 @@ def interface_used(device_ip=None):
                 continue
             elif i['interface'].startswith('AggregatePort'):
                 continue
+            elif i['interface'].startswith('Eth-Trunk'):
+                continue
+            # Virtual-if0 NULL  vlan  mgmt_eth  null  smartgroup
+            elif i['interface'].startswith('Virtual-if'):
+                continue
+            elif i['interface'].startswith('NULL'):
+                continue
+            elif i['interface'].startswith('vlan'):
+                continue
+            elif i['interface'].startswith('null'):
+                continue
+            elif i['interface'].startswith('smartgroup'):
+                continue
             _tmp_slot = i['interface'].split('/')[0]
             mongo_res_slot.append(int(_tmp_slot[-1]))
         mongo_res_slot = list(set(mongo_res_slot))
-        logger.info(mongo_res_slot, slot_res)
         if len(mongo_res_slot) == len(slot_res) and mongo_res_slot == slot_res:
-            print('匹配独立设备')
+            logger.debug('匹配独立设备')
             # 用于存储根据slot作为key ，接口列表作为value的 key-value结构
             _tmp_res = dict()
             for _slot in mongo_res_slot:
@@ -404,13 +407,12 @@ def interface_used(device_ip=None):
                                 host_final_res['int_total'] += 1
                                 host_final_res['int_unused_' + key] += 1
                                 host_final_res['int_unused'] += 1
-                print(k_slot, host_final_res)
                 host_final_res['hostip'] = host
                 host_final_res['slot'] = k_slot
                 data_to_table(**host_final_res)
                 # interface_res_mongo.insert(host_final_res)
         elif len(mongo_res_slot) == len(chassis_res) and mongo_res_slot == chassis_res:
-            print('匹配框式')
+            logger.debug('匹配框式')
             # 用于存储根据slot作为key ，接口列表作为value的 key-value结构
             _tmp_res = dict()
             for _slot in mongo_res_slot:
@@ -444,13 +446,12 @@ def interface_used(device_ip=None):
                                 host_final_res['int_total'] += 1
                                 host_final_res['int_unused_' + key] += 1
                                 host_final_res['int_unused'] += 1
-                print(k_slot, host_final_res)
                 host_final_res['hostip'] = host
                 host_final_res['chassis'] = k_slot
                 data_to_table(**host_final_res)
                 # interface_res_mongo.insert(host_final_res)
         else:
-            print('slot不匹配')
+            logger.info('slot不匹配')
             host_final_res = dict()
             host_final_res['hostip'] = host
             host_final_res['int_total'] = 0

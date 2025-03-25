@@ -200,7 +200,6 @@ class BindIpField(serializers.Serializer):
 class NetworkDeviceSerializer(serializers.ModelSerializer):
     plan_name = serializers.CharField(source='plan.name', read_only=True)
     idc_name = serializers.CharField(source='idc.name', read_only=True)
-    nvwa_idc_name = serializers.CharField(source='idc.nvwa_name', read_only=True)
     vendor_name = serializers.CharField(source='vendor.name', read_only=True)
     rack_name = serializers.CharField(source='rack.name', read_only=True)
     role_name = serializers.CharField(source='role.name', read_only=True)
