@@ -24,24 +24,12 @@ log = logging.getLogger(__name__)
 DEFAULTS_FILENAME = "../config/defaults.json"
 # 实际运行配置，会覆盖缺省配置
 CONFIG_FILENAME = "../config/config.json"
-MENU_FILENAME = "../web/default_menu.json"
 NAMESPACE = "public"
 
 try:
     yaml_loader = yaml.CSafeLoader
 except AttributeError:
     yaml_loader = yaml.SafeLoader
-
-
-# 加载前端默认菜单
-def load_memu_files() -> list:
-    try:
-        with open(MENU_FILENAME) as infil:
-            return json.load(infil)
-    except FileNotFoundError:
-        log.warning(f"Couldn't find {MENU_FILENAME}")
-
-    return []
 
 
 # 加载配置文件
@@ -65,7 +53,6 @@ class Config:
     _instance = None
 
     def __init__(self):
-        self.default_menu = load_memu_files()
         data = load_config_files()
         self.__registerDict = {}
         self.__configDict = {}
