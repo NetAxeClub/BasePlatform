@@ -151,3 +151,18 @@ class ConfigComplianceResult(models.Model):
         db_table = 'config_compliance_result'  # 通过db_table自定义数据表名
         indexes = [models.Index(fields=['log_time']),
                    models.Index(fields=['manage_ip'])]
+
+
+class BackupPolicy(models.Model):
+    vendor = models.CharField(verbose_name="厂商", max_length=100, null=False, default='-', blank=True)
+    startup_command = models.CharField(verbose_name="启动配置命令", max_length=100, null=False, default='', blank=True)
+    current_command = models.CharField(verbose_name="当前配置命令", max_length=100, null=False, default='', blank=True)
+
+    def __str__(self):
+        return "{}-{}-{}".format(self.vendor, self.startup_command, self.current_command)
+
+    class Meta:
+        verbose_name_plural = '配置备份策略表'
+        verbose_name = '配置备份策略表'
+        db_table = 'config_backup_policy'  # 通过db_table自定义数据表名
+        indexes = [models.Index(fields=['vendor'])]

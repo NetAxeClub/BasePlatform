@@ -37,24 +37,6 @@ log = logging.getLogger(__name__)
 config.setup_logging(max_debug=False)
 
 
-def register_server():
-    tmp = {
-        "method": "register_server",  # 指定rbac的route 回调方法
-        "key": config.project_name,
-        "name": "基础平台",
-        "url": config.web_url
-    }
-    app_manager_sync.pubilch_task(queue='rbac', routing_key='rbac', data=json.dumps(tmp))
-
-
-def register_menu():
-    tmp = {
-        "method": "register_menu",  # 指定rbac的route 回调方法
-        "key": config.project_name,
-        "menu": config.default_menu['menu'],
-    }
-    app_manager_sync.pubilch_task(queue='rbac', routing_key='rbac', data=json.dumps(tmp))
-
 
 # 运行rpc服务器
 def run_rpc_server():
@@ -62,25 +44,25 @@ def run_rpc_server():
 
 
 # 实现work的基本方法
-def run_worker():
-    try:
-        register_server()
-        register_menu()
-        schedule.every(10).minutes.do(register_server)
-        schedule.every(6).hours.do(register_menu)
-    except Exception as e:
-        return e
+# def run_worker():
+#     try:
+#         register_server()
+#         register_menu()
+#         schedule.every(10).minutes.do(register_server)
+#         schedule.every(6).hours.do(register_menu)
+#     except Exception as e:
+#         return e
 
 
 # 开启多进程
-def worker_constructor():
-    try:
-        p = Process(target=run_worker, name="worker-{}".format(hostname))
-        p.start()
-        while True:
-            time.sleep(99999999)
-    finally:
-        sys.exit()
+# def worker_constructor():
+#     try:
+#         p = Process(target=run_worker, name="worker-{}".format(hostname))
+#         p.start()
+#         while True:
+#             time.sleep(99999999)
+#     finally:
+#         sys.exit()
 
 
 # 开启多进程
@@ -97,9 +79,9 @@ def worker_rpc():
 # 最终调用
 def main(args):
     worker_type = args[-1]
-    if worker_type == "default":
-        worker_constructor()
-    elif worker_type == "rpc":
+    # if worker_type == "default":
+    #     worker_constructor()
+    if worker_type == "rpc":
         worker_rpc()
     elif worker_type == "nacos":
         nacos_init()
