@@ -321,7 +321,7 @@ class NetworkDevice(models.Model):
 
     status_choices = ((0, '在线'), (1, '下线'), (2, '挂牌'), (3, '备用'))
     ha_choices = ((1, '主设备'), (2, '从设备'), (0, '独立设备'))
-    manage_choices = (('0', '不纳管'), ('1', '纳管'), ('account', 'account'))
+    manage_choices = (('0', '不纳管'), ('account', 'account'))
     ssh_method_choice = (('ssh', 'ssh'), ('telnet', 'telnet'))
     serial_num = models.CharField(
         verbose_name='序列号',
@@ -336,28 +336,28 @@ class NetworkDevice(models.Model):
         "Vendor",
         verbose_name='供应商',
         related_name='vendor_asset',
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True)
     idc = models.ForeignKey(
         "Idc",
         related_name='idc_asset',
         verbose_name='所属机房',
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True)
     category = models.ForeignKey(
         "Category",
         verbose_name='设备类型',
         related_name='category_asset',
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True)
     model = models.ForeignKey(
         "Model",
         verbose_name='硬件型号',
         related_name='model_asset',
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True)
     soft_version = models.CharField(
@@ -435,46 +435,13 @@ class NetworkDevice(models.Model):
     # SSH纳管
     ssh_enable = models.CharField(verbose_name="ssh是否纳管", null=False, default="0", choices=manage_choices,
                                   max_length=50)
-    ssh_manage = models.CharField(verbose_name="ssh纳管方式", null=False, default="ssh", choices=ssh_method_choice,
-                                  max_length=50)
     ssh_account = models.ForeignKey('AssetAccount', verbose_name='ssh纳管关联账户', blank=True, null=True,
                                     related_name="releate_ssh", on_delete=models.SET_NULL)
-    ssh_username = models.CharField(
-        verbose_name='SSH登录用户名',
-        max_length=50,
-        default='',
-        null=True,
-        blank=True)
-    ssh_password = models.CharField(
-        verbose_name='登录密码',
-        max_length=200,
-        default='',
-        null=True,
-        blank=True)
-    ssh_port = models.IntegerField(verbose_name='端口号', default=22)
-    ssh_en_pwd = models.CharField(
-        verbose_name='特权密码',
-        max_length=300,
-        default='', blank=True,
-        null=True)
     # NETCONF
     netconf_enable = models.CharField(verbose_name="NETCONF是否纳管", null=False, default="0", choices=manage_choices,
                                       max_length=50)
     netconf_account = models.ForeignKey('AssetAccount', verbose_name='netconf纳管关联账户', blank=True, null=True,
                                         related_name="releate_netconf", on_delete=models.SET_NULL)
-    netconf_username = models.CharField(
-        verbose_name='NETCONF登录用户名',
-        max_length=50,
-        default='',
-        null=True,
-        blank=True)
-    netconf_password = models.CharField(
-        verbose_name='登录密码',
-        max_length=200,
-        default='',
-        null=True,
-        blank=True)
-    netconf_port = models.IntegerField(verbose_name='端口号', default=830)
     is_monitor = models.BooleanField(verbose_name='是否监控', default=False, null=False)
     history = HistoricalRecords()
 
