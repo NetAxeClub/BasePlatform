@@ -12,8 +12,10 @@
 """
 from rest_framework import serializers
 
+from utils.custom.exception import SerializerValidateError
 from .models import (
-    ConfigCompliance, ConfigTemplate, TTPTemplate, ConfigBackup, ConfigComplianceResult, ConfigComplianceRule
+    ConfigCompliance, ConfigTemplate, TTPTemplate, ConfigBackup, ConfigComplianceResult, ConfigComplianceRule,
+    BackupPolicy
 )
 
 
@@ -108,3 +110,24 @@ class TTPTemplateSerializer(serializers.ModelSerializer):
     class Meta:
         model = TTPTemplate
         fields = '__all__'
+
+
+# 配置策略
+class ConfigBackupPolicySerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = BackupPolicy
+        fields = '__all__'
+
+    def validate_vendor(self, value):
+        """
+        校验 vendor 是否已存在
+        """
+        # 如果是更新操作，排除当前实例
+        if self.instance:
+            if BackupPolicy.objects.filter(vendor=value).exclude(pk=self.instance.pk).exists():
+                raise SerializerValidateError(f"Vendor '{value}' 已经存在！")
+        else:
+            if BackupPolicy.objects.filter(vendor=value).exists():
+                raise SerializerValidateError(f"Vendor '{value}' 已经存在！")
+        return value
