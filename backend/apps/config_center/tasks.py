@@ -191,7 +191,7 @@ def config_compliance(**kwargs):
 
     vendor_map = ['H3C', 'HUAWEI']
     start_datetime = (date.today() - timedelta(days=1)).strftime('%Y-%m-%d') + ' 00:00:00'
-    end_datetime = (date.today()).strftime('%Y-%m-%d') + ' 23:59:59'
+    end_datetime = date.today().strftime('%Y-%m-%d') + ' 23:59:59'
     config_files = ConfigBackup.objects.filter(last_time__range=(start_datetime, end_datetime),
                                                config_status='SUCCESS').iterator()
     for config_file in config_files:
