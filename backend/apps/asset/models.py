@@ -336,28 +336,28 @@ class NetworkDevice(models.Model):
         "Vendor",
         verbose_name='供应商',
         related_name='vendor_asset',
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True)
     idc = models.ForeignKey(
         "Idc",
         related_name='idc_asset',
         verbose_name='所属机房',
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True)
     category = models.ForeignKey(
         "Category",
         verbose_name='设备类型',
         related_name='category_asset',
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True)
     model = models.ForeignKey(
         "Model",
         verbose_name='硬件型号',
         related_name='model_asset',
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True)
     soft_version = models.CharField(
