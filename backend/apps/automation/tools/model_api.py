@@ -40,7 +40,8 @@ def get_device_info_v2(**kwargs):
             'idc_model', 'model', 'category', 'vendor', 'idc', 'plan',
             'rack').prefetch_related('bind_ip', 'account').values(
             'id', 'serial_num', 'manage_ip', 'name', 'soft_version', 'vendor__name', 'vendor__alias',
-            'category__name', 'model__name', 'plan_id',
+            'category__name', 'model__name', 'plan_id', 'ssh_enable', 'ssh_account',
+            'netconf_enable', 'netconf_account',
             'patch_version', 'soft_version', 'status', 'idc__name', 'auto_enable',
             'ha_status', 'chassis', 'slot')  # bind_ip__ipaddr
     # 获取中文标识的port、username、password表，方便处理
