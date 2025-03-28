@@ -190,10 +190,17 @@ def config_compliance(**kwargs):
         return re.compile(pattern=_regex, flags=re.M).findall(string=kwargs['data_to_parse'])
 
     vendor_map = ['H3C', 'HUAWEI']
-    start_datetime = (timezone.now().date().today() - timedelta(days=1)).strftime('%Y-%m-%d') + ' 00:00:00'
-    end_datetime = timezone.now().date().today().strftime('%Y-%m-%d') + ' 23:59:59'
-    config_files = ConfigBackup.objects.filter(last_time__range=(start_datetime, end_datetime),
-                                               config_status='SUCCESS').iterator()
+    # start_datetime = (timezone.now().date().today() - timedelta(days=1)).strftime('%Y-%m-%d') + ' 00:00:00'
+    # end_datetime = timezone.now().date().today().strftime('%Y-%m-%d') + ' 23:59:59'
+    # config_files = ConfigBackup.objects.filter(last_time__range=(start_datetime, end_datetime),
+    #                                            config_status='SUCCESS').iterator()
+
+    query_date = timezone.now().date() - timedelta(days=1)
+    config_files = ConfigBackup.objects.filter(
+        last_time__date=query_date,
+        config_status='SUCCESS'
+    ).iterator()
+
     for config_file in config_files:
         if config_file.vendor in vendor_map:
             if not default_storage.exists(config_file.file_path):
