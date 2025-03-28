@@ -20,7 +20,7 @@ from apps.config_center.git_tools.git_proc import ConfigGit
 # from apps.config_center.config_parse.config_parse import config_file_parse
 from apps.config_center.git_tools.git_proc import push_file
 # from apps.config_center.my_nornir import config_backup_nornir
-from apps.config_center.models import ConfigBackup, ConfigCompliance, ConfigComplianceResult, ConfigComplianceRule
+from apps.config_center.models import ConfigBackup, BackupPolicy, ConfigComplianceResult, ConfigComplianceRule
 from utils.db.mongo_ops import MongoOps
 
 logger = logging.getLogger('automation')
@@ -269,6 +269,7 @@ def config_compliance(**kwargs):
 def backup_device_config_sub(**kwargs):
     connections.close_all()
     today = kwargs['today']
+    policy_map = kwargs['policy_map']
     command_map = {
         'H3C': {'cmd': 'display current-configuration', 'expect_string': None, 'enable': False},
         'Huawei': {'cmd': 'display current-configuration', 'expect_string': None, 'enable': False},
@@ -338,12 +339,15 @@ def backup_device_config(**kwargs):
         hosts = get_device_info_v2()
 
     logger.info('获取所有设备信息结束')
+    p = BackupPolicy.objects.all().values()
+    policy_map = {k['vendor']: {'startup_command': k['startup_command'], 'current_command': k['current_command']} for k in p}
     # 参数初始化
     net_tower_tasks = []  # 寻觅任务id集合
     # 批量下发任务
     for host in hosts:
         # backup_device_config_sub(**host)
         host['today'] = today
+        host['policy_map'] = policy_map[host['vendor__alias']] if host['vendor__alias'] in policy_map.keys() else {}
         net_tower_tasks.append(
             backup_device_config_sub.apply_async(
                 kwargs=host,
