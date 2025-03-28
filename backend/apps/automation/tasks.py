@@ -1208,11 +1208,6 @@ def tracking_sub(*args):
 def tracking_main():
     connections.close_all()
     start_time = time.time()
-    # 重建寻觅表索引
-    try:
-        XunMiOps.xunmi_reindex()
-    except Exception as e:
-        logger.error("重建寻觅表索引失败:{}".format(str(e)))
     total_ip_mongo = MongoOps(db='Automation', coll='Total_ip_list')
     total_ip_res = total_ip_mongo.find(fields={'_id': 0})
     for ip_address in range(0, len(total_ip_res), 20):
@@ -1222,7 +1217,7 @@ def tracking_main():
         .format(len(total_ip_res))
     logger.info(send_message)
     end_time = time.time()
-    print("time :", int(end_time - start_time))
+    logger.info("time :", int(end_time - start_time))
     # #send_msg_netops'step3:' + send_message)
 
 
