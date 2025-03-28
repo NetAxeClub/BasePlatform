@@ -157,6 +157,7 @@ class BackupPolicy(models.Model):
     vendor = models.CharField(verbose_name="厂商", max_length=100, null=False, default='-', blank=True)
     startup_command = models.CharField(verbose_name="启动配置命令", max_length=100, null=False, default='', blank=True)
     current_command = models.CharField(verbose_name="当前配置命令", max_length=100, null=False, default='', blank=True)
+    remark = models.TextField(verbose_name="备注", null=False, blank=True, default='-')
 
     def __str__(self):
         return "{}-{}-{}".format(self.vendor, self.startup_command, self.current_command)
