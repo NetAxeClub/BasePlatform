@@ -77,29 +77,6 @@ def get_device_info_v2(**kwargs):
             hosts.append(dev)
         except Exception as e:
             print(e)
-        # try:
-        #     tmp_account = AssetAccount.objects.filter(networkdevice__id=dev['id']).values(
-        #         'networkdevice__account__name',
-        #         'networkdevice__account__username',
-        #         'networkdevice__account__password',
-        #         'networkdevice__account__protocol',
-        #         'networkdevice__account__port',
-        #         'networkdevice__account__en_pwd',
-        #     )
-        #     tmp_protocol = []
-        #     for _account in tmp_account:
-        #         _protocol = _account["networkdevice__account__protocol"].lower()
-        #         if _protocol in ['ssh', 'telnet', 'netconf']:
-        #             dev[_protocol] = dict()
-        #             dev[_protocol]['username'] = _account["networkdevice__account__username"]
-        #             dev[_protocol]['password'] = _CryptPwd.decrypt_pwd(_account["networkdevice__account__password"])
-        #             dev[_protocol]['port'] = _account["networkdevice__account__port"]
-        #             tmp_protocol.append(_protocol)
-        #     tmp_protocol = list(set(tmp_protocol))
-        #     dev['protocol'] = tmp_protocol
-        #     hosts.append(dev)
-        # except Exception as e:
-        #     print(e)
     result = OrderedDict()
     for item in hosts:
         result.setdefault(item['manage_ip'], {**item})
