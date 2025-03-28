@@ -93,8 +93,8 @@ class MongoOps:
     def drop_indexes(self):
         return self.coll.drop_indexes()
 
-    def rebuild_index(self, session=None, **kwargs):
-        return self.coll.reindex(session=None, **kwargs)
+    # def rebuild_index(self, session=None, **kwargs):
+    #     return self.coll.reindex(session=None, **kwargs)
 
     def drop_index(self, index_or_name, session=None, **kwargs):
         return self.coll.drop_index(index_or_name, session=session, **kwargs)
@@ -277,6 +277,12 @@ class MongoNetOps(object):
     def del_topology(name):
         topology_mongo.delete_many(query={'name': name})
         return
+
+    @staticmethod
+    def clear_arp_mac_table():
+        log_time = datetime.now() - timedelta(days=1)
+        arp_mongo.delete_many({'log_time': {'$lt': log_time}})
+        mac_mongo.delete_many({'log_time': {'$lt': log_time}})
 
     @staticmethod
     def get_topology(name):
@@ -850,7 +856,7 @@ class XunMiOps(object):
         """
         my_mongo = MongoOps(db='BasePlatform', coll='XunMi')
         # my_mongo.list_indexes()
-        my_mongo.rebuild_index()
+        # my_mongo.rebuild_index()
         # my_mongo.drop_indexes()
         # my_mongo.create_index([('log_time', pymongo.DESCENDING)])
         # my_mongo.create_index("server_ip_address")
