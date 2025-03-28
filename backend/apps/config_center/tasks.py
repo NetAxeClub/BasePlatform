@@ -190,8 +190,8 @@ def config_compliance(**kwargs):
         return re.compile(pattern=_regex, flags=re.M).findall(string=kwargs['data_to_parse'])
 
     vendor_map = ['H3C', 'HUAWEI']
-    start_datetime = (date.today() - timedelta(days=1)).strftime('%Y-%m-%d') + ' 00:00:00'
-    end_datetime = date.today().strftime('%Y-%m-%d') + ' 23:59:59'
+    start_datetime = (timezone.now().date().today() - timedelta(days=1)).strftime('%Y-%m-%d') + ' 00:00:00'
+    end_datetime = timezone.now().date().today().strftime('%Y-%m-%d') + ' 23:59:59'
     config_files = ConfigBackup.objects.filter(last_time__range=(start_datetime, end_datetime),
                                                config_status='SUCCESS').iterator()
     for config_file in config_files:
