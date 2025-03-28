@@ -1217,7 +1217,7 @@ def tracking_main():
         .format(len(total_ip_res))
     logger.info(send_message)
     end_time = time.time()
-    logger.info("time :", int(end_time - start_time))
+    logger.info("耗时{}秒".format(str(int(end_time - start_time))))
     # #send_msg_netops'step3:' + send_message)
 
 
