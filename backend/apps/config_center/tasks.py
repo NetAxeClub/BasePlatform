@@ -190,14 +190,17 @@ def config_compliance(**kwargs):
         return re.compile(pattern=_regex, flags=re.M).findall(string=kwargs['data_to_parse'])
 
     vendor_map = ['H3C', 'HUAWEI']
-    # start_datetime = (timezone.now().date().today() - timedelta(days=1)).strftime('%Y-%m-%d') + ' 00:00:00'
-    # end_datetime = timezone.now().date().today().strftime('%Y-%m-%d') + ' 23:59:59'
-    # config_files = ConfigBackup.objects.filter(last_time__range=(start_datetime, end_datetime),
-    #                                            config_status='SUCCESS').iterator()
+    # 获取时区感知的日期时间范围
+    today = timezone.now().date()
+    start_datetime = timezone.make_aware(
+        datetime.combine(today - timedelta(days=1), datetime.min.time())
+    )
+    end_datetime = timezone.make_aware(
+        datetime.combine(today, datetime.max.time())
+    )
 
-    query_date = timezone.now().date() - timedelta(days=1)
     config_files = ConfigBackup.objects.filter(
-        last_time__date=query_date,
+        last_time__range=(start_datetime, end_datetime),
         config_status='SUCCESS'
     ).iterator()
 
