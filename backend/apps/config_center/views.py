@@ -163,6 +163,17 @@ class ConfigComplianceRuleViewSet(CustomViewBase):
         return self.queryset
 
 
+# 配置策略
+class ConfigBackupPolicyViewSet(CustomViewBase):
+    queryset = BackupPolicy.objects.all().order_by('-id')
+    serializer_class = ConfigBackupPolicySerializer
+    pagination_class = LargeResultsSetPagination
+    # 配置搜索功能
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    filter_fields = ('vendor',)
+    search_fields = ('vendor',)
+
+
 # 配置合规表
 class ConfigComplianceViewSet(CustomViewBase):
     queryset = ConfigCompliance.objects.all().order_by('-id')
