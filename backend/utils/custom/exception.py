@@ -8,6 +8,7 @@ import traceback
 from django.db.models import ProtectedError
 from rest_framework.exceptions import APIException as DRFAPIException, AuthenticationFailed
 from rest_framework.views import set_rollback
+from rest_framework import status
 
 from utils.custom.json_response import ErrorResponse
 
@@ -47,3 +48,12 @@ def CustomExceptionHandler(ex, context):
     #     msg = errorMsg[key][0]
 
     return ErrorResponse(msg=msg, code=code)
+
+
+class SerializerValidateError(Exception):
+    detail = None
+    code = None
+
+    def __init__(self, detail: str, code: int = status.HTTP_400_BAD_REQUEST):
+        self.detail = detail
+        self.code = code
