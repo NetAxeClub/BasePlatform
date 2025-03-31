@@ -4285,4 +4285,4 @@ class DiagnoseProc(object):
             res = requests.request("GET", url, headers=headers, params=payload)
             if res.status_code == 200:
                 return res.json()['data']
-        return res
+        return []
