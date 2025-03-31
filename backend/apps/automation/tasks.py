@@ -988,6 +988,7 @@ def collect_device_by_rule():
 
 
 async def xunmi_operation(**kwargs):
+    logger.info(kwargs['ipaddress'])
     start_time = time.time()
     ip_address = kwargs['ipaddress']
     log_time = kwargs.get('log_time')
@@ -1015,6 +1016,7 @@ async def xunmi_operation(**kwargs):
         mac_res = mac_mongo.find(query_dict={'macaddress': arp['macaddress'], 'idc_name': arp['idc_name']}, fields={'_id': 0})
         if mac_res:
             # mac_res = json.loads(mac_res)
+            logger.info(mac_res)
             for mac in mac_res:
                 mac_interface = mac['interface']
                 try:
@@ -1308,19 +1310,19 @@ class AutomationMongo(object):
         # MongoOps(db='Automation', coll='DNAT').delete()
         # 清空netconf失败记录
         MongoOps(db='Automation', coll='netconf_failed').delete()
-        # MongoOps(db='Automation', coll='ARPTable').delete()
-        # MongoOps(db='Automation', coll='AggreTable').delete()
-        # MongoOps(db='Automation', coll='LLDPTable').delete()
-        # MongoOps(db='Automation', coll='MACTable').delete()
-        # MongoOps(db='Automation', coll='hillstone_interface').delete()
-        # MongoOps(db='Automation', coll='hillstone_address').delete()
-        # MongoOps(db='Automation', coll='hillstone_service').delete()
-        # MongoOps(db='Automation', coll='hillstone_servgroup').delete()
-        # MongoOps(db='Automation', coll='hillstone_slb_server').delete()
-        # MongoOps(db='Automation', coll='hillstone_dnat').delete()
-        # MongoOps(db='Automation', coll='layer2interface').delete()
-        # MongoOps(db='Automation', coll='layer3interface').delete()
-        # MongoOps(db='Automation', coll='mellanox_interface').delete()
+        MongoOps(db='Automation', coll='ARPTable').delete()
+        MongoOps(db='Automation', coll='AggreTable').delete()
+        MongoOps(db='Automation', coll='LLDPTable').delete()
+        MongoOps(db='Automation', coll='MACTable').delete()
+        MongoOps(db='Automation', coll='hillstone_interface').delete()
+        MongoOps(db='Automation', coll='hillstone_address').delete()
+        MongoOps(db='Automation', coll='hillstone_service').delete()
+        MongoOps(db='Automation', coll='hillstone_servgroup').delete()
+        MongoOps(db='Automation', coll='hillstone_slb_server').delete()
+        MongoOps(db='Automation', coll='hillstone_dnat').delete()
+        MongoOps(db='Automation', coll='layer2interface').delete()
+        MongoOps(db='Automation', coll='layer3interface').delete()
+        MongoOps(db='Automation', coll='mellanox_interface').delete()
         netconf_db = MongoOps(db='NETCONF', coll='netconf_interface_ipv4v6')
         netconf_tables = netconf_db.all_table()
         for netconf_table in netconf_tables:
