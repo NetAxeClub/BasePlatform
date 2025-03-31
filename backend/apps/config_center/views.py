@@ -81,7 +81,7 @@ class ConfigBackupFilter(django_filters.FilterSet):
 
 # 配置备份
 class ConfigBackupViewSet(CustomViewBase):
-    queryset = ConfigBackup.objects.all().order_by('-id')
+    queryset = ConfigBackup.objects.all().order_by('-last_time')
     serializer_class = ConfigBackupSerializer
     # permission_classes = (permissions.IsAuthenticated,)
     pagination_class = LargeResultsSetPagination

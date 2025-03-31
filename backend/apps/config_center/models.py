@@ -108,7 +108,7 @@ class ConfigBackup(models.Model):
         max_length=100,
         null=False, default='')
     manage_ip = models.GenericIPAddressField(verbose_name='管理地址', null=False, default='0.0.0.0')
-    last_time = models.DateTimeField(verbose_name='备份时间', null=False, default=timezone.localtime)
+    last_time = models.DateTimeField(verbose_name='备份时间', null=False, default=timezone.now)
     idc_name = models.CharField(verbose_name='机房', max_length=100, null=True, default='')
     model_name = models.CharField(verbose_name='型号', max_length=100, null=True, default='')
     vendor = models.CharField(verbose_name='厂商', max_length=100, null=True, default='')
@@ -157,6 +157,7 @@ class BackupPolicy(models.Model):
     vendor = models.CharField(verbose_name="厂商", max_length=100, null=False, default='-', blank=True)
     startup_command = models.CharField(verbose_name="启动配置命令", max_length=100, null=False, default='', blank=True)
     current_command = models.CharField(verbose_name="当前配置命令", max_length=100, null=False, default='', blank=True)
+    remark = models.TextField(verbose_name="备注", null=False, blank=True, default='-')
 
     def __str__(self):
         return "{}-{}-{}".format(self.vendor, self.startup_command, self.current_command)
