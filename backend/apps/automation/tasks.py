@@ -645,6 +645,25 @@ def datas_to_cache():
                 json.dumps(
                     lldp_result[_lldp]),
                 3600 * 12)
+        # 反向
+        reverse_lldp_result = dict()
+        for _lldp in lldp_res:
+            if _lldp['neighbor_ip'] is None:
+                continue
+            if not _lldp['neighbor_ip']:
+                continue
+            if not _lldp.get('neighbor_port'):
+                continue
+            if _lldp['neighbor_ip'] + '_' + _lldp['neighbor_port'] in reverse_lldp_result.keys():
+                reverse_lldp_result[_lldp['neighbor_ip'] + '_' + _lldp['neighbor_port']].append(_lldp)
+            else:
+                reverse_lldp_result[_lldp['neighbor_ip'] + '_' + _lldp['neighbor_port']] = [_lldp]
+        for _lldp in reverse_lldp_result.keys():
+            cache.set(
+                "lldp_reverse_" + _lldp,
+                json.dumps(
+                    reverse_lldp_result[_lldp]),
+                3600 * 12)
 
     # layer3interface以 hostip ipaddress 作为key
     def layer3interface_to_cache():
@@ -1119,13 +1138,13 @@ async def xunmi_operation(**kwargs):
                                     fields={'_id': 0, 'manage_ip': 1})
                                 if tmp_neighbor_ip:
                                     neighbor_hostip = tmp_neighbor_ip[0]['manage_ip']
-                                    _ip_res = cache.get(
-                                        'layer3interface_{}_{}'.format(neighbor_hostip, ip_address))
-                                    if _ip_res:
-                                        _ip_res = json.loads(_ip_res)
-                                    else:
-                                        _ip_res = show_ip_mongo.find(
-                                            query_dict=dict(ipaddress=ip_address, hostip=neighbor_hostip))
+                                    # _ip_res = cache.get(
+                                    #     'layer3interface_{}_{}'.format(neighbor_hostip, ip_address))
+                                    # if _ip_res:
+                                    #     _ip_res = json.loads(_ip_res)
+                                    # else:
+                                    _ip_res = show_ip_mongo.find(
+                                        query_dict=dict(ipaddress=ip_address, hostip=neighbor_hostip))
                                     if _ip_res:
                                         logger.debug('有聚合组且有直连LLDP邻居')
                                         tmp_result.append(dict(host=arp['hostip'],
