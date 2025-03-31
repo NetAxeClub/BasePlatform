@@ -376,22 +376,20 @@ class JobCenterView(APIView):
         queue = f['queue']
         celery_app.loader.import_default_modules()
         tasks = [(celery_app.tasks.get(taskname),
-                  loads(json.dumps(args)),
-                  loads(json.dumps(kwargs)),
+                  loads(json.dumps(args)) if args != '[]' else '',
+                  loads(json.dumps(kwargs)) if kwargs != '{}' else '',
                   queue)]
         if any(t[0] is None for t in tasks):
             for i, t in enumerate(tasks):
                 if t[0] is None:
                     break
             return JsonResponse({'code': 400, 'data': None}, safe=False)
-        task_ids = [task.apply_async(args=args, kwargs=kwargs, queue=queue)
+        task_ids = [task.apply_async(args=args if args != '[]' else '', kwargs=kwargs if kwargs != '{}' else '', queue=queue)
                     if queue and len(queue)
-                    else task.apply_async(args=args, kwargs=kwargs)
+                    else task.apply_async(args=args if args != '[]' else '', kwargs=kwargs if kwargs != '{}' else '')
                     for task, args, kwargs, queue in tasks]
-        if task_ids[0] == None:
+        if task_ids[0] is None:
             return JsonResponse({'code': 400, 'data': '执行失败'}, safe=False)
-        #  list:<class 'celery.result.AsyncResult'>
-        # print(task_ids[0],str(task_ids[0]))
         return JsonResponse({'code': 200, 'data': str(task_ids[0])}, safe=False)
 
 

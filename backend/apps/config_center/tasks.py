@@ -20,7 +20,7 @@ from apps.config_center.git_tools.git_proc import ConfigGit
 # from apps.config_center.config_parse.config_parse import config_file_parse
 from apps.config_center.git_tools.git_proc import push_file
 # from apps.config_center.my_nornir import config_backup_nornir
-from apps.config_center.models import ConfigBackup, ConfigCompliance, ConfigComplianceResult, ConfigComplianceRule
+from apps.config_center.models import ConfigBackup, BackupPolicy, ConfigComplianceResult, ConfigComplianceRule
 from utils.db.mongo_ops import MongoOps
 
 logger = logging.getLogger('automation')
@@ -190,10 +190,20 @@ def config_compliance(**kwargs):
         return re.compile(pattern=_regex, flags=re.M).findall(string=kwargs['data_to_parse'])
 
     vendor_map = ['H3C', 'HUAWEI']
-    start_datetime = (date.today() - timedelta(days=1)).strftime('%Y-%m-%d') + ' 00:00:00'
-    end_datetime = date.today().strftime('%Y-%m-%d') + ' 23:59:59'
-    config_files = ConfigBackup.objects.filter(last_time__range=(start_datetime, end_datetime),
-                                               config_status='SUCCESS').iterator()
+    # 获取时区感知的日期时间范围
+    today = timezone.now().date()
+    start_datetime = timezone.make_aware(
+        datetime.combine(today - timedelta(days=1), datetime.min.time())
+    )
+    end_datetime = timezone.make_aware(
+        datetime.combine(today, datetime.max.time())
+    )
+
+    config_files = ConfigBackup.objects.filter(
+        last_time__range=(start_datetime, end_datetime),
+        config_status='SUCCESS'
+    ).iterator()
+
     for config_file in config_files:
         if config_file.vendor in vendor_map:
             if not default_storage.exists(config_file.file_path):
@@ -259,6 +269,7 @@ def config_compliance(**kwargs):
 def backup_device_config_sub(**kwargs):
     connections.close_all()
     today = kwargs['today']
+    policy_map = kwargs['policy_map']
     command_map = {
         'H3C': {'cmd': 'display current-configuration', 'expect_string': None, 'enable': False},
         'Huawei': {'cmd': 'display current-configuration', 'expect_string': None, 'enable': False},
@@ -328,12 +339,15 @@ def backup_device_config(**kwargs):
         hosts = get_device_info_v2()
 
     logger.info('获取所有设备信息结束')
+    p = BackupPolicy.objects.all().values()
+    policy_map = {k['vendor']: {'startup_command': k['startup_command'], 'current_command': k['current_command']} for k in p}
     # 参数初始化
     net_tower_tasks = []  # 寻觅任务id集合
     # 批量下发任务
     for host in hosts:
         # backup_device_config_sub(**host)
         host['today'] = today
+        host['policy_map'] = policy_map[host['vendor__alias']] if host['vendor__alias'] in policy_map.keys() else {}
         net_tower_tasks.append(
             backup_device_config_sub.apply_async(
                 kwargs=host,

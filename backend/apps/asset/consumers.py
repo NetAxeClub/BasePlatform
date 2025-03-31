@@ -106,10 +106,10 @@ class WebSSHConsumer(MySSH):
                 self.close()
                 return
         _CryptPwd = CryptPwd()
-        if self.server.ssh_enable == 'account' and self.server.ssh_manage == 'ssh':
+        if self.server.ssh_enable == 'account':
             self.username = self.server.ssh_account.username
             self.password = _CryptPwd.decrypt_pwd(self.server.ssh_account.password)
-            self.port = self.server.ssh_port
+            self.port = self.server.ssh_account.port
         else:
             self.account = AssetAccount.objects.filter(
                 networkdevice=self.server, networkdevice__account__protocol='ssh'

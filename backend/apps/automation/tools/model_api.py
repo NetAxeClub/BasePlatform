@@ -30,7 +30,8 @@ def get_device_info_v2(**kwargs):
             'idc_model', 'model', 'category', 'vendor', 'idc', 'plan',
             'rack').prefetch_related('bind_ip', 'adpp_device').values(
             'id', 'serial_num', 'manage_ip', 'name', 'vendor__name', 'soft_version', 'vendor__alias', 'plan_id',
-            'category__name', 'model__name', 'account',
+            'category__name', 'model__name', 'ssh_enable', 'ssh_account',
+            'netconf_enable', 'netconf_account',
             'patch_version', 'soft_version', 'status', 'idc__name', 'auto_enable',
             'ha_status', 'chassis', 'slot', 'bind_ip__ipaddr')
     else:
@@ -48,22 +49,28 @@ def get_device_info_v2(**kwargs):
     # 过滤需要设备:在线,主设备或独立设备,有管理ip,支持的类型
     for dev in all_devs:
         try:
-            tmp_account = AssetAccount.objects.filter(networkdevice__id=dev['id']).values(
-                'networkdevice__account__name',
-                'networkdevice__account__username',
-                'networkdevice__account__password',
-                'networkdevice__account__protocol',
-                'networkdevice__account__port',
-                'networkdevice__account__en_pwd',
-            )
             tmp_protocol = []
-            for _account in tmp_account:
-                _protocol = _account["networkdevice__account__protocol"].lower()
-                if _protocol in ['ssh', 'telnet', 'netconf']:
+            if dev['ssh_enable'] == 'account':
+                tmp_account = AssetAccount.objects.filter(id=dev['ssh_account']).values(
+                    'name', 'username', 'password', 'protocol', 'port'
+                ).first()
+                if tmp_account:
+                    _protocol = tmp_account["protocol"].lower()
                     dev[_protocol] = dict()
-                    dev[_protocol]['username'] = _account["networkdevice__account__username"]
-                    dev[_protocol]['password'] = _CryptPwd.decrypt_pwd(_account["networkdevice__account__password"])
-                    dev[_protocol]['port'] = _account["networkdevice__account__port"]
+                    dev[_protocol]['username'] = tmp_account["username"]
+                    dev[_protocol]['password'] = _CryptPwd.decrypt_pwd(tmp_account["password"])
+                    dev[_protocol]['port'] = tmp_account["port"]
+                    tmp_protocol.append(_protocol)
+            if dev['netconf_enable'] == 'account':
+                tmp_account = AssetAccount.objects.filter(id=dev['netconf_account']).values(
+                    'name', 'username', 'password', 'protocol', 'port'
+                ).first()
+                if tmp_account:
+                    _protocol = tmp_account["protocol"].lower()
+                    dev[_protocol] = dict()
+                    dev[_protocol]['username'] = tmp_account["username"]
+                    dev[_protocol]['password'] = _CryptPwd.decrypt_pwd(tmp_account["password"])
+                    dev[_protocol]['port'] = tmp_account["port"]
                     tmp_protocol.append(_protocol)
             tmp_protocol = list(set(tmp_protocol))
             dev['protocol'] = tmp_protocol
