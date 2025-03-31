@@ -1033,11 +1033,11 @@ async def xunmi_operation(**kwargs):
                     if len(lagg_res['memberports']) >= 1:
                         lldp_num = 0
                         for port in lagg_res['memberports']:
-                            lldp_res = cache.get(
-                                'lldp_{}_{}'.format(lagg_res['hostip'], port))
-                            if not lldp_res:
-                                # lldp_res = cache.get('lldp_reverse_{}_{}'.format(lagg_res['hostip'], port))
-                                lldp_res = lldp_mongo.find(query_dict={'hostip': lagg_res['hostip'], 'local_interface': port}, fields={'_id': 0})
+                            # lldp_res = cache.get(
+                            #     'lldp_{}_{}'.format(lagg_res['hostip'], port))
+                            # if not lldp_res:
+                            # lldp_res = cache.get('lldp_reverse_{}_{}'.format(lagg_res['hostip'], port))
+                            lldp_res = lldp_mongo.find(query_dict={'hostip': lagg_res['hostip'], 'local_interface': port}, fields={'_id': 0})
                             if lldp_res:
                                 # lldp_res = json.loads(lldp_res)
                                 # print("====>是聚合口，有LLDP信息", lldp_res)
