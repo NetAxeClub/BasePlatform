@@ -1016,8 +1016,8 @@ async def xunmi_operation(**kwargs):
         mac_res = mac_mongo.find(query_dict={'macaddress': arp['macaddress'], 'idc_name': arp['idc_name']}, fields={'_id': 0})
         if mac_res:
             # mac_res = json.loads(mac_res)
-            logger.info(mac_res)
             for mac in mac_res:
+                logger.info(mac['interface'])
                 mac_interface = mac['interface']
                 try:
                     if mac_interface.find('.') != -1:
@@ -1025,7 +1025,7 @@ async def xunmi_operation(**kwargs):
                 except Exception as e:
                     logger.error("ip{}:{}".format(ip_address, str(e)))
                 # lagg_res = cache.get('lagg_{}_{}'.format(mac['hostip'], mac_interface))
-                lagg_res = lagg_mongo.find(query_dict={'hostip': mac['hostip'],'aggregroup': mac_interface})
+                lagg_res = lagg_mongo.find(query_dict={'hostip': mac['hostip'], 'aggregroup': mac_interface}, fields={'_id': 0})
                 # 是聚合口
                 if lagg_res:
                     # lagg_res = json.loads(lagg_res)
@@ -1037,7 +1037,7 @@ async def xunmi_operation(**kwargs):
                                 'lldp_{}_{}'.format(lagg_res['hostip'], port))
                             if not lldp_res:
                                 # lldp_res = cache.get('lldp_reverse_{}_{}'.format(lagg_res['hostip'], port))
-                                lldp_res = lldp_mongo.find(query_dict={'hostip': lagg_res['hostip'], 'local_interface': port})
+                                lldp_res = lldp_mongo.find(query_dict={'hostip': lagg_res['hostip'], 'local_interface': port}, fields={'_id': 0})
                             if lldp_res:
                                 # lldp_res = json.loads(lldp_res)
                                 # print("====>是聚合口，有LLDP信息", lldp_res)
