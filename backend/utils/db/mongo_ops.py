@@ -71,7 +71,8 @@ class MongoOps:
         return mongo_client.close()
 
     def all_table(self):
-        return self.db.collection_names()
+        # return self.db.collection_names()
+        return self.db.list_collection_names()
 
     def create_index(self, keys, session=None, **kwargs):
         # pymongo.ASCENDING 升序 从小到大
