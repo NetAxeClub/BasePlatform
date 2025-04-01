@@ -1036,6 +1036,9 @@ async def xunmi_operation(**kwargs):
         logger.debug('ip{}:macaddress_{}_{}'.format(ip_address, arp['idc_name'], arp['macaddress']))
         # mac_res = cache.get('macaddress_{}_{}'.format(arp['idc_name'], arp['macaddress']))
         mac_res = mac_mongo.find(query_dict={'macaddress': arp['macaddress'], 'idc_name': arp['idc_name']}, fields={'_id': 0})
+
+
+
         if mac_res:
             # mac_res = json.loads(mac_res)
             for mac in mac_res:

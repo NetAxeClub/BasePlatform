@@ -347,12 +347,14 @@ class HillstoneProc(BaseConn):
                             for _sub_dst_ip in _addr_res:
                                 if 'ip' in _sub_dst_ip.keys():
                                     for _t_ip in _sub_dst_ip['ip']:
-                                        tmp['dst_ip_split'].append(dict(start=IPNetwork(_t_ip['ip']).first,
-                                                                        end=IPNetwork(_t_ip['ip']).last))
+                                        if IPNetwork(_t_ip['ip']).version == 4:
+                                            tmp['dst_ip_split'].append(dict(start=IPNetwork(_t_ip['ip']).first,
+                                                                            end=IPNetwork(_t_ip['ip']).last))
                                 if 'range' in _sub_dst_ip.keys():
                                     for _t_ip in _sub_dst_ip['range']:
-                                        tmp['dst_ip_split'].append(dict(start=IPAddress(_t_ip['start']).value,
-                                                                        end=IPAddress(_t_ip['end']).value))
+                                        if IPNetwork(_t_ip['start']).version == 4:
+                                            tmp['dst_ip_split'].append(dict(start=IPAddress(_t_ip['start']).value,
+                                                                            end=IPAddress(_t_ip['end']).value))
                         elif i['dst_addr']['object'] == 'Any':
                             tmp['dst_ip_split'].append(dict(start=0,
                                                             end=4294967295))
@@ -360,14 +362,16 @@ class HillstoneProc(BaseConn):
                     elif 'ip' in i['dst_addr'].keys():
                         dst_addr.append(dict(ip=i['dst_addr']['ip']))
                         _ip = IPNetwork(i['dst_addr']['ip'])
-                        tmp['dst_ip_split'].append(dict(start=IPNetwork(_ip).first,
-                                                        end=IPNetwork(_ip).last))
+                        if IPNetwork(_ip).version == 4:
+                            tmp['dst_ip_split'].append(dict(start=IPNetwork(_ip).first,
+                                                            end=IPNetwork(_ip).last))
                     elif 'range' in i['dst_addr'].keys():
                         start_ip = i['dst_addr']['range'].split()[0]
                         end_ip = i['dst_addr']['range'].split()[1]
                         dst_addr.append(dict(range=start_ip + '-' + end_ip))
-                        tmp['dst_ip_split'].append(dict(start=IPNetwork(start_ip).first,
-                                                        end=IPNetwork(end_ip).last))
+                        if IPNetwork(start_ip).version == 4:
+                            tmp['dst_ip_split'].append(dict(start=IPNetwork(start_ip).first,
+                                                            end=IPNetwork(end_ip).last))
                 elif isinstance(i['dst_addr'], list):
                     for _dst_tmp in i['dst_addr']:
                         if 'object' in _dst_tmp.keys():
@@ -377,28 +381,32 @@ class HillstoneProc(BaseConn):
                                 for _sub_src_ip in _addr_res:
                                     if 'ip' in _sub_src_ip.keys():
                                         for _t_ip in _sub_src_ip['ip']:
-                                            tmp['dst_ip_split'].append(dict(start=IPNetwork(_t_ip['ip']).first,
-                                                                            end=IPNetwork(_t_ip['ip']).last))
+                                            if IPNetwork(_t_ip['ip']).version == 4:
+                                                tmp['dst_ip_split'].append(dict(start=IPNetwork(_t_ip['ip']).first,
+                                                                                end=IPNetwork(_t_ip['ip']).last))
                                     if 'range' in _sub_src_ip.keys():
                                         for _t_ip in _sub_src_ip['range']:
-                                            tmp['dst_ip_split'].append(
-                                                dict(start=IPAddress(_t_ip['start']).value,
-                                                     end=IPAddress(_t_ip['end']).value))
+                                            if IPNetwork(_t_ip['start']).version == 4:
+                                                tmp['dst_ip_split'].append(
+                                                    dict(start=IPAddress(_t_ip['start']).value,
+                                                         end=IPAddress(_t_ip['end']).value))
                             elif _dst_tmp['object'] == 'Any':
                                 tmp['dst_ip_split'].append(dict(start=0,
                                                                 end=4294967295))
                         elif 'ip' in _dst_tmp.keys():
                             dst_addr.append(dict(ip=_dst_tmp['ip']))
                             _ip = IPNetwork(_dst_tmp['ip'])
-                            tmp['dst_ip_split'].append(dict(start=IPNetwork(_ip).first,
-                                                            end=IPNetwork(_ip).last))
+                            if IPNetwork(_ip).version == 4:
+                                tmp['dst_ip_split'].append(dict(start=IPNetwork(_ip).first,
+                                                                end=IPNetwork(_ip).last))
                         elif 'range' in _dst_tmp.keys():
                             start_ip = _dst_tmp['range'].split()[0]
                             end_ip = _dst_tmp['range'].split()[1]
                             dst_addr.append(
                                 dict(range=start_ip + '-' + end_ip))
-                            tmp['dst_ip_split'].append(dict(start=IPNetwork(start_ip).first,
-                                                            end=IPNetwork(end_ip).last))
+                            if IPNetwork(start_ip).version == 4:
+                                tmp['dst_ip_split'].append(dict(start=IPNetwork(start_ip).first,
+                                                                end=IPNetwork(end_ip).last))
             enable = True
             if i.get('disable'):
                 enable = False
@@ -441,9 +449,9 @@ class HillstoneProc(BaseConn):
                         global_ip = [dict(start=i['TO_IP'],
                                           end=i['TO_IP'],
                                           start_int=IPAddress(
-                                              i['TO_IP']).value,
+                                              i['TO_IP']).value if len(str(IPAddress(i['TO_IP']).value)) < 12 else 0,
                                           end_int=IPAddress(
-                                              i['TO_IP']).value,
+                                              i['TO_IP']).value if len(str(IPAddress(i['TO_IP']).value)) < 12 else 0,
                                           result=i['TO_IP'])]
                     else:
                         global_ip = [dict(start=i['TO_IP'],
@@ -472,17 +480,17 @@ class HillstoneProc(BaseConn):
                         global_ip += list([dict(start=x['ip'],
                                                 end=x['ip'],
                                                 start_int=IPNetwork(
-                                                    x['ip']).first,
+                                                    x['ip']).first if IPNetwork(x['ip']).version == 4 else 0,
                                                 end_int=IPNetwork(
-                                                    x['ip']).last,
+                                                    x['ip']).last if IPNetwork(x['ip']).version == 4 else 0,
                                                 result=x['ip']) for x in _global_ip['ip']])
                     if _global_ip.get('range'):
                         global_ip_range += list([dict(start=x['start'],
                                                       end=x['end'],
                                                       start_int=IPAddress(
-                                                          x['start']).value,
+                                                          x['start']).value if IPNetwork(x['start']).version == 4 else 0,
                                                       end_int=IPAddress(
-                                                          x['end']).value,
+                                                          x['end']).value if IPNetwork(x['start']).version == 4 else 0,
                                                       result=x['start'] +
                                                              '-' + x['end']
                                                       ) for x in _global_ip['range']])
@@ -493,17 +501,17 @@ class HillstoneProc(BaseConn):
                         global_ip = [dict(start=i['TO_IP'],
                                           end=i['TO_IP'],
                                           start_int=IPNetwork(
-                                              i['TO_IP']).first,
+                                              i['TO_IP']).first if IPNetwork(i['TO_IP']).version == 4 else 0,
                                           end_int=IPNetwork(
-                                              i['TO_IP']).last,
+                                              i['TO_IP']).last if IPNetwork(i['TO_IP']).version == 4 else 0,
                                           result=i['TO_IP'])]
                     else:
                         global_ip = [dict(start=i['TO_IP'],
                                           end=i['TO_IP'],
                                           start_int=IPAddress(
-                                              i['TO_IP']).value,
+                                              i['TO_IP']).value if len(str(IPAddress(i['TO_IP']).value)) < 12 else 0,
                                           end_int=IPAddress(
-                                              i['TO_IP']).value,
+                                              i['TO_IP']).value if len(str(IPAddress(i['TO_IP']).value)) < 12 else 0,
                                           result=i['TO_IP'])]
                 except Exception as e:
                     global_ip = [
