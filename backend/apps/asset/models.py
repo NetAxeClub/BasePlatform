@@ -275,6 +275,9 @@ class AssetAccount(models.Model):
         default='', blank=True,
         null=True)
 
+    def device_list_count(self):
+        return len([i for i in self.networkdevice_set.all()])
+
     def __str__(self):
         return "{}-{}-{}".format(self.name, self.protocol, self.port)
 
@@ -318,6 +321,8 @@ class NetworkDevice(models.Model):
 
     status_choices = ((0, '在线'), (1, '下线'), (2, '挂牌'), (3, '备用'))
     ha_choices = ((1, '主设备'), (2, '从设备'), (0, '独立设备'))
+    manage_choices = (('0', '不纳管'), ('account', 'account'))
+    ssh_method_choice = (('ssh', 'ssh'), ('telnet', 'telnet'))
     serial_num = models.CharField(
         verbose_name='序列号',
         max_length=200,
@@ -326,44 +331,44 @@ class NetworkDevice(models.Model):
     name = models.CharField(
         verbose_name='资产名称',
         max_length=100,
-        null=False, default='')
+        null=False, default='-')
     vendor = models.ForeignKey(
         "Vendor",
         verbose_name='供应商',
         related_name='vendor_asset',
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True)
     idc = models.ForeignKey(
         "Idc",
         related_name='idc_asset',
         verbose_name='所属机房',
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True)
     category = models.ForeignKey(
         "Category",
         verbose_name='设备类型',
         related_name='category_asset',
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True)
     model = models.ForeignKey(
         "Model",
         verbose_name='硬件型号',
         related_name='model_asset',
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True)
     soft_version = models.CharField(
         verbose_name='软件版本',
         max_length=200,
-        default='',
+        default='-',
         null=False)
     patch_version = models.CharField(
         verbose_name='补丁版本',
         max_length=200,
-        default='',
+        default='-',
         null=True)
     role = models.ForeignKey(
         "Role",
@@ -413,7 +418,7 @@ class NetworkDevice(models.Model):
         verbose_name='机架位结束', default=0, validators=[MaxValueValidator(50), MinValueValidator(1)])
     uptime = models.DateField(verbose_name='上线时间', null=True, auto_now_add=True)
     expire = models.DateField(verbose_name='维保日期', null=True, blank=True)
-    memo = models.TextField(verbose_name='备注', null=True, default='', blank=True)
+    memo = models.TextField(verbose_name='备注', null=True, default='-', blank=True)
     status = models.PositiveSmallIntegerField(
         verbose_name='状态', choices=status_choices, default=0)
     ha_status = models.PositiveSmallIntegerField(
@@ -424,6 +429,20 @@ class NetworkDevice(models.Model):
     account = models.ManyToManyField('AssetAccount', verbose_name='管理账户', blank=True)
     plan = models.ForeignKey("automation.CollectionPlan", verbose_name='采集方案',
                              blank=True, null=True, related_name='releate_device', on_delete=models.SET_NULL)
+    snmp_version = models.CharField(verbose_name="SNMP version", default="v2c", null=False, max_length=50)
+    snmp_community = models.CharField(verbose_name="SNMP community", default="-", null=False, max_length=50)
+    snmp_port = models.IntegerField(verbose_name="snmp port", default=161, null=False)
+    # SSH纳管
+    ssh_enable = models.CharField(verbose_name="ssh是否纳管", null=False, default="0", choices=manage_choices,
+                                  max_length=50)
+    ssh_account = models.ForeignKey('AssetAccount', verbose_name='ssh纳管关联账户', blank=True, null=True,
+                                    related_name="releate_ssh", on_delete=models.SET_NULL)
+    # NETCONF
+    netconf_enable = models.CharField(verbose_name="NETCONF是否纳管", null=False, default="0", choices=manage_choices,
+                                      max_length=50)
+    netconf_account = models.ForeignKey('AssetAccount', verbose_name='netconf纳管关联账户', blank=True, null=True,
+                                        related_name="releate_netconf", on_delete=models.SET_NULL)
+    is_monitor = models.BooleanField(verbose_name='是否监控', default=False, null=False)
     history = HistoricalRecords()
 
     def __str__(self):
@@ -649,7 +668,6 @@ class ContainerService(models.Model):
         verbose_name = '服务管理'
         verbose_name_plural = "服务管理"
         db_table = 'asset_service'
-
 
 # class ServerAccount(models.Model):
 #     """
