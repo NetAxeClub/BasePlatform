@@ -1,0 +1,20 @@
+Value Required LOCAL_INTERFACE (\S+)
+Value CHASSIS_ID (\S+)
+Value NEIGHBOR_PORT (.*)
+Value PortDescription (.*)
+Value NEIGHBORSYSNAME (\S+)
+Value MANAGEMENT_IP (\S+)
+Value MANAGEMENT_TYPE (\S+)
+
+Start
+  ^------------------
+  ^Local\sport\s+:${LOCAL_INTERFACE}
+  ^Chassis\sID\s+:${CHASSIS_ID}
+  ^Port\sdescription\s+:${PortDescription}
+  ^Port\sID\s+:\s*${NEIGHBOR_PORT}
+  ^System\sname\s+:${NEIGHBORSYSNAME}
+  ^Management\saddress\s+:${MANAGEMENT_TYPE}-${MANAGEMENT_IP},.*
+  ^$$ -> Record
+
+
+

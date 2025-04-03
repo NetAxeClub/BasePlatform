@@ -11,8 +11,9 @@
 -------------------------------------------------
 """
 import re
+import json
 from datetime import datetime
-
+from django.core.cache import cache
 from netaddr import IPNetwork
 
 from apps.asset.models import NetworkDevice, Model, Vendor
@@ -214,6 +215,40 @@ class ZteProc(BaseConn):
                         ha_status=2)
         return
 
+    def lldp_proc(self, res):
+        """
+        {'local_interface': 'xxvgei-0/1/1/9', 'chassis_id': 'fc44.9f6a.f32c', 'neighbor_port': 'xgei-0/1/1/49', 'portdescription': 'uT:SRDSJJL-3F-C-11_C-12-MHSW-ZX5960-1U34.30.116.151.126.xxv', 'neighborsysname': 'SRDSJJL-3F-A-13_A-14-SMSW-ZX5952-1U40', 'management_ip': '30.116.151.1', 'management_type': 'IPv4'}
+
+        """
+        lldp_datas = []
+        for i in res:
+            neighbor_ip = ''
+            if 'neighborsysname' in i.keys():
+                if i['neighborsysname']:
+                    tmp_neighbor_ip = cache.get('cmdb_' + i['neighborsysname'])
+                    if tmp_neighbor_ip:
+                        tmp_neighbor_ip = json.loads(tmp_neighbor_ip)
+                        neighbor_ip = tmp_neighbor_ip[0]['manage_ip']
+                    else:
+                        tmp_neighbor_ip = NetworkDevice.objects.filter(name=i['neighborsysname']
+                                                                       ).values('manage_ip')
+                        neighbor_ip = tmp_neighbor_ip[0]['manage_ip'] if tmp_neighbor_ip else ''
+            tmp = dict(
+                hostip=self.hostip,
+                local_interface=i['local_interface'],
+                chassis_id=i['chassis_id'],
+                neighbor_port=i['neighbor_port'],
+                portdescription=i['portdescription'],
+                neighborsysname=i['neighborsysname'],
+                management_ip=i['management_ip'],
+                management_type=i['management_type'],
+                neighbor_ip=neighbor_ip
+            )
+            lldp_datas.append(tmp)
+        if lldp_datas:
+            MongoNetOps.insert_table(
+                'Automation', self.hostip, lldp_datas, 'LLDPTable')
+
     def path_map(self, file_name, res: list):
         fsm_map = {
             'show_arp': self.arp_proc,
@@ -221,6 +256,7 @@ class ZteProc(BaseConn):
             'show_interface': self.interface_proc,
             'show_version': self.version_proc,
             'show_lacp_internal': self.aggre_port_proc,
+            'show_lldp_entry': self.lldp_proc,
         }
         if file_name in fsm_map.keys():
             fsm_map[file_name](res)
