@@ -31,16 +31,19 @@ class UserData(object):
             setattr(self, key, my_dict[key])
 
 
-def get_auth_user(token, url, action):
+def get_auth_user(token):
     logger.info("get_auth_user")
-    auth_url = config.iam['url'] + '/users/casbin/'
-    headers = {'Authorization': token}
-    params = {'data': url, 'action': action}
+    rbac_instance = config.service_dicovery('rbac')
+    auth_service_url = "http://{}:{}".format(rbac_instance['hosts'][0]['ip'], rbac_instance['hosts'][0]['port'])
+    auth_decode_url = f'{auth_service_url}/rbac/userinfo/'
+    headers = {'Accept': 'application/json', 'Authorization': f'{str(token)}',
+               'Content-Type': 'application/json'}
     try:
-        res = requests.request(method="GET", url=auth_url, headers=headers, params=params, timeout=5)
-        if res.status_code == 200:
+        res = requests.request(method="GET", url=auth_decode_url, headers=headers)
+        logger.info(str(res.json()))
+        if 200 <= res.status_code < 300:
             logger.info(res.status_code)
-            return UserData(res.json()['data']['userinfo'])
+            return UserData(res.json()['results'])
         else:
             return AnonymousUser()
     except Exception as e:
@@ -50,9 +53,9 @@ def get_auth_user(token, url, action):
 
 def get_user(scope):
     try:
-        if 'netops-token' in scope['cookies'].keys():
+        if not config.local_dev and 'netops-token' in scope['cookies'].keys():
             logger.debug('token: {}'.format(scope['cookies']['netops-token']))
-            return get_auth_user(parse.unquote(scope['cookies']['netops-token']), scope['path'], scope['type'])
+            return get_auth_user(parse.unquote(scope['cookies']['netops-token']))
         return AnonymousUser()
     except Exception as e:
         logger.error("function 'get_user' error: {}".format(str(e)))
@@ -76,15 +79,19 @@ class QueryAuthMiddleware(BaseMiddleware):
 
     def populate_scope(self, scope):
         logger.info('populate_scope')
+        print('populate_scope')
         # Make sure we have a session
         if "session" not in scope:
             raise ValueError(
                 "AuthMiddleware cannot find session in scope. SessionMiddleware must be above it."
             )
-        scope["user"] = get_user(scope)
+        # Add it to the scope if it's not there already
+        if "user" not in scope:
+            scope["user"] = get_user(scope)
 
     async def resolve_scope(self, scope):
         logger.info('resolve_scope')
+        # scope["user"] = get_user(scope)
 
 
 QueryAuthMiddlewareStack = lambda inner: CookieMiddleware(

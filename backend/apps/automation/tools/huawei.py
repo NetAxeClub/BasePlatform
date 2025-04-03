@@ -357,6 +357,8 @@ class HuaweiProc(BaseConn):
         if isinstance(res, list):
             arp_datas = []
             for i in res:
+                if i['interface'].find('.') != -1:
+                    i['interface'] = i['interface'].split('.')[0]
                 tmp = dict(
                     hostip=self.hostip,
                     hostname=self.hostname,
@@ -486,6 +488,79 @@ class HuaweiProc(BaseConn):
                 tablename='layer2interface')
         return
 
+    def _interfaces(self, res):
+        """
+        {'interface': '10GE0/0/0', 'link_status': 'UP (ifindex: 6)', 'protocol_status': 'UP', 'interface_description': ' pT:SRXZJL-2F1-F-01_G-01-MHSW-ZX5960-1U31.30.116.136.126.xxvgei-0/1/1/19', 'link_type': '', 'port_type': '', 'pvid': '', 'tpid': '', 'mtu': '', 'hold_timer': '', 'internet_address': '', 'internet_protocol': '', 'hardware_address': '60ce-411f-df88', 'last_physical_up_time': '2024-08-29 19:30:40', 'last_physical_down_time': '2024-08-29 19:30:01', 'last_line_protocol_uptime': '', 'current_system_time': '2024-12-20 11:24:33', 'port_mode': 'COMMON FIBER', 'speed': '10000', 'loopback': 'NONE', 'duplex': 'FULL', 'negotiation': '-', 'aggregated_interfaces': []}
+        {'interface': '10GE0/0/1', 'link_status': 'UP (ifindex: 7)', 'protocol_status': 'UP', 'interface_description': ' pT:SRXZJL-2F1-F-01_G-01-MHSW-ZX5960-1U31.30.116.136.126.xxvgei-0/1/1/20', 'link_type': '', 'port_type': '', 'pvid': '', 'tpid': '', 'mtu': '', 'hold_timer': '', 'internet_address': '', 'internet_protocol': '', 'hardware_address': '60ce-411f-df87', 'last_physical_up_time': '2024-08-29 19:30:37', 'last_physical_down_time': '2024-08-29 19:30:04', 'last_line_protocol_uptime': '', 'current_system_time': '2024-12-20 11:24:39', 'port_mode': 'COMMON FIBER', 'speed': '10000', 'loopback': 'NONE', 'duplex': 'FULL', 'negotiation': '-', 'aggregated_interfaces': []}
+        {'interface': '10GE0/0/2', 'link_status': 'UP (ifindex: 8)', 'protocol_status': 'UP', 'interface_description': ' pT:SRXZJL-2F1-F-01_G-01-MHSW-ZX5960-1U31.30.116.136.126.xxvgei-1/1/1/19', 'link_type': '', 'port_type': '', 'pvid': '', 'tpid': '', 'mtu': '', 'hold_timer': '', 'internet_address': '', 'internet_protocol': '', 'hardware_address': '60ce-411f-df8d', 'last_physical_up_time': '2024-08-29 19:30:31', 'last_physical_down_time': '2024-08-29 19:30:06', 'last_line_protocol_uptime': '', 'current_system_time': '2024-12-20 11:24:39', 'port_mode': 'COMMON FIBER', 'speed': '10000', 'loopback': 'NONE', 'duplex': 'FULL', 'negotiation': '-', 'aggregated_interfaces': []}
+        {'interface': '10GE0/0/9', 'link_status': 'UP (ifindex: 15)', 'protocol_status': 'UP', 'interface_description': ' pT:SRDSJJL-3F-C-11_C-12-MFW-HWE1KE-H1-1U25-1U17.30.116.151.6.10GE0/0/9_HA', 'link_type': '', 'port_type': '', 'pvid': '', 'tpid': '', 'mtu': '', 'hold_timer': '', 'internet_address': '', 'internet_protocol': '', 'hardware_address': '60ce-411f-df86', 'last_physical_up_time': '2024-08-30 16:53:18', 'last_physical_down_time': '2024-08-30 16:53:16', 'last_line_protocol_uptime': '', 'current_system_time': '2024-12-20 16:15:49', 'port_mode': 'COMMON FIBER', 'speed': '10000', 'loopback': 'NONE', 'duplex': 'FULL', 'negotiation': '-', 'aggregated_interfaces': []}
+        {'interface': 'Eth-Trunk1', 'link_status': 'UP (ifindex: 29)', 'protocol_status': 'DOWN', 'interface_description': ' pT:SRXZJL-2F1-F-01_G-01-MHSW-ZX5960-1U31.30.116.136.126.AGG1001', 'link_type': '', 'port_type': '', 'pvid': '', 'tpid': '', 'mtu': '', 'hold_timer': '', 'internet_address': '', 'internet_protocol': 'disabled', 'hardware_address': '60ce-411f-df82', 'last_physical_up_time': '', 'last_physical_down_time': '', 'last_line_protocol_uptime': '', 'current_system_time': '2024-12-20 16:15:50', 'port_mode': '', 'speed': '', 'loopback': '', 'duplex': '', 'negotiation': '', 'aggregated_interfaces': ['10GE0/0/0', '10GE0/0/1', '10GE0/0/2', '10GE0/0/3']}
+        {'interface': 'Eth-Trunk1.4001', 'link_status': 'UP (ifindex: 30)', 'protocol_status': 'UP', 'interface_description': ' pT:SRXZJL-2F1-F-01_G-01-MHSW-ZX5960-1U31.30.116.136.126.AGG1001', 'link_type': '', 'port_type': '', 'pvid': '', 'tpid': '', 'mtu': '', 'hold_timer': '', 'internet_address': '169.169.0.110/30', 'internet_protocol': '', 'hardware_address': '60ce-411f-df82', 'last_physical_up_time': '', 'last_physical_down_time': '', 'last_line_protocol_uptime': '', 'current_system_time': '2024-12-20 16:15:56', 'port_mode': '', 'speed': '', 'loopback': '', 'duplex': '', 'negotiation': '', 'aggregated_interfaces': ['10GE0/0/0', '10GE0/0/1', '10GE0/0/2', '10GE0/0/3']}
+        {'interface': 'Eth-Trunk1.4002', 'link_status': 'UP (ifindex: 31)', 'protocol_status': 'UP', 'interface_description': ' pT:SRXZJL-2F1-F-01_G-01-MHSW-ZX5960-1U31.30.116.136.126.AGG1001', 'link_type': '', 'port_type': '', 'pvid': '', 'tpid': '', 'mtu': '', 'hold_timer': '', 'internet_address': '169.169.0.114/30', 'internet_protocol': '', 'hardware_address': '60ce-411f-df82', 'last_physical_up_time': '', 'last_physical_down_time': '', 'last_line_protocol_uptime': '', 'current_system_time': '2024-12-20 16:16:01', 'port_mode': '', 'speed': '', 'loopback': '', 'duplex': '', 'negotiation': '', 'aggregated_interfaces': ['10GE0/0/0', '10GE0/0/1', '10GE0/0/2', '10GE0/0/3']}
+        {'interface': 'Eth-Trunk63', 'link_status': 'UP (ifindex: 28)', 'protocol_status': 'UP', 'interface_description': ' pT:SRDSJJL-3F-C-11_C-12-MFW-HWE1KE-H1-1U25.30.116.151.6-Eth-Trunk63', 'link_type': '', 'port_type': '', 'pvid': '', 'tpid': '', 'mtu': '', 'hold_timer': '', 'internet_address': '169.169.1.2/30', 'internet_protocol': '', 'hardware_address': '60ce-411f-df82', 'last_physical_up_time': '', 'last_physical_down_time': '', 'last_line_protocol_uptime': '', 'current_system_time': '2024-12-20 16:16:04', 'port_mode': '', 'speed': '', 'loopback': '', 'duplex': '', 'negotiation': '', 'aggregated_interfaces': ['10GE0/0/8', '10GE0/0/9']}
+        """
+        layer2datas = []
+        layer3datas = []
+        for i in res:
+            if i['internet_address']:
+                _ip = IPNetwork(i['internet_address'])
+                location = [dict(start=_ip.first, end=_ip.last)]
+                data = dict(
+                    hostip=self.hostip,
+                    interface=i['interface'],
+                    line_status=i['link_status'],
+                    protocol_status=i['protocol_status'],
+                    ipaddress=_ip.ip.format(),
+                    ipmask=_ip.netmask.format(),
+                    ip_type='Primary',
+                    location=location,
+                    mtu='')
+                layer3datas.append(data)
+            else:
+                speed = InterfaceFormat.mathintspeed(int(i['speed'])) if i['speed'] else ''
+                data = dict(hostip=self.hostip,
+                            interface=i['interface'],
+                            status=i['protocol_status'],
+                            speed=speed,
+                            duplex=i['duplex'],
+                            description=i.get('interface_description') or '')
+                layer2datas.append(data)
+        if layer2datas:
+            MongoNetOps.insert_table(
+                db='Automation',
+                hostip=self.hostip,
+                datas=layer2datas,
+                tablename='layer2interface')
+        if layer3datas:
+            MongoNetOps.insert_table(
+                db='Automation',
+                hostip=self.hostip,
+                datas=layer3datas,
+                tablename='layer3interface')
+        return
+
+    def _aggre_port_proc(self, res):
+        if isinstance(res, list):
+            aggre_datas = []
+            for i in res:
+                if isinstance(i['portname'], list):
+                    memberports = []
+                    for member in i['portname']:
+                        memberports.append(member)
+                else:
+                    memberports = i['memberports']
+                tmp = dict(
+                    hostip=self.hostip,
+                    aggregroup=i['trunk_num'],
+                    memberports=memberports,
+                    status=i['portstatus'],
+                    mode=i.get('mode') or ''
+                )
+                aggre_datas.append(tmp)
+            if aggre_datas:
+                MongoNetOps.insert_table(
+                    'Automation', self.hostip, aggre_datas, 'AggreTable')
+
     def _lldp_proc(self, res):
         lldp_datas = []
         for i in res:
@@ -560,6 +635,9 @@ class HuaweiProc(BaseConn):
             #         ha_status=2)
 
     def _version_proc(self, res):
+        """
+        [{'vrp_version': '1.23.0.1', 'product_version': 'Eudemon V600R023C00SPC100', 'model': 'Eudemon1000E-F55', 'uptime': '112 days, 23 hours, 43 minutes'}]
+        """
         if isinstance(res, list):
             if res[0]['model'] and self.model__name is None:
                 _vendor = Vendor.objects.get(name='华为')
@@ -579,7 +657,9 @@ class HuaweiProc(BaseConn):
             'display_lldp_neighbor': '_lldp_proc',
             'display_device_manufacture-info': '_manuinfo_proc',
             'display_stack': '_stack_proc',
-            'display_version': '_version_proc'
+            'display_version': '_version_proc',
+            'display_interface': '_interfaces',
+            'display_eth-trunk': '_aggre_port_proc'
         }
         if file_name in fsm_map.keys():
             caller = methodcaller(fsm_map[file_name], res)
@@ -589,11 +669,11 @@ class HuaweiProc(BaseConn):
 
     def _collection_analysis(self, paths: list):
         for path in paths:
-            if path['cmd_file'] == 'display_interface':
-                self.interface_proc(path)
-            else:
-                res = BatManMain.info_fsm(path=path['path'], fsm_platform=self.fsm_flag)
-                self.path_map(path['cmd_file'], res)
+            # if path['cmd_file'] == 'display_interface':
+            #     self.interface_proc(path)
+            # else:
+            res = BatManMain.info_fsm(path=path['path'], fsm_platform=self.fsm_flag)
+            self.path_map(path['cmd_file'], res)
 
     def _netconf_ce_system_info(self, res: list):
         """
