@@ -206,9 +206,9 @@ def config_compliance(**kwargs):
 
     for config_file in config_files:
         if config_file.vendor in vendor_map:
-            if not default_storage.exists(config_file.file_path):
+            if not default_storage.exists(f"device_config/{config_file.file_path}"):
                 continue
-            data_to_parse = default_storage.open(config_file.file_path).read().decode('utf-8')
+            data_to_parse = default_storage.open(f"device_config/{config_file.file_path}").read().decode('utf-8')
             rules = ConfigComplianceRule.objects.all().iterator()
             for rule in rules:
                 childrens = rule.children.all()
@@ -280,6 +280,7 @@ def backup_device_config_sub(**kwargs):
         'inspur': {'cmd': 'show running-config', 'expect_string': None, 'enable': False},
         'Cisco': {'cmd': 'show running-config', 'expect_string': None, 'enable': False},
         'Maipu': {'cmd': 'show running-config', 'expect_string': ']'},
+        'ZTE': {'cmd': 'show running-config', 'expect_string': ']'},
     }
     hostip = kwargs['manage_ip']  # 设备管理IP地址
     if hostip == '0.0.0.0':

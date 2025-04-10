@@ -863,6 +863,7 @@ def collect_device(**kwargs):
 @shared_task(base=AxeTask, once={'graceful': True})
 def collect_device_main(**kwargs):
     logger.info('开始执行信息采集主调度任务')
+    datas_to_cache()
     try:
         MainIn.cmdb_to_mongo()
     except Exception as e:
@@ -947,7 +948,6 @@ def collect_device_main(**kwargs):
         .format(net_tower_tasks_counters, len(FAILURE_TASK), '\n'.join(failed_res_list), '\n'.join(failed_netconf_list),
                 '\n'.join(ping_result), int(total_time))
     logger.info(send_message)
-    datas_to_cache()
     try:
         standard_analysis_main()
         interface_used.apply_async()
