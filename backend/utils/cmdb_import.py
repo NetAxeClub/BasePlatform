@@ -30,15 +30,14 @@ def str2time(str):
         return csv_time
 
 
-def csv_device_staus(device_staus):
-    device_staus_dict = {
+def csv_device_status(device_status):
+    device_status_dict = {
         '在线': 0,
-        '已下线': 1,
-        '未知': 2,
-        '故障': 3,
-        '备用': 4,
+        '下线': 1,
+        '挂牌': 2,
+        '备用': 3
     }
-    return device_staus_dict[device_staus]
+    return device_status_dict[device_status]
 
 
 def csv_attribute(attribute):
@@ -244,8 +243,8 @@ def search_cmdb_vendor_id(cmdb_vendor_name):
             return cmdb_vendor_instance['id']
 
     else:
-        pass
         print('厂商为空')
+        return None
 
 
 def old_import_parse(import_list):
@@ -292,7 +291,7 @@ def old_import_parse(import_list):
                     'u_location_end': int(data[12]),  # U位
                     'uptime': datetime.now().strftime('%Y-%m-%d'),  # 上线时间必须要，默认当前日期
                     'expire': '2099-01-01',  # 维保时间必须有，默认3年
-                    'status': csv_device_staus(data[14]),
+                    'status': csv_device_status(data[14]),
                     'memo': str(data[13]).strip(),  # memo为备注信息
                     'name': str(data[1]).strip(),  # 系统名称必须有。用管理IP代替
                     'auto_enable': True,
@@ -346,15 +345,19 @@ def new_import_parse(import_list):
         with transaction.atomic():
             devices_to_create = []
             for index, data in enumerate(data_list):
-                if not data or len(data) < 15 or data in new_lst or type(data[1]) != str:
+                if not data or data in new_lst:
                     continue
                 
-                print('----------------------', data[1].strip())
+                ok, msg = check_row(data)
+                if not ok:
+                    import_fail_list.append({'data': data, 'reason': f"第{index+1}行数据校验失败: 错误信息是：{msg}"})
+                    continue
+                
                 new_lst.append(data)
-                # SN1107500140038130	172.16.75.253	深信服	万兆接入	公网区域	生产网络	三层	合肥B3	4-3号	J05	11-11	2025-03-24	在线	路由器	教育公共综合业务防火墙
+                # SN1107500140038130	172.16.75.253	深信服	万兆接入	公网区域	生产网络	三层	合肥B3	4-3号	J05	11 11	在线	路由器	教育公共综合业务防火墙
                 # 判断厂商是否存在，如 F5 Mellanox  华三  华为  山石网科  思科  成都数维  深信服  盛科  科来 锐捷
                 manege_ip = str(data[1]).strip()
-                cmdb_vendor_id = search_cmdb_vendor_id(data[2])
+                cmdb_vendor_id = search_cmdb_vendor_id(data[2].strip())                 # 非必填
                 cmdb_role_id = search_cmdb_role_id(data[3])
                 cmdb_netzone_id = search_cmdb_netzone_id(data[4])
                 cmdb_attribute_id = search_cmdb_attribute_id(data[5])
@@ -362,19 +365,18 @@ def new_import_parse(import_list):
                 cmdb_idc_id = search_cmdb_idc_id(data[7])
                 cmdb_idc_model_id = search_cmdb_idc_model_id(data[8], cmdb_idc_id)
                 cmdb_cabinet_id = search_cmdb_cabinet_id(data[9], cmdb_idc_model_id)
-                
-                u_location = data[10].split('-')
-                u_location_start = u_location[0]
-                u_location_end = u_location[1] if len(u_location) > 1 else ''
 
-                status = csv_device_staus(data[12])
+                u_location_start = data[10]
+                u_location_end = data[11]
+
+                status = csv_device_status(data[12])
                 cmdb_category_id = search_cmdb_category_id(data[13])
                 memo = str(data[14]).strip()
 
                 networkdevices = {
                     'serial_num': data[0],
                     'manage_ip': manege_ip,
-                    'name': manege_ip,  # 系统名称必须有。用管理IP代替
+                    'name': '-',  # 系统名称必须有。用管理IP代替
                     'vendor': Vendor.objects.filter(id=cmdb_vendor_id).first() if cmdb_vendor_id else None,
                     'idc': Idc.objects.filter(id=cmdb_idc_id).first() if cmdb_idc_id else None,
                     'category': Category.objects.filter(id=cmdb_category_id).first() if cmdb_category_id else None,
@@ -406,7 +408,7 @@ def new_import_parse(import_list):
                     import_success_list.append(data)
                 except Exception as e:
                     print(f"数据校验失败: {e}")
-                    import_fail_list.append({'data': data, 'reason': str(e)})
+                    import_fail_list.append({'data': data, 'reason': f"第{index+1}行数据校验失败: 错误信息是：{e}"})
             
             # 批量创建所有有效设备
             if devices_to_create:
@@ -417,6 +419,17 @@ def new_import_parse(import_list):
         print(f"事务执行失败: {e}")
         # 回滚事务后返回所有失败记录
         return [], import_exists_list, [{'data': d, 'reason': str(e)} for d in import_success_list + import_fail_list], str(e)
+
+
+def check_row(data: list):
+    # SN1107500140038130	172.16.75.253	深信服	万兆接入	公网区域	生产网络	三层	合肥B3	4-3号	J05	11 11	在线	路由器	教育公共综合业务防火墙
+    error_message = ""
+    for i in range(len(data)):
+        if i not in [2, 5, 14] and not data[i]:
+            error_message += f"第{i+1}行数据为空\n"
+    if error_message:
+        return False, error_message.strip()
+    return True, "数据检查通过"
 
 
 def pandas_read_file(filename, **kwargs):
