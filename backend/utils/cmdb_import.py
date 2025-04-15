@@ -333,9 +333,9 @@ def old_import_parse(import_list):
 def new_import_parse(import_list):
     data_list = import_list
     new_lst = []
-    import_fail_list = []
-    import_success_list = []
-    import_exists_list = []
+    import_fail_list = []  # 导入错误
+    import_success_list = []  # 导入成功
+    import_exists_list = []  # 导入失败-已存在
     
     # 预收集所有序列号用于批量检查
     all_serials = [str(item[0]).strip() for item in data_list if len(item) > 0]
@@ -345,42 +345,38 @@ def new_import_parse(import_list):
         with transaction.atomic():
             devices_to_create = []
             for index, data in enumerate(data_list):
-                if not data or data in new_lst:
+                if not data:                                    # 没有数据直接continue
                     continue
                 
-                ok, msg = check_row(data)
+                ok, msg = check_row(data, new_lst)               # 检查行数据是否完整，同时检查序列化是否相同
                 if not ok:
-                    import_fail_list.append({'data': data, 'reason': f"第{index+1}行数据校验失败: 错误信息是：{msg}"})
+                    import_fail_list.append({'reason': f"第{index+1}行 {msg}"})
                     continue
                 
-                new_lst.append(data)
-                # SN1107500140038130	172.16.75.253	深信服	万兆接入	公网区域	生产网络	三层	合肥B3	4-3号	J05	11 11	在线	路由器	教育公共综合业务防火墙
-                # 判断厂商是否存在，如 F5 Mellanox  华三  华为  山石网科  思科  成都数维  深信服  盛科  科来 锐捷
-                manege_ip = str(data[1]).strip()
-                cmdb_vendor_id = search_cmdb_vendor_id(data[2].strip())                 # 非必填
-                cmdb_role_id = search_cmdb_role_id(data[3])
-                cmdb_netzone_id = search_cmdb_netzone_id(data[4])
-                cmdb_attribute_id = search_cmdb_attribute_id(data[5])
-                cmdb_framework_id = search_cmdb_framework_id(data[6])
-                cmdb_idc_id = search_cmdb_idc_id(data[7])
-                cmdb_idc_model_id = search_cmdb_idc_model_id(data[8], cmdb_idc_id)
-                cmdb_cabinet_id = search_cmdb_cabinet_id(data[9], cmdb_idc_model_id)
-
-                u_location_start = data[10]
-                u_location_end = data[11]
-
-                status = csv_device_status(data[12])
-                cmdb_category_id = search_cmdb_category_id(data[13])
-                memo = str(data[14]).strip()
+                new_lst.append(str(data[0]).strip())
+                # SN1107500140038130	172.16.75.253	三层	深信服	交换机	合肥B3	4-3号	J05	万兆接入	公网区域	11 	11 	在线	生产网络	教育公共综合业务防火墙
+                serial_num = str(data[0]).strip()                                                       # 序列号
+                manege_ip = str(data[1]).strip()                                                        # 管理IP
+                cmdb_framework_id = search_cmdb_framework_id(data[2])                                   # 网络架构
+                cmdb_vendor_id = None if isinstance(data[3], float) else search_cmdb_vendor_id(data[3].strip())     # 产商，非必填
+                cmdb_category_id = search_cmdb_category_id(data[4])                                     # 设备类型
+                cmdb_idc_id = search_cmdb_idc_id(data[5])                                               # 机房
+                cmdb_idc_model_id = search_cmdb_idc_model_id(data[6], cmdb_idc_id)                      # 模块
+                cmdb_cabinet_id = search_cmdb_cabinet_id(data[7], cmdb_idc_model_id)                    # 机柜
+                cmdb_role_id = None if isinstance(data[8], float) else search_cmdb_role_id(data[8])     # 设备角色, 非必填
+                cmdb_netzone_id = None if isinstance(data[9], float) else search_cmdb_netzone_id(data[9])  # 网络区域，非必填
+                u_location_start = data[10]                                                             # 起始U位
+                u_location_end = data[11]                                                               # 结束U位
+                status = csv_device_status(data[12])                                                    # 设备状态
+                cmdb_attribute_id = None if isinstance(data[13], float) else None                       # 网络属性，非必填
+                memo = None if isinstance(data[14], float) else str(data[14]).strip()                    # 备注，非非必填
 
                 networkdevices = {
-                    'serial_num': data[0],
+                    'serial_num': serial_num,
                     'manage_ip': manege_ip,
-                    'name': '-',  # 系统名称必须有。用管理IP代替
                     'vendor': Vendor.objects.filter(id=cmdb_vendor_id).first() if cmdb_vendor_id else None,
                     'idc': Idc.objects.filter(id=cmdb_idc_id).first() if cmdb_idc_id else None,
                     'category': Category.objects.filter(id=cmdb_category_id).first() if cmdb_category_id else None,
-                    # 'model': Model.objects.filter(id=cmdb_model_id).first() if cmdb_model_id else None,
                     'role': Role.objects.filter(id=cmdb_role_id).first() if cmdb_role_id else None,
                     "attribute": Attribute.objects.filter(id=cmdb_attribute_id).first() if cmdb_attribute_id else None,
                     "framework": Framework.objects.filter(id=cmdb_framework_id).first() if cmdb_framework_id else None,
@@ -396,19 +392,19 @@ def new_import_parse(import_list):
                     'auto_enable': True,
                     'is_monitor': True
                 }
-                serial_num = str(data[0]).strip()
+
                 if serial_num in existing_serials:
-                    import_exists_list.append(data)
+                    import_exists_list.append({"serial_num": serial_num, "manage_ip": manege_ip})
                     continue
                 
                 try:
                     # 构造设备对象但不立即保存
                     device = NetworkDevice(**networkdevices)
                     devices_to_create.append(device)
-                    import_success_list.append(data)
+                    import_success_list.append({"serial_num": serial_num, "manage_ip": manege_ip})
                 except Exception as e:
                     print(f"数据校验失败: {e}")
-                    import_fail_list.append({'data': data, 'reason': f"第{index+1}行数据校验失败: 错误信息是：{e}"})
+                    import_fail_list.append({"manage_ip": manege_ip, "reason": f"第{index+1}行数据校验失败: {e}"})
             
             # 批量创建所有有效设备
             if devices_to_create:
@@ -418,15 +414,21 @@ def new_import_parse(import_list):
     except Exception as e:
         print(f"事务执行失败: {e}")
         # 回滚事务后返回所有失败记录
-        return [], import_exists_list, [{'data': d, 'reason': str(e)} for d in import_success_list + import_fail_list], str(e)
+        return [], import_exists_list, [{"reason": str(e)} for _ in import_success_list + import_fail_list], "error"
 
 
-def check_row(data: list):
-    # SN1107500140038130	172.16.75.253	深信服	万兆接入	公网区域	生产网络	三层	合肥B3	4-3号	J05	11 11	在线	路由器	教育公共综合业务防火墙
+def check_row(data: list, serial_exists: list):
+    # SN1107500140038130	172.16.75.253	三层	深信服	交换机	合肥B3	4-3号	J05	万兆接入	公网区域	11 	11 	在线	生产网络	教育公共综合业务防火墙
     error_message = ""
     for i in range(len(data)):
-        if i not in [2, 5, 14] and not data[i]:
-            error_message += f"第{i+1}行数据为空\n"
+        if i not in [3, 8, 9, 13, 14] and isinstance(data[i], float):
+            error_message += f"第{i+1}列存在数据为空\n"
+            break
+        
+        if i == 0 and str(data[0]).strip() in serial_exists:     # 判断序列号是否重复
+            error_message += f"第{i+1}列序列号已存在\n"
+            break
+        
     if error_message:
         return False, error_message.strip()
     return True, "数据检查通过"
