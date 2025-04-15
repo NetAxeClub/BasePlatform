@@ -41,6 +41,15 @@ discovered_apps = [
     in pkgutil.iter_modules(apps.__path__, apps.__name__ + ".")
 ]
 
+# # 插件配置
+# PLUGINS_DIR = 'plugins/extensibles'  # 插件存放目录，可以是绝对路径或相对路径
+#
+# PLUGINS_CONFIG = {
+#     'hello_world': {
+#         'default_name': 'Django User'
+#     }
+# }
+
 
 # Application definition
 INSTALLED_APPS = [
@@ -432,7 +441,8 @@ CACHES = {
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
             "CONNECTION_POOL_KWARGS": {"max_connections": 100},
-        }
+        },
+        # 'KEY_PREFIX': 'netloc'
     },
     "api_cache": {
         "BACKEND": "django_redis.cache.RedisCache",
@@ -443,7 +453,7 @@ CACHES = {
         }
     }
 }
-
+CACHE_TTL = 60 * 60 * 8  # 8小时
 # 认证配置
 AUTHENTICATION_BACKENDS = (
     # "django_auth_ldap.backend.LDAPBackend",
