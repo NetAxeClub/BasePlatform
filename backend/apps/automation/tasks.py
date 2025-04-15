@@ -512,7 +512,7 @@ def standard_analysis_main():
     # for item in total_ip_tmp:
     #     result.setdefault(item, {**item})
     # xunmi_res = list(result.values())
-    xunmi_res = [dict(ipaddress=x) for x in total_ip_tmp]
+    xunmi_res = [dict(ipaddress=x) for x in total_ip_tmp if not x.startswith('10.254.')]
     # 所有IP明细存入mongo, 作为后面地址定位源数据
     total_ip_mongo = MongoOps(db='Automation', coll='Total_ip_list')
     total_ip_mongo.delete()
