@@ -1017,7 +1017,7 @@ def check_aggregation_port(device_ip, port):
         return cached
     agg_entry = lagg_mongo.find(query_dict={'hostip': device_ip, 'memberports': port}, fields={'_id': 0})
     if agg_entry:
-        return cache_network_data('xunmi', *cache_key, agg_entry)
+        cache_network_data('xunmi', *cache_key, data=agg_entry)
     return agg_entry
 
 
@@ -1048,7 +1048,7 @@ def is_lldp_reverse_connected(device_ip, port):
     lldp_entry = lldp_mongo.find(query_dict={'hostip': device_ip, 'neighbor_port': port},
                                  fields={'_id': 0})
     if lldp_entry:
-        return cache_network_data('xunmi', *cache_key, lldp_entry)
+        cache_network_data('xunmi', *cache_key, data=lldp_entry)
     return lldp_entry
 
 
