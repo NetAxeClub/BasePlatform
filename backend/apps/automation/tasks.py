@@ -1015,7 +1015,7 @@ def check_aggregation_port(device_ip, port):
     cached = get_cached_network_data('xunmi', *cache_key)
     if cached is not None:
         return cached
-    agg_entry = lagg_mongo.find(query_dict={'hostip': device_ip, 'memberports': port}, fields={'_id': 0})
+    agg_entry = lagg_mongo.find(query_dict={'hostip': device_ip, 'aggregroup': port}, fields={'_id': 0})
     if agg_entry:
         cache_network_data('xunmi', *cache_key, data=agg_entry)
     return agg_entry
@@ -1095,7 +1095,7 @@ async def xunmi_operation(**kwargs):
                 agg_entry = check_aggregation_port(mac['hostip'], mac_interface)
 
                 # 是聚合口
-                if agg_entry is not None:
+                if agg_entry:
                     # lagg_res = json.loads(lagg_res)
                     lagg_res = agg_entry[0]
                     if len(lagg_res['memberports']) >= 1:
