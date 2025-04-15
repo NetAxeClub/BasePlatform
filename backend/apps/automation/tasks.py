@@ -1106,7 +1106,7 @@ async def xunmi_operation(**kwargs):
                             # if not lldp_res:
                             # lldp_res = cache.get('lldp_reverse_{}_{}'.format(lagg_res['hostip'], port))
                             lldp_res = is_lldp_connected(lagg_res['hostip'], port)
-                            if lldp_res is not None:
+                            if lldp_res:
                                 # lldp_res = json.loads(lldp_res)
                                 # print("====>是聚合口，有LLDP信息", lldp_res)
                                 if not lldp_res[0]['neighborsysname']:
