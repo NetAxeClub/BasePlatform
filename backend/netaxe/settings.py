@@ -453,7 +453,7 @@ CACHES = {
         }
     }
 }
-CACHE_TTL = 60 * 60 * 8  # 8小时
+CACHE_TTL = 60 * 60 * 2  # 8小时
 # 认证配置
 AUTHENTICATION_BACKENDS = (
     # "django_auth_ldap.backend.LDAPBackend",
