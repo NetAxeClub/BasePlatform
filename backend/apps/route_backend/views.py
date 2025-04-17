@@ -151,6 +151,8 @@ class NetworkDeviceWebSshView(APIView):
         get_param = request.GET.dict()
         server_obj = NetworkDevice.objects.filter(
             manage_ip=get_param['manage_ip']).values('vendor__name', 'manage_ip', 'id').first()
+        if not server_obj:
+            return JsonResponse({'code': 400, 'msg': f"{get_param['manage_ip']}该设备不存在"})
         init_cmd = ''
         if server_obj['vendor__name'] in ['华三', '华为', '锐捷', '盛科']:
             init_cmd = 'terminal monitor'
