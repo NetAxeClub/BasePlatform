@@ -68,18 +68,18 @@ def search_cmdb_cabinet_id(cmdb_cabinet_name, cmdb_idc_model_id):
                                                 idc_model__id=cmdb_idc_model_id).values().first()
 
     if not cmdb_cabinet_instance:
-        msg = "[{}] 机柜不存在，请先录入机柜信息！".format(cmdb_cabinet_name)
-        print(msg)
+        # msg = "[{}] 机柜不存在，请先录入机柜信息！".format(cmdb_cabinet_name)
+        # print(msg)
         idc_model_instance = IdcModel.objects.filter(id=cmdb_idc_model_id).first() if cmdb_idc_model_id else None
-        Rack.objects.create(
+        instance = Rack.objects.create(
             idc_model=idc_model_instance,
             name=cmdb_cabinet_name)
-        time.sleep(3)
-        print("{} 机柜不存在，系统已创建完成!".format(cmdb_cabinet_name))
-        time.sleep(2)
+        # time.sleep(3)
+        # print("{} 机柜不存在，系统已创建完成!".format(cmdb_cabinet_name))
+        # time.sleep(2)
         # cmdb_cabinet_id = search_cmdb_cabinet_id(cmdb_cabinet_name, cmdb_idc_model_id)
-        instance = Rack.objects.filter(name=cmdb_cabinet_name, idc_model__id=cmdb_idc_model_id).values().first()
-        return instance['id']
+        # instance = Rack.objects.filter(name=cmdb_cabinet_name, idc_model__id=cmdb_idc_model_id).values().first()
+        return instance.id
 
     else:
         print("机柜存在：已完成检索，{} 机柜ID为: {}".format(cmdb_cabinet_name, cmdb_cabinet_instance['id']))
@@ -92,14 +92,14 @@ def search_cmdb_idc_model_id(cmdb_idc_model_name, cmdb_idc_id):
 
     if not cmdb_idc_model_id:
         msg = "[{}] 机房模块不存在，请先录入机房模块信息！".format(cmdb_idc_model_name)
-        print(msg)
-        IdcModel.objects.create(idc=Idc.objects.filter(id=cmdb_idc_id).first() if cmdb_idc_id else None,
-                                name=cmdb_idc_model_name)
-        time.sleep(5)
-        print("{} 机房模块不存在，系统已创建完成!".format(cmdb_idc_model_name))
+        # print(msg)
+        instance = IdcModel.objects.create(idc=Idc.objects.filter(id=cmdb_idc_id).first() if cmdb_idc_id else None,
+                                           name=cmdb_idc_model_name)
+        # time.sleep(5)
+        # print("{} 机房模块不存在，系统已创建完成!".format(cmdb_idc_model_name))
         # cmdb_idc_model_id = search_cmdb_idc_model_id(cmdb_idc_model_name, cmdb_idc_id)
-        instance = IdcModel.objects.filter(name=cmdb_idc_model_name, idc__id=cmdb_idc_id).values('id').first()
-        return instance['id']
+        # instance = IdcModel.objects.filter(name=cmdb_idc_model_name, idc__id=cmdb_idc_id).values('id').first()
+        return instance.id
 
     else:
         print("机房模块存在：已完成检索名称:{} 模块ID为: {}".format(cmdb_idc_model_name, cmdb_idc_model_id['id']))
@@ -110,14 +110,14 @@ def search_cmdb_idc_model_id(cmdb_idc_model_name, cmdb_idc_id):
 def search_cmdb_netzone_id(cmdb_netzone_name):
     cmdb_netzone_instance = NetZone.objects.filter(name=cmdb_netzone_name).values('id').first()
     if not cmdb_netzone_instance:
-        msg = "[{}] 网络区域不存在，请先录入网络区域信息！".format(cmdb_netzone_name)
-        print(msg)
-        NetZone.objects.create(name=cmdb_netzone_name)
-        time.sleep(3)
-        print("{} 网络区域不存在，系统已创建完成!".format(cmdb_netzone_name))
-        instance = NetZone.objects.filter(name=cmdb_netzone_name).values('id').first()
+        # msg = "[{}] 网络区域不存在，请先录入网络区域信息！".format(cmdb_netzone_name)
+        # print(msg)
+        instance = NetZone.objects.create(name=cmdb_netzone_name)
+        # time.sleep(3)
+        # print("{} 网络区域不存在，系统已创建完成!".format(cmdb_netzone_name))
+        # instance = NetZone.objects.filter(name=cmdb_netzone_name).values('id').first()
         # cmdb_netzone_id = search_cmdb_netzone_id(cmdb_netzone_name)
-        return instance['id']
+        return instance.id
 
 
     else:
@@ -130,14 +130,14 @@ def search_cmdb_role_id(cmdb_role_name):
     cmdb_role_instance = Role.objects.filter(name=cmdb_role_name).values('id').first()
 
     if not cmdb_role_instance:
-        msg = "[{}] 设备角色不存在，请先录入设备角色信息！".format(cmdb_role_name)
-        print(msg)
-        Role.objects.create(name=cmdb_role_name)
-        time.sleep(5)
-        print("{} 设备角色不存在，系统已创建完成!".format(cmdb_role_name))
+        # msg = "[{}] 设备角色不存在，请先录入设备角色信息！".format(cmdb_role_name)
+        # print(msg)
+        instance = Role.objects.create(name=cmdb_role_name)
+        # time.sleep(5)
+        # print("{} 设备角色不存在，系统已创建完成!".format(cmdb_role_name))
         # cmdb_role_id = search_cmdb_role_id(cmdb_role_name)
-        instance = Role.objects.filter(name=cmdb_role_name).values('id').first()
-        return instance['id']
+        # instance = Role.objects.filter(name=cmdb_role_name).values('id').first()
+        return instance.id
 
     else:
         print("设备角色存在:已完成检索，{} 设备角色ID为: {}".format(cmdb_role_name, cmdb_role_instance['id']))
@@ -150,14 +150,14 @@ def search_cmdb_idc_id(cmdb_idc_name):
     cmdb_idc_instance = Idc.objects.filter(name=cmdb_idc_name).values('id').first()
 
     if not cmdb_idc_instance:
-        msg = "[{}] 机房不存在，请先录入机房信息！".format(cmdb_idc_name)
-        print(msg)
-        Idc.objects.create(name=cmdb_idc_name)
+        # msg = "[{}] 机房不存在，请先录入机房信息！".format(cmdb_idc_name)
+        # print(msg)
+        instance = Idc.objects.create(name=cmdb_idc_name)
         time.sleep(3)
-        print("{} 机房不存在，系统已创建完成!".format(cmdb_idc_name))
+        # print("{} 机房不存在，系统已创建完成!".format(cmdb_idc_name))
         # cmdb_idc_id = search_cmdb_idc_id(cmdb_idc_name)
-        cmdb_instance = Idc.objects.filter(name=cmdb_idc_name).values('id').first()
-        return cmdb_instance['id']
+        # instance = Idc.objects.filter(name=cmdb_idc_name).values('id').first()
+        return instance.id
         # return msg
 
     else:
@@ -174,14 +174,14 @@ def search_cmdb_category_id(cmdb_category_name):
         return cmdb_category_instance['id']
 
     else:
-        print("{} 设备型号不存在，系统正在创建!".format(cmdb_category_name))
-        Category.objects.create(name=cmdb_category_name)
-        time.sleep(3)
-        print("{} 设备型号不存在，系统已创建完成!".format(cmdb_category_name))
+        # print("{} 设备型号不存在，系统正在创建!".format(cmdb_category_name))
+        instance= Category.objects.create(name=cmdb_category_name)
+        # time.sleep(3)
+        # print("{} 设备型号不存在，系统已创建完成!".format(cmdb_category_name))
         # cmdb_category_id = search_cmdb_category_id(cmdb_category_name)
-        instance = Category.objects.filter(name=cmdb_category_name).values('id').first()
+        # instance = Category.objects.filter(name=cmdb_category_name).values('id').first()
 
-        return instance['id']
+        return instance.id
 
 
 # 根据设备属性名称查询设备属性ID
@@ -192,13 +192,13 @@ def search_cmdb_attribute_id(attribute_name):
         return attribute_id_info['id']
 
     else:
-        print("{} 设备属性不存在，系统正在创建!".format(attribute_name))
-        Attribute.objects.create(name=attribute_name)
-        time.sleep(5)
-        print("{} 设备属性不存在，系统已创建完成!".format(attribute_name))
+        # print("{} 设备属性不存在，系统正在创建!".format(attribute_name))
+        instance = Attribute.objects.create(name=attribute_name)
+        time.sleep(1)
+        # print("{} 设备属性不存在，系统已创建完成!".format(attribute_name))
         # attribute_id = search_cmdb_attribute_id(attribute_name)
-        instance = Attribute.objects.filter(name=attribute_name).values('id').first()
-        return instance['id']
+        # instance = Attribute.objects.filter(name=attribute_name).values('id').first()
+        return instance.id
 
 
 # 根据设备架构名称查询设备架构ID
@@ -210,38 +210,27 @@ def search_cmdb_framework_id(framework_name):
 
     else:
         print("{} 设备架构不存在，系统正在创建!".format(framework_name))
-        Framework.objects.create(name=framework_name)
-        time.sleep(3)
-        print("{} 设备架构不存在，系统已创建完成!".format(framework_name))
+        instance = Framework.objects.create(name=framework_name)
+        # time.sleep(1)
+        # print("{} 设备架构不存在，系统已创建完成!".format(framework_name))
         # framework_id = search_cmdb_framework_id(framework_name)
-        instance = Framework.objects.filter(name=framework_name).values('id').first()
+        # instance = Framework.objects.filter(name=framework_name).values('id').first()
 
-        return instance['id']
+        return instance.id
 
 
 # 根据厂商名称进行检索，若厂商不存在，则抛出msg
 def search_cmdb_vendor_id(cmdb_vendor_name):
-    print(type(cmdb_vendor_name))
-    print(cmdb_vendor_name)  # 避免为空情况
     if type(cmdb_vendor_name) == str:
         cmdb_vendor_instance = Vendor.objects.filter(name=cmdb_vendor_name).values('id').first()
         # print(cmdb_vendor_instance)
-        if not cmdb_vendor_instance:
-            msg = "[{}] 厂商不存在，请先录入厂商信息！".format(cmdb_vendor_name)
-            print(msg)
-            Vendor.objects.create(name=cmdb_vendor_name)
-            time.sleep(3)
-            print("{} 厂商不存在，系统已创建完成!".format(cmdb_vendor_name))
-            # cmdb_vendor_id = search_cmdb_netzone_id(cmdb_vendor_name)
-            time.sleep(2)
-            instance = Vendor.objects.filter(name=cmdb_vendor_name).values('id').first()
-            return instance['id']
-
-        else:
-            print("厂商存在：已完成检索，{} 厂商ID为: {}".format(cmdb_vendor_name, cmdb_vendor_instance['id']))
-
+        if cmdb_vendor_instance:
             return cmdb_vendor_instance['id']
-
+        else:
+            # msg = "[{}] 厂商不存在，请先录入厂商信息！".format(cmdb_vendor_name)
+            instance = Vendor.objects.create(name=cmdb_vendor_name)
+            print("{} 厂商不存在，系统已创建完成!".format(cmdb_vendor_name))
+            return instance.id
     else:
         print('厂商为空')
         return None
@@ -336,40 +325,42 @@ def new_import_parse(import_list):
     import_fail_list = []  # 导入错误
     import_success_list = []  # 导入成功
     import_exists_list = []  # 导入失败-已存在
-    
+
     # 预收集所有序列号用于批量检查
     all_serials = [str(item[0]).strip() for item in data_list if len(item) > 0]
-    existing_serials = set(NetworkDevice.objects.filter(serial_num__in=all_serials).values_list('serial_num', flat=True))
+    existing_serials = set(
+        NetworkDevice.objects.filter(serial_num__in=all_serials).values_list('serial_num', flat=True))
 
     try:
         with transaction.atomic():
             devices_to_create = []
             for index, data in enumerate(data_list):
-                if not data:                                    # 没有数据直接continue
+                if not data:  # 没有数据直接continue
                     continue
-                
-                ok, msg = check_row(data, new_lst)               # 检查行数据是否完整，同时检查序列化是否相同
+
+                ok, msg = check_row(data, new_lst)  # 检查行数据是否完整，同时检查序列化是否相同
                 if not ok:
-                    import_fail_list.append({'reason': f"第{index+1}行 {msg}"})
+                    import_fail_list.append({'reason': f"第{index + 1}行 {msg}"})
                     continue
-                
+
                 new_lst.append(str(data[0]).strip())
                 # SN1107500140038130	172.16.75.253	三层	深信服	交换机	合肥B3	4-3号	J05	万兆接入	公网区域	11 	11 	在线	生产网络	教育公共综合业务防火墙
-                serial_num = str(data[0]).strip()                                                       # 序列号
-                manege_ip = str(data[1]).strip()                                                        # 管理IP
-                cmdb_framework_id = search_cmdb_framework_id(data[2])                                   # 网络架构
-                cmdb_vendor_id = None if isinstance(data[3], float) else search_cmdb_vendor_id(data[3].strip())     # 产商，非必填
-                cmdb_category_id = search_cmdb_category_id(data[4])                                     # 设备类型
-                cmdb_idc_id = search_cmdb_idc_id(data[5])                                               # 机房
-                cmdb_idc_model_id = search_cmdb_idc_model_id(data[6], cmdb_idc_id)                      # 模块
-                cmdb_cabinet_id = search_cmdb_cabinet_id(data[7], cmdb_idc_model_id)                    # 机柜
-                cmdb_role_id = None if isinstance(data[8], float) else search_cmdb_role_id(data[8])     # 设备角色, 非必填
+                serial_num = str(data[0]).strip()  # 序列号
+                manege_ip = str(data[1]).strip()  # 管理IP
+                cmdb_framework_id = search_cmdb_framework_id(data[2])  # 网络架构
+                cmdb_vendor_id = None if isinstance(data[3], float) else search_cmdb_vendor_id(
+                    data[3].strip())  # 产商，非必填
+                cmdb_category_id = search_cmdb_category_id(data[4])  # 设备类型
+                cmdb_idc_id = search_cmdb_idc_id(data[5])  # 机房
+                cmdb_idc_model_id = search_cmdb_idc_model_id(data[6], cmdb_idc_id)  # 模块
+                cmdb_cabinet_id = search_cmdb_cabinet_id(data[7], cmdb_idc_model_id)  # 机柜
+                cmdb_role_id = None if isinstance(data[8], float) else search_cmdb_role_id(data[8])  # 设备角色, 非必填
                 cmdb_netzone_id = None if isinstance(data[9], float) else search_cmdb_netzone_id(data[9])  # 网络区域，非必填
-                u_location_start = data[10]                                                             # 起始U位
-                u_location_end = data[11]                                                               # 结束U位
-                status = csv_device_status(data[12])                                                    # 设备状态
-                cmdb_attribute_id = None if isinstance(data[13], float) else None                       # 网络属性，非必填
-                memo = None if isinstance(data[14], float) else str(data[14]).strip()                    # 备注，非非必填
+                u_location_start = data[10]  # 起始U位
+                u_location_end = data[11]  # 结束U位
+                status = csv_device_status(data[12])  # 设备状态
+                cmdb_attribute_id = None if isinstance(data[13], float) else None  # 网络属性，非必填
+                memo = None if isinstance(data[14], float) else str(data[14]).strip()  # 备注，非非必填
 
                 networkdevices = {
                     'serial_num': serial_num,
@@ -396,7 +387,7 @@ def new_import_parse(import_list):
                 if serial_num in existing_serials:
                     import_exists_list.append({"serial_num": serial_num, "manage_ip": manege_ip})
                     continue
-                
+
                 try:
                     # 构造设备对象但不立即保存
                     device = NetworkDevice(**networkdevices)
@@ -404,12 +395,12 @@ def new_import_parse(import_list):
                     import_success_list.append({"serial_num": serial_num, "manage_ip": manege_ip})
                 except Exception as e:
                     print(f"数据校验失败: {e}")
-                    import_fail_list.append({"manage_ip": manege_ip, "reason": f"第{index+1}行数据校验失败: {e}"})
-            
+                    import_fail_list.append({"manage_ip": manege_ip, "reason": f"第{index + 1}行数据校验失败: {e}"})
+
             # 批量创建所有有效设备
             if devices_to_create:
                 NetworkDevice.objects.bulk_create(devices_to_create, batch_size=100)
-        
+
         return import_success_list, import_exists_list, import_fail_list, 'success'
     except Exception as e:
         print(f"事务执行失败: {e}")
@@ -418,17 +409,17 @@ def new_import_parse(import_list):
 
 
 def check_row(data: list, serial_exists: list):
-    # SN1107500140038130	172.16.75.253	三层	深信服	交换机	合肥B3	4-3号	J05	万兆接入	公网区域	11 	11 	在线	生产网络	教育公共综合业务防火墙
+    # SN1107500140038130	172.16.75.23	三层	信服	交换机	合肥	3号	J05	万兆接入	公网区域	11 	11 	在线	生产网络	公共综合业务交换机
     error_message = ""
     for i in range(len(data)):
         if i not in [3, 8, 9, 13, 14] and isinstance(data[i], float):
-            error_message += f"第{i+1}列存在数据为空\n"
+            error_message += f"第{i + 1}列存在数据为空\n"
             break
-        
-        if i == 0 and str(data[0]).strip() in serial_exists:     # 判断序列号是否重复
-            error_message += f"第{i+1}列序列号已存在\n"
+
+        if i == 0 and str(data[0]).strip() in serial_exists:  # 判断序列号是否重复
+            error_message += f"第{i + 1}列序列号已存在\n"
             break
-        
+
     if error_message:
         return False, error_message.strip()
     return True, "数据检查通过"

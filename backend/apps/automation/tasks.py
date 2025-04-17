@@ -4359,3 +4359,16 @@ class DiagnoseProc(object):
             if res.status_code == 200:
                 return res.json()['data']
         return []
+
+
+
+# def account_sync():
+#     from apps.asset.models import NetworkDevice, AssetAccount
+#     devices = NetworkDevice.objects.all().iterator()
+#     for device in devices:
+#         device.ssh_enable = 'account'
+#         account_list = device.account.all()
+#         for account in account_list:
+#             if account.protocol == 'ssh':
+#                 device.ssh_account = AssetAccount.objects.get(id=account.id)
+#         device.save()
