@@ -370,7 +370,9 @@ class XunMiView(APIView):
                 end_time = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
                 mongo_data['log_time'] = {"$gte": start_time, "$lte": end_time}
             if mongo_data:
-                query_tmp = xunmi_mongo.find(query_dict=mongo_data, fields={'_id': 0}, sort='log_time')
+                page_size = int(get_param["page_size"]) if get_param.get("page_size") else 10
+                page_num = int(get_param["start"]) + 1 if get_param.get("start") else 1
+                query_tmp = xunmi_mongo.find_page_query(query_dict=mongo_data, fields={'_id': 0}, sort='log_time', page_size=page_size, page_num=page_num)
                 if query_tmp:
                     mongo_data['log_time'] = query_tmp[-1]['log_time']
 
