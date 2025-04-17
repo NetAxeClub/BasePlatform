@@ -315,8 +315,7 @@ class GitConfig(APIView):
                 }
                 return JsonResponse(data, safe=False)
         if 'get_commit' in get_param.keys():
-            res = _ConfigGit.get_commit()
-            # print(res)
+            res = _ConfigGit.get_file_all_change_commmit(file_path=get_param['file_path'])
             data = {
                 "code": 200,
                 "data": res,

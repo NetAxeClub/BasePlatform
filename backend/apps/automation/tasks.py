@@ -11,7 +11,6 @@
 -------------------------------------------------
 """
 from __future__ import absolute_import, unicode_literals
-
 import json
 import logging
 import math
@@ -44,6 +43,7 @@ from apps.automation.tools.ruijie import RuijieProc
 from apps.automation.tools.centec import CentecProc
 from apps.automation.tools.zte import ZteProc
 from apps.automation.tools.model_api import get_device_info_v2
+from apps.automation.cache_utils import get_cached_network_data, cache_network_data
 from utils.connect_layer.auto_main import HuaweiS, HillstoneFsm
 from utils.db.mongo_ops import MongoOps, MongoNetOps, XunMiOps
 from driver import discovered_plugins
@@ -496,15 +496,15 @@ def standard_analysis_main():
     total_arp_res = [x['ipaddress'] for x in total_arp_tmp]
     total_layer3ip_tmp = show_ip_mongo.find(fields={'_id': 0, 'ipaddress': 1})
     total_layer3ip_res = [x['ipaddress'] for x in total_layer3ip_tmp]
-    public_scan_tmp = MongoOps(
-        db='logs',
-        coll='scan_port_res').find_re(
-        mac_kwargs,
-        fields={
-            '_id': 0,
-            'global_ip': 1})
-    public_scan_res = [x['global_ip'] for x in public_scan_tmp]
-    total_ip_tmp = list(set(total_arp_res)) + list(set(total_layer3ip_res)) + list(set(public_scan_res))
+    # public_scan_tmp = MongoOps(
+    #     db='logs',
+    #     coll='scan_port_res').find_re(
+    #     mac_kwargs,
+    #     fields={
+    #         '_id': 0,
+    #         'global_ip': 1})
+    # public_scan_res = [x['global_ip'] for x in public_scan_tmp]
+    total_ip_tmp = list(set(total_arp_res)) + list(set(total_layer3ip_res))
     # total_ip_tmp = MongoOps(db='Automation', coll='ARPTable').find(fields={'_id': 0, 'ipaddress': 1})
     # total_ip_res = list(set([x['ipaddress'] for x in total_ip_tmp]))
     # result = OrderedDict()
@@ -512,7 +512,7 @@ def standard_analysis_main():
     # for item in total_ip_tmp:
     #     result.setdefault(item, {**item})
     # xunmi_res = list(result.values())
-    xunmi_res = [dict(ipaddress=x) for x in total_ip_tmp]
+    xunmi_res = [dict(ipaddress=x) for x in total_ip_tmp if not x.startswith('10.254.')]
     # 所有IP明细存入mongo, 作为后面地址定位源数据
     total_ip_mongo = MongoOps(db='Automation', coll='Total_ip_list')
     total_ip_mongo.delete()
@@ -790,7 +790,7 @@ class MainIn:
         return
 
     @staticmethod
-    async def xunmi_sub(**kwargs):
+    def xunmi_sub(**kwargs):
         """
         用来承接上层xunmi_check方法中的根据接口查询LLDP往下的逻辑
         接收参数  ip_address  mac  arp
@@ -801,16 +801,14 @@ class MainIn:
         ip_address = kwargs['ip_address']
         mac = kwargs['mac']
         arp = kwargs['arp']
-        # lldp_res = cache.get('lldp_{}_{}'.format(mac['hostip'], mac['interface']))
-        lldp_res = lldp_mongo.find(query_dict={'hostip': mac['hostip'], 'local_interface': mac['interface']}, fields={'_id': 0})
+        lldp_res = is_lldp_connected(mac['hostip'], mac['interface'])
         if not lldp_res:
-            lldp_res = lldp_mongo.find(query_dict={'neighbor_ip': mac['hostip'], 'neighbor_port': mac['interface']}, fields={'_id': 0})
-            # lldp_res = cache.get('lldp_reverse_{}_{}'.format(mac['hostip'], mac['interface']))
+            lldp_res = is_lldp_reverse_connected(mac['hostip'], mac['interface'])
         if lldp_res:
-            # lldp_res = json.loads(lldp_res)
             neighbor_ip = lldp_res[0]['neighbor_ip']
             if neighbor_ip:
-                _ip_res = show_ip_mongo.find(query_dict={'hostip': neighbor_ip, 'ipaddress': ip_address}, fields={'_id': 0})
+                _ip_res = show_ip_mongo.find(query_dict={'hostip': neighbor_ip, 'ipaddress': ip_address},
+                                             fields={'_id': 0})
                 # _ip_res = cache.get('layer3interface_{}_{}'.format(neighbor_ip, ip_address))
                 if _ip_res:
                     # _ip_res = json.loads(_ip_res)
@@ -1009,19 +1007,57 @@ def collect_device_by_rule():
     all_tasks_counters = len(all_task)
 
 
+def check_aggregation_port(device_ip, port):
+    """
+    检查端口是否是聚合接口，如果是则返回物理端口列表
+    """
+    # cache_key = ('agg_port', device_ip, port)
+    # cached = get_cached_network_data('xunmi', *cache_key)
+    # if cached is not None:
+    #     return cached
+    agg_entry = lagg_mongo.find(query_dict={'hostip': device_ip, 'aggregroup': port}, fields={'_id': 0})
+    # if agg_entry:
+    #     cache_network_data('xunmi', *cache_key, data=agg_entry)
+    return agg_entry
+
+
+def is_lldp_connected(device_ip, port):
+    """
+    检查端口是否通过LLDP连接到其他设备
+    """
+    # cache_key = ('lldp', device_ip, port)
+    # cached = get_cached_network_data('xunmi', *cache_key)
+    # if cached is not None:
+    #     return cached
+    lldp_entry = lldp_mongo.find(query_dict={'hostip': device_ip, 'local_interface': port},
+                                 fields={'_id': 0})
+    # if lldp_entry:
+    #     cache_network_data('xunmi', *cache_key, data=lldp_entry)
+    return lldp_entry
+
+
+def is_lldp_reverse_connected(device_ip, port):
+    """
+    检查端口是否通过LLDP连接到其他设备
+    """
+    # cache_key = ('lldp_reverse', device_ip, port)
+    # cached = get_cached_network_data('xunmi', *cache_key)
+    # if cached is not None:
+    #     return cached
+
+    lldp_entry = lldp_mongo.find(query_dict={'hostip': device_ip, 'neighbor_port': port},
+                                 fields={'_id': 0})
+    # if lldp_entry:
+    #     cache_network_data('xunmi', *cache_key, data=lldp_entry)
+    return lldp_entry
+
+
 async def xunmi_operation(**kwargs):
     logger.info(kwargs['ipaddress'])
     start_time = time.time()
     ip_address = kwargs['ipaddress']
     log_time = kwargs.get('log_time')
     arp_res = arp_mongo.find(query_dict={'ipaddress': ip_address}, fields={'_id': 0})
-    # arp_res = cache.get('arp_' + ip_address)
-    # if arp_res:
-    #     arp_res = json.loads(arp_res)
-    # else:
-    #     logger.info("{}没有ARP表项，直接退出".format(ip_address))
-    #     # 没有ARP， 直接退出，防止频繁查询mongo
-    #     return
     arp_result = OrderedDict()
     # 多字典合并去重
     for item in arp_res:
@@ -1034,13 +1070,9 @@ async def xunmi_operation(**kwargs):
         if arp['interface'] is None:
             continue
         logger.debug('ip{}:macaddress_{}_{}'.format(ip_address, arp['idc_name'], arp['macaddress']))
-        # mac_res = cache.get('macaddress_{}_{}'.format(arp['idc_name'], arp['macaddress']))
-        mac_res = mac_mongo.find(query_dict={'macaddress': arp['macaddress'], 'idc_name': arp['idc_name']}, fields={'_id': 0})
-
-
-
+        mac_res = mac_mongo.find(query_dict={'macaddress': arp['macaddress'], 'idc_name': arp['idc_name']},
+                                 fields={'_id': 0})
         if mac_res:
-            # mac_res = json.loads(mac_res)
             for mac in mac_res:
                 logger.info(mac['interface'])
                 mac_interface = mac['interface']
@@ -1050,11 +1082,12 @@ async def xunmi_operation(**kwargs):
                 except Exception as e:
                     logger.error("ip{}:{}".format(ip_address, str(e)))
                 # lagg_res = cache.get('lagg_{}_{}'.format(mac['hostip'], mac_interface))
-                lagg_res = lagg_mongo.find(query_dict={'hostip': mac['hostip'], 'aggregroup': mac_interface}, fields={'_id': 0})
+                agg_entry = check_aggregation_port(mac['hostip'], mac_interface)
+
                 # 是聚合口
-                if lagg_res:
+                if agg_entry:
                     # lagg_res = json.loads(lagg_res)
-                    lagg_res = lagg_res[0]
+                    lagg_res = agg_entry[0]
                     if len(lagg_res['memberports']) >= 1:
                         lldp_num = 0
                         for port in lagg_res['memberports']:
@@ -1062,7 +1095,7 @@ async def xunmi_operation(**kwargs):
                             #     'lldp_{}_{}'.format(lagg_res['hostip'], port))
                             # if not lldp_res:
                             # lldp_res = cache.get('lldp_reverse_{}_{}'.format(lagg_res['hostip'], port))
-                            lldp_res = lldp_mongo.find(query_dict={'hostip': lagg_res['hostip'], 'local_interface': port}, fields={'_id': 0})
+                            lldp_res = is_lldp_connected(lagg_res['hostip'], port)
                             if lldp_res:
                                 # lldp_res = json.loads(lldp_res)
                                 # print("====>是聚合口，有LLDP信息", lldp_res)
@@ -1078,7 +1111,9 @@ async def xunmi_operation(**kwargs):
                                     # print('聚合组=>LLDP邻居系统名不为空')
                                     neighbor_hostip = lldp_res[0]['neighbor_ip']
                                     # _ip_res = cache.get('layer3interface_{}_{}'.format(neighbor_hostip, ip_address))
-                                    _ip_res = show_ip_mongo.find(query_dict={'hostip': neighbor_hostip, 'ipaddress': ip_address}, fields={'_id': 0})
+                                    _ip_res = show_ip_mongo.find(
+                                        query_dict={'hostip': neighbor_hostip, 'ipaddress': ip_address},
+                                        fields={'_id': 0})
                                     if _ip_res:
                                         tmp_result.append(dict(host=mac['hostip'],
                                                                interface=mac['interface'],
@@ -1093,9 +1128,9 @@ async def xunmi_operation(**kwargs):
                                                    memberport=','.join(lagg_res['memberports'])))
                 else:
                     # logger.info('ip {}:======>不是聚合口:'.format(ip_address))
-                    res, break_falg = await MainIn.xunmi_sub(**dict(mac=mac, arp=arp, ip_address=ip_address))
+                    res, break_flag = MainIn.xunmi_sub(**dict(mac=mac, arp=arp, ip_address=ip_address))
                     tmp_result += res
-                    if break_falg:
+                    if break_flag:
                         break
     # 如果没有查询结果，则以ARP信息为最终结果
     if not tmp_result:
@@ -1107,7 +1142,7 @@ async def xunmi_operation(**kwargs):
             if arp['interface'] is None:
                 continue
             # lagg_res = cache.get('lagg_{}_{}'.format(arp['hostip'], arp['interface']))
-            lagg_res = lagg_mongo.find(query_dict={'hostip': arp['hostip'], 'memberports': arp['interface']})
+            lagg_res = check_aggregation_port(arp['hostip'], arp['interface'])
             # 是聚合口
             if lagg_res:
                 # lagg_res = json.loads(lagg_res)
@@ -1121,10 +1156,10 @@ async def xunmi_operation(**kwargs):
                             query_dict=dict(hostip=lagg_res['hostip'], local_interface=port),
                             fields={'_id': 0, 'neighborsysname': 1})
                         # if not lldp_res:
-                            # lldp_res = cache.get('lldp_reverse_' + lagg_res['hostip'] + '_' + port)
-                            # lldp_res = lldp_mongo.find(
-                            #     query_dict=dict(hostip=lagg_res['hostip'], local_interface=port),
-                            #     fields={'_id': 0, 'neighborsysname': 1})
+                        # lldp_res = cache.get('lldp_reverse_' + lagg_res['hostip'] + '_' + port)
+                        # lldp_res = lldp_mongo.find(
+                        #     query_dict=dict(hostip=lagg_res['hostip'], local_interface=port),
+                        #     fields={'_id': 0, 'neighborsysname': 1})
                         # if lldp_res:
                         #     lldp_res = json.loads(lldp_res)
                         # else:
@@ -1150,7 +1185,8 @@ async def xunmi_operation(**kwargs):
                                     #     _ip_res = json.loads(_ip_res)
                                     # else:
                                     _ip_res = show_ip_mongo.find(
-                                        query_dict=dict(ipaddress=ip_address, hostip=neighbor_hostip), fields={'_id': 0})
+                                        query_dict=dict(ipaddress=ip_address, hostip=neighbor_hostip),
+                                        fields={'_id': 0})
                                     if _ip_res:
                                         logger.debug('有聚合组且有直连LLDP邻居')
                                         tmp_result.append(dict(host=arp['hostip'],
@@ -1177,10 +1213,10 @@ async def xunmi_operation(**kwargs):
                                            memberport=','.join(lagg_res['memberports'])))
             else:
                 # logger.debug("没有查询结果，则以ARP信息为最终结果 非聚合口")
-                lldp_res = lldp_mongo.find(query_dict={'hostip': arp['hostip'], 'local_interface': arp['interface']}, fields={'_id': 0})
+                lldp_res = is_lldp_connected(arp['hostip'], arp['interface'])
                 # lldp_res = cache.get('lldp_{}_{}'.format(arp['hostip'], arp['interface']))
                 if not lldp_res:
-                    lldp_res = lldp_mongo.find(query_dict={'neighbor_ip': arp['hostip'], 'neighbor_port': arp['interface']}, fields={'_id': 0})
+                    lldp_res = is_lldp_reverse_connected(arp['hostip'], arp['interface'])
                     # lldp_res = cache.get('lldp_reverse_{}_{}'.format(arp['hostip'], arp['interface']))
                 if lldp_res:
                     # lldp_res = json.loads(lldp_res)
