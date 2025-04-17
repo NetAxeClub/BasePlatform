@@ -110,16 +110,8 @@ def search_cmdb_idc_model_id(cmdb_idc_model_name, cmdb_idc_id):
 def search_cmdb_netzone_id(cmdb_netzone_name):
     cmdb_netzone_instance = NetZone.objects.filter(name=cmdb_netzone_name).values('id').first()
     if not cmdb_netzone_instance:
-        # msg = "[{}] 网络区域不存在，请先录入网络区域信息！".format(cmdb_netzone_name)
-        # print(msg)
         instance = NetZone.objects.create(name=cmdb_netzone_name)
-        # time.sleep(3)
-        # print("{} 网络区域不存在，系统已创建完成!".format(cmdb_netzone_name))
-        # instance = NetZone.objects.filter(name=cmdb_netzone_name).values('id').first()
-        # cmdb_netzone_id = search_cmdb_netzone_id(cmdb_netzone_name)
         return instance.id
-
-
     else:
         print("网络区域存在：已完成检索，{} 网络区域ID为: {}".format(cmdb_netzone_name, cmdb_netzone_instance['id']))
         return cmdb_netzone_instance['id']
@@ -130,15 +122,8 @@ def search_cmdb_role_id(cmdb_role_name):
     cmdb_role_instance = Role.objects.filter(name=cmdb_role_name).values('id').first()
 
     if not cmdb_role_instance:
-        # msg = "[{}] 设备角色不存在，请先录入设备角色信息！".format(cmdb_role_name)
-        # print(msg)
         instance = Role.objects.create(name=cmdb_role_name)
-        # time.sleep(5)
-        # print("{} 设备角色不存在，系统已创建完成!".format(cmdb_role_name))
-        # cmdb_role_id = search_cmdb_role_id(cmdb_role_name)
-        # instance = Role.objects.filter(name=cmdb_role_name).values('id').first()
         return instance.id
-
     else:
         print("设备角色存在:已完成检索，{} 设备角色ID为: {}".format(cmdb_role_name, cmdb_role_instance['id']))
 
@@ -150,15 +135,8 @@ def search_cmdb_idc_id(cmdb_idc_name):
     cmdb_idc_instance = Idc.objects.filter(name=cmdb_idc_name).values('id').first()
 
     if not cmdb_idc_instance:
-        # msg = "[{}] 机房不存在，请先录入机房信息！".format(cmdb_idc_name)
-        # print(msg)
         instance = Idc.objects.create(name=cmdb_idc_name)
-        time.sleep(3)
-        # print("{} 机房不存在，系统已创建完成!".format(cmdb_idc_name))
-        # cmdb_idc_id = search_cmdb_idc_id(cmdb_idc_name)
-        # instance = Idc.objects.filter(name=cmdb_idc_name).values('id').first()
         return instance.id
-        # return msg
 
     else:
         print(cmdb_idc_instance['id'])
@@ -176,11 +154,6 @@ def search_cmdb_category_id(cmdb_category_name):
     else:
         # print("{} 设备型号不存在，系统正在创建!".format(cmdb_category_name))
         instance= Category.objects.create(name=cmdb_category_name)
-        # time.sleep(3)
-        # print("{} 设备型号不存在，系统已创建完成!".format(cmdb_category_name))
-        # cmdb_category_id = search_cmdb_category_id(cmdb_category_name)
-        # instance = Category.objects.filter(name=cmdb_category_name).values('id').first()
-
         return instance.id
 
 
@@ -194,10 +167,6 @@ def search_cmdb_attribute_id(attribute_name):
     else:
         # print("{} 设备属性不存在，系统正在创建!".format(attribute_name))
         instance = Attribute.objects.create(name=attribute_name)
-        time.sleep(1)
-        # print("{} 设备属性不存在，系统已创建完成!".format(attribute_name))
-        # attribute_id = search_cmdb_attribute_id(attribute_name)
-        # instance = Attribute.objects.filter(name=attribute_name).values('id').first()
         return instance.id
 
 
