@@ -55,7 +55,6 @@ class AccountExtend:
 
 class ResourceManageExcelView(APIView):
     permission_classes = (AllowAny,)
-    # permission_classes = ()
     authentication_classes = ()
 
     def post(self, request):

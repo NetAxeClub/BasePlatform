@@ -6,7 +6,7 @@ import os
 import logging
 from datetime import datetime, date, timedelta
 from celery import shared_task
-from django.template import loader
+# from django.template import loader
 from netaxe.celery import AxeTask
 from netaxe.settings import DEBUG
 from django.utils import timezone
@@ -33,153 +33,6 @@ if DEBUG:
     CELERY_QUEUE = 'dev'
 else:
     CELERY_QUEUE = 'config'
-
-
-# @shared_task(base=AxeTask, once={'graceful': True})
-# def config_backup(**kwargs):
-#     """废弃"""
-#     log_time = datetime.now().strftime("%Y-%m-%d")
-#     start_time = time.time()
-#     msg_gateway_runner.send_wechat(channel="netdevops", content=f"配置备份开始，时间:{log_time}")
-#     today = timezone.now()
-#     if kwargs:
-#         hosts = get_device_info_v2(**kwargs)
-#     else:
-#         hosts = get_device_info_v2()
-#     # 配置备份任务
-#     result = config_backup_nornir(hosts)
-#     end_time = time.time()
-#     time_use = int(int(end_time - start_time) / 60)
-#     fail_host_list = [x for x in result.failed_hosts.keys()]
-#     fail_host = '\n'.join([x for x in result.failed_hosts.keys()])
-#     config_mongo.insert({
-#         'name': 'config_backup_status',
-#         'data': {
-#             'success': len([x['manage_ip'] for x in hosts if x['manage_ip'] not in fail_host_list]),
-#             'failed': len(fail_host_list)
-#         },
-#         'log_time': log_time
-#     })
-#     msg_gateway_runner.send_wechat(channel="netdevops",
-#                                    content=f"配置备份完成，耗时:{time_use}分\n备份失败设备:\n{fail_host}")
-#     success_host_list = [x['manage_ip'] for x in hosts if x not in fail_host_list]
-#     # 配置解析
-#     loop = asyncio.get_event_loop()
-#     loop.run_until_complete(config_file_parse())
-#     # config_file_parse()
-#     # 推送git
-#     commit, changed_files, untracked_files = push_file()
-#     if changed_files or untracked_files:
-#         html_tmp = loader.render_to_string(
-#             'config_center/config_backup.html',
-#             dict(commit=commit, changedFiles=changed_files, untracked_files=untracked_files), None, None)
-#         # html_res = str(html_tmp, "utf-8")
-#         # email_addr = ['dd@dd.com']
-#         # email_subject = '配置备份结果_' + datetime.now().strftime("%Y-%m-%d %H:%M")
-#         # email_text_content = html_res
-#         # msg_gateway_runner.send_email(user=email_addr, subject=email_subject, content=email_text_content)
-#     for host in hosts:
-#         if host['manage_ip'] in fail_host_list:
-#             ConfigBackup.objects.create(
-#                 name=host['name'], manage_ip=host['manage_ip'],
-#                 config_status='FAILED',
-#                 status=host['status'], idc_name=host['idc__name'], vendor=host['vendor__alias'],
-#                 model_name=host['model__name'],
-#                 git_type='change', commit='', file_path='', last_time=today
-#             )
-#         # elif host['manage_ip'] in success_host_list:
-#         else:
-#             ConfigBackup.objects.create(
-#                 name=host['name'], manage_ip=host['manage_ip'],
-#                 config_status='SUCCESS',
-#                 status=host['status'], idc_name=host['idc__name'], vendor=host['vendor__alias'],
-#                 model_name=host['model__name'],
-#                 git_type='change', commit='', file_path=result[host['manage_ip']][0].filename, last_time=today
-#             )
-#     for change_host in changed_files:
-#         hostip = change_host.split('/')[1]
-#         host_info = [host for host in hosts if host['manage_ip'] == hostip]
-#         if host_info:
-#             ConfigBackup.objects.filter(name=host_info[0]['name'], manage_ip=host_info[0]['manage_ip'],
-#                                         status=host_info[0]['status'],
-#                                         idc_name=host_info[0]['idc__name'],
-#                                         vendor=host_info[0]['vendor__alias'],
-#                                         model_name=host_info[0]['model__name'], last_time=today
-#                                         ).update(
-#                 config_status='SUCCESS', git_type='change', commit=commit, file_path=change_host, last_time=today
-#             )
-#     for untracked_host in untracked_files:
-#         hostip = untracked_host.split('/')[1]
-#         host_info = [host for host in hosts if host['manage_ip'] == hostip]
-#         if host_info:
-#             ConfigBackup.objects.filter(name=host_info[0]['name'], manage_ip=host_info[0]['manage_ip'],
-#                                         status=host_info[0]['status'],
-#                                         idc_name=host_info[0]['idc__name'],
-#                                         vendor=host_info[0]['vendor__alias'],
-#                                         model_name=host_info[0]['model__name'], last_time=today
-#                                         ).update(
-#                 config_status='SUCCESS', git_type='add', commit=commit, file_path=untracked_host, last_time=today
-#             )
-#     config_mongo.insert({
-#         'name': 'config_backup_git_status',
-#         'data': {
-#             'change': len(changed_files),
-#             'add': len(untracked_files),
-#             'commit': commit
-#         },
-#         'log_time': log_time
-#     })
-#     msg_gateway_runner.send_wechat(channel='netdevops',
-#                                    content=f"配置备份推送完成\n变更配置文件数:{len(changed_files)}\n新增配置文件数:{len(untracked_files)}\ncommit:{commit}")
-#     config_compliance.apply_async(kwargs={}, queue=CELERY_QUEUE, retry=True)
-#     return
-
-
-# 配置合规检查
-# @shared_task(base=AxeTask, once={'graceful': True})
-# def config_safe_baseline_check(**kwargs):
-#     vendor_map = {
-#         'hp_comware': 'H3C',
-#         'huawei': 'HUAWEI',
-#     }
-#     start_datetime = date.today().strftime('%Y-%m-%d') + ' 00:00:00'
-#     end_datetime = date.today().strftime('%Y-%m-%d') + ' 23:59:59'
-#     rules_q = ConfigCompliance.objects.all().values()
-#     res = ConfigBackup.objects.filter(last_time__range=(start_datetime, end_datetime)).values()
-#     for host_info in res:
-#         vendor = host_info['file_path'].split('/')[-1].split('-')[0]
-#         if vendor in vendor_map.keys():
-#             rules = [x for x in rules_q if x['vendor'] == vendor_map[vendor]]
-#             data_to_parse = default_storage.open(f"device_config/{host_info['file_path']}").read()
-#             data_to_parse = data_to_parse.decode('utf-8')
-#             # print(data_to_parse)
-#             for rule in rules:
-#                 _data = {
-#                     'compliance': '',
-#                     'rule_id': rule['id'],
-#                     'manage_ip': host_info['manage_ip'],
-#                     'hostname': host_info['name'],
-#                     'vendor': vendor_map[vendor],
-#                     'rule': rule['name'],
-#                     'regex': rule['regex'],
-#                     'log_time': timezone.now()
-#                 }
-#                 _regex = rule['regex']
-#                 _pattern = rule['pattern']  # match-compliance  mismatch-compliance
-#                 _res = re.compile(pattern=_regex, flags=re.M).findall(string=data_to_parse)
-#                 # 匹配-合规 反之 不匹配-不合规
-#                 if _pattern == 'match-compliance':
-#                     _data['compliance'] = '合规' if _res else '不合规'
-#                 # 不匹配-合规 反之 匹配-不合规
-#                 elif _pattern == 'mismatch-compliance':
-#                     _data['compliance'] = '不合规' if _res else '合规'
-#                 res_query = ConfigComplianceResult.objects.filter(manage_ip=host_info['manage_ip'], rule_id=rule['id'])
-#                 # logger.debug('res_query', res_query)
-#                 if res_query:
-#                     ConfigComplianceResult.objects.filter(manage_ip=host_info['manage_ip'], rule_id=rule['id']).update(
-#                         **_data)
-#                 else:
-#                     ConfigComplianceResult.objects.create(**_data)
 
 
 @shared_task(base=AxeTask, once={'graceful': True})
@@ -265,51 +118,122 @@ def config_compliance(**kwargs):
                                 ConfigComplianceResult.objects.create(**_data)
 
 
+# @shared_task(base=AxeTask, once={'graceful': True})
+# def backup_device_config_sub(**kwargs):
+#     connections.close_all()
+#     today = kwargs['today']
+#     policy_map = kwargs['policy_map']
+#     # command_map = {
+#     #     'H3C': {'cmd': 'display current-configuration', 'expect_string': None, 'enable': False},
+#     #     'Huawei': {'cmd': 'display current-configuration', 'expect_string': None, 'enable': False},
+#     #     'Mellanox': {'cmd': 'show running-config', 'expect_string': None, 'enable': True},
+#     #     'Ruijie': {'cmd': 'show running-config', 'expect_string': None, 'enable': False},
+#     #     'centec': {'cmd': 'show running-config', 'expect_string': None, 'enable': False},
+#     #     'Hillstone': {'cmd': 'show configuration running', 'expect_string': None, 'enable': False},
+#     #     'inspur': {'cmd': 'show running-config', 'expect_string': None, 'enable': False},
+#     #     'Cisco': {'cmd': 'show running-config', 'expect_string': None, 'enable': False},
+#     #     'Maipu': {'cmd': 'show running-config', 'expect_string': ']'},
+#     #     'ZTE': {'cmd': 'show running-config', 'expect_string': ']'},
+#     # }
+#     hostip = kwargs['manage_ip']  # 设备管理IP地址
+#     class_instance = BaseConn(**kwargs)
+#     filename = f"current-configuration/{hostip}/{kwargs['vendor__alias']}_{hostip}.txt"
+#     try:
+#         content = class_instance.send_commands(cmd=policy_map['current_command'])
+#         if not os.path.exists(BASE_DIR + f"/media/device_config/current-configuration/{hostip}/"):
+#             os.mkdir(BASE_DIR + f"/media/device_config/current-configuration/{hostip}/")
+#         with open(BASE_DIR + "/media/device_config/" + filename, "w", encoding="utf-8") as f:
+#             f.write(content)
+#         device_q = ConfigBackup.objects.filter(manage_ip=hostip)
+#         if device_q:
+#             ConfigBackup.objects.filter(manage_ip=hostip).update(name=kwargs['name'],
+#                                                                  config_status='SUCCESS',
+#                                                                  status=kwargs['status'], idc_name=kwargs['idc__name'],
+#                                                                  vendor=kwargs['vendor__alias'],
+#                                                                  model_name=kwargs['model__name'], file_path=filename,
+#                                                                  last_time=today)
+#         else:
+#             ConfigBackup.objects.create(name=kwargs['name'], manage_ip=hostip,
+#                                         config_status='SUCCESS',
+#                                         status=kwargs['status'], idc_name=kwargs['idc__name'],
+#                                         vendor=kwargs['vendor__alias'],
+#                                         model_name=kwargs['model__name'], file_path=filename,
+#                                         last_time=today)
+#
+#     except RuntimeError as e:
+#         device_q = ConfigBackup.objects.filter(manage_ip=hostip)
+#         if device_q:
+#             ConfigBackup.objects.filter(manage_ip=hostip).update(name=kwargs['name'],
+#                                                                  config_status='FAILED',
+#                                                                  status=kwargs['status'], idc_name=kwargs['idc__name'],
+#                                                                  vendor=kwargs['vendor__alias'],
+#                                                                  model_name=kwargs['model__name'], file_path=filename,
+#                                                                  last_time=today)
+#         else:
+#             ConfigBackup.objects.create(
+#                 name=kwargs['name'], manage_ip=hostip,
+#                 config_status='FAILED',
+#                 status=kwargs['status'], idc_name=kwargs['idc__name'], vendor=kwargs['vendor__alias'],
+#                 model_name=kwargs['model__name'], last_time=today
+#             )
+#     return filename
+
 @shared_task(base=AxeTask, once={'graceful': True})
 def backup_device_config_sub(**kwargs):
     connections.close_all()
     today = kwargs['today']
     policy_map = kwargs['policy_map']
-    command_map = {
-        'H3C': {'cmd': 'display current-configuration', 'expect_string': None, 'enable': False},
-        'Huawei': {'cmd': 'display current-configuration', 'expect_string': None, 'enable': False},
-        'Mellanox': {'cmd': 'show running-config', 'expect_string': None, 'enable': True},
-        'Ruijie': {'cmd': 'show running-config', 'expect_string': None, 'enable': False},
-        'centec': {'cmd': 'show running-config', 'expect_string': None, 'enable': False},
-        'Hillstone': {'cmd': 'show configuration running', 'expect_string': None, 'enable': False},
-        'inspur': {'cmd': 'show running-config', 'expect_string': None, 'enable': False},
-        'Cisco': {'cmd': 'show running-config', 'expect_string': None, 'enable': False},
-        'Maipu': {'cmd': 'show running-config', 'expect_string': ']'},
-        'ZTE': {'cmd': 'show running-config', 'expect_string': ']'},
-    }
     hostip = kwargs['manage_ip']  # 设备管理IP地址
-    if hostip == '0.0.0.0':
-        return {}
     class_instance = BaseConn(**kwargs)
     filename = f"current-configuration/{hostip}/{kwargs['vendor__alias']}_{hostip}.txt"
     try:
-        content = class_instance.send_commands(cmd=command_map[kwargs['vendor__alias']]['cmd'])
-        if not os.path.exists(BASE_DIR + f"/media/device_config/current-configuration/{hostip}/"):
-            os.mkdir(BASE_DIR + f"/media/device_config/current-configuration/{hostip}/")
-        with open(BASE_DIR + "/media/device_config/" + filename, "w", encoding="utf-8") as f:
-            f.write(content)
-        device_q = ConfigBackup.objects.filter(manage_ip=hostip)
-        if device_q:
-            ConfigBackup.objects.filter(manage_ip=hostip).update(name=kwargs['name'],
-                                                                 config_status='SUCCESS',
-                                                                 status=kwargs['status'], idc_name=kwargs['idc__name'],
-                                                                 vendor=kwargs['vendor__alias'],
-                                                                 model_name=kwargs['model__name'], file_path=filename,
-                                                                 last_time=today)
+        flag, res = class_instance.backup_command(cmds=policy_map)
+        cmd_map = {
+            'startup_command': 'startup',
+            'current_command': 'running',
+        }
+        if flag:
+            for cmd in res.keys():
+                device_q = ConfigBackup.objects.filter(manage_ip=hostip, config_type=cmd_map[cmd])
+                if device_q:
+                    ConfigBackup.objects.filter(manage_ip=hostip).update(name=kwargs['name'], config_type=cmd_map[cmd],
+                                                                         config_status='SUCCESS',
+                                                                         status=kwargs['status'],
+                                                                         idc_name=kwargs['idc__name'],
+                                                                         vendor=kwargs['vendor__alias'],
+                                                                         model_name=kwargs['model__name'],
+                                                                         file_path=filename,
+                                                                         last_time=today)
+                else:
+                    ConfigBackup.objects.create(name=kwargs['name'], manage_ip=hostip, config_type=cmd_map[cmd],
+                                                config_status='SUCCESS',
+                                                status=kwargs['status'], idc_name=kwargs['idc__name'],
+                                                vendor=kwargs['vendor__alias'],
+                                                model_name=kwargs['model__name'], file_path=filename,
+                                                last_time=today)
         else:
-            ConfigBackup.objects.create(name=kwargs['name'], manage_ip=hostip,
-                                        config_status='SUCCESS',
-                                        status=kwargs['status'], idc_name=kwargs['idc__name'],
-                                        vendor=kwargs['vendor__alias'],
-                                        model_name=kwargs['model__name'], file_path=filename,
-                                        last_time=today)
+            device_q = ConfigBackup.objects.filter(manage_ip=hostip)
+            if device_q:
+                ConfigBackup.objects.filter(manage_ip=hostip).update(name=kwargs['name'],
+                                                                     config_status='FAILED',
+                                                                     status=kwargs['status'],
+                                                                     idc_name=kwargs['idc__name'],
+                                                                     vendor=kwargs['vendor__alias'],
+                                                                     model_name=kwargs['model__name'],
+                                                                     file_path=filename,
+                                                                     last_time=today, detail=res)
+            else:
+                ConfigBackup.objects.create(
+                    name=kwargs['name'], manage_ip=hostip,
+                    config_status='FAILED',
+                    status=kwargs['status'], idc_name=kwargs['idc__name'], vendor=kwargs['vendor__alias'],
+                    model_name=kwargs['model__name'], last_time=today, detail=res
+                )
 
+
+    #
     except RuntimeError as e:
+        logger.error(e)
         device_q = ConfigBackup.objects.filter(manage_ip=hostip)
         if device_q:
             ConfigBackup.objects.filter(manage_ip=hostip).update(name=kwargs['name'],
@@ -317,13 +241,13 @@ def backup_device_config_sub(**kwargs):
                                                                  status=kwargs['status'], idc_name=kwargs['idc__name'],
                                                                  vendor=kwargs['vendor__alias'],
                                                                  model_name=kwargs['model__name'], file_path=filename,
-                                                                 last_time=today)
+                                                                 last_time=today, detail=str(e))
         else:
             ConfigBackup.objects.create(
                 name=kwargs['name'], manage_ip=hostip,
                 config_status='FAILED',
                 status=kwargs['status'], idc_name=kwargs['idc__name'], vendor=kwargs['vendor__alias'],
-                model_name=kwargs['model__name'], last_time=today
+                model_name=kwargs['model__name'], last_time=today, detail=str(e)
             )
     return filename
 
@@ -341,19 +265,20 @@ def backup_device_config(**kwargs):
 
     logger.info('获取所有设备信息结束')
     p = BackupPolicy.objects.all().values()
-    policy_map = {k['vendor']: {'startup_command': k['startup_command'], 'current_command': k['current_command']} for k in p}
+    policy_map = {k['vendor']: {'startup_command': k['startup_command'], 'current_command': k['current_command']} for k
+                  in p}
     # 参数初始化
     net_tower_tasks = []  # 寻觅任务id集合
     # 批量下发任务
     for host in hosts:
-        # backup_device_config_sub(**host)
-        host['today'] = today
-        host['policy_map'] = policy_map[host['vendor__alias']] if host['vendor__alias'] in policy_map.keys() else {}
-        net_tower_tasks.append(
-            backup_device_config_sub.apply_async(
-                kwargs=host,
-                queue='config',
-                retry=True))
+        if host['vendor__alias'] in policy_map.keys() and host['manage_ip'] != '0.0.0.0':
+            host['today'] = today
+            host['policy_map'] = policy_map[host['vendor__alias']]
+            net_tower_tasks.append(
+                backup_device_config_sub.apply_async(
+                    kwargs=host,
+                    queue='config',
+                    retry=True))
 
     # 去除结果中的<EagerResult: None>
     for task in net_tower_tasks:

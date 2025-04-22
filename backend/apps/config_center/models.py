@@ -113,12 +113,11 @@ class ConfigBackup(models.Model):
     model_name = models.CharField(verbose_name='型号', max_length=100, null=True, default='')
     vendor = models.CharField(verbose_name='厂商', max_length=100, null=True, default='')
     file_path = models.CharField(verbose_name='文件路径', max_length=200, null=True, default='')
-    # commit = models.CharField(verbose_name='提交commit', max_length=200, null=True, default='')
-    # git_type = models.CharField(verbose_name='类型', max_length=200, null=True, default='')
     config_type = models.CharField(choices=config_type, null=False, default='running', max_length=100)
     status = models.PositiveSmallIntegerField(
         verbose_name='状态', choices=status_choices, default=0)
     config_status = models.CharField(verbose_name='备份状态', max_length=100, null=False, default='')
+    detail = models.TextField(verbose_name='详情', null=True, blank=True)
 
     def __str__(self):
         return "{}-{}".format(self.manage_ip, self.last_time)

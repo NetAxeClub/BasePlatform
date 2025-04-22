@@ -7,11 +7,13 @@
 # from apps.automation.utils.auto_main import BatManMain
 import json
 import math
+import os
 import re
 import logging
 from typing import Dict, List
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
+from netaxe.settings import BASE_DIR
 from netmiko import (NetmikoTimeoutException, NetmikoAuthenticationException, ConfigInvalidException)
 from apps.asset.models import NetworkDevice
 from apps.automation.models import CollectionPlan
@@ -360,6 +362,51 @@ class BaseConn:
             print(str(e))
             raise RuntimeError('[Error 4] Exception.{}'.format(str(e)))
         return content
+
+    def backup_command(self, cmds: dict) -> tuple:
+        path = {}
+        try:
+            with ConnectHandler(**self.netmiko_params) as dev_connection:
+                # prompt = dev_connection.find_prompt()  # 找出设备的prompt
+                quit_cmd = {
+                    'H3C': 'quit',
+                    'Huawei': 'quit',
+                    'Hillstone': 'exit',
+                    'Ruijie': 'exit',
+                    'centec': 'exit',
+                    'Maipu': 'exit',
+                    'ZTE': 'exit',
+                }
+                # 映射目录用
+                path_map = {
+                    'current_command': 'current-configuration',
+                    'startup_command': 'startup-configuration',
+                }
+                for cmd in cmds.keys():
+                    if len(cmds[cmd]) < 3:
+                        continue
+                    content = dev_connection.send_command(cmds[cmd])
+                    if content:
+                        filename = f"device_config/{path_map[cmd]}/{self.hostip}/{self.vendor_alias}_{self.hostip}.txt"
+                        if not os.path.exists(BASE_DIR + f"/media/device_config/{path_map[cmd]}/{self.hostip}/"):
+                            os.mkdir(BASE_DIR + f"/media/device_config/{path_map[cmd]}/{self.hostip}/")
+                        with open(BASE_DIR + "/media/" + filename, "w", encoding="utf-8") as f:
+                            f.write(content)
+                        path[cmd] = filename
+                if self.vendor_alias in quit_cmd.keys():
+                    dev_connection.cleanup(command=quit_cmd[self.vendor_alias])
+                dev_connection.disconnect()
+        except NetmikoAuthenticationException as e:  # 认证失败报错记录
+            return False, {'error': '[Error 1] Authentication failed.{}'.format(str(e))}
+        except NetmikoTimeoutException as e:  # 登录超时报错记录
+            print('[Error 2] Connection timed out.{}'.format(str(e)))
+            return False, {'error': '[Error 2] Connection timed out.{}'.format(str(e))}
+        except ConfigInvalidException as e:  # 配置项错误
+            return False, {'error': '[Error 3] ConfigInvalidException.{}'.format(str(e))}
+        except Exception as e:
+            # 采集失败的记录日志
+            return False, {'error': '[Error 4] Exception.{}'.format(str(e))}
+        return True, path
 
     # 执行数据解析  这里每个厂商的解析方式不一样，采用类的继承方式实现，父类只做定义
     def _collection_analysis(self, paths: list):
