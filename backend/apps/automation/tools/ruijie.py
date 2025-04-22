@@ -193,7 +193,7 @@ class RuijieProc(BaseConn):
             if model_tmp:
                 model_name = model_tmp[1:-1]
                 model_q = Model.objects.get_or_create(name=model_name,
-                                                           vendor=Vendor.objects.get(alias='Ruijie'))
+                                                      vendor=Vendor.objects.get(alias='Ruijie'))
                 NetworkDevice.objects.filter(
                     manage_ip=self.hostip).update(model=model_q[0])
             NetworkDevice.objects.filter(
@@ -210,7 +210,7 @@ class RuijieProc(BaseConn):
                     if model_tmp:
                         model_name = model_tmp[1:-1]
                         model_q = Model.objects.get_or_create(name=model_name,
-                                                                   vendor=Vendor.objects.get(alias='Ruijie'))
+                                                              vendor=Vendor.objects.get(alias='Ruijie'))
                         NetworkDevice.objects.filter(
                             manage_ip=self.hostip).update(model=model_q[0])
                     NetworkDevice.objects.filter(
@@ -294,7 +294,7 @@ class RuijieProc(BaseConn):
             fsm_map[file_name](res)
         else:
             pass
-            #send_msg_netops"设备:{}\n命令:{}\n不被解析".format(self.hostip, file_name))
+            # send_msg_netops"设备:{}\n命令:{}\n不被解析".format(self.hostip, file_name))
 
     def _collection_analysis(self, paths: list):
         for path in paths:
