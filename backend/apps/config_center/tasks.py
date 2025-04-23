@@ -2,9 +2,8 @@
 from __future__ import absolute_import, unicode_literals
 import re
 import time
-import os
 import logging
-from datetime import datetime, date, timedelta
+from datetime import datetime, timedelta
 from celery import shared_task
 # from django.template import loader
 from netaxe.celery import AxeTask
@@ -185,7 +184,7 @@ def backup_device_config_sub(**kwargs):
     policy_map = kwargs['policy_map']
     hostip = kwargs['manage_ip']  # 设备管理IP地址
     class_instance = BaseConn(**kwargs)
-    filename = f"current-configuration/{hostip}/{kwargs['vendor__alias']}_{hostip}.txt"
+    # filename = f"current-configuration/{hostip}/{kwargs['vendor__alias']}_{hostip}.txt"
     try:
         flag, res = class_instance.backup_command(cmds=policy_map)
         cmd_map = {
@@ -196,20 +195,21 @@ def backup_device_config_sub(**kwargs):
             for cmd in res.keys():
                 device_q = ConfigBackup.objects.filter(manage_ip=hostip, config_type=cmd_map[cmd])
                 if device_q:
-                    ConfigBackup.objects.filter(manage_ip=hostip).update(name=kwargs['name'], config_type=cmd_map[cmd],
-                                                                         config_status='SUCCESS',
-                                                                         status=kwargs['status'],
-                                                                         idc_name=kwargs['idc__name'],
-                                                                         vendor=kwargs['vendor__alias'],
-                                                                         model_name=kwargs['model__name'],
-                                                                         file_path=filename,
-                                                                         last_time=today)
+                    ConfigBackup.objects.filter(manage_ip=hostip, config_type=cmd_map[cmd]).update(
+                        name=kwargs['name'],
+                        config_status='SUCCESS',
+                        status=kwargs['status'],
+                        idc_name=kwargs['idc__name'],
+                        vendor=kwargs['vendor__alias'],
+                        model_name=kwargs['model__name'],
+                        file_path=res[cmd],
+                        last_time=today)
                 else:
                     ConfigBackup.objects.create(name=kwargs['name'], manage_ip=hostip, config_type=cmd_map[cmd],
                                                 config_status='SUCCESS',
                                                 status=kwargs['status'], idc_name=kwargs['idc__name'],
                                                 vendor=kwargs['vendor__alias'],
-                                                model_name=kwargs['model__name'], file_path=filename,
+                                                model_name=kwargs['model__name'], file_path=res[cmd],
                                                 last_time=today)
         else:
             device_q = ConfigBackup.objects.filter(manage_ip=hostip)
@@ -220,18 +220,15 @@ def backup_device_config_sub(**kwargs):
                                                                      idc_name=kwargs['idc__name'],
                                                                      vendor=kwargs['vendor__alias'],
                                                                      model_name=kwargs['model__name'],
-                                                                     file_path=filename,
-                                                                     last_time=today, detail=res)
+                                                                     file_path='',
+                                                                     last_time=today, detail=res.get('error') or '')
             else:
                 ConfigBackup.objects.create(
                     name=kwargs['name'], manage_ip=hostip,
                     config_status='FAILED',
                     status=kwargs['status'], idc_name=kwargs['idc__name'], vendor=kwargs['vendor__alias'],
-                    model_name=kwargs['model__name'], last_time=today, detail=res
+                    model_name=kwargs['model__name'], last_time=today, detail=res.get('error') or ''
                 )
-
-
-    #
     except RuntimeError as e:
         logger.error(e)
         device_q = ConfigBackup.objects.filter(manage_ip=hostip)
@@ -240,7 +237,7 @@ def backup_device_config_sub(**kwargs):
                                                                  config_status='FAILED',
                                                                  status=kwargs['status'], idc_name=kwargs['idc__name'],
                                                                  vendor=kwargs['vendor__alias'],
-                                                                 model_name=kwargs['model__name'], file_path=filename,
+                                                                 model_name=kwargs['model__name'], file_path='',
                                                                  last_time=today, detail=str(e))
         else:
             ConfigBackup.objects.create(
@@ -249,13 +246,11 @@ def backup_device_config_sub(**kwargs):
                 status=kwargs['status'], idc_name=kwargs['idc__name'], vendor=kwargs['vendor__alias'],
                 model_name=kwargs['model__name'], last_time=today, detail=str(e)
             )
-    return filename
+    return {}
 
 
 @shared_task(base=AxeTask, once={'graceful': True})
 def backup_device_config(**kwargs):
-    log_time = datetime.now().strftime("%Y-%m-%d")
-    # msg_gateway_runner.send_wechat(channel="netdevops", content=f"配置备份开始，时间:{log_time}")
     start_time = time.time()
     today = timezone.now()
     if kwargs:

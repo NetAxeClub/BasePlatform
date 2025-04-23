@@ -340,7 +340,7 @@ CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 CELERY_ACCEPT_CONTENT = ["json", "application/text"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
-CELERYD_CONCURRENCY = 40  # celery worker的并发数
+CELERYD_CONCURRENCY = 60  # celery worker的并发数
 CELERY_MAX_TASKS_PER_CHILD = 20
 CELERYD_MAX_TASKS_PER_CHILD = 20
 # 这个表示每个工作的进程／线程／绿程 在执行 n 次任务后，主动销毁，之后会起一个新的。主要解决一些资源释放的问题。
@@ -352,7 +352,7 @@ CELERY_TASK_TIME_LIMIT = 7200
 # 单个任务的运行时间不超过此值，否则会被SIGKILL 信号杀死
 CELERY_ENABLE_UTC = False
 
-CELERY_WORKER_CONCURRENCY = 40  # celery worker的并发数
+CELERY_WORKER_CONCURRENCY = 60  # celery worker的并发数
 DJANGO_CELERY_BEAT_TZ_AWARE = True
 CELERY_RESULT_EXTENDED = True
 CELERY_TIMEZONE = "Asia/Shanghai"  # celery 时区问题
