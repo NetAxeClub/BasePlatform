@@ -42,10 +42,13 @@ class BaseTree:
                 data['children'].append(sub_data)
         self.tree_data[root_name]['children'].append(data)
 
-    def root_tree(self):
+    def root_tree(self, root_name=None):
         # 遍历根目录下所有文件
         for root in self.pathname.iterdir():
             if root.name not in self.black_list:
+                if root_name is not None:
+                    if root.name != root_name:
+                        continue
                 self.key += 1
                 data = {
                     'id': root.name,
@@ -59,6 +62,6 @@ class BaseTree:
                         if cp.name not in self.black_list:
                             self._second_path(root.name, cp)
 
-    def produce_tree(self):
-        self.root_tree()
+    def produce_tree(self, root_name=None):
+        self.root_tree(root_name=root_name)
         self.tree_final = [self.tree_data[k] for k in self.tree_data.keys()]

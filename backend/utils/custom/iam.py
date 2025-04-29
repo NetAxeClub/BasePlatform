@@ -14,7 +14,7 @@ import json
 import logging
 # import traceback
 import requests
-# from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.exceptions import NotAuthenticated
 from django.http.response import HttpResponseForbidden
 from django.utils.deprecation import MiddlewareMixin
 from django.contrib.auth.models import AnonymousUser
@@ -78,13 +78,13 @@ class IamMiddleware(MiddlewareMixin):
             logger.info(f"header token: {token}")
         if token is None:
             response_data = {'error': 'Missing netops-token', 'code': 400, 'path': request.path, 'method': request.method}
-            return HttpResponseForbidden(json.dumps(response_data), content_type='application/json')
+            return NotAuthenticated(json.dumps(response_data))
             # self.require_permission()
         flag, res = self.check_permission(unquote(token), request.path, request.method.lower())
         logger.info(f"flag: {flag}, res: {res}")
         if not flag:
             response_data = {'error': 'request netaxe iam failed', 'code': 400, 'path': request.path, 'method': request.method}
-            return HttpResponseForbidden(json.dumps(response_data), content_type='application/json')
+            return NotAuthenticated(json.dumps(response_data))
             # raise PermissionDenied
         if res['code'] == 200:
             is_allow = res['data']['is_allow']
@@ -93,7 +93,7 @@ class IamMiddleware(MiddlewareMixin):
         else:
             request.iam = AnonymousUser()
             response_data = {'error': 'netaxe iam policy not allowed AnonymousUser', 'code': 400, 'path': request.path, 'method': request.method}
-            return HttpResponseForbidden(json.dumps(response_data), content_type='application/json')
+            return NotAuthenticated(json.dumps(response_data))
         # if not is_allow:
         #     raise PermissionDenied
 

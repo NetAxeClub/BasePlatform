@@ -277,9 +277,12 @@ class GitConfig(APIView):
                     "msg": "没有获取到git配置文件目录的设备IP列表"
                 }
                 return JsonResponse(data)
-        if 'get_hostip_file' in get_param.keys():
+        if all(k in get_param for k in ("get_hostip_file", "config_type")):
             _tree = ConfigTree()
-            _tree.produce_tree()
+            if get_param['config_type'] == 'startup':
+                _tree.produce_tree(root_name='startup-configuration')
+            else:
+                _tree.produce_tree(root_name='current-configuration')
             res = _tree.tree_final
             host_list = [x for x in res[0]['children'] if x['label'] == get_param['get_hostip_file']]
             if host_list:
