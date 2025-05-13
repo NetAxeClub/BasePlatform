@@ -67,7 +67,12 @@ class IamMiddleware(MiddlewareMixin):
         if request.path.startswith('/base_platform/monitor/public_net_resource/'):
             """允许公网数据源操作"""
             return
+        # if request.path.startswith('/base_platform/monitor/public_net_owner/'):
+        #     """允许公网数据源操作"""
+        #     return
         api_key = request.headers.get('x-api-key', None)
+        if api_key is None:
+            api_key = request.COOKIES.get('x-api-key')
         if api_key is not None:
             if api_key == config.api_key:
                 return
