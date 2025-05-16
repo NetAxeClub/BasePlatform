@@ -344,11 +344,11 @@ CELERYD_CONCURRENCY = 60  # celery worker的并发数
 CELERY_MAX_TASKS_PER_CHILD = 20
 CELERYD_MAX_TASKS_PER_CHILD = 20
 # 这个表示每个工作的进程／线程／绿程 在执行 n 次任务后，主动销毁，之后会起一个新的。主要解决一些资源释放的问题。
-CELERY_RESULT_EXPIRES = 7200  # celery任务执行结果的超时时间，
-CELERY_TASK_RESULT_EXPIRES = 7200
+CELERY_RESULT_EXPIRES = 7200 * 2# celery任务执行结果的超时时间，
+CELERY_TASK_RESULT_EXPIRES = 7200 * 2
 # 这个表示保存任务结果的时长，这个时间会被设置到 redis 里面（假设 backend 是 redis ），如果抓取数据量大的话，是可以缩短保存的时间，
 # 节省 backend 的资源（ redis 主要是内存）消耗，默认是 24 小时（ 86400 ），单位是秒。
-CELERY_TASK_TIME_LIMIT = 7200
+CELERY_TASK_TIME_LIMIT = 7200 * 2
 # 单个任务的运行时间不超过此值，否则会被SIGKILL 信号杀死
 CELERY_ENABLE_UTC = False
 
