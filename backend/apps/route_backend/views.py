@@ -427,7 +427,7 @@ class TaskResultViewSet(CustomViewBase):
     """
     处理  GET POST , 处理 /api/post/<pk>/ GET PUT PATCH DELETE
     """
-    queryset = TaskResult.objects.all().order_by('id')
+    queryset = TaskResult.objects.all().order_by('-id')
     serializer_class = TaskResultSerializer
     permission_classes = ()
     authentication_classes = ()
@@ -437,4 +437,5 @@ class TaskResultViewSet(CustomViewBase):
     filter_fields = '__all__'
     pagination_class = LimitSet
     # 设置搜索的关键字
-    search_fields = ('date_done', 'result', 'status', 'task_id', 'task_name', 'traceback')
+    # search_fields = ('date_done', 'result', 'status', 'task_id', 'task_name', 'traceback')
+    search_fields = ('date_done', 'task_name', 'task_id')
