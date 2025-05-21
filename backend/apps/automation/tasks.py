@@ -1055,7 +1055,23 @@ def is_lldp_reverse_connected(device_ip, port):
     return lldp_entry
 
 
-async def xunmi_operation(**kwargs):
+def is_device_ip(device_ip, ipaddress):
+    """
+    检查是否是设备IP
+    """
+    cache_key = ('device_interface_ip', device_ip, ipaddress)
+    cached = get_cached_network_data('xunmi', *cache_key)
+    if cached is not None:
+        return cached
+    show_ip_entry = show_ip_mongo.find(
+        query_dict={'hostip': device_ip, 'ipaddress': ipaddress},
+        fields={'_id': 0})
+    if show_ip_entry:
+        cache_network_data('xunmi', *cache_key, data=show_ip_entry)
+    return show_ip_entry
+
+
+def xunmi_operation(**kwargs):
     logger.info(kwargs['ipaddress'])
     start_time = time.time()
     ip_address = kwargs['ipaddress']
@@ -1084,12 +1100,10 @@ async def xunmi_operation(**kwargs):
                         mac_interface = mac_interface.split('.')[0]
                 except Exception as e:
                     logger.error("ip{}:{}".format(ip_address, str(e)))
-                # lagg_res = cache.get('lagg_{}_{}'.format(mac['hostip'], mac_interface))
                 agg_entry = check_aggregation_port(mac['hostip'], mac_interface)
 
                 # 是聚合口
                 if agg_entry:
-                    # lagg_res = json.loads(lagg_res)
                     lagg_res = agg_entry[0]
                     if len(lagg_res['memberports']) >= 1:
                         lldp_num = 0
@@ -1114,10 +1128,11 @@ async def xunmi_operation(**kwargs):
                                     # print('聚合组=>LLDP邻居系统名不为空')
                                     neighbor_hostip = lldp_res[0]['neighbor_ip']
                                     # _ip_res = cache.get('layer3interface_{}_{}'.format(neighbor_hostip, ip_address))
-                                    _ip_res = show_ip_mongo.find(
-                                        query_dict={'hostip': neighbor_hostip, 'ipaddress': ip_address},
-                                        fields={'_id': 0})
-                                    if _ip_res:
+                                    show_ip_entry = is_device_ip(neighbor_hostip, ip_address)
+                                    # _ip_res = show_ip_mongo.find(
+                                    #     query_dict={'hostip': neighbor_hostip, 'ipaddress': ip_address},
+                                    #     fields={'_id': 0})
+                                    if show_ip_entry:
                                         tmp_result.append(dict(host=mac['hostip'],
                                                                interface=mac['interface'],
                                                                macaddress=arp['macaddress'],
@@ -1144,11 +1159,9 @@ async def xunmi_operation(**kwargs):
         for arp in arp_res:
             if arp['interface'] is None:
                 continue
-            # lagg_res = cache.get('lagg_{}_{}'.format(arp['hostip'], arp['interface']))
             lagg_res = check_aggregation_port(arp['hostip'], arp['interface'])
             # 是聚合口
             if lagg_res:
-                # lagg_res = json.loads(lagg_res)
                 lagg_res = lagg_res[0]
                 if len(lagg_res['memberports']) >= 1:
                     # logger.debug("没有查询结果，则以ARP信息为最终结果 且是聚合口")
@@ -1187,10 +1200,11 @@ async def xunmi_operation(**kwargs):
                                     # if _ip_res:
                                     #     _ip_res = json.loads(_ip_res)
                                     # else:
-                                    _ip_res = show_ip_mongo.find(
-                                        query_dict=dict(ipaddress=ip_address, hostip=neighbor_hostip),
-                                        fields={'_id': 0})
-                                    if _ip_res:
+                                    show_ip_entry = is_device_ip(neighbor_hostip, ip_address)
+                                    # _ip_res = show_ip_mongo.find(
+                                    #     query_dict=dict(ipaddress=ip_address, hostip=neighbor_hostip),
+                                    #     fields={'_id': 0})
+                                    if show_ip_entry:
                                         logger.debug('有聚合组且有直连LLDP邻居')
                                         tmp_result.append(dict(host=arp['hostip'],
                                                                interface=port,
@@ -1229,10 +1243,11 @@ async def xunmi_operation(**kwargs):
                         if tmp_neighbor_ip:
                             # 需要把需要定位的IP和设备管理IP作为参数查询layer3interface，目的是校验
                             neighbor_hostip = tmp_neighbor_ip[0]['manage_ip']
-                            _ip_res = show_ip_mongo.find(
-                                query_dict=dict(ipaddress=ip_address, hostip=neighbor_hostip),
-                                fields={'_id': 0})
-                            if _ip_res:
+                            show_ip_entry = is_device_ip(neighbor_hostip, ip_address)
+                            # _ip_res = show_ip_mongo.find(
+                            #     query_dict=dict(ipaddress=ip_address, hostip=neighbor_hostip),
+                            #     fields={'_id': 0})
+                            if show_ip_entry:
                                 tmp_result.append(dict(host=arp['hostip'],
                                                        interface=arp['interface'],
                                                        macaddress=arp['macaddress'],
@@ -1264,7 +1279,8 @@ async def xunmi_operation(**kwargs):
         if i['macaddress']:
             # 判断MAC地址合法性  (\w+-\w+-\w+)
             if re.search(r'^(\w+-\w+-\w+)', i['macaddress']):
-                await MainIn.tracking_format(ip_address, i['host'], log_time, i['memberport'], i['macaddress'])
+                asyncio.run(MainIn.tracking_format(ip_address, i['host'], log_time, i['memberport'], i['macaddress']))
+                # await MainIn.tracking_format(ip_address, i['host'], log_time, i['memberport'], i['macaddress'])
     total_time = int((time.time() - start_time))
     logger.info("{}地址查询耗时{}秒".format(ip_address, total_time))
     return
@@ -1280,10 +1296,10 @@ def tracking_sub(**kwargs):
     for _ip in data:
         params = dict(ipaddress=_ip['ipaddress'], log_time=log_time)
         # await xunmi_operation(**params)
-        # xunmi_operation(**params)
-        asyncio.run(xunmi_operation(**params))
+        xunmi_operation(**params)
+        # asyncio.run(xunmi_operation(**params))
     e = time.time()
-    logger.info('async cost time: %s' % (e - b))
+    logger.info('cost time: %s' % (e - b))
     xunmi_process_mongo.delete_many(query={'page': page, 'page_size': page_size})
     # asyncio.run(async_operation())
     return {'cost': int(e - b)}
