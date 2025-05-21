@@ -320,8 +320,8 @@ def interface_used(device_ip=None):
                         InterfaceUsed.objects.filter(host=post_data['host']).update(**post_data)
                     else:
                         InterfaceUsed.objects.create(**post_data)
-                    cache.set("interface_used_" + str(post_data['host_id']),
-                              json.dumps(post_data, cls=JsonEncoder), 3600 * 5)
+                    # cache.set("interface_used_" + str(post_data['host_id']),
+                    #           json.dumps(post_data, cls=JsonEncoder), 3600 * 5)
                 except Exception as e:
                     logger.error(e)
         except Exception as e:
@@ -1028,14 +1028,14 @@ def is_lldp_connected(device_ip, port):
     """
     检查端口是否通过LLDP连接到其他设备
     """
-    # cache_key = ('lldp', device_ip, port)
-    # cached = get_cached_network_data('xunmi', *cache_key)
-    # if cached is not None:
-    #     return cached
+    cache_key = ('lldp', device_ip, port)
+    cached = get_cached_network_data('xunmi', *cache_key)
+    if cached is not None:
+        return cached
     lldp_entry = lldp_mongo.find(query_dict={'hostip': device_ip, 'local_interface': port},
                                  fields={'_id': 0})
-    # if lldp_entry:
-    #     cache_network_data('xunmi', *cache_key, data=lldp_entry)
+    if lldp_entry:
+        cache_network_data('xunmi', *cache_key, data=lldp_entry)
     return lldp_entry
 
 
@@ -1043,15 +1043,15 @@ def is_lldp_reverse_connected(device_ip, port):
     """
     检查端口是否通过LLDP连接到其他设备
     """
-    # cache_key = ('lldp_reverse', device_ip, port)
-    # cached = get_cached_network_data('xunmi', *cache_key)
-    # if cached is not None:
-    #     return cached
+    cache_key = ('lldp_reverse', device_ip, port)
+    cached = get_cached_network_data('xunmi', *cache_key)
+    if cached is not None:
+        return cached
 
     lldp_entry = lldp_mongo.find(query_dict={'hostip': device_ip, 'neighbor_port': port},
                                  fields={'_id': 0})
-    # if lldp_entry:
-    #     cache_network_data('xunmi', *cache_key, data=lldp_entry)
+    if lldp_entry:
+        cache_network_data('xunmi', *cache_key, data=lldp_entry)
     return lldp_entry
 
 
