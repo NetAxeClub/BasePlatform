@@ -47,6 +47,7 @@ from apps.automation.cache_utils import get_cached_network_data, cache_network_d
 from utils.connect_layer.auto_main import HuaweiS, HillstoneFsm
 from utils.db.mongo_ops import MongoOps, MongoNetOps, XunMiOps
 from driver import discovered_plugins
+# from bus import SyncMessageBus
 
 logger = logging.getLogger('automation')
 
@@ -72,6 +73,8 @@ show_ip_mongo = MongoOps(db='Automation', coll='layer3interface')
 log_mongo = MongoOps(db='logs', coll='xumi_time_cost')
 interface_mongo = MongoOps(db='Automation', coll='layer2interface')
 interface_used_mongo = MongoOps(db='Automation', coll='Interface_used')
+xunmi_process_mongo = MongoOps(db='Automation', coll='xunmi_process')
+total_ip_mongo = MongoOps(db='Automation', coll='Total_ip_list')
 
 
 def clear_his_collect_res():
@@ -1268,16 +1271,20 @@ async def xunmi_operation(**kwargs):
 
 
 @shared_task(base=AxeTask, once={'graceful': True})
-def tracking_sub(*args):
+def tracking_sub(**kwargs):
     b = time.time()
     log_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    for _ip in args:
+    page = kwargs['page']
+    page_size = kwargs['page_size']
+    data = total_ip_mongo.find_page_query(page_num=page, page_size=page_size, fields={'_id': 0})
+    for _ip in data:
         params = dict(ipaddress=_ip['ipaddress'], log_time=log_time)
         # await xunmi_operation(**params)
         # xunmi_operation(**params)
         asyncio.run(xunmi_operation(**params))
     e = time.time()
     logger.info('async cost time: %s' % (e - b))
+    xunmi_process_mongo.delete_many(query={'page': page, 'page_size': page_size})
     # asyncio.run(async_operation())
     return {'cost': int(e - b)}
 
@@ -1287,17 +1294,29 @@ def tracking_main():
     connections.close_all()
     standard_analysis_main()
     interface_used.apply_async()
-    start_time = time.time()
-    total_ip_mongo = MongoOps(db='Automation', coll='Total_ip_list')
-    total_ip_res = total_ip_mongo.find(fields={'_id': 0})
-    for ip_address in range(0, len(total_ip_res), 20):
-        # asyncio.run(tracking_sub(*total_ip_res[ip_address:ip_address + 20]))
-        tracking_sub.apply_async(args=total_ip_res[ip_address:ip_address + 20], queue='xunmi', retry=True)
-    send_message = "【自动化】地址定位任务下发完成：\n总数量：{}个" \
-        .format(len(total_ip_res))
-    logger.info(send_message)
-    end_time = time.time()
-    logger.info("耗时{}秒".format(str(int(end_time - start_time))))
+
+    total_records = total_ip_mongo.count_documents()
+    # bus = SyncMessageBus()
+    page_size = 20
+    total_pages = math.ceil(total_records / page_size)
+    for page in range(1, total_pages + 1):
+        # bus.publish(queue=config.queue, routing_key=config.queue, body="xunmi_process_page{}".format(page))
+        xunmi_process_mongo.insert({'page': page, 'page_size': page_size})
+        tracking_sub.apply_async(kwargs={'page': page, 'page_size': page_size}, queue='xunmi', retry=True)
+    # start_time = time.time()
+    # total_ip_mongo = MongoOps(db='Automation', coll='Total_ip_list')
+    # # total_ip_res = total_ip_mongo.find(fields={'_id': 0})
+    # total_ip_res = total_ip_mongo.count_documents()
+    # # total_ip_res = total_ip_mongo.find_page_query(fields={'_id': 0}, page_size=20, page_num=1)
+    # # 20个队列，
+    # for ip_address in range(0, total_ip_res, 20):
+    #     # asyncio.run(tracking_sub(*total_ip_res[ip_address:ip_address + 20]))
+    #     tracking_sub.apply_async(args=total_ip_res[ip_address:ip_address + 20], queue='xunmi', retry=True)
+    # send_message = "【自动化】地址定位任务下发完成：\n总数量：{}个" \
+    #     .format(len(total_ip_res))
+    # logger.info(send_message)
+    # end_time = time.time()
+    # logger.info("耗时{}秒".format(str(int(end_time - start_time))))
     # #send_msg_netops'step3:' + send_message)
 
 
@@ -4374,3 +4393,42 @@ class DiagnoseProc(object):
 #             if account.protocol == 'ssh':
 #                 device.ssh_account = AssetAccount.objects.get(id=account.id)
 #         device.save()
+
+@shared_task(base=AxeTask, once={'graceful': True})
+def process_page(page, page_size=20):
+    """
+    处理单页数据的Celery任务
+    :param page: 当前页码（从1开始）
+    :param page_size: 固定每页20条
+    """
+    # 1. 处理当前页数据
+    start = (page - 1) * page_size
+    end = start + page_size
+    print(f"Processing records {start}-{end} (page {page})")
+    # 替换为实际的数据处理逻辑
+
+    # 2. 计算总页数（动态获取或传入）
+    total_records = 132711  # 可改为从数据库动态获取
+    total_pages = math.ceil(total_records / page_size)
+
+    # 3. 如果还有下一页，触发新任务
+    if page < total_pages:
+        next_page = page + 1
+        process_page(next_page, page_size)
+        # process_page.apply_async(
+        #     args=(next_page, page_size),
+        #     queue='worker_queue'
+        # )
+def distribute_initial_tasks():
+    total_records = 132711
+    page_size = 20
+    total_pages = math.ceil(total_records / page_size)
+    workers = 40
+
+    # 初始分配：将前40页分给40个worker
+    for page in range(1, min(workers, total_pages) + 1):
+        process_page(page, page_size)
+        # process_page.apply_async(
+        #     args=(page, page_size),
+        #     queue='worker_queue'
+        # )

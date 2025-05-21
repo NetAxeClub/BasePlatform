@@ -11,6 +11,7 @@
 -------------------------------------------------
 """
 from .redisHelper import RedisOps
+from .bus_sync import SyncMessageBus
 redis_conn = RedisOps()
 
-__all__ = ['redis_conn']
+__all__ = ['redis_conn', 'SyncMessageBus']
