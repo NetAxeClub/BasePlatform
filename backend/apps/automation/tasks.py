@@ -1014,13 +1014,13 @@ def check_aggregation_port(device_ip, port):
     """
     检查端口是否是聚合接口，如果是则返回物理端口列表
     """
-    # cache_key = ('agg_port', device_ip, port)
-    # cached = get_cached_network_data('xunmi', *cache_key)
-    # if cached is not None:
-    #     return cached
+    cache_key = ('agg_port', device_ip, port)
+    cached = get_cached_network_data('xunmi', *cache_key)
+    if cached is not None:
+        return cached
     agg_entry = lagg_mongo.find(query_dict={'hostip': device_ip, 'aggregroup': port}, fields={'_id': 0})
-    # if agg_entry:
-    #     cache_network_data('xunmi', *cache_key, data=agg_entry)
+    if agg_entry:
+        cache_network_data('xunmi', *cache_key, data=agg_entry)
     return agg_entry
 
 
@@ -1077,7 +1077,7 @@ async def xunmi_operation(**kwargs):
                                  fields={'_id': 0})
         if mac_res:
             for mac in mac_res:
-                logger.info(mac['interface'])
+                # logger.info(mac['interface'])
                 mac_interface = mac['interface']
                 try:
                     if mac_interface.find('.') != -1:
