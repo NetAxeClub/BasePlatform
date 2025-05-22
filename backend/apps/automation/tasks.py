@@ -22,7 +22,7 @@ import traceback
 import ipaddr as IPaddr
 import netaddr
 from celery import shared_task
-from netaxe.celery import AxeTask
+from netaxe.celery import AxeTask, app
 from collections import OrderedDict
 from django_celery_results.models import TaskResult
 from django.core.cache import cache
@@ -1310,7 +1310,7 @@ def tracking_main():
     connections.close_all()
     standard_analysis_main()
     interface_used.apply_async()
-
+    xunmi_process_mongo.delete_many()
     total_records = total_ip_mongo.count_documents()
     # bus = SyncMessageBus()
     page_size = 20
@@ -1334,6 +1334,37 @@ def tracking_main():
     # end_time = time.time()
     # logger.info("耗时{}秒".format(str(int(end_time - start_time))))
     # #send_msg_netops'step3:' + send_message)
+
+
+@shared_task(base=AxeTask, once={'graceful': True})
+def xunmi_tasks_check():
+    #  查看是否有活动任务
+    # 获取所有 worker 的检查对象
+    app_control = app.control.inspect()
+
+    # 查看已注册的 worker
+    # print(app_control.registered())
+    #
+    # # 查看活动队列
+    # print(app_control.active_queues())
+    #
+    # # 查看预定任务
+    # print(app_control.scheduled())
+
+    # 查看活动任务
+    # print(app_control.active())
+    active_res = app_control.active()
+    if 'celery@xunmi' in active_res.keys():
+        if len(active_res['celery@xunmi']) == 0:
+            # 查看保留任务
+            # 存量查询参数数据查询，看是否存在未处理的
+            all_old_params_count = xunmi_process_mongo.count_documents()
+            if all_old_params_count > 0:
+                all_old_params_res = xunmi_process_mongo.find(fields={'_id': 0})
+                for params in all_old_params_res:
+                    tracking_sub.apply_async(kwargs={'page': params['page'], 'page_size': params['page_size']}, queue='xunmi',
+                                             retry=True)
+    return active_res
 
 
 # 自动化通用mongo接口
