@@ -1094,72 +1094,72 @@ def xunmi_operation(**kwargs):
                                        fields={'hostip': 1, 'hostname': 1, 'idc_name': 1, 'macaddress': 1,
                                                'interface': 1})
         if mac_res_query:
-            mac_res = OrderedDict()
+            mac_result = OrderedDict()
             # 多字典合并去重
             for item in mac_res_query:
-                mac_res.setdefault(item, {**item})
-                mac_result = list(mac_res.values())
-                if mac_result:
-                    for mac in mac_res:
-                        # logger.info(mac['interface'])
-                        mac_interface = mac['interface']
-                        try:
-                            if mac_interface.find('.') != -1:
-                                mac_interface = mac_interface.split('.')[0]
-                            elif mac_interface.find(':') != -1:
-                                mac_interface = mac_interface.split(':')[0]
-                        except Exception as e:
-                            logger.error("ip{}:{}".format(ip_address, str(e)))
-                        agg_entry = check_aggregation_port(mac['hostip'], mac_interface)
+                mac_result.setdefault(item, {**item})
+            mac_in_result = list(mac_result.values())
+            if mac_in_result:
+                for mac in mac_in_result:
+                    # logger.info(mac['interface'])
+                    mac_interface = mac['interface']
+                    try:
+                        if mac_interface.find('.') != -1:
+                            mac_interface = mac_interface.split('.')[0]
+                        elif mac_interface.find(':') != -1:
+                            mac_interface = mac_interface.split(':')[0]
+                    except Exception as e:
+                        logger.error("ip{}:{}".format(ip_address, str(e)))
+                    agg_entry = check_aggregation_port(mac['hostip'], mac_interface)
 
-                        # 是聚合口
-                        if agg_entry:
-                            lagg_res = agg_entry[0]
-                            if len(lagg_res['memberports']) >= 1:
-                                lldp_num = 0
-                                for port in lagg_res['memberports']:
-                                    # lldp_res = cache.get(
-                                    #     'lldp_{}_{}'.format(lagg_res['hostip'], port))
-                                    # if not lldp_res:
-                                    # lldp_res = cache.get('lldp_reverse_{}_{}'.format(lagg_res['hostip'], port))
-                                    lldp_res = is_lldp_connected(lagg_res['hostip'], port)
-                                    if lldp_res:
-                                        # lldp_res = json.loads(lldp_res)
-                                        # print("====>是聚合口，有LLDP信息", lldp_res)
-                                        if not lldp_res[0]['neighborsysname']:
-                                            # print('有聚合组且LLDP邻居系统名为空', mac['hostip'], mac['interface'])
+                    # 是聚合口
+                    if agg_entry:
+                        lagg_res = agg_entry[0]
+                        if len(lagg_res['memberports']) >= 1:
+                            lldp_num = 0
+                            for port in lagg_res['memberports']:
+                                # lldp_res = cache.get(
+                                #     'lldp_{}_{}'.format(lagg_res['hostip'], port))
+                                # if not lldp_res:
+                                # lldp_res = cache.get('lldp_reverse_{}_{}'.format(lagg_res['hostip'], port))
+                                lldp_res = is_lldp_connected(lagg_res['hostip'], port)
+                                if lldp_res:
+                                    # lldp_res = json.loads(lldp_res)
+                                    # print("====>是聚合口，有LLDP信息", lldp_res)
+                                    if not lldp_res[0]['neighborsysname']:
+                                        # print('有聚合组且LLDP邻居系统名为空', mac['hostip'], mac['interface'])
+                                        tmp_result.append(dict(host=mac['hostip'],
+                                                               interface=mac['interface'],
+                                                               macaddress=arp['macaddress'],
+                                                               memberport=','.join(lagg_res['memberports'])))
+                                        continue
+                                    if lldp_res[0]['neighbor_ip']:
+                                        lldp_num += 1
+                                        # print('聚合组=>LLDP邻居系统名不为空')
+                                        neighbor_hostip = lldp_res[0]['neighbor_ip']
+                                        # _ip_res = cache.get('layer3interface_{}_{}'.format(neighbor_hostip, ip_address))
+                                        show_ip_entry = is_device_ip(neighbor_hostip, ip_address)
+                                        # _ip_res = show_ip_mongo.find(
+                                        #     query_dict={'hostip': neighbor_hostip, 'ipaddress': ip_address},
+                                        #     fields={'_id': 0})
+                                        if show_ip_entry:
                                             tmp_result.append(dict(host=mac['hostip'],
                                                                    interface=mac['interface'],
                                                                    macaddress=arp['macaddress'],
                                                                    memberport=','.join(lagg_res['memberports'])))
-                                            continue
-                                        if lldp_res[0]['neighbor_ip']:
-                                            lldp_num += 1
-                                            # print('聚合组=>LLDP邻居系统名不为空')
-                                            neighbor_hostip = lldp_res[0]['neighbor_ip']
-                                            # _ip_res = cache.get('layer3interface_{}_{}'.format(neighbor_hostip, ip_address))
-                                            show_ip_entry = is_device_ip(neighbor_hostip, ip_address)
-                                            # _ip_res = show_ip_mongo.find(
-                                            #     query_dict={'hostip': neighbor_hostip, 'ipaddress': ip_address},
-                                            #     fields={'_id': 0})
-                                            if show_ip_entry:
-                                                tmp_result.append(dict(host=mac['hostip'],
-                                                                       interface=mac['interface'],
-                                                                       macaddress=arp['macaddress'],
-                                                                       memberport=','.join(lagg_res['memberports'])))
-                                                break
+                                            break
 
-                                if lldp_num == 0:
-                                    tmp_result.append(dict(host=mac['hostip'],
-                                                           interface=mac['interface'],
-                                                           macaddress=arp['macaddress'],
-                                                           memberport=','.join(lagg_res['memberports'])))
-                        else:
-                            # logger.info('ip {}:======>不是聚合口:'.format(ip_address))
-                            res, break_flag = MainIn.xunmi_sub(**dict(mac=mac, arp=arp, ip_address=ip_address))
-                            tmp_result += res
-                            if break_flag:
-                                break
+                            if lldp_num == 0:
+                                tmp_result.append(dict(host=mac['hostip'],
+                                                       interface=mac['interface'],
+                                                       macaddress=arp['macaddress'],
+                                                       memberport=','.join(lagg_res['memberports'])))
+                    else:
+                        # logger.info('ip {}:======>不是聚合口:'.format(ip_address))
+                        res, break_flag = MainIn.xunmi_sub(**dict(mac=mac, arp=arp, ip_address=ip_address))
+                        tmp_result += res
+                        if break_flag:
+                            break
     # 如果没有查询结果，则以ARP信息为最终结果
     if not tmp_result:
         logger.info("ip {}没有MAC查询结果，则以ARP信息为最终结果".format(ip_address))
