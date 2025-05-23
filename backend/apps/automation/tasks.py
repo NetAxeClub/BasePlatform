@@ -1091,8 +1091,8 @@ def xunmi_operation(**kwargs):
             continue
         logger.debug('ip{}:macaddress_{}_{}'.format(ip_address, arp['idc_name'], arp['macaddress']))
         mac_result = mac_mongo.find(query_dict={'macaddress': arp['macaddress'], 'idc_name': arp['idc_name']},
-                                       fields={'hostip': 1, 'hostname': 1, 'idc_name': 1, 'macaddress': 1,
-                                               'interface': 1})
+                                    fields={'hostip': 1, 'hostname': 1, 'idc_name': 1, 'macaddress': 1,
+                                            'interface': 1})
         if mac_result:
             seen = set()
             unique_mac_data = []
@@ -1374,6 +1374,7 @@ def xunmi_tasks_check():
             all_old_params_count = xunmi_process_mongo.count_documents()
             if all_old_params_count > 0:
                 all_old_params_res = xunmi_process_mongo.find(fields={'_id': 0})
+                all_old_params_res.reverse()
                 for params in all_old_params_res:
                     tracking_sub.apply_async(kwargs={'page': params['page'], 'page_size': params['page_size']},
                                              queue='xunmi',
