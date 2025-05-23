@@ -1090,17 +1090,20 @@ def xunmi_operation(**kwargs):
         if arp['interface'] is None:
             continue
         logger.debug('ip{}:macaddress_{}_{}'.format(ip_address, arp['idc_name'], arp['macaddress']))
-        mac_res_query = mac_mongo.find(query_dict={'macaddress': arp['macaddress'], 'idc_name': arp['idc_name']},
+        mac_result = mac_mongo.find(query_dict={'macaddress': arp['macaddress'], 'idc_name': arp['idc_name']},
                                        fields={'hostip': 1, 'hostname': 1, 'idc_name': 1, 'macaddress': 1,
                                                'interface': 1})
-        if mac_res_query:
-            mac_result = OrderedDict()
-            # 多字典合并去重
-            for item in mac_res_query:
-                mac_result.setdefault(item, {**item})
-            mac_in_result = list(mac_result.values())
-            if mac_in_result:
-                for mac in mac_in_result:
+        if mac_result:
+            seen = set()
+            unique_mac_data = []
+            for d in mac_result:
+                # 将字典转换为可哈希的元组
+                t = tuple(sorted(d.items()))
+                if t not in seen:
+                    seen.add(t)
+                    unique_mac_data.append(d)
+            if unique_mac_data:
+                for mac in unique_mac_data:
                     # logger.info(mac['interface'])
                     mac_interface = mac['interface']
                     try:
