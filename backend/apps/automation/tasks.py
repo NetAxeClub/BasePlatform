@@ -605,7 +605,7 @@ def datas_to_cache():
                            _mac['macaddress']] = [_mac]
         for _mac in mac_result.keys():
             cache_key = ('device_mac', _mac)
-            cache_network_data('arp_table', *cache_key, data=mac_result[_mac])
+            cache_network_data('mac_table', *cache_key, data=mac_result[_mac])
 
     # lagg 以 hostip aggregroup 作为key
     def lagg_to_cache():
@@ -1067,6 +1067,36 @@ def is_device_ip(device_ip, ipaddress):
     if show_ip_entry:
         cache_network_data('xunmi', *cache_key, data=show_ip_entry)
     return show_ip_entry
+
+
+def is_arp_table(ipaddress):
+    """
+    检查是否是设备ARP表项
+    """
+    cache_key = ('device_arp', ipaddress)
+    cached = get_cached_network_data('arp_table', *cache_key)
+    if cached is not None:
+        return cached
+    show_ip_entry = arp_mongo.find(
+        query_dict={'ipaddress': ipaddress},fields={'_id': 0})
+    if show_ip_entry:
+        cache_network_data('arp_table', *cache_key, data=show_ip_entry)
+    return show_ip_entry
+
+def is_mac_table(macaddress):
+    """
+    检查是否是设备MAC表项
+    """
+    cache_key = ('device_mac', macaddress)
+    cached = get_cached_network_data('mac_table', *cache_key)
+    if cached is not None:
+        return cached
+    show_ip_entry = mac_mongo.find(
+        query_dict={'macaddress': macaddress},fields={'_id': 0})
+    if show_ip_entry:
+        cache_network_data('mac_table', *cache_key, data=show_ip_entry)
+    return show_ip_entry
+
 
 
 def xunmi_operation(**kwargs):
