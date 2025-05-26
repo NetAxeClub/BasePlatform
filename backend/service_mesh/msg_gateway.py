@@ -145,6 +145,15 @@ class SendRunner:
         }
         return self.send('hw_sms', send_args, webhook)
 
+    def send_ali_sms(self, user: list, template_data: dict, webhook=None, priority=0):
+        send_args = {
+            "phone": user,
+            "template_code": config.ali_sms['duty_template_code'],
+            "template_data": template_data,
+            "priority": priority,
+        }
+        return self.send('ali_sms', send_args, webhook)
+
     # @run_time_sync
     def send_wechat(self, channel, content, webhook=None, priority=0):
         send_args = {
