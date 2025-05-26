@@ -573,7 +573,6 @@ def datas_to_cache():
 
     # arp 以 arp_ + ip 作为key
     def arp_to_cache():
-        # arp_mongo = MongoOps(db='Automation', coll='ARPTable')
         arp_res = arp_mongo.find(fields={'_id': 0, 'log_time': 0})
         arp_result = dict()
         for _arp in arp_res:
@@ -582,7 +581,8 @@ def datas_to_cache():
             else:
                 arp_result[_arp['ipaddress']] = [_arp]
         for _arp in arp_result.keys():
-            cache.set("arp_" + _arp, json.dumps(arp_result[_arp]), 3600 * 12)
+            cache_key = ('device_arp', _arp)
+            cache_network_data('arp_table', *cache_key, data=arp_result[_arp])
 
     # mac地址 以 idc + mac 地址作为key
     def mac_to_cache():
@@ -604,11 +604,8 @@ def datas_to_cache():
                 mac_result[_mac['idc_name'] + '_' +
                            _mac['macaddress']] = [_mac]
         for _mac in mac_result.keys():
-            cache.set(
-                "macaddress_" + _mac,
-                json.dumps(
-                    mac_result[_mac]),
-                3600 * 12)
+            cache_key = ('device_mac', _mac)
+            cache_network_data('arp_table', *cache_key, data=mac_result[_mac])
 
     # lagg 以 hostip aggregroup 作为key
     def lagg_to_cache():
@@ -690,17 +687,17 @@ def datas_to_cache():
                 3600 * 12)
 
     # cmdb_to_cache()
-    # content = ''
+    content = ''
     # content += "{}缓存耗时{}秒\n".format('CMDB', int(time.time() - start_time))
-    # start_time = time.time()
-    # arp_to_cache()
-    # # print("{}缓存耗时{}秒\n".format('ARP地址库', int(time.time() - start_time)))
-    # content += "{}缓存耗时{}秒\n".format('ARP地址库', int(time.time() - start_time))
-    # start_time = time.time()
-    # mac_to_cache()
-    # # print("{}缓存耗时{}秒\n".format('mac地址库', int(time.time() - start_time)))
-    # content += "{}缓存耗时{}秒\n".format('MAC地址库', int(time.time() - start_time))
-    # start_time = time.time()
+    start_time = time.time()
+    arp_to_cache()
+    # print("{}缓存耗时{}秒\n".format('ARP地址库', int(time.time() - start_time)))
+    content += "{}缓存耗时{}秒\n".format('ARP地址库', int(time.time() - start_time))
+    start_time = time.time()
+    mac_to_cache()
+    # print("{}缓存耗时{}秒\n".format('mac地址库', int(time.time() - start_time)))
+    content += "{}缓存耗时{}秒\n".format('MAC地址库', int(time.time() - start_time))
+    start_time = time.time()
     # lagg_to_cache()
     # # print("{}缓存耗时{}秒\n".format('聚合端口库', int(time.time() - start_time)))
     # content += "{}缓存耗时{}秒\n".format('聚合端口库', int(time.time() - start_time))
@@ -713,7 +710,7 @@ def datas_to_cache():
     # # print("{}缓存耗时{}秒\n".format('三层接口地址库', int(time.time() - start_time)))
     # content += "{}缓存耗时{}秒\n".format('三层接口地址库', int(time.time() - start_time))
     # content += "{}缓存耗时{}秒\n".format('总写入', int(time.time() - init_time))
-    # logger.debug(content)
+    logger.debug(content)
     return
 
 
@@ -811,10 +808,10 @@ class MainIn:
         if lldp_res:
             neighbor_ip = lldp_res[0]['neighbor_ip']
             if neighbor_ip:
-                _ip_res = show_ip_mongo.find(query_dict={'hostip': neighbor_ip, 'ipaddress': ip_address},
-                                             fields={'_id': 0})
-                # _ip_res = cache.get('layer3interface_{}_{}'.format(neighbor_ip, ip_address))
-                if _ip_res:
+                _is_device_ip = is_device_ip(neighbor_ip, ip_address)
+                # _ip_res = show_ip_mongo.find(query_dict={'hostip': neighbor_ip, 'ipaddress': ip_address},
+                #                              fields={'_id': 0})
+                if _is_device_ip:
                     # _ip_res = json.loads(_ip_res)
                     tmp_result.append(dict(host=mac['hostip'],
                                            interface=mac['interface'],
