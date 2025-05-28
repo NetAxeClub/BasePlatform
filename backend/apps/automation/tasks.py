@@ -1083,6 +1083,7 @@ def is_arp_table(ipaddress):
         cache_network_data('arp_table', *cache_key, data=show_ip_entry)
     return show_ip_entry
 
+
 def is_mac_table(macaddress):
     """
     检查是否是设备MAC表项
@@ -1096,7 +1097,6 @@ def is_mac_table(macaddress):
     if show_ip_entry:
         cache_network_data('mac_table', *cache_key, data=show_ip_entry)
     return show_ip_entry
-
 
 
 def xunmi_operation(**kwargs):
