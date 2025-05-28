@@ -77,6 +77,18 @@ def search_cmdb_idc_model_id(cmdb_idc_model_name, cmdb_idc_id):
         return cmdb_idc_model_id['id']
 
 
+# 根据厂商ID进行检索
+def search_device_model_id(device_model_name, vendor_id):
+    device_model_id = Model.objects.filter(name=device_model_name, vendor_id=vendor_id).values('id').first()
+    if not device_model_id:
+        instance = Model.objects.create(vendor=Vendor.objects.filter(id=vendor_id).first() if vendor_id else None,
+                                        name=device_model_name)
+        return instance.id
+
+    else:
+        return device_model_id['id']
+
+
 # 根据网络区域名称、机房ID、网络属性、网络架构等信息进行检索，若网络区域不存在，则创建并返回网络区域ID
 def search_cmdb_netzone_id(cmdb_netzone_name):
     cmdb_netzone_instance = NetZone.objects.filter(name=cmdb_netzone_name).values('id').first()
@@ -118,7 +130,7 @@ def search_cmdb_category_id(cmdb_category_name):
 
     else:
         # print("{} 设备型号不存在，系统正在创建!".format(cmdb_category_name))
-        instance= Category.objects.create(name=cmdb_category_name)
+        instance = Category.objects.create(name=cmdb_category_name)
         return instance.id
 
 
@@ -199,6 +211,7 @@ def new_import_parse(import_list):
                 status = csv_device_status(data[12])  # 设备状态
                 cmdb_attribute_id = None if isinstance(data[13], float) else None  # 网络属性，非必填
                 memo = None if isinstance(data[14], float) else str(data[14]).strip()  # 备注，非非必填
+                device_model_id = search_device_model_id(data[15], cmdb_vendor_id)  # 设备型号
 
                 networkdevices = {
                     'serial_num': serial_num,
@@ -212,6 +225,7 @@ def new_import_parse(import_list):
                     'zone': NetZone.objects.filter(id=cmdb_netzone_id).first() if cmdb_netzone_id else None,
                     'rack': Rack.objects.filter(id=cmdb_cabinet_id).first() if cmdb_cabinet_id else None,
                     'idc_model': IdcModel.objects.filter(id=cmdb_idc_model_id).first() if cmdb_idc_model_id else None,
+                    'model': Model.objects.filter(id=device_model_id).first() if device_model_id else None,
                     'u_location_start': int(u_location_start),  # U位
                     'u_location_end': int(u_location_end),  # U位
                     'uptime': datetime.now().strftime('%Y-%m-%d'),  # 上线时间必须要，默认当前日期
