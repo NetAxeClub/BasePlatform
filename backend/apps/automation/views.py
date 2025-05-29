@@ -470,50 +470,20 @@ class XunMiView(APIView):
                 mongo_data['log_time'] = {"$gte": start_time, "$lte": end_time}
             page_size = int(get_param["page_size"]) if get_param.get("page_size") else 10
             page_num = int(get_param["start"]) + 1 if get_param.get("start") else 1
-            skip = (page_num - 1) * page_size
+            # skip = (page_num - 1) * page_size
             count_pipeline = [
                 {"$match": mongo_data},
-                {"$sort": {"log_time": -1}},
                 {"$group": {
                     "_id": None,
-                    "latest_time": {"$max": "$log_time"},
-                    "all_docs": {"$push": "$$ROOT"}
+                    "count": {"$sum": 1}
                 }},
-                {"$unwind": "$all_docs"},
-                {"$replaceRoot": {"newRoot": "$all_docs"}},
-                {"$count": "total"}
-            ]
-            pipeline = [
-                # 第一步：匹配指定IP的文档
-                {"$match": mongo_data},
-
-                # 第二步：按log_time降序排序
                 {"$sort": {"log_time": -1}},
-
-                # 第三步：获取最新的log_time
-                {"$group": {
-                    "_id": None,  # 不按字段分组，计算全局值
-                    "latest_time": {"$max": "$log_time"},
-                    "all_docs": {"$push": "$$ROOT"}
-                }},
-
-                # 第四步：展开所有文档
-                {"$unwind": "$all_docs"},
-
-                # 第六步：替换根文档为原始文档格式
-                {"$replaceRoot": {"newRoot": "$all_docs"}},
-
-                # 可选：排除_id字段
-                {"$project": {"_id": 0}},
-                {"$skip": skip},
-                {"$limit": page_size}
+                {"$limit": 1}
             ]
-            total_result = xunmi_mongo.aggregate(count_pipeline)
-            total = total_result[0]["total"] if total_result else 0
-            res = xunmi_mongo.aggregate(pipeline=pipeline)
-            for i in res:
-                i['log_time'] = i['log_time'].strftime("%Y-%m-%d %H:%M:%S")
-
+            total_result = xunmi_mongo.aggregate(count_pipeline, allowDiskUse=True)
+            total = total_result[0]["count"] if total_result else 0
+            # res = xunmi_mongo.aggregate(pipeline=pipeline, allowDiskUse=True)
+            res = xunmi_mongo.find_page_query(query_dict=mongo_data, page_size=page_size, page_num=page_num, fields={'_id': 0})
             result = {
                 "code": 200,
                 "results": res,
