@@ -182,6 +182,9 @@ class MongoOps:
             r = self.coll.find().limit(page_size).skip(skip)
         return list(r)
 
+    def aggregate(self, pipeline):
+        return list(self.coll.aggregate(pipeline))
+
     def find_re(self, kwargs, fields=None, sort=None):
         """
         正则匹配  kwargs :{'name': re.compile(e)}

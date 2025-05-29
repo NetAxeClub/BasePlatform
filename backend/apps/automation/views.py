@@ -283,7 +283,6 @@ class AutomationChart(APIView):
 class XunMiView(APIView):
     def get(self, request):
         get_param = request.GET.dict()
-        print(get_param)
         mongo_data = dict()
         if get_param.get('get_interface_by_hostip'):
             hostip = get_param['get_interface_by_hostip']
@@ -369,30 +368,89 @@ class XunMiView(APIView):
                 start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
                 end_time = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
                 mongo_data['log_time'] = {"$gte": start_time, "$lte": end_time}
-            if mongo_data:
                 page_size = int(get_param["page_size"]) if get_param.get("page_size") else 10
                 page_num = int(get_param["start"]) + 1 if get_param.get("start") else 1
-                query_tmp = xunmi_mongo.find_page_query(query_dict=mongo_data, fields={'_id': 0}, sort='log_time', page_size=page_size, page_num=page_num)
-                if query_tmp:
-                    mongo_data['log_time'] = query_tmp[-1]['log_time']
+                skip = (page_num - 1) * page_size
+                pipeline = [
+                    # 第一步：匹配指定IP的文档
+                    {"$match": mongo_data},
 
-                    res = xunmi_mongo.find(query_dict=mongo_data, fields={'_id': 0}, sort='log_time')
-                    for i in res:
-                        i['log_time'] = i['log_time'].strftime("%Y-%m-%d %H:%M:%S")
-                    result = {
-                        "code": 200,
-                        "results": res,
-                        "count": len(res)
-                    }
-                    return JsonResponse(result, safe=False)
-            else:
+                    # 第二步：按log_time降序排序
+                    {"$sort": {"log_time": -1}},
+
+                    # 第三步：获取最新的log_time
+                    {"$group": {
+                        "_id": None,  # 不按字段分组，计算全局值
+                        "latest_time": {"$max": "$log_time"},
+                        "all_docs": {"$push": "$$ROOT"}
+                    }},
+                    # 第四步：展开所有文档
+                    {"$unwind": "$all_docs"},
+
+                    # 可选：排除_id字段
+                    {"$project": {"_id": 0}},
+                    {"$skip": skip},
+                    {"$limit": page_size}
+                ]
+                res = xunmi_mongo.aggregate(pipeline=pipeline)
                 result = {
-                    "code": 400,
-                    "count": 0,
-                    "message": "没有匹配查询条件的数据",
-                    "results": []
+                    "code": 200,
+                    "results": res,
+                    "count": len(res)
                 }
                 return JsonResponse(result, safe=False)
+            # else:
+            else:
+                page_size = int(get_param["page_size"]) if get_param.get("page_size") else 10
+                page_num = int(get_param["start"]) + 1 if get_param.get("start") else 1
+                skip = (page_num - 1) * page_size
+                pipeline = [
+                    # 第一步：匹配指定IP的文档
+                    {"$match": mongo_data},
+
+                    # 第二步：按log_time降序排序
+                    {"$sort": {"log_time": -1}},
+
+                    # 第三步：获取最新的log_time
+                    {"$group": {
+                        "_id": None,  # 不按字段分组，计算全局值
+                        "latest_time": {"$max": "$log_time"},
+                        "all_docs": {"$push": "$$ROOT"}
+                    }},
+
+                    # 第四步：展开所有文档
+                    {"$unwind": "$all_docs"},
+
+                    # 第五步：只保留时间等于latest_time的文档
+                    {"$match": {
+                        "$expr": {"$eq": ["$all_docs.log_time", "$latest_time"]}
+                    }},
+
+                    # 第六步：替换根文档为原始文档格式
+                    {"$replaceRoot": {"newRoot": "$all_docs"}},
+
+                    # 可选：排除_id字段
+                    {"$project": {"_id": 0}},
+                    {"$skip": skip},
+                    {"$limit": page_size}
+                ]
+                res = xunmi_mongo.aggregate(pipeline=pipeline)
+                for i in res:
+                    i['log_time'] = i['log_time'].strftime("%Y-%m-%d %H:%M:%S")
+                result = {
+                    "code": 200,
+                    "results": res,
+                    "count": len(res)
+                }
+                return JsonResponse(result, safe=False)
+            # else:
+            #     result = {
+            #         "code": 400,
+            #         "count": 0,
+            #         "message": "没有匹配查询条件的数据",
+            #         "results": []
+            #     }
+            #     return JsonResponse(result, safe=False)
         else:
             # 用于把key值为空的可以过滤掉，只保留有完整key value的字典信息
             for param in get_param.keys():
@@ -410,29 +468,58 @@ class XunMiView(APIView):
                 start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
                 end_time = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
                 mongo_data['log_time'] = {"$gte": start_time, "$lte": end_time}
-            page_size = int(get_param.get("page_size", 10))
-            page = int(get_param.get("page", 1))
-            res = xunmi_mongo.find_page_query(fields={'_id': 0}, sort='log_time',
-                                              query_dict=mongo_data,
-                                              page_size=page_size,
-                                              page_num=page)
-            count = xunmi_mongo.count_documents(query=mongo_data)
+            page_size = int(get_param["page_size"]) if get_param.get("page_size") else 10
+            page_num = int(get_param["start"]) + 1 if get_param.get("start") else 1
+            skip = (page_num - 1) * page_size
+            count_pipeline = [
+                {"$match": mongo_data},
+                {"$sort": {"log_time": -1}},
+                {"$group": {
+                    "_id": None,
+                    "latest_time": {"$max": "$log_time"},
+                    "all_docs": {"$push": "$$ROOT"}
+                }},
+                {"$unwind": "$all_docs"},
+                {"$replaceRoot": {"newRoot": "$all_docs"}},
+                {"$count": "total"}
+            ]
+            pipeline = [
+                # 第一步：匹配指定IP的文档
+                {"$match": mongo_data},
+
+                # 第二步：按log_time降序排序
+                {"$sort": {"log_time": -1}},
+
+                # 第三步：获取最新的log_time
+                {"$group": {
+                    "_id": None,  # 不按字段分组，计算全局值
+                    "latest_time": {"$max": "$log_time"},
+                    "all_docs": {"$push": "$$ROOT"}
+                }},
+
+                # 第四步：展开所有文档
+                {"$unwind": "$all_docs"},
+
+                # 第六步：替换根文档为原始文档格式
+                {"$replaceRoot": {"newRoot": "$all_docs"}},
+
+                # 可选：排除_id字段
+                {"$project": {"_id": 0}},
+                {"$skip": skip},
+                {"$limit": page_size}
+            ]
+            total_result = xunmi_mongo.aggregate(count_pipeline)
+            total = total_result[0]["total"] if total_result else 0
+            res = xunmi_mongo.aggregate(pipeline=pipeline)
             for i in res:
                 i['log_time'] = i['log_time'].strftime("%Y-%m-%d %H:%M:%S")
 
             result = {
                 "code": 200,
                 "results": res,
-                "count": count
+                "count": total
             }
             return JsonResponse(result, safe=False)
-        result = {
-            "code": 400,
-            "count": 0,
-            "message": "没有匹配的数据",
-            "results": []
-        }
-        return JsonResponse(result, safe=False)
 
     def post(self, request):
         post_param = request.data
