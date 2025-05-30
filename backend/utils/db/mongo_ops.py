@@ -182,8 +182,8 @@ class MongoOps:
             r = self.coll.find().limit(page_size).skip(skip)
         return list(r)
 
-    def aggregate(self, pipeline):
-        return list(self.coll.aggregate(pipeline))
+    def aggregate(self, pipeline, allowDiskUse=False):
+        return list(self.coll.aggregate(pipeline, allowDiskUse=allowDiskUse))
 
     def find_re(self, kwargs, fields=None, sort=None):
         """
