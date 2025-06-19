@@ -117,12 +117,12 @@ class IamMiddleware(MiddlewareMixin):
         headers = {'Authorization': token}
         params = {'data': url, 'action': method}
         try:
-            res = requests.request(method="GET", url=auth_url, headers=headers, params=params, timeout=5)
+            res = requests.request(method="GET", url=auth_url, headers=headers, params=params, timeout=10)
             if res.status_code == 200:
                 return True, res.json()
             return False, res.json()
         except Exception as e:
-            print(e)
+            logger.error(e)
             return False, {}
 
     # def require_permission(self):
