@@ -119,11 +119,10 @@ class WebSSHConsumer(MySSH):
                 "networkdevice__account__protocol",
                 "networkdevice__account__port",
             ).first()
+        try:
             self.port = self.account['networkdevice__account__port']
             self.username = self.account['networkdevice__account__username']
             self.password = _CryptPwd.decrypt_pwd(self.account['networkdevice__account__password'])
-
-        try:
             # self.ssh.load_system_host_keys()
             self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             self.ssh.connect(self.ip,
