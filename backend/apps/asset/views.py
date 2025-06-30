@@ -276,6 +276,7 @@ class IdcViewSet(CustomViewBase):
     filter_fields = '__all__'
     # 设置搜索的关键字
     search_fields = '__all__'
+    ordering_fields = ('name',)
 
     @action(detail=False, methods=['get'])
     def tree_data(self, request, *args, **kwargs):
@@ -380,6 +381,7 @@ class CmdbRackModelViewSet(CustomViewBase):
     # 配置搜索功能
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filter_fields = '__all__'
+    ordering_fields = ('name',)
 
 
 class CmdbIdcModelViewSet(CustomViewBase):
@@ -396,6 +398,7 @@ class CmdbIdcModelViewSet(CustomViewBase):
     # filterset_class = CmdbIdcModelFilter
     # 配置搜索功能
     filter_fields = ('id', 'name', 'idc')
+    ordering_fields = ('name',)
 
 
 # asset account
