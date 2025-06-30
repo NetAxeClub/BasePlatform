@@ -155,6 +155,8 @@ class AutoVarsViewSet(CustomViewBase):
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filter_fields = '__all__'
     pagination_class = LargeResultsSetPagination
+    # 设置搜索的关键字
+    search_fields = ('ans_name', 'ans_host')
 
 
 class AutomationInventoryViewSet(CustomViewBase):
