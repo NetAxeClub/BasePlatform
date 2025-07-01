@@ -16,7 +16,6 @@
 import logging
 import re
 import paramiko
-import traceback
 from django import db
 from apps.asset.models import NetworkDevice, AssetIpInfo, AssetAccount, Server
 from utils.crypt_pwd import CryptPwd
@@ -107,49 +106,45 @@ class WebSSHConsumer(MySSH):
                 self.close()
                 return
         _CryptPwd = CryptPwd()
-        print(self.server.ssh_enable)
+        if self.server.ssh_enable == 'account':
+            self.username = self.server.ssh_account.username
+            self.password = _CryptPwd.decrypt_pwd(self.server.ssh_account.password)
+            self.port = self.server.ssh_account.port
+        else:
+            self.account = AssetAccount.objects.filter(
+                networkdevice=self.server, networkdevice__account__protocol='ssh'
+            ).values(
+                "networkdevice__account__username",
+                "networkdevice__account__password",
+                "networkdevice__account__protocol",
+                "networkdevice__account__port",
+            ).first()
+            self.port = self.account['networkdevice__account__port']
+            self.username = self.account['networkdevice__account__username']
+            self.password = _CryptPwd.decrypt_pwd(self.account['networkdevice__account__password'])
+
         try:
-            if self.server.ssh_enable == 'account':
-                self.username = self.server.ssh_account.username
-                self.password = _CryptPwd.decrypt_pwd(self.server.ssh_account.password)
-                self.port = self.server.ssh_account.port
-            else:
-                self.account = AssetAccount.objects.filter(
-                    networkdevice=self.server, networkdevice__account__protocol='ssh'
-                ).values(
-                    "networkdevice__account__username",
-                    "networkdevice__account__password",
-                    "networkdevice__account__protocol",
-                    "networkdevice__account__port",
-                ).first()
-
-                self.port = self.account['networkdevice__account__port']
-                self.username = self.account['networkdevice__account__username']
-                self.password = _CryptPwd.decrypt_pwd(self.account['networkdevice__account__password'])
-                # self.ssh.load_system_host_keys()
-                self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                self.ssh.connect(self.ip,
-                                 self.port,
-                                 self.username.strip(),
-                                 self.password.strip(),
-                                 timeout=20,
-                                 banner_timeout=60,
-                                 allow_agent=False,
-                                 look_for_keys=False)
-                self.send("当前使用网管账号登陆设备,账号:{},操作用户:{}".format(self.username, self.scope['user'].username))
-
-            # ansi or xterm ?
-            self.chan = self.ssh.invoke_shell(term='xterm', width=self.width, height=self.height)
-            # 设置如果60分钟没有任何输入，就断开连接
-            self.chan.settimeout(60 * 10)
-            self.t1.setDaemon(True)
-            self.t1.start()
+            # self.ssh.load_system_host_keys()
+            self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            self.ssh.connect(self.ip,
+                             self.port,
+                             self.username.strip(),
+                             self.password.strip(),
+                             timeout=20,
+                             banner_timeout=60,
+                             allow_agent=False,
+                             look_for_keys=False)
+            self.send("当前使用网管账号登陆设备,账号:{},操作用户:{}".format(self.username, self.scope['user'].username))
         except Exception as e:
-            print(e)
-            print(traceback.print_exc())
             self.send(
                 '用户{}通过webssh连接{}失败！原因：{}，用户名:{},密码:{}'.format(self.username, self.ip, e,
                                                                str(self.username).strip(),
                                                                str(self.password).strip()))
             self.close()
             return
+        # ansi or xterm ?
+        self.chan = self.ssh.invoke_shell(term='xterm', width=self.width, height=self.height)
+        # 设置如果60分钟没有任何输入，就断开连接
+        self.chan.settimeout(60 * 10)
+        self.t1.setDaemon(True)
+        self.t1.start()
