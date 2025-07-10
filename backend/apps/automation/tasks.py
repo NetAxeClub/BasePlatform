@@ -4453,7 +4453,6 @@ class DiagnoseProc(object):
     def get_alert(self, manage_ip):
         alert_server = config.service_dicovery('alert_gateway')
         server_hosts = alert_server['hosts']
-        res = []
         if server_hosts:
             url = "http://{}:{}/alert_gateway/event/list".format(server_hosts[0]['ip'], server_hosts[0]['port'])
             payload = {
@@ -4462,7 +4461,8 @@ class DiagnoseProc(object):
                 "page_size": 100,
             }
             headers = {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'x-api-key': config.alert_gateway_api
             }
 
             res = requests.request("GET", url, headers=headers, params=payload)
