@@ -401,6 +401,14 @@ class CmdbIdcModelViewSet(CustomViewBase):
     ordering_fields = ('name',)
 
 
+class AssetAccountFilter(django_filters.FilterSet):
+    name = django_filters.CharFilter(lookup_expr='icontains')
+
+    class Meta:
+        model = AssetAccount
+        fields = ['name']
+
+
 # asset account
 class AccountList(CustomViewBase, AccountExtend):
     """
@@ -413,10 +421,12 @@ class AccountList(CustomViewBase, AccountExtend):
     permission_classes = ()
     # 配置搜索功能
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    filterset_class = AssetAccountFilter
     # 如果要允许对某些字段进行过滤，可以使用filter_fields属性。
     filter_fields = '__all__'
     # 设置搜索的关键字
     search_fields = '__all__'
+
     # list_cache_key_func = QueryParamsKeyConstructor()
 # class ServerAccountList(CustomViewBase):
 #     """
@@ -613,6 +623,13 @@ class NetworkDeviceViewSet(CustomViewBase):
         else:
             return self.queryset
 
+    def get_serializer(self, *args, **kwargs):
+        # 获取 fields 参数
+        fields = self.request.query_params.get('fields', '')
+        if fields:
+            kwargs['fields'] = fields.split(",")
+        return super().get_serializer(*args, **kwargs)
+
     @action(detail=False, methods=['get'])
     def export(self, request, *args, **kwargs):
         # 获取过滤后的查询集
@@ -681,7 +698,6 @@ class NetworkDeviceViewSet(CustomViewBase):
     # def update(self, request, *args, **kwargs):
     #     print('更新', super().update(request, *args, **kwargs))
     #     return super().update(request, *args, **kwargs)
-
 
 
 class AssetIpInfoViewSet(CustomViewBase):

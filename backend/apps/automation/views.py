@@ -373,28 +373,37 @@ class XunMiView(APIView):
                 page_size = int(get_param["page_size"]) if get_param.get("page_size") else 10
                 page_num = int(get_param["start"]) + 1 if get_param.get("start") else 1
                 skip = (page_num - 1) * page_size
-                pipeline = [
-                    # 第一步：匹配指定IP的文档
+                # 优化方案：分两步查询，避免内存溢出
+                # 第一步：获取最新时间
+                latest_time_pipeline = [
                     {"$match": mongo_data},
-
-                    # 第二步：按log_time降序排序
-                    {"$sort": {"log_time": -1}},
-
-                    # 第三步：获取最新的log_time
                     {"$group": {
-                        "_id": None,  # 不按字段分组，计算全局值
-                        "latest_time": {"$max": "$log_time"},
-                        "all_docs": {"$push": "$$ROOT"}
-                    }},
-                    # 第四步：展开所有文档
-                    {"$unwind": "$all_docs"},
-
-                    # 可选：排除_id字段
-                    {"$project": {"_id": 0}},
-                    {"$skip": skip},
-                    {"$limit": page_size}
+                        "_id": None,
+                        "latest_time": {"$max": "$log_time"}
+                    }}
                 ]
-                res = xunmi_mongo.aggregate(pipeline=pipeline)
+                latest_time_result = xunmi_mongo.aggregate(latest_time_pipeline, allowDiskUse=True)
+                
+                if not latest_time_result:
+                    result = {
+                        "code": 200,
+                        "results": [],
+                        "count": 0
+                    }
+                    return JsonResponse(result, safe=False)
+                
+                latest_time = latest_time_result[0]["latest_time"]
+                
+                # 第二步：查询最新时间的数据
+                final_query = mongo_data.copy()
+                final_query["log_time"] = latest_time
+                
+                res = xunmi_mongo.find_page_query(
+                    query_dict=final_query, 
+                    page_size=page_size, 
+                    page_num=page_num, 
+                    fields={'_id': 0}
+                )
                 result = {
                     "code": 200,
                     "results": res,
@@ -406,37 +415,38 @@ class XunMiView(APIView):
                 page_size = int(get_param["page_size"]) if get_param.get("page_size") else 10
                 page_num = int(get_param["start"]) + 1 if get_param.get("start") else 1
                 skip = (page_num - 1) * page_size
-                pipeline = [
-                    # 第一步：匹配指定IP的文档
+                
+                # 优化方案：分两步查询，避免内存溢出
+                # 第一步：获取最新时间
+                latest_time_pipeline = [
                     {"$match": mongo_data},
-
-                    # 第二步：按log_time降序排序
-                    {"$sort": {"log_time": -1}},
-
-                    # 第三步：获取最新的log_time
                     {"$group": {
-                        "_id": None,  # 不按字段分组，计算全局值
-                        "latest_time": {"$max": "$log_time"},
-                        "all_docs": {"$push": "$$ROOT"}
-                    }},
-
-                    # 第四步：展开所有文档
-                    {"$unwind": "$all_docs"},
-
-                    # 第五步：只保留时间等于latest_time的文档
-                    {"$match": {
-                        "$expr": {"$eq": ["$all_docs.log_time", "$latest_time"]}
-                    }},
-
-                    # 第六步：替换根文档为原始文档格式
-                    {"$replaceRoot": {"newRoot": "$all_docs"}},
-
-                    # 可选：排除_id字段
-                    {"$project": {"_id": 0}},
-                    {"$skip": skip},
-                    {"$limit": page_size}
+                        "_id": None,
+                        "latest_time": {"$max": "$log_time"}
+                    }}
                 ]
-                res = xunmi_mongo.aggregate(pipeline=pipeline)
+                latest_time_result = xunmi_mongo.aggregate(latest_time_pipeline, allowDiskUse=True)
+                
+                if not latest_time_result:
+                    result = {
+                        "code": 200,
+                        "results": [],
+                        "count": 0
+                    }
+                    return JsonResponse(result, safe=False)
+                
+                latest_time = latest_time_result[0]["latest_time"]
+                
+                # 第二步：查询最新时间的数据
+                final_query = mongo_data.copy()
+                final_query["log_time"] = latest_time
+                
+                res = xunmi_mongo.find_page_query(
+                    query_dict=final_query, 
+                    page_size=page_size, 
+                    page_num=page_num, 
+                    fields={'_id': 0}
+                )
                 for i in res:
                     i['log_time'] = i['log_time'].strftime("%Y-%m-%d %H:%M:%S")
                 result = {
@@ -445,14 +455,6 @@ class XunMiView(APIView):
                     "count": len(res)
                 }
                 return JsonResponse(result, safe=False)
-            # else:
-            #     result = {
-            #         "code": 400,
-            #         "count": 0,
-            #         "message": "没有匹配查询条件的数据",
-            #         "results": []
-            #     }
-            #     return JsonResponse(result, safe=False)
         else:
             # 用于把key值为空的可以过滤掉，只保留有完整key value的字典信息
             for param in get_param.keys():
@@ -478,9 +480,7 @@ class XunMiView(APIView):
                 {"$group": {
                     "_id": None,
                     "count": {"$sum": 1}
-                }},
-                {"$sort": {"log_time": -1}},
-                {"$limit": 1}
+                }}
             ]
             total_result = xunmi_mongo.aggregate(count_pipeline, allowDiskUse=True)
             total = total_result[0]["count"] if total_result else 0
