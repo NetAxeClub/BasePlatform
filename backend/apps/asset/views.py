@@ -694,6 +694,75 @@ class NetworkDeviceViewSet(CustomViewBase):
 
         return response
 
+    @action(detail=False, methods=['get'])
+    def firewall_business(self, request, *args, **kwargs):
+        business_mapping = {
+            'AICar': '智能汽车',
+            'WXYY': '无线音乐',
+            'EDU': '教育',
+            'CUBG': '消费者',
+            'KXJL': '科讯嘉联',
+            'YJJH': '引江济淮',
+            'XHZL': '星河智联',
+            'QXB': '企信部',
+            'Tech': '技术中心',
+            'AIYL': 'AI医疗',
+            'HDYL': 'HDYL',
+            'JSZX': 'JSZX',
+            'YL': '医疗',
+            'YYY': '语音云',
+            'Linxi': '灵犀',
+            'pitaya': '火龙果',
+            'LianShangZX': '联商在线',
+            'ABK': 'AI资源爱标客',
+            'FYJ': '翻译机',
+            '7S': '7S',
+            'AD': '广告业务'
+        }
+
+        # 按关键字长度降序排列，确保最长优先匹配
+        sorted_keywords = sorted(business_mapping.items(), key=lambda x: -len(x[0]))
+
+        # 只查询必要字段，避免序列化所有字段，使用only()优化查询
+        devices = NetworkDevice.objects.filter(category_id=5, status=0).values(
+            'id', 'name', 'manage_ip', 'serial_num', 'status', 'category__name', 'idc__name',
+            'idc_model__name', 'rack__name', 'u_location_start', 'u_location_end'
+        ).iterator()  # 使用iterator()减少内存使用
+        
+        # 使用列表推导式优化数据处理
+        data_list = []
+        for device in devices:
+            device_name = device.get("name", "")
+            
+            # 优化字符串匹配 - 使用next()和生成器表达式，找到第一个匹配的关键字
+            business = next((business_name for keyword, business_name in sorted_keywords if keyword in device_name), "公共")
+
+            # 一次性获取所有需要的值
+            idc_name = device.get('idc__name', '')
+            idc_model_name = device.get('idc_model__name', '')
+            rack_name = device.get('rack__name', '')
+            category_name = device.get('category__name', '')
+            u_start = device.get('u_location_start', '')
+            u_end = device.get('u_location_end', '')
+            serial_num = device.get('serial_num', '')
+
+            data_list.append({
+                'id': device['id'],
+                'name': f'{business}{category_name}({idc_name}/{idc_model_name}/{rack_name}/{u_start}-{u_end}U SN:{serial_num})',
+                'manage_ip': device['manage_ip'],
+                'serial_num': serial_num,
+                'status': device['status'],
+                'category_name': category_name,
+                'idc_name': idc_name,
+                'business': business
+            })
+
+        return JsonResponse(data={
+            'code': 200,
+            'data': {"count": len(data_list), "data_list": data_list},
+            'msg': 'success'
+        })
+
     # 重新update方法主要用来捕获更改前的字段值并赋值给self.log
     # def update(self, request, *args, **kwargs):
     #     print('更新', super().update(request, *args, **kwargs))
