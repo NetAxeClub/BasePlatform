@@ -699,7 +699,8 @@ class NetworkDeviceViewSet(CustomViewBase):
         business_mapping = {
             'AICar': '智能汽车',
             'WXYY': '无线音乐',
-            'EDU': '教育',
+            'EDU.Geli': '教育BG生产环境隔离',
+            'EDU': '教育BG/教育BG技术平台部',
             'CUBG': '消费者',
             'KXJL': '科讯嘉联',
             'YJJH': '引江济淮',
@@ -735,7 +736,7 @@ class NetworkDeviceViewSet(CustomViewBase):
             device_name = device.get("name", "")
             
             # 优化字符串匹配 - 使用next()和生成器表达式，找到第一个匹配的关键字
-            business = next((business_name for keyword, business_name in sorted_keywords if keyword in device_name), "公共")
+            business = next((business_name for keyword, business_name in sorted_keywords if keyword in device_name), "公共业务")
 
             # 一次性获取所有需要的值
             idc_name = device.get('idc__name', '')
