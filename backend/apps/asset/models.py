@@ -276,7 +276,8 @@ class AssetAccount(models.Model):
         null=True)
 
     def device_list_count(self):
-        return self.networkdevice_set.count() + self.server_set.count()
+        # self.networkdevice_set.count()
+        return self.releate_ssh.count() + self.server_set.count()
 
     def __str__(self):
         return "{}-{}-{}".format(self.name, self.protocol, self.port)
