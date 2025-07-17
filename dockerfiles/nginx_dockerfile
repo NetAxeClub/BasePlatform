@@ -1,4 +1,4 @@
-FROM nginx:1.23.1
+FROM docker-mirror.aigc2d.com/nginx:1.23.1
 #COPY nginx/nginx.conf /etc/nginx/nginx.conf
 #COPY nginx/my_nginx.conf /etc/nginx/sites-available/
 COPY nginx/backend_nginx.conf /etc/nginx/conf.d/default.conf
