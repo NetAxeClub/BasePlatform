@@ -32,7 +32,8 @@ class AssetAccountSerializer(serializers.ModelSerializer):  # 指定ModelSeriali
     @staticmethod
     def setup_eager_loading(queryset):
         """ Perform necessary eager loading of data. """
-        queryset = queryset.prefetch_related('networkdevice_set', 'server_set')
+        # networkdevice_set
+        queryset = queryset.prefetch_related('releate_ssh', 'server_set')
         return queryset
 
     @staticmethod
