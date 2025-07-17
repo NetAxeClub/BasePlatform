@@ -595,6 +595,8 @@ class DiagnoseView(APIView):
         if 'server_ip_address' in get_param.keys():
             _DiagnoseProc = DiagnoseProc(get_param['server_ip_address'])
             xunmi_res = _DiagnoseProc.get_xunmi()
+            if not xunmi_res:
+                return JsonResponse(data={})
             manage_ip = xunmi_res[0]['node_ip']
             name = xunmi_res[0]['node_hostname']
             cmdb_res = _DiagnoseProc.get_cmdb(manage_ip)
