@@ -778,7 +778,7 @@ class H3CinfoCollection(H3CNetconf):
         request_info = self.netconf_cli(obtain_h3c_display_logbuffer_summary_xml)
         return request_info
 
-    def colleciton_interfaceinfo(self):
+    def collection_interfaceinfo(self):
         """
         请求的XML命令
         """
