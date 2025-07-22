@@ -787,7 +787,7 @@ class HuaweiCollection(HuaweiyangNetconfConnect):
         return [func for func in dir(HuaweiCollection) if
                 callable(getattr(HuaweiCollection, func)) and not func.startswith("__")]
 
-    def colleciton_system_info(self):
+    def collection_system_info(self):
         data_xml = '''
         <system xmlns="http://www.huawei.com/netconf/vrp/huawei-system">
           <systemInfo>
@@ -797,7 +797,7 @@ class HuaweiCollection(HuaweiyangNetconfConnect):
         res = self.netconf_get(data_xml)
         return res['system']['systemInfo'] if res else None
 
-    def colleciton_stack(self):
+    def collection_stack(self):
         data_xml = '''
          <stack xmlns="http://www.huawei.com/netconf/vrp/huawei-stack">
             <stackMemberInfos>
@@ -885,7 +885,7 @@ class HuaweiCollection(HuaweiyangNetconfConnect):
         return request['devm']['mpuBoards']['mpuBoard']
 
     # 根据序列号区分slot编号
-    def colleciton_moduleinfo(self):
+    def collection_moduleinfo(self):
         """
         采集colleciton_moduleinfo
         请求的XML命令
@@ -937,7 +937,7 @@ class HuaweiCollection(HuaweiyangNetconfConnect):
         # {'ifName': 'Eth-Trunk127', 'TrunkMemberIfs': {'TrunkMemberIf': [{'memberIfName': '40GE1/0/5', 'weight': '1', 'memberIfState': 'Up'}, {'memberIfName': '40GE1/0/6', 'weight': '1', 'memberIfState': 'Up'}]}}
         # {'ifName': 'Eth-Trunk1', 'TrunkMemberIfs': {'TrunkMemberIf': {'memberIfName': '10GE1/0/1', 'weight': '1', 'memberIfState': 'Up'}}}
 
-    def colleciton_trunk_lacp(self):
+    def collection_trunk_lacp(self):
         """
         采集聚合口
         请求的XML命令
@@ -961,7 +961,7 @@ class HuaweiCollection(HuaweiyangNetconfConnect):
         res = self.netconf_get(obtain_xml)
         return res['ifmtrunk']['TrunkIfs']['TrunkIf'] if res else []
 
-    def colleciton_subif(self):
+    def collection_subif(self):
         """
         采集MAC信息
         请求的XML命令
@@ -979,7 +979,7 @@ class HuaweiCollection(HuaweiyangNetconfConnect):
         print(res)
         return res['ethernet']['ethSubIfs']['ethSubIf'] if res else []
 
-    def colleciton_arp_list(self):
+    def collection_arp_list(self):
         """
         采集ARP信息
         请求的XML命令
@@ -1008,7 +1008,7 @@ class HuaweiCollection(HuaweiyangNetconfConnect):
         # {'vrfName': '_public_', 'ipAddr': '100.71.0.98', 'macAddr': '70c7-f2be-9c02', 'styleType': 'InterfaceArp', 'ifName': '40GE1/0/1'} 全局
         return res['arp']['arpTables']['arpTable'] if res else []
 
-    def colleciton_mac_vlanFdbs(self):
+    def collection_mac_vlanFdbs(self):
         """
         采集MAC信息
         请求的XML命令
@@ -1030,7 +1030,7 @@ class HuaweiCollection(HuaweiyangNetconfConnect):
         res = self.netconf_get(data_xml)
         return res['mac']['vlanFdbs']['vlanFdb'] if res else []
 
-    def colleciton_mac_vlanFdbDynamics(self):
+    def collection_mac_vlanFdbDynamics(self):
         """
         采集MAC信息
         请求的XML命令
@@ -1052,7 +1052,7 @@ class HuaweiCollection(HuaweiyangNetconfConnect):
         res = self.netconf_get(data_xml)
         return res['mac']['vlanFdbDynamics']['vlanFdbDynamic'] if res else []
 
-    def colleciton_mac_bdFdbs(self):
+    def collection_mac_bdFdbs(self):
         """
         采集MAC信息
         请求的XML命令
@@ -1075,7 +1075,7 @@ class HuaweiCollection(HuaweiyangNetconfConnect):
         res = self.netconf_get(data_xml)
         return res['mac']['bdFdbs']['bdFdb'] if res else []
 
-    def colleciton_mac_bdFdbDynamic(self):
+    def collection_mac_bdFdbDynamic(self):
         """
         采集MAC信息
         请求的XML命令
@@ -1342,7 +1342,7 @@ class HuaweiCollection(HuaweiyangNetconfConnect):
 
     # 以下为巡检内容
     # CPU
-    def colleciton_device_cpu(self):
+    def collection_device_cpu(self):
         xml = '''
       <devm xmlns="http://www.huawei.com/netconf/vrp/huawei-devm">
         <cpuInfos>
@@ -1365,7 +1365,7 @@ class HuaweiCollection(HuaweiyangNetconfConnect):
         return res
 
     # memory
-    def colleciton_device_memory(self):
+    def collection_device_memory(self):
         xml = '''
       <devm xmlns="http://www.huawei.com/netconf/vrp/huawei-devm">
         <memoryInfos>
