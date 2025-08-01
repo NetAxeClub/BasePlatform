@@ -80,7 +80,7 @@ class ConfigComplianceSerializer(serializers.ModelSerializer):
 
 # 配置合规结果表
 class ConfigComplianceResultSerializer(serializers.ModelSerializer):
-    log_time = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', read_only=True)
+    log_time = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
 
     @staticmethod
     def setup_eager_loading(queryset):

@@ -32,11 +32,12 @@ class AssetAccountSerializer(serializers.ModelSerializer):  # 指定ModelSeriali
     @staticmethod
     def setup_eager_loading(queryset):
         """ Perform necessary eager loading of data. """
-        # select_related for "to-one" relationships
-        queryset = queryset.prefetch_related('networkdevice_set')
+        # networkdevice_set
+        queryset = queryset.prefetch_related('releate_ssh', 'server_set')
         return queryset
 
-    def get_device_list(self, obj):
+    @staticmethod
+    def get_device_list(obj):
         return obj.device_list_count()
 
     class Meta:
@@ -219,6 +220,17 @@ class NetworkDeviceSerializer(serializers.ModelSerializer):
     class Meta:
         model = NetworkDevice
         fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        # 接收 fields 参数
+        fields = kwargs.pop('fields', None)
+        super().__init__(*args, **kwargs)
+
+        if fields is not None:
+            allowed = set(fields)
+            existing = set(self.fields)
+            for field_name in existing - allowed:
+                self.fields.pop(field_name)
 
     @staticmethod
     def setup_eager_loading(queryset):

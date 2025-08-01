@@ -149,8 +149,8 @@ class ConfigComplianceRuleViewSet(CustomViewBase):
     pagination_class = LargeResultsSetPagination
     # 配置搜索功能
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
-    filter_fields = ('name')
-    search_fields = ('name')
+    filter_fields = ('name',)
+    search_fields = ('name',)
 
     def get_queryset(self):
         # tree = self.request.query_params.get('tree', None)
@@ -183,7 +183,7 @@ class ConfigComplianceViewSet(CustomViewBase):
     # 配置搜索功能
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filter_fields = '__all__'
-    search_fields = 'name'
+    search_fields = ('vendor',)
 
 
 class ConfigComplianceResultViewSet(CustomViewBase):

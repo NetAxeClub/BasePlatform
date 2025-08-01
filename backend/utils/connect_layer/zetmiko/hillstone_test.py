@@ -17,7 +17,6 @@ hs_fw1 = {
 }
 
 
-
 # Show command that we execute
 command = "display version"
 with ConnectHandler(**hs_fw1) as net_connect:

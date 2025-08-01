@@ -4459,16 +4459,16 @@ class DiagnoseProc(object):
     def get_alert(self, manage_ip):
         alert_server = config.service_dicovery('alert_gateway')
         server_hosts = alert_server['hosts']
-        res = []
         if server_hosts:
-            url = "http://{}:{}/alert_gateway/event/list".format(server_hosts[0]['ip'], server_hosts[0]['port'])
+            url = "http://{}:{}/alert_gateway/problem/problem/".format(server_hosts[0]['ip'], server_hosts[0]['port'])
             payload = {
-                "query": json.dumps({'hostip': manage_ip}),
+                "query": json.dumps({"hostip": manage_ip}),
                 "page": 1,
-                "page_size": 100,
+                "page_size": 1000,
             }
             headers = {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'x-api-key': config.alert_gateway_api
             }
 
             res = requests.request("GET", url, headers=headers, params=payload)
