@@ -160,7 +160,7 @@ class CiscoSoftwareinfoCollection(CiscoNetconfConnect):
             "look_for_keys": False
         }
 
-    def colleciton_hostname(self):
+    def collection_hostname(self):
         xml = '''
         <show xmlns="http://www.cisco.com/nxos:1.0">
         <hostname>
@@ -170,7 +170,7 @@ class CiscoSoftwareinfoCollection(CiscoNetconfConnect):
         request = self.netconf_get(xml)
         return request
 
-    def colleciton_arp_list(self):
+    def collection_arp_list(self):
         """
         采集ARP表
         请求的XML命令
@@ -191,7 +191,7 @@ class CiscoSoftwareinfoCollection(CiscoNetconfConnect):
 
         return request_arplist
 
-    def colleciton_ip_route(self):
+    def collection_ip_route(self):
         """
         采集路由表
         请求的XML命令
@@ -311,7 +311,7 @@ class CiscoSoftwareinfoCollection(CiscoNetconfConnect):
         #print(res)
         return res
 
-    def colleciton_vlan_info(self):
+    def collection_vlan_info(self):
 
         xml = '''
         <show xmlns="http://www.cisco.com/nxos:1.0">
