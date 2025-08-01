@@ -1123,9 +1123,10 @@ def xunmi_operation(**kwargs):
         if arp['interface'] is None:
             continue
         logger.debug('ip{}:macaddress_{}_{}'.format(ip_address, arp['idc_name'], arp['macaddress']))
-        mac_result = mac_mongo.find(query_dict={'macaddress': arp['macaddress'], 'idc_name': arp['idc_name']},
-                                    fields={'hostip': 1, 'hostname': 1, 'idc_name': 1, 'macaddress': 1,
-                                            'interface': 1})
+        mac_result = is_mac_table(macaddress=arp['macaddress'], idc_name=arp['idc_name'])
+        # mac_result = mac_mongo.find(query_dict={'macaddress': arp['macaddress'], 'idc_name': arp['idc_name']},
+        #                             fields={'hostip': 1, 'hostname': 1, 'idc_name': 1, 'macaddress': 1,
+        #                                     'interface': 1})
         if mac_result:
             seen = set()
             unique_mac_data = []
