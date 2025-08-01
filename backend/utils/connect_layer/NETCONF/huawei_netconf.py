@@ -1007,6 +1007,25 @@ class HuaweiCollection(HuaweiyangNetconfConnect):
         # {'vrfName': 'MGMT', 'ipAddr': '10.254.2.1', 'macAddr': '9ce8-95d3-f0e2', 'styleType': 'DynamicArp', 'ifName': 'MEth0/0/0'}
         # {'vrfName': '_public_', 'ipAddr': '100.71.0.98', 'macAddr': '70c7-f2be-9c02', 'styleType': 'InterfaceArp', 'ifName': '40GE1/0/1'} 全局
         return res['arp']['arpTables']['arpTable'] if res else []
+    def colleciton_arp_list_test(self):
+        """
+        采集ARP信息
+        请求的XML命令
+        <vni></vni>
+        """
+        data_xml = '''
+           <ifm:ifm xmlns:ifm="urn:huawei:yang:huawei-ifm" xmlns:ip="urn:huawei:yang:huawei-ip">
+        <ifm:interfaces>
+          <ifm:interface>
+            <ip:ipv4/>
+          </ifm:interface>
+        </ifm:interfaces>
+      </ifm:ifm>
+        '''
+        res = self.netconf_get(data_xml)
+        # {'vrfName': 'MGMT', 'ipAddr': '10.254.2.1', 'macAddr': '9ce8-95d3-f0e2', 'styleType': 'DynamicArp', 'ifName': 'MEth0/0/0'}
+        # {'vrfName': '_public_', 'ipAddr': '100.71.0.98', 'macAddr': '70c7-f2be-9c02', 'styleType': 'InterfaceArp', 'ifName': '40GE1/0/1'} 全局
+        return res['ifm']['interfaces']['interface'] if res else []
 
     def colleciton_mac_vlanFdbs(self):
         """
