@@ -1090,16 +1090,16 @@ def is_arp_table(ipaddress):
     return show_ip_entry
 
 
-def is_mac_table(macaddress):
+def is_mac_table(macaddress, idc_name):
     """
     检查是否是设备MAC表项
     """
-    cache_key = ('device_mac', macaddress)
+    cache_key = ('device_mac', macaddress, idc_name)
     cached = get_cached_network_data('mac_table', *cache_key)
     if cached is not None:
         return cached
     show_ip_entry = mac_mongo.find(
-        query_dict={'macaddress': macaddress},fields={'_id': 0})
+        query_dict={'macaddress': macaddress, 'idc_name': idc_name},fields={'_id': 0})
     if show_ip_entry:
         cache_network_data('mac_table', *cache_key, data=show_ip_entry)
     return show_ip_entry
