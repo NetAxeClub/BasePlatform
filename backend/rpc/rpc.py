@@ -32,44 +32,44 @@ def dispatcher(method, data):
     log.info(f"method:{method}")
     log.info(f"data:{data}")
     try:
-        if method == 'get_firewall_list':
-            res = get_firewall_list()
-            return list(res)
-        elif method == 'get_firewall_zone':
-            res = get_firewall_zone(**data)
-            return res
-        elif method == 'config_sec_policy':
-            res = config_sec_policy.apply_async(kwargs=data, queue=CELERY_QUEUE,
-                                                retry=True)  # config
-            if str(res) == 'None':
-                print('forget')
-                res.forget()
-            return [{'task_id': str(res)}]
-        elif method == 'bulk_deny_by_address':
-            res = bulk_deny_by_address.apply_async(kwargs=data, queue=CELERY_QUEUE,
-                                                   retry=True)  # config
-            if str(res) == 'None':
-                print('forget')
-                res.forget()
-            return [{'task_id': str(res)}]
-        elif method == 'address_set':
-            res = address_set.apply_async(kwargs=data, queue=CELERY_QUEUE,
-                                          retry=True)  # config_backup
-            if str(res) == 'None':
-                print('forget')
-                res.forget()
-            return [{'task_id': str(res)}]
-        elif method == 'get_device_name':
+        # if method == 'get_firewall_list':
+        #     res = get_firewall_list()
+        #     return list(res)
+        # elif method == 'get_firewall_zone':
+        #     res = get_firewall_zone(**data)
+        #     return res
+        # elif method == 'config_sec_policy':
+        #     res = config_sec_policy.apply_async(kwargs=data, queue=CELERY_QUEUE,
+        #                                         retry=True)  # config
+        #     if str(res) == 'None':
+        #         print('forget')
+        #         res.forget()
+        #     return [{'task_id': str(res)}]
+        # elif method == 'bulk_deny_by_address':
+        #     res = bulk_deny_by_address.apply_async(kwargs=data, queue=CELERY_QUEUE,
+        #                                            retry=True)  # config
+        #     if str(res) == 'None':
+        #         print('forget')
+        #         res.forget()
+        #     return [{'task_id': str(res)}]
+        # elif method == 'address_set':
+        #     res = address_set.apply_async(kwargs=data, queue=CELERY_QUEUE,
+        #                                   retry=True)  # config_backup
+        #     if str(res) == 'None':
+        #         print('forget')
+        #         res.forget()
+        #     return [{'task_id': str(res)}]
+        if method == 'get_device_name':
             res = get_device_name(**data)
             # log.info({'data': res})
             return {'data': res}
-        else:
-            _FirewallMain = FirewallMain(data['host'])
-            func = getattr(_FirewallMain, method)
-            res = func(**data)
-            if res is None:
-                return {'code': 200}
-            return res
+        # else:
+        #     _FirewallMain = FirewallMain(data['host'])
+        #     func = getattr(_FirewallMain, method)
+        #     res = func(**data)
+        #     if res is None:
+        #         return {'code': 200}
+        #     return res
     except Exception as e:
         log.error(e)
         return {'code': 400, "msg": str(e)}
