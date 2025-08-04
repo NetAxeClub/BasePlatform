@@ -461,7 +461,6 @@ class H3cProc(BaseConn):
         :return:
         """
         if isinstance(res, list):
-            mac_datas = []
             for i in res:
                 tmp = dict(
                     hostip=self.hostip,
@@ -473,10 +472,7 @@ class H3cProc(BaseConn):
                     type=i['state'],
                     log_time=datetime.now()
                 )
-                mac_datas.append(tmp)
-            if mac_datas:
-                MongoNetOps.insert_table(
-                    'Automation', self.hostip, mac_datas, 'MACTable')
+                self.mac_datas.append(tmp)
 
     def _ip_interface_proc(self, res):
         layer3datas = []
@@ -1184,9 +1180,6 @@ class H3cProc(BaseConn):
                     type='evpn',
                 )
                 self.mac_datas.append(tmp)
-        # if l2vpn_mac_datas:
-        #     MongoNetOps.insert_table(
-        #         'Automation', self.hostip, l2vpn_mac_datas, 'MACTable', delete=False)
 
     def _netconf_mac_unicasttable(self, res):
         if res:
@@ -1213,9 +1206,6 @@ class H3cProc(BaseConn):
                     log_time=datetime.now()
                 )
                 self.mac_datas.append(tmp)
-            # if mac_datas:
-            #     MongoNetOps.insert_table(
-            #         'Automation', self.hostip, mac_datas, 'MACTable')
 
     def _netconf_vrrp(self, res):
         if res:
