@@ -768,31 +768,31 @@ class MainIn:
                 'memberport': memberport_list,
                 'server_ip_address': ip_address,
                 'server_mac_address': macaddress,
-                # 'server_admin': '',
-                # 'server_department': '',
-                # 'server_location': '',
-                # 'server_managername': '',
-                # 'telphone': '',
-                # 'memo': ""
+                'server_admin': '',
+                'server_department': '',
+                'server_location': '',
+                'server_managername': '',
+                'telphone': '',
+                'memo': ""
             }
-            plugin = discovered_plugins.get('plugins.extensibles.xunmi')
-            if plugin is not None:
-                methods = sorted([x for x in plugin.__all__])
-                start_time = time.time()
-                for method in methods:
-                    if callable(eval("discovered_plugins.get('plugins.extensibles.xunmi').{}".format(method))):
-                        try:
-                            flag, res = await eval(
-                                "discovered_plugins.get('plugins.extensibles.xunmi').{}".format(method))(
-                                **dict(ip_address=ip_address, hostip=hostip))
-                            if flag:
-                                mongo_data.update(res)
-                                # break
-                        except Exception as e:
-                            logger.info(f"{method}定位使用插件异常")
-                            logger.exception(e)
-                end_time = time.time() - start_time
-                logger.info("插件执行耗时：{}".format(str(end_time)))
+            # plugin = discovered_plugins.get('plugins.extensibles.xunmi')
+            # if plugin is not None:
+            #     methods = sorted([x for x in plugin.__all__])
+            #     start_time = time.time()
+            #     for method in methods:
+            #         if callable(eval("discovered_plugins.get('plugins.extensibles.xunmi').{}".format(method))):
+            #             try:
+            #                 flag, res = await eval(
+            #                     "discovered_plugins.get('plugins.extensibles.xunmi').{}".format(method))(
+            #                     **dict(ip_address=ip_address, hostip=hostip))
+            #                 if flag:
+            #                     mongo_data.update(res)
+            #                     # break
+            #             except Exception as e:
+            #                 logger.info(f"{method}定位使用插件异常")
+            #                 logger.exception(e)
+            #     end_time = time.time() - start_time
+            #     logger.info("插件执行耗时：{}".format(str(end_time)))
             XunMiOps.xunmi_ops(**mongo_data)
         return
 
