@@ -648,13 +648,10 @@ class MongoNetOps(object):
     # 插入总表项集合
     @staticmethod
     def insert_table(db, hostip, datas, tablename, delete=True):
-        # db='Automation',
         my_mongo = MongoOps(db=db, coll=tablename)
         if delete:
             my_mongo.delete_many(query=dict(hostip=hostip))
         [my_mongo.insert(x) for x in datas]
-        # my_mongo.insert_many(datas)
-        # netconf_mongo.insert_many(datas)
         return
 
     @staticmethod
