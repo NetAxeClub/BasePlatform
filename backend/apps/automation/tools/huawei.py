@@ -1600,6 +1600,9 @@ class HuaweiProc(BaseConn):
                 print(str(e))
         else:
             send_msg_netops("设备:{}\nnetconf方法:{}\n不被设备支持\n".format(self.hostip, method))
+        if self.mac_data:
+            MongoNetOps.insert_table(db='Automation', hostip=self.hostip,
+                                     datas=self.mac_data, tablename='MACTable', delete=True)
         if self.layer3datas:
             MongoNetOps.insert_table(db='Automation', hostip=self.hostip, datas=self.layer3datas,
                                      tablename='layer3interface')
