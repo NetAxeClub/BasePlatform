@@ -6,6 +6,7 @@
 # @Software: PyCharm
 import json
 import re
+import logging
 from datetime import datetime
 from operator import methodcaller
 from django.core.cache import cache
@@ -22,6 +23,8 @@ from .base_connection import BaseConn, InterfaceFormat
 address_mongo = MongoOps(db='NETCONF', coll='huawei_usg_address_set')
 nat_address_mongo = MongoOps(db='NETCONF', coll='huawei_usg_nat_address')
 sec_mongo = MongoOps(db='Automation', coll='sec_policy')
+
+logger = logging.getLogger(__file__)
 
 
 class HuaweiProc(BaseConn):
@@ -48,6 +51,7 @@ class HuaweiProc(BaseConn):
         self.address_set = []
         # 服务对象
         self.service_set = {}
+        self.mac_data = []
 
     def _huawei_usg_sec_policy(self, datas):
         """
@@ -385,7 +389,6 @@ class HuaweiProc(BaseConn):
         :return:
         """
         if isinstance(res, list):
-            mac_datas = []
             for i in res:
                 tmp = dict(
                     hostip=self.hostip,
@@ -398,10 +401,7 @@ class HuaweiProc(BaseConn):
                     type=i['type'],
                     log_time=datetime.now()
                 )
-                mac_datas.append(tmp)
-            if mac_datas:
-                MongoNetOps.insert_table(
-                    'Automation', self.hostip, mac_datas, 'MACTable')
+                self.mac_data.append(tmp)
 
     def interface_proc(self, path):
         eth_trunk_res = HuaweiS.eth_trunk(path=path)
@@ -853,11 +853,11 @@ class HuaweiProc(BaseConn):
                 )
                 arp_datas.append(tmp)
             MongoNetOps.insert_table(
-                'Automation', self.hostip, arp_datas, 'ARPTable')
+                'Automation', self.hostip, arp_datas, 'ARPTable', True)
 
     def _netconf_mac_bd(self, mac_bd):
+        # mac_bd_datas = []
         if mac_bd:
-            mac_bd_datas = []
             for i in mac_bd:
                 tmp = dict(
                     hostip=self.hostip,
@@ -870,9 +870,7 @@ class HuaweiProc(BaseConn):
                     type=i['macType'],
                     log_time=datetime.now()
                 )
-                mac_bd_datas.append(tmp)
-            MongoNetOps.insert_table(db='Automation', hostip=self.hostip,
-                                     datas=mac_bd_datas, tablename='MACTable')
+                self.mac_data.append(tmp)
 
     def _netconf_mac_vxlan(self, mac_vxlan):
         if mac_vxlan:
@@ -881,7 +879,7 @@ class HuaweiProc(BaseConn):
                 i['hostip'] = self.hostip
                 mac_vxlan_datas.append(i)
             MongoNetOps.insert_table(db='NETCONF', hostip=self.hostip,
-                                     datas=mac_vxlan_datas, tablename='netconf_mac_vxlan')
+                                     datas=mac_vxlan_datas, tablename='netconf_mac_vxlan', delete=True)
 
     def _netconf_mac_vxlan_control(self, mac_vxlan_control):
         if mac_vxlan_control:
@@ -890,7 +888,7 @@ class HuaweiProc(BaseConn):
                 i['hostip'] = self.hostip
                 mac_vxlan_control_datas.append(i)
             MongoNetOps.insert_table(db='NETCONF', hostip=self.hostip,
-                                     datas=mac_vxlan_control_datas, tablename='netconf_mac_vxlan_control')
+                                     datas=mac_vxlan_control_datas, tablename='netconf_mac_vxlan_control', delete=True)
 
     def _netconf_mac_table(self, mac_res):
         if mac_res:
@@ -899,7 +897,6 @@ class HuaweiProc(BaseConn):
             'outIfName': 'Eth-Trunk227'}
             {'slotId': '0', 'vlanId': '654', 'macAddress': 'fa16-3e4d-cedb', 'macType': 'blackHole'}
             """
-            mac_datas = []
             for i in mac_res:
                 tmp = dict(
                     hostip=self.hostip,
@@ -911,10 +908,7 @@ class HuaweiProc(BaseConn):
                     type=i['macType'],
                     log_time=datetime.now()
                 )
-                mac_datas.append(tmp)
-            if mac_datas:
-                MongoNetOps.insert_table(
-                    'Automation', self.hostip, mac_datas, 'MACTable', delete=False)
+                self.mac_data.append(tmp)
 
     def _netconf_lldp(self, lldp_res):
         if lldp_res:
@@ -1034,7 +1028,7 @@ class HuaweiProc(BaseConn):
                                 patch_version=dev_sysinfo['patch-version'])
                 else:
                     model_q = Model.objects.create(name=dev_sysinfo['model'],
-                                                        vendor=Vendor.objects.get(alias='Huawei'))
+                                                   vendor=Vendor.objects.get(alias='Huawei'))
                     NetworkDevice.objects.filter(manage_ip=self.hostip, status=0) \
                         .update(model=model_q,
                                 soft_version=dev_sysinfo['version'],
@@ -1049,7 +1043,7 @@ class HuaweiProc(BaseConn):
                                     patch_version=_sysinfo['patch-version'])
                     else:
                         model_q = Model.objects.create(name=_sysinfo['model'],
-                                                            vendor=Vendor.objects.get(alias='Huawei'))
+                                                       vendor=Vendor.objects.get(alias='Huawei'))
                         NetworkDevice.objects.filter(manage_ip=self.hostip, status=0) \
                             .update(model=model_q,
                                     soft_version=_sysinfo['version'],
@@ -1509,18 +1503,18 @@ class HuaweiProc(BaseConn):
 
     def _netconf_method_map(self, method, res):
         ntf_map = {
-            "colleciton_system_info": '_netconf_ce_system_info',
-            "colleciton_moduleinfo": '_netconf_moduleinfo',
-            "colleciton_stack": '_netconf_stack',
+            "collection_system_info": '_netconf_ce_system_info',
+            "collection_moduleinfo": '_netconf_moduleinfo',
+            "collection_stack": '_netconf_stack',
             "collection_intf_ipv4v6": '_netconf_intf_ipv4v6',
-            "colleciton_arp_list": '_netconf_arp_list',
+            "collection_arp_list": '_netconf_arp_list',
             "collection_aggregation": '_netconf_aggregation',
             "collection_mac_bd": '_netconf_mac_bd',
             "collection_mac_vxlan": '_netconf_mac_vxlan',
             "collection_mac_vxlan_control": '_netconf_mac_vxlan_control',
             "collection_mac_table": '_netconf_mac_table',
             "collection_lldp_ip": '_netconf_lldp',
-            "colleciton_trunk_lacp": '_netconf_lldp',
+            "collection_trunk_lacp": '_netconf_lldp',
             "get_system_info": '_netcocnf_system_info',
             "get_interface_list": '_netconf_usg_interface_list',
             "get_vrrp_info": '_netconf_usg_vrrp_info',
@@ -1559,16 +1553,19 @@ class HuaweiProc(BaseConn):
             methods = json.loads(self.plan['netconf_method'])
             if methods:
                 for method in methods:
-                    # print("开始执行{}方法".format(method))
+                    print("开始执行{}方法".format(method))
                     class_method = getattr(device, method, None)
+                    print(class_method)
                     if class_method:
                         try:
                             res = class_method()
-                            # print("netconf_method:{} ==> res:{}".format(method, str(res)))
                             if res:
                                 self._netconf_method_map(method, res)
                         except Exception as e:
-                            send_msg_netops("设备:{}\nnetconf方法:{}\n不被设备支持\n{}".format(self.hostip, method, str(e)))
+                            logger.error(e)
+            if self.mac_data:
+                MongoNetOps.insert_table(db='Automation', hostip=self.hostip,
+                                         datas=self.mac_data, tablename='MACTable', delete=True)
             if self.layer3datas:
                 MongoNetOps.insert_table(db='Automation', hostip=self.hostip, datas=self.layer3datas,
                                          tablename='layer3interface')
