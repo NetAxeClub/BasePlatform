@@ -1728,7 +1728,6 @@ class H3cProc(BaseConn):
                                 NetworkDevice.objects.filter(manage_ip=self.hostip).update(l2vpn=False)
                                 logger.error(
                                     "设备:{}\nnetconf方法:{}\n不被设备支持\n{}".format(self.hostip, method, str(e)))
-                                # send_msg_netops("设备:{}\nnetconf方法:{}\n不被设备支持\n{}".format(self.hostip, method, str(e)))
                             except Exception as e:
                                 logger.error(
                                     "设备:{}\nnetconf方法:{}\n执行过程中异常\n{}".format(self.hostip, method, str(e)))
