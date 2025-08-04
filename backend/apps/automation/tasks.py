@@ -1360,6 +1360,7 @@ def tracking_main():
     interface_used.apply_async()
     xunmi_process_mongo.delete_many()
     total_records = total_ip_mongo.count_documents()
+    MongoNetOps.clear_xunmi()
     # bus = SyncMessageBus()
     page_size = 20
     total_pages = math.ceil(total_records / page_size)
