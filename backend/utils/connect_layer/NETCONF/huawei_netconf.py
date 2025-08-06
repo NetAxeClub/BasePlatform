@@ -1008,26 +1008,6 @@ class HuaweiCollection(HuaweiyangNetconfConnect):
         # {'vrfName': '_public_', 'ipAddr': '100.71.0.98', 'macAddr': '70c7-f2be-9c02', 'styleType': 'InterfaceArp', 'ifName': '40GE1/0/1'} 全局
         return res['arp']['arpTables']['arpTable'] if res else []
 
-    def colleciton_arp_list_test(self):
-        """
-        采集ARP信息
-        请求的XML命令
-        <vni></vni>
-        """
-        data_xml = '''
-           <ifm:ifm xmlns:ifm="urn:huawei:yang:huawei-ifm" xmlns:ip="urn:huawei:yang:huawei-ip">
-            <ifm:interfaces>
-              <ifm:interface>
-                <ip:ipv4/>
-              </ifm:interface>
-            </ifm:interfaces>
-          </ifm:ifm>
-        '''
-        res = self.netconf_get(data_xml)
-        # {'vrfName': 'MGMT', 'ipAddr': '10.254.2.1', 'macAddr': '9ce8-95d3-f0e2', 'styleType': 'DynamicArp', 'ifName': 'MEth0/0/0'}
-        # {'vrfName': '_public_', 'ipAddr': '100.71.0.98', 'macAddr': '70c7-f2be-9c02', 'styleType': 'InterfaceArp', 'ifName': '40GE1/0/1'} 全局
-        return res['ifm']['interfaces']['interface'] if res else []
-
     def collection_mac_vlanFdbs(self):
         """
         采集MAC信息
@@ -1775,5 +1755,65 @@ class HuaweiCollection(HuaweiyangNetconfConnect):
         return data
 
 
+class HuaweiYunShanCollection(HuaweiyangNetconfConnect):
+    """
+    https://support.huawei.com/hedex/hdx.do?docid=EDOC1100344999&id=ahuawei-yang
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(HuaweiYunShanCollection, self).__init__(*args, **kwargs)
+        self.device_type = kwargs.get("device_type")
+
+    def collection_arp_list_test(self):
+        """
+        采集ARP信息
+        请求的XML命令
+        <vni></vni>
+        """
+        data_xml = '''
+           <ifm:ifm xmlns:ifm="urn:huawei:yang:huawei-ifm" xmlns:ip="urn:huawei:yang:huawei-ip">
+            <ifm:interfaces>
+              <ifm:interface>
+                <ip:ipv4/>
+              </ifm:interface>
+            </ifm:interfaces>
+          </ifm:ifm>
+        '''
+        res = self.netconf_get(data_xml)
+        return res['ifm']['interfaces']['interface'] if res else []
+
+    def collection_arp_list(self):
+        """
+        https://support.huawei.com/hedex/hdx.do?docid=EDOC1100344999&id=ahuawei-arp_list_bb2c34aaf6579b4b21e6b4fbb9dd9c0d
+        """
+        data_xml = '''
+        <arp:arp xmlns:arp="urn:huawei:yang:huawei-arp">
+          <arp:query-entries>
+            <arp:query-entry>
+              <arp:ip-addr/>
+              <arp:if-name/>
+              <arp:mac-addr/>
+            </arp:query-entry>
+          </arp:query-entries>
+        </arp:arp>
+        '''
+        res = self.netconf_get(data_xml)
+        return res['arp']['query-entries']['query-entry']
+
+    def collection_mac_table(self):
+        data_xml = '''
+        <vlan:vlan xmlns:vlan="urn:huawei:yang:huawei-vlan" xmlns:mac="urn:huawei:yang:huawei-mac">
+            <vlan:vlans>
+                <vlan:vlan>
+                <mac:mac-addresss/>
+                </vlan:vlan>
+            </vlan:vlans>
+        </vlan:vlan>
+        '''
+        res = self.netconf_get(data_xml)
+        return res['vlan']['vlans'] if res is not None else []
+
+
 if __name__ == '__main__':
+    # 不允许将调试代码写在这里
     pass
