@@ -93,6 +93,7 @@ class DeviceCollectionPlanSerializer(serializers.ModelSerializer):
     summary_plan_name = serializers.CharField(source='summary_plan.name', read_only=True)
     summary_plan_vendor = serializers.CharField(source='summary_plan.vendor', read_only=True)
     summary_plan_device_type = serializers.CharField(source='summary_plan.device_type', read_only=True)
+    description = serializers.CharField()
     xml_templates = serializers.SerializerMethodField()
 
     class Meta:
