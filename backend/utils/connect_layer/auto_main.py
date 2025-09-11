@@ -21,7 +21,8 @@ from textfsm import TextFSM
 from ttp import ttp
 from netaxe.settings import BASE_DIR
 from utils.db.mongo_ops import MongoOps
-from utils.connect_layer.zetmiko import ConnectHandler
+from utils.connect_layer.zetmiko import ConnectHandler as ZetmikoConnectHandler
+from netmiko import ConnectHandler
 
 channel_layer = get_channel_layer()
 """
@@ -163,8 +164,18 @@ class BatManMain(object):
     def send_cmds(*cmds, **dev_info):
         # paths = BatManMain.send_cmds(*['display evpn route arp'], **dev_info)
         paths = []
+
+        # 根据设备类型选择合适的ConnectHandler
+        device_type = dev_info.get('device_type', '')
+        if device_type in ['hillstone', 'fiberhome', 'mypower']:
+            # 使用自定义的zetmiko ConnectHandler
+            handler_class = ZetmikoConnectHandler
+        else:
+            # 使用标准的Netmiko ConnectHandler
+            handler_class = ConnectHandler
+
         try:
-            with ConnectHandler(**dev_info) as dev_connection:
+            with handler_class(**dev_info) as dev_connection:
                 prompt = dev_connection.find_prompt()  # 找出设备的prompt
                 for cmd in cmds:
                     content = dev_connection.send_command(cmd)
