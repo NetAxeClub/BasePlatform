@@ -272,9 +272,9 @@ class DeviceCollectionPlanViewSet(CustomViewBase):
     queryset = DeviceCollectionPlan.objects.all()
     serializer_class = DeviceCollectionPlanSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['summary_plan', 'summary_plan__vendor', 'summary_plan__device_type', 'netmiko_enabled', 'netconf_enabled', 'is_active']
+    filterset_fields = ['summary_plan', 'summary_plan__vendor', 'summary_plan__device_type', 'is_active', 'description']
     pagination_class = LargeResultsSetPagination
-    search_fields = ['name', 'description', 'summary_plan__name']
+    search_fields = ['name', 'description']
     ordering_fields = ['id', 'name', 'summary_plan__vendor', 'summary_plan__device_type', 'created_at', 'updated_at']
     ordering = ['-created_at']
     
@@ -1068,14 +1068,13 @@ class CollectionLogViewSet(CustomViewBase):
                     time_query['$lte'] = end_time
                 query['executed_at'] = time_query
             
-            # 执行查询
-
-            logs = COLLECTION_LOG_DB.find_page_query(
-                query_dict=query,
-                sort=('executed_at', -1),
-                page_size=page_size,
-                page_num=page
-            )
+            # 执行查询，按执行时间逆序排列（最新的在前面）
+            # 计算分页参数
+            skip = page_size * (page - 1)
+            
+            # 直接使用MongoDB原生查询确保正确的排序
+            cursor = COLLECTION_LOG_DB.coll.find(query).sort('executed_at', -1).limit(page_size).skip(skip)
+            logs = list(cursor)
 
             # 获取总数
             total_count = COLLECTION_LOG_DB.count_documents(query)
