@@ -788,17 +788,12 @@ class CollectionResultViewSet(CustomViewBase):
             sort_order = filter_data.get('sort_order', 'desc')
             sort_direction = -1 if sort_order == 'desc' else 1
             
-            # 使用 MongoOps 内置的分页查询
-            # 构建排序参数
-            sort_param = (sort_by, sort_direction) if sort_by and sort_direction else None
+            # 计算分页参数
+            skip = page_size * (page - 1)
             
-            # 执行分页查询
-            results = COLLECTION_RESULTS_DB.find_page_query(
-                query_dict=query,
-                sort=sort_param,
-                page_size=page_size,
-                page_num=page
-            )
+            # 直接使用MongoDB原生查询确保正确的分页和排序
+            cursor = COLLECTION_RESULTS_DB.coll.find(query).sort(sort_by, sort_direction).limit(page_size).skip(skip)
+            results = list(cursor)
             
             # 获取总数
             total_count = COLLECTION_RESULTS_DB.count_documents(query)
