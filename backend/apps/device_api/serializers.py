@@ -485,7 +485,14 @@ class CollectionFilterSerializer(serializers.Serializer):
     method_name = serializers.CharField(help_text='采集方法名称', required=False, allow_blank=True)
     status = serializers.CharField(help_text='采集状态', required=False)
     start_date = serializers.CharField(help_text='开始采集时间', required=False)
+    end_date = serializers.CharField(help_text='结束采集日期', required=False)
+    start_time = serializers.CharField(help_text='开始采集时间', required=False)
     end_time = serializers.CharField(help_text='结束采集时间', required=False)
+    days = serializers.IntegerField(help_text='最近天数', required=False)
+    page = serializers.IntegerField(help_text='页码', required=False, default=1)
+    page_size = serializers.IntegerField(help_text='每页大小', required=False, default=10)
+    sort_by = serializers.CharField(help_text='排序字段', required=False, default='collected_at')
+    sort_order = serializers.CharField(help_text='排序方向', required=False, default='desc')
 
 
 class CollectionResultListSerializer(serializers.Serializer):
