@@ -147,6 +147,27 @@ class AlertRunner:
                 return {}
         return {}
 
+
+    def get_user_detail(self, params):
+        self.server = config.service_dicovery('alert_gateway')
+        self.server_hosts = self.server['hosts']
+        self.metadata = self.server_hosts[0]['metadata']
+        for _server in self.server_hosts:
+            url = "http://{}:{}/alert_gateway/system/user/".format(_server['ip'], _server['port'])
+            params = {
+                'query': json.dumps(params),
+                'page': 1,
+                'page_size': 1000
+            }
+            headers = {
+                'Content-Type': 'application/json',
+                'x-api-key': config.alert_gateway_api
+            }
+
+            res = requests.request("GET", url, headers=headers, params=params)
+            if res.status_code == 200:
+                return res.json()['data']
+        return {}
     # @run_time_sync
     # def send_sms(self, user, content, webhook=None, priority=0):
     #     send_args = {
