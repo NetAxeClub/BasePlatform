@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 # 2023/8/28
-from django.db import connections
 from apps.asset.models import NetworkDevice, Category
 # from apps.asset.serializers import NetworkDeviceSerializer
 
@@ -31,11 +30,3 @@ def get_device_info(**kwargs):
 def get_device_name(**kwargs):
     res = NetworkDevice.objects.filter(**kwargs).values('manage_ip', 'name')
     return list(res)
-
-
-def netpalm_data_to_mongodb(**kwargs):
-    import logging
-    logging.info("开始执行管控平台rpc回调")
-    device_info = kwargs.get("device_info", {})
-    logging.info(device_info)
-    return [1, 2, 3]

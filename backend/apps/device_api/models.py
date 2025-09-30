@@ -54,6 +54,8 @@ class DeviceCollectionPlan(models.Model):
 
     # 基本信息
     name = models.CharField(max_length=100, verbose_name='采集方案名称', unique=True)
+    type = models.CharField(max_length=20, default='arp', verbose_name='采集类型')
+    machine_room_ip = models.CharField(max_length=15, default='10.254.2.111', verbose_name='执行机房IP')
     description = models.TextField(blank=True, verbose_name='方案描述')
 
     # 采集方式配置,Netmiko配置
@@ -99,11 +101,11 @@ class DeviceCollectionPlan(models.Model):
 
     def get_netmiko_method(self):
         """获取Netmiko方法名称"""
-        return self.netmiko_method.strip() if self.netmiko_method else None
+        return self.netmiko_method.strip().split(',') if self.netmiko_method else []
 
     def get_netconf_method(self):
         """获取NETCONF方法名称"""
-        return self.netconf_method.strip() if self.netconf_method else None
+        return self.netconf_method.strip() if self.netconf_method else []
 
     def get_netmiko_field_mappings_dict(self):
         """获取Netmiko字段映射字典"""
@@ -133,15 +135,15 @@ class DeviceCollectionPlan(models.Model):
 
         return errors
 
-    def process_collected_data(self, raw_data):
+    def process_collected_data(self, data):
         """处理采集到的数据"""
         if not self.data_processor_enabled or not self.data_processor:
-            return raw_data
+            return data
 
         try:
             # 创建安全的执行环境
             local_vars = {
-                'raw_data': raw_data,
+                'data': data,
             }
 
             # 执行数据处理代码
@@ -150,7 +152,7 @@ class DeviceCollectionPlan(models.Model):
             # 检查函数是否定义成功，并调用它
             if 'process_data' in local_vars:
                 # 调用在 exec 中定义的函数，传入数据
-                processed_result = local_vars['process_data'](local_vars['raw_data'])
+                processed_result = local_vars['process_data'](local_vars['data'])
             else:
                 raise RuntimeError("在执行代码后未找到 'process_data' 函数。")
 
@@ -159,13 +161,13 @@ class DeviceCollectionPlan(models.Model):
                 return processed_result
 
             # 如果没有明确的返回值，返回处理后的数据
-            return raw_data
+            return data
 
         except Exception as e:
             import logging
             logger = logging.getLogger(__name__)
             logger.error(f"执行数据处理代码失败: {str(e)}")
-            return raw_data
+            return data
 
     def save(self, *args, **kwargs):
         """保存时确保字段映射有正确的默认值"""

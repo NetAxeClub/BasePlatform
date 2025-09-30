@@ -100,7 +100,7 @@ class DeviceCollectionPlanSerializer(serializers.ModelSerializer):
         model = DeviceCollectionPlan
         fields = [
             'id', 'summary_plan', 'summary_plan_name', 'summary_plan_vendor',
-            'summary_plan_device_type', 'name', 'description',
+            'summary_plan_device_type', 'name', 'description', 'type', 'machine_room_ip',
             'textfsm_enabled', 'textfsm_template',
             'netmiko_enabled', 'netmiko_path', 'netmiko_method', 'netmiko_field_mappings',
             'netconf_enabled', 'netconf_path', 'netconf_method', 'netconf_field_mappings',
@@ -147,7 +147,7 @@ class DeviceCollectionPlanCreateSerializer(serializers.ModelSerializer):
         model = DeviceCollectionPlan
         fields = [
             'id', 'summary_plan_id', 'summary_plan', 'summary_plan_name', 'summary_plan_vendor',
-            'summary_plan_device_type', 'name', 'description',
+            'summary_plan_device_type', 'name', 'description', 'type', 'machine_room_ip',
             'textfsm_enabled', 'textfsm_template',
             'netmiko_enabled', 'netmiko_path', 'netmiko_method', 'netmiko_field_mappings',
             'netconf_enabled', 'netconf_path', 'netconf_method', 'netconf_field_mappings',
@@ -255,7 +255,7 @@ class DeviceCollectionPlanUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = DeviceCollectionPlan
         fields = [
-            'id', 'summary_plan_id', 'name', 'description',
+            'id', 'summary_plan_id', 'name', 'description', 'type', 'machine_room_ip',
             'textfsm_enabled', 'textfsm_template',
             'netmiko_enabled', 'netmiko_path', 'netmiko_method', 'netmiko_field_mappings',
             'netconf_enabled', 'netconf_path', 'netconf_method', 'netconf_field_mappings',
@@ -542,7 +542,6 @@ class CollectionResultListSerializer(serializers.Serializer):
 
 class CollectionResultDetailSerializer(CollectionResultListSerializer):
     """采集结果详情序列化器"""
-    raw_data = serializers.JSONField(help_text='原始数据')
+    data = serializers.JSONField(help_text='原始数据')
     processed_data = serializers.JSONField(help_text='处理后数据')
-    # processed_at = serializers.CharField(help_text='处理时间')
-    # processing_time = serializers.FloatField(help_text='执行时间(秒)')
+
