@@ -12,12 +12,14 @@
 """
 import json
 import logging
+
 from confload.confload import config
 from pika import BasicProperties
 from netaxe.settings import DEBUG
 from bus.bus_sync import SyncMessageBus
 from apps.dcs_control.tasks import FirewallMain
-from apps.automation.tools.models_api import get_firewall_list, get_device_name, netpalm_data_to_mongodb
+from apps.automation.tools.models_api import get_firewall_list, get_device_name
+from apps.device_api.models_api import netpalm_data_to_mongodb
 from apps.dcs_control.tasks import address_set, bulk_deny_by_address, get_firewall_zone, config_sec_policy
 
 log = logging.getLogger(__name__)
