@@ -7036,7 +7036,6 @@ def bulk_deny_by_address(self, **post_param):
     event_id = AutoEvent.objects.create(**dict(commit_user=post_param.get('user') or '',
                                                remote_ip=post_param['remote_ip'],
                                                task=AutoFlowTasks.DENY))
-    print('hosts', hosts)
     for host in hosts:
         if host['ans_group_hosts__ans_vars']:
             # json卸载主机变量
@@ -7047,8 +7046,6 @@ def bulk_deny_by_address(self, **post_param):
                 print('错误', str(e))
                 b = eval(host['ans_group_hosts__ans_vars'])
                 host_vars = json.loads(b)
-            print('host_vars', host_vars)
-            print(type(host_vars))
             if post_param.get('ip_mask'):
                 if post_param.get('add_detail_ip'):
                     post_data = {
