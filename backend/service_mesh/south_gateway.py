@@ -1,15 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
--------------------------------------------------
-   File Name：      south_gateway
-   Description:     南向驱动网关，用于调用南向驱动的配置获取和任务查询接口
-   Author:          Lijiamin
-   date：           2025/3/24 09:53
--------------------------------------------------
-   Change Activity:
-                    2025/3/24 09:53
--------------------------------------------------
-"""
 import logging
 import requests
 import json

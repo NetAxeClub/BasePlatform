@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 import logging
+from datetime import datetime
 from apps.device_api import (
     COLLECTION_RESULTS_DB, COLLECTION_ARP, COLLECTION_MAC, COLLECTION_LLDP, 
     COLLECTION_IP_INTERFACE, COLLECTION_INTERFACE_BRIEF, COLLECTION_AGGRE_PORT
 )
-from apps.device_api.models import DeviceCollectionPlan
+from apps.device_api.models import DeviceSubCollectionPlan
 
 
 def netpalm_data_to_mongodb(**kwargs):
@@ -35,6 +36,7 @@ def netpalm_data_to_mongodb(**kwargs):
         plan_id = webhook_args.get("plan_id")
         device_ip = webhook_args.get("device_ip")
         device_name = webhook_args.get("device_name")
+        idc_name = webhook_args.get("idc_name", "")
         collection_method = webhook_args.get("collection_method", "netmiko")
         collection_type = webhook_args.get("type", "arp")
 
@@ -42,9 +44,9 @@ def netpalm_data_to_mongodb(**kwargs):
 
         # 查询采集方案
         try:
-            plan = DeviceCollectionPlan.objects.select_related('summary_plan').get(id=plan_id)
+            plan = DeviceSubCollectionPlan.objects.select_related('summary_plan').get(id=plan_id)
             logging.info(f"成功获取采集方案: {plan.name} (ID: {plan_id})")
-        except DeviceCollectionPlan.DoesNotExist:
+        except DeviceSubCollectionPlan.DoesNotExist:
             logging.error(f"采集方案不存在: plan_id={plan_id}")
             return {"status": "failed", "message": f"采集方案不存在: plan_id={plan_id}"}
         
@@ -65,6 +67,7 @@ def netpalm_data_to_mongodb(**kwargs):
                 'plan_name': plan.name,
                 'device_ip': device_ip,
                 'device_name': device_name,
+                'idc_name': idc_name,
                 'device_type': plan.summary_plan.device_type,
                 'vendor': plan.summary_plan.vendor,
                 'collection_method': collection_method,
@@ -86,8 +89,8 @@ def netpalm_data_to_mongodb(**kwargs):
             if processing_status:
                 logging.info(f"数据处理成功: {device_ip} - 命令: {command_name}")
 
-                # 保存到MongoDB
-                result = save_to_collection_db(
+                # 保存数据到指定MongoDB，比如arp、mac
+                result_dict = save_to_collection_db(
                     content=processed_data if isinstance(processed_data, list) else [],
                     hostip=device_ip,
                     collection_type=collection_type,
@@ -96,10 +99,13 @@ def netpalm_data_to_mongodb(**kwargs):
                     created_on=created_on
                 )
 
+                if not result_dict.get("status"):
+                    logging.error(f"保存数据失败，错误信息为 {result_dict['message']}")
+
             else:
                 logging.error(f"数据处理失败: {device_ip} - 命令: {command_name}")
       
-            # 保存到MongoDB
+            # 保存当前执行流程结果到MongoDB
             try:
                 COLLECTION_RESULTS_DB.insert_one(collection_result)
                 logging.info(f"采集结果已保存: {device_ip} - {plan.name} - 命令: {command_name}")
@@ -134,7 +140,7 @@ def process_raw_data(plan, collection_result, collection_method):
         if plan.data_processor_enabled and plan.data_processor:
             logging.info(f"执行数据处理函数: {plan.name}")
             try:
-                processed_data = plan.process_collected_data(command_result)
+                processed_data = plan.process_netconf_data(command_result)
                 logging.info(f"数据处理函数执行成功: {plan.name}")
             except Exception as e:
                 logging.error(f"数据处理函数执行失败: {plan.name} - {str(e)}")
@@ -247,6 +253,7 @@ def apply_field_mappings(data_dict, field_mappings, path_config=None):
             return []
 
         processed_data = []
+        log_time = datetime.now()
 
         # 遍历数组中的每个元素
         for item in array_data:
@@ -289,6 +296,7 @@ def apply_field_mappings(data_dict, field_mappings, path_config=None):
                 result_item[field_name] = value
 
             # 将结果添加到数组中
+            result_item['log_time'] = log_time
             processed_data.append(result_item)
 
         logging.info(f"字段映射完成: 处理了 {len(processed_data)} 条记录，使用了 {len(sorted_fields)} 个字段")
@@ -323,12 +331,12 @@ def save_to_collection_db(content: list, hostip: str, collection_type: str, plan
     my_mongo = collection_map.get(collection_type, None)
 
     if len(content) == 0:
-        logging.error("processed_data is null")
-        return {"status": "failed", "message": "processed_data is null"}
+        logging.info("processed_data is []")
+        return {"status": True, "message": "processed_data is []"}
         
     if not my_mongo:
         logging.error(f"找不到对应的集合: {collection_type}")
-        return {"status": "failed", "message": f"找不到对应的集合: {collection_type}"}
+        return {"status": False, "message": f"找不到对应的集合: {collection_type}"}
     
     try:
         # 删除该设备的已有数据
@@ -347,10 +355,10 @@ def save_to_collection_db(content: list, hostip: str, collection_type: str, plan
         my_mongo.insert_many(datas)
         
         logging.info(f"数据传输成功: {hostip} - 类型: {collection_type}")
-        return {'status': 200}
+        return {'status': True}
         
     except Exception as e:
         logging.error(f"insert_many_failed:{str(e)}")
         logging.error(f"保存到数据库失败: hostip={hostip}, collection_type={collection_type}")
         logging.error(f"数据传输失败: {hostip} - 类型: {collection_type} - {str(e)}")
-        return {"status": "failed", "message": f"保存到数据库失败: {str(e)}"}
+        return {"status": False, "message": f"保存到数据库失败: {str(e)}"}

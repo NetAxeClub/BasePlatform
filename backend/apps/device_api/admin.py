@@ -1,9 +1,9 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from apps.device_api.models import DeviceSummaryPlans, DeviceCollectionPlan, NetconfXMLTemplate
+from apps.device_api.models import DeviceCollectionPlans, DeviceSubCollectionPlan, NetconfXMLTemplate
 
 
-@admin.register(DeviceSummaryPlans)
+@admin.register(DeviceCollectionPlans)
 class DeviceSummaryPlansAdmin(admin.ModelAdmin):
     """采集汇总方案管理"""
     list_display = [
@@ -38,7 +38,7 @@ class DeviceSummaryPlansAdmin(admin.ModelAdmin):
     collect_plans_count.short_description = '采集方案数量'
 
 
-@admin.register(DeviceCollectionPlan)
+@admin.register(DeviceSubCollectionPlan)
 class DeviceCollectionPlanAdmin(admin.ModelAdmin):
     """设备采集方案管理"""
     list_display = [
@@ -100,7 +100,7 @@ class DeviceCollectionPlanAdmin(admin.ModelAdmin):
     def device_type_display(self, obj):
         """显示设备类型"""
         if obj.summary_plan:
-            return obj.summary_plan.get_device_type_display()
+            return obj.summary_plan.device_type
         return '-'
     device_type_display.short_description = '设备类型'
     
@@ -154,7 +154,7 @@ class NetconfXMLTemplateAdmin(admin.ModelAdmin):
                 '<small style="color: gray;">{}-{}</small>',
                 obj.collection_plan.name,
                 obj.collection_plan.summary_plan.get_vendor_display(),
-                obj.collection_plan.summary_plan.get_device_type_display()
+                obj.collection_plan.summary_plan.device_type
             )
         return '-'
     collection_plan_info.short_description = '采集方案信息'

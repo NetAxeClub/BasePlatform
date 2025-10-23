@@ -1,3 +1,4 @@
+# 采集类型 需要入库的标准字段
 
 APR_MAPPING = [
     {"label": "主机IP: hostip", "value": "hostip"},

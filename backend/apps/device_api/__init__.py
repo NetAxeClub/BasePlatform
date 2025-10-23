@@ -10,7 +10,6 @@ COLLECTION_RESULTS_DB = MongoOps(db='BasePlatform', coll='DeviceCollection')
 COLLECTION_LOG_DB = MongoOps(db='BasePlatform', coll='DeviceCollectionLog')
 
 # 标准数据存入mongodb
-
 COLLECTION_ARP = MongoOps(db='BasePlatform', coll='CollectARPTable')
 COLLECTION_MAC = MongoOps(db='BasePlatform', coll='CollectMACTable')
 COLLECTION_LLDP = MongoOps(db='BasePlatform', coll='CollectLLDPTable')

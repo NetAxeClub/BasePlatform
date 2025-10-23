@@ -7,8 +7,8 @@ from rest_framework.decorators import action
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from apps.api.tools.custom_viewset_base import CustomViewBase
-from apps.device_api.models import DeviceSummaryPlans, DeviceCollectionPlan, NetconfXMLTemplate
-from apps.device_api.models_api import process_raw_data
+from apps.device_api.models import DeviceCollectionPlans, DeviceSubCollectionPlan, NetconfXMLTemplate
+from apps.device_api.models_api import process_raw_data, netpalm_data_to_mongodb
 from apps.device_api.serializers import (
     DeviceSummaryPlansSerializer, DeviceSummaryPlansCreateSerializer,
     DeviceSummaryPlansUpdateSerializer, DeviceSummaryPlansDetailSerializer,
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 class DeviceSummaryPlansViewSet(CustomViewBase):
     """采集汇总方案视图集"""
-    queryset = DeviceSummaryPlans.objects.all()
+    queryset = DeviceCollectionPlans.objects.all()
     serializer_class = DeviceSummaryPlansSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['vendor', 'device_type', 'is_active']
@@ -271,7 +271,7 @@ class DeviceSummaryPlansViewSet(CustomViewBase):
 
 class DeviceCollectionPlanViewSet(CustomViewBase):
     """设备采集方案视图集"""
-    queryset = DeviceCollectionPlan.objects.all()
+    queryset = DeviceSubCollectionPlan.objects.all()
     serializer_class = DeviceCollectionPlanSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['summary_plan', 'summary_plan__vendor', 'summary_plan__device_type', 'is_active', 'description']
@@ -383,7 +383,7 @@ class DeviceCollectionPlanViewSet(CustomViewBase):
             
             # 2. 查询设备信息
             try:
-                device = NetworkDevice.objects.get(manage_ip=device_ip)
+                device = NetworkDevice.objects.select_related('idc').get(manage_ip=device_ip)
             except NetworkDevice.DoesNotExist:
                 return False, f"设备 {device_ip} 不存在", None
             
@@ -768,7 +768,7 @@ class DeviceCollectionPlanViewSet(CustomViewBase):
         data = COLLECTION_RESULTS_DB.find(query_dict=query, fields={"_id": 0})
         collection_data = data[-1]
 
-        plan = DeviceCollectionPlan.objects.get(id=plan_id)
+        plan = DeviceSubCollectionPlan.objects.get(id=plan_id)
         processed_data = process_raw_data(plan, collection_data, "netmiko")
 
         COLLECTION_RESULTS_DB.delete_many(query=query)
@@ -777,6 +777,18 @@ class DeviceCollectionPlanViewSet(CustomViewBase):
             'code': 200,
             'message': '获取成功',
             'data': processed_data
+        })
+
+    @action(detail=False, methods=['post'])
+    def record_plan_data(self, request, *args, **kwargs):
+        """接收南向驱动数据，存入db"""
+
+        data = request.data
+        result = netpalm_data_to_mongodb(**data)
+
+        return JsonResponse({
+            'code': 200 if result.get("status") == "success" else 500,
+            'message': result.get("message", "")
         })
 
 
