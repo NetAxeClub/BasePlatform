@@ -5,7 +5,7 @@ from typing import Dict, List, Any
 from django.utils import timezone
 from service_mesh import south_driver_runner
 from apps.automation.tools.base_connection import device_type_map
-from apps.device_api.models import DeviceCollectionPlan, NetconfXMLTemplate
+from apps.device_api.models import DeviceSubCollectionPlan, NetconfXMLTemplate
 from utils.connect_layer.NETCONF.h3c_netconf_db import H3CinfoCollectionDB, H3CSecPathDB
 from utils.connect_layer.NETCONF.huawei_netconf_db import HuaweiCollectionDB, HuaweiUSGDB
 from apps.device_api import COLLECTION_RESULTS_DB
@@ -133,6 +133,7 @@ class DeviceCollectionService:
                         "plan_id": plan.id,
                         "device_ip": device.manage_ip,
                         "device_name": device.name,
+                        "idc_name": device.idc.name,
                         "collection_method": "netmiko",
                         "type": plan.type,
                         **host_info
@@ -182,9 +183,13 @@ class DeviceCollectionService:
 
                 return {"status": "failed", "data": {}}
 
+            # TODO 这个地方需要后期调整，因为不能永远只拿第一个，要不然后面的就没有意义
             args_filter = xml_templates[0].xml_template
             clean_xml = args_filter.strip()
-            filter_xml = f'<filter type="subtree">{clean_xml}</filter>'
+            if "<filter type=" not in clean_xml:
+                filter_xml = f'<filter type="subtree">{clean_xml}</filter>'
+            else:
+                filter_xml = clean_xml
             logger.info(f"构建的filter XML: {filter_xml}")
 
             netpalm_info = {
@@ -209,6 +214,7 @@ class DeviceCollectionService:
                         "plan_id": plan.id,
                         "device_ip": device.manage_ip,
                         "device_name": device.name,
+                        "idc_name": device.idc.name,
                         "collection_method": "netconf",
                         "type": plan.type,
                         **host_info
@@ -286,8 +292,8 @@ class DeviceCollectionService:
 
             # 根据plan_id获取采集方案对象
             try:
-                plan = DeviceCollectionPlan.objects.get(id=plan_id)
-            except DeviceCollectionPlan.DoesNotExist:
+                plan = DeviceSubCollectionPlan.objects.get(id=plan_id)
+            except DeviceSubCollectionPlan.DoesNotExist:
                 return {
                     'success': False,
                     'error': f'采集方案不存在 (ID: {plan_id})',
@@ -324,7 +330,7 @@ class DeviceCollectionService:
                         pass
                 
                 # 调用采集方案的数据处理方法
-                processed_data = plan.process_collected_data(raw_data)
+                processed_data = plan.process_netconf_data(raw_data)
                 
                 # 计算处理时间
                 processing_time = time.time() - start_time

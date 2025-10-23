@@ -3,23 +3,22 @@ import logging
 import pytz
 from datetime import datetime
 from rest_framework import serializers
-from apps.device_api.models import DeviceSummaryPlans, DeviceCollectionPlan, NetconfXMLTemplate
+from apps.device_api.models import DeviceCollectionPlans, DeviceSubCollectionPlan, NetconfXMLTemplate
 
 
 class DeviceSummaryPlansSerializer(serializers.ModelSerializer):
     """采集汇总方案序列化器"""
     vendor_display = serializers.CharField(source='get_vendor_display', read_only=True)
-    device_type_display = serializers.CharField(source='get_device_type_display', read_only=True)
     collect_plans_count = serializers.SerializerMethodField()
     collect_plans = serializers.SerializerMethodField()
 
     class Meta:
-        model = DeviceSummaryPlans
+        model = DeviceCollectionPlans
         fields = [
-            'id', 'name', 'vendor', 'vendor_display', 'device_type', 'device_type_display',
+            'id', 'name', 'vendor', 'vendor_display', 'device_type',
             'description', 'is_active', 'collect_plans_count', 'collect_plans', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'vendor_display', 'device_type_display',
+        read_only_fields = ['id', 'vendor_display',
                            'collect_plans_count', 'created_at', 'updated_at']
 
     def get_collect_plans_count(self, obj):
@@ -33,18 +32,17 @@ class DeviceSummaryPlansSerializer(serializers.ModelSerializer):
 class DeviceSummaryPlansCreateSerializer(serializers.ModelSerializer):
     """采集汇总方案创建序列化器"""
     vendor_display = serializers.CharField(source='get_vendor_display', read_only=True)
-    device_type_display = serializers.CharField(source='get_device_type_display', read_only=True)
 
     class Meta:
-        model = DeviceSummaryPlans
+        model = DeviceCollectionPlans
         fields = [
-            'id', 'name', 'vendor', 'vendor_display', 'device_type', 'device_type_display',
+            'id', 'name', 'vendor', 'vendor_display', 'device_type',
             'description', 'is_active', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'vendor_display', 'device_type_display', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'vendor_display', 'created_at', 'updated_at']
 
     def validate_name(self, value):
-        if DeviceSummaryPlans.objects.filter(name=value).exists():
+        if DeviceCollectionPlans.objects.filter(name=value).exists():
             raise serializers.ValidationError("采集汇总方案名称已存在")
         return value
 
@@ -52,19 +50,18 @@ class DeviceSummaryPlansCreateSerializer(serializers.ModelSerializer):
 class DeviceSummaryPlansUpdateSerializer(serializers.ModelSerializer):
     """采集汇总方案更新序列化器"""
     vendor_display = serializers.CharField(source='get_vendor_display', read_only=True)
-    device_type_display = serializers.CharField(source='get_device_type_display', read_only=True)
 
     class Meta:
-        model = DeviceSummaryPlans
+        model = DeviceCollectionPlans
         fields = [
-            'id', 'name', 'vendor', 'vendor_display', 'device_type', 'device_type_display',
+            'id', 'name', 'vendor', 'vendor_display', 'device_type',
             'description', 'is_active', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'vendor_display', 'device_type_display', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'vendor_display', 'created_at', 'updated_at']
 
     def validate_name(self, value):
         instance = self.instance
-        if instance and DeviceSummaryPlans.objects.filter(name=value).exclude(id=instance.id).exists():
+        if instance and DeviceCollectionPlans.objects.filter(name=value).exclude(id=instance.id).exists():
             raise serializers.ValidationError("采集汇总方案名称已存在")
         return value
 
@@ -72,7 +69,6 @@ class DeviceSummaryPlansUpdateSerializer(serializers.ModelSerializer):
 class DeviceSummaryPlansDetailSerializer(serializers.ModelSerializer):
     """采集汇总方案详情序列化器"""
     vendor_display = serializers.CharField(source='get_vendor_display', read_only=True)
-    device_type_display = serializers.CharField(source='get_device_type_display', read_only=True)
     collect_plans = serializers.SerializerMethodField()
 
     def get_collect_plans(self, obj):
@@ -80,26 +76,27 @@ class DeviceSummaryPlansDetailSerializer(serializers.ModelSerializer):
         return DeviceCollectionPlanSerializer(collect_plans, many=True).data
 
     class Meta:
-        model = DeviceSummaryPlans
+        model = DeviceCollectionPlans
         fields = [
-            'id', 'name', 'vendor', 'vendor_display', 'device_type', 'device_type_display',
+            'id', 'name', 'vendor', 'vendor_display', 'device_type',
             'description', 'is_active', 'collect_plans', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'vendor_display', 'device_type_display', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'vendor_display', 'created_at', 'updated_at']
 
 
 class DeviceCollectionPlanSerializer(serializers.ModelSerializer):
     """设备采集方案序列化器"""
     summary_plan_name = serializers.CharField(source='summary_plan.name', read_only=True)
     summary_plan_vendor = serializers.CharField(source='summary_plan.vendor', read_only=True)
+    summary_plan_vendor_display = serializers.CharField(source='summary_plan.get_vendor_display', read_only=True)
     summary_plan_device_type = serializers.CharField(source='summary_plan.device_type', read_only=True)
     description = serializers.CharField()
     xml_templates = serializers.SerializerMethodField()
 
     class Meta:
-        model = DeviceCollectionPlan
+        model = DeviceSubCollectionPlan
         fields = [
-            'id', 'summary_plan', 'summary_plan_name', 'summary_plan_vendor',
+            'id', 'summary_plan', 'summary_plan_name', 'summary_plan_vendor', 'summary_plan_vendor_display',
             'summary_plan_device_type', 'name', 'description', 'type', 'machine_room_ip',
             'textfsm_enabled', 'textfsm_template',
             'netmiko_enabled', 'netmiko_path', 'netmiko_method', 'netmiko_field_mappings',
@@ -107,7 +104,7 @@ class DeviceCollectionPlanSerializer(serializers.ModelSerializer):
             'data_processor_enabled', 'data_processor', 'is_active', 'xml_templates',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'summary_plan_name', 'summary_plan_vendor',
+        read_only_fields = ['id', 'summary_plan_name', 'summary_plan_vendor', 'summary_plan_vendor_display',
                             'summary_plan_device_type', 'created_at', 'updated_at']
 
     def get_xml_templates(self, obj):
@@ -144,7 +141,7 @@ class DeviceCollectionPlanCreateSerializer(serializers.ModelSerializer):
     )
 
     class Meta:
-        model = DeviceCollectionPlan
+        model = DeviceSubCollectionPlan
         fields = [
             'id', 'summary_plan_id', 'summary_plan', 'summary_plan_name', 'summary_plan_vendor',
             'summary_plan_device_type', 'name', 'description', 'type', 'machine_room_ip',
@@ -205,15 +202,15 @@ class DeviceCollectionPlanCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         from django.db import transaction
-        from apps.device_api.models import DeviceSummaryPlans
+        from apps.device_api.models import DeviceCollectionPlans
 
         # 处理summary_plan_id
         summary_plan_id = validated_data.pop('summary_plan_id', None)
         if summary_plan_id:
             try:
-                summary_plan = DeviceSummaryPlans.objects.get(id=summary_plan_id)
+                summary_plan = DeviceCollectionPlans.objects.get(id=summary_plan_id)
                 validated_data['summary_plan'] = summary_plan
-            except DeviceSummaryPlans.DoesNotExist:
+            except DeviceCollectionPlans.DoesNotExist:
                 raise serializers.ValidationError(f"汇总方案ID {summary_plan_id} 不存在")
         else:
             raise serializers.ValidationError("必须提供summary_plan_id")
@@ -223,7 +220,7 @@ class DeviceCollectionPlanCreateSerializer(serializers.ModelSerializer):
         try:
             with transaction.atomic():
                 # 创建采集方案
-                collection_plan = DeviceCollectionPlan.objects.create(**validated_data)
+                collection_plan = DeviceSubCollectionPlan.objects.create(**validated_data)
 
                 # 如果启用了NETCONF且有XML模板，创建XML模板
                 if collection_plan.netconf_enabled and xml_templates_data:
@@ -253,7 +250,7 @@ class DeviceCollectionPlanUpdateSerializer(serializers.ModelSerializer):
     )
 
     class Meta:
-        model = DeviceCollectionPlan
+        model = DeviceSubCollectionPlan
         fields = [
             'id', 'summary_plan_id', 'name', 'description', 'type', 'machine_room_ip',
             'textfsm_enabled', 'textfsm_template',
@@ -359,15 +356,15 @@ class DeviceCollectionPlanUpdateSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         from django.db import transaction
-        from apps.device_api.models import DeviceSummaryPlans
+        from apps.device_api.models import DeviceCollectionPlans
 
         # 处理summary_plan_id
         summary_plan_id = validated_data.pop('summary_plan_id', None)
         if summary_plan_id:
             try:
-                summary_plan = DeviceSummaryPlans.objects.get(id=summary_plan_id)
+                summary_plan = DeviceCollectionPlans.objects.get(id=summary_plan_id)
                 validated_data['summary_plan'] = summary_plan
-            except DeviceSummaryPlans.DoesNotExist:
+            except DeviceCollectionPlans.DoesNotExist:
                 raise serializers.ValidationError(f"汇总方案ID {summary_plan_id} 不存在")
 
         xml_templates_data = validated_data.pop('xml_templates', None)
@@ -502,6 +499,7 @@ class CollectionResultListSerializer(serializers.Serializer):
     plan_name = serializers.CharField(help_text='采集方案名称')
     device_ip = serializers.CharField(help_text='设备IP地址')
     device_name = serializers.CharField(help_text='设备名称')
+    idc_name = serializers.CharField(help_text='机房名称')
     device_type = serializers.CharField(help_text='设备类型')
     vendor = serializers.CharField(help_text='厂商')
     collection_method = serializers.CharField(help_text='采集方式')
