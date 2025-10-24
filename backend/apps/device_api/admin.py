@@ -4,13 +4,13 @@ from apps.device_api.models import DeviceCollectionPlans, DeviceSubCollectionPla
 
 
 @admin.register(DeviceCollectionPlans)
-class DeviceSummaryPlansAdmin(admin.ModelAdmin):
+class DeviceCollectionPlansAdmin(admin.ModelAdmin):
     """采集汇总方案管理"""
     list_display = [
-        'name', 'vendor', 'device_type', 'collect_plans_count', 'created_at'
+        'name', 'vendor', 'device_type', 'is_active', 'collect_plans_count', 'created_at'
     ]
     list_filter = [
-        'vendor', 'device_type', 'created_at'
+        'vendor', 'device_type', 'is_active', 'created_at'
     ]
     search_fields = ['name', 'description']
     readonly_fields = ['created_at', 'updated_at']
@@ -18,7 +18,7 @@ class DeviceSummaryPlansAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('基本信息', {
-            'fields': ('name', 'vendor', 'device_type', 'description')
+            'fields': ('name', 'vendor', 'device_type', 'description', 'is_active')
         }),
         ('时间信息', {
             'fields': ('created_at', 'updated_at'),
@@ -39,18 +39,18 @@ class DeviceSummaryPlansAdmin(admin.ModelAdmin):
 
 
 @admin.register(DeviceSubCollectionPlan)
-class DeviceCollectionPlanAdmin(admin.ModelAdmin):
+class DeviceSubCollectionPlanAdmin(admin.ModelAdmin):
     """设备采集方案管理"""
     list_display = [
         'name', 'summary_plan', 'vendor_display', 'device_type_display', 'netmiko_enabled', 'netconf_enabled', 
-        'netmiko_method', 'netconf_method', 'textfsm_enabled', 
-        'data_processor_enabled', 'xml_templates_count', 'is_active', 'created_at'
+        'netmiko_method', 'textfsm_enabled', 
+        'netmiko_processor_enabled', 'netconf_processor_enabled', 'xml_templates_count', 'created_at'
     ]
     list_filter = [
         'summary_plan__vendor', 'summary_plan__device_type', 'netmiko_enabled', 'netconf_enabled',
-        'textfsm_enabled', 'data_processor_enabled', 'is_active', 'created_at'
+        'textfsm_enabled', 'netmiko_processor_enabled', 'netconf_processor_enabled', 'created_at'
     ]
-    search_fields = ['name', 'description', 'netmiko_method', 'netconf_method', 'summary_plan__name']
+    search_fields = ['name', 'description', 'netmiko_method', 'summary_plan__name']
     readonly_fields = ['created_at', 'updated_at', 'vendor_display', 'device_type_display']
     ordering = ['summary_plan__vendor', 'summary_plan__device_type', 'name']
     
@@ -62,23 +62,16 @@ class DeviceCollectionPlanAdmin(admin.ModelAdmin):
             'fields': ('netmiko_enabled', 'netconf_enabled')
         }),
         ('Netmiko配置', {
-            'fields': ('netmiko_method', 'netmiko_path', 'netmiko_field_mappings'),
+            'fields': ('netmiko_method', 'netmiko_path', 'netmiko_field_mappings', 'netmiko_processor_enabled', 'netmiko_processor'),
             'classes': ('collapse',)
         }),
         ('NETCONF配置', {
-            'fields': ('netconf_method', 'netconf_path', 'netconf_field_mappings'),
+            'fields': ('netconf_path', 'netconf_field_mappings', 'netconf_processor_enabled', 'netconf_processor'),
             'classes': ('collapse',)
         }),
         ('TextFSM配置', {
             'fields': ('textfsm_enabled', 'textfsm_template'),
             'classes': ('collapse',)
-        }),
-        ('数据处理配置', {
-            'fields': ('data_processor_enabled', 'data_processor'),
-            'classes': ('collapse',)
-        }),
-        ('状态管理', {
-            'fields': ('is_active',)
         }),
         ('时间信息', {
             'fields': ('created_at', 'updated_at'),
@@ -106,7 +99,7 @@ class DeviceCollectionPlanAdmin(admin.ModelAdmin):
     
     def xml_templates_count(self, obj):
         """显示XML模板数量"""
-        count = obj.xml_templates.filter(is_active=True).count()
+        count = obj.xml_templates.count()
         return format_html('<span style="color: {};">{}</span>', 
                          'green' if count > 0 else 'red', count)
     xml_templates_count.short_description = 'XML模板数量'
@@ -116,25 +109,22 @@ class DeviceCollectionPlanAdmin(admin.ModelAdmin):
 class NetconfXMLTemplateAdmin(admin.ModelAdmin):
     """NETCONF XML模板管理"""
     list_display = [
-        'name', 'collection_plan', 'is_active', 'created_at', 'updated_at'
+        'collect_method', 'collection_plan', 'created_at', 'updated_at'
     ]
     list_filter = [
         'collection_plan__summary_plan__vendor', 'collection_plan__summary_plan__device_type', 
-        'is_active', 'created_at'
+        'collect_method', 'created_at'
     ]
-    search_fields = ['name', 'description', 'collection_plan__name']
+    search_fields = ['collect_method', 'description', 'collection_plan__name']
     readonly_fields = ['created_at', 'updated_at']
-    ordering = ['collection_plan', 'name']
+    ordering = ['collection_plan', 'collect_method']
     
     fieldsets = (
         ('基本信息', {
-            'fields': ('name', 'collection_plan', 'description')
+            'fields': ('collect_method', 'collection_plan', 'description')
         }),
         ('模板内容', {
             'fields': ('xml_template',)
-        }),
-        ('状态管理', {
-            'fields': ('is_active',)
         }),
         ('时间信息', {
             'fields': ('created_at', 'updated_at'),

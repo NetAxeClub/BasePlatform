@@ -14,7 +14,6 @@ class DeviceCollectionPlans(models.Model):
         ('ZTE', '中兴'),
         ('Centec', '盛科'),
         ('colasoft', '科来'),
-        ('Mellanox', 'Mellanox'),
         ('DELL', '戴尔'),
         ('F5', 'F5'),
         ('Maipu', '迈普'),
@@ -237,8 +236,9 @@ class NetconfXMLTemplate(models.Model):
         ordering = ['collection_plan', 'created_at']
         indexes = [
             models.Index(fields=['collection_plan']),
+            models.Index(fields=['collect_method']),
         ]
-        unique_together = ['collection_plan', 'xml_template']  # 同一采集方案下采集方法唯一
+        unique_together = ['collection_plan', 'collect_method']  # 同一采集方案下采集方法唯一
 
     def __str__(self):
         return f"{self.collect_method} ({self.collection_plan.name})"

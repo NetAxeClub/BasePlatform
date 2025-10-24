@@ -6,7 +6,7 @@ from rest_framework import serializers
 from apps.device_api.models import DeviceCollectionPlans, DeviceSubCollectionPlan, NetconfXMLTemplate
 
 
-class DeviceSummaryPlansSerializer(serializers.ModelSerializer):
+class DeviceCollectionPlansSerializer(serializers.ModelSerializer):
     """采集汇总方案序列化器"""
     vendor_display = serializers.CharField(source='get_vendor_display', read_only=True)
     collect_plans_count = serializers.SerializerMethodField()
@@ -26,10 +26,10 @@ class DeviceSummaryPlansSerializer(serializers.ModelSerializer):
 
     def get_collect_plans(self, obj):
         collect_plans = obj.collect_plans.all()[:5]
-        return DeviceCollectionPlanSerializer(collect_plans, many=True).data
+        return DeviceSubCollectionPlanSerializer(collect_plans, many=True).data
 
 
-class DeviceSummaryPlansCreateSerializer(serializers.ModelSerializer):
+class DeviceCollectionPlansCreateSerializer(serializers.ModelSerializer):
     """采集汇总方案创建序列化器"""
     vendor_display = serializers.CharField(source='get_vendor_display', read_only=True)
 
@@ -47,7 +47,7 @@ class DeviceSummaryPlansCreateSerializer(serializers.ModelSerializer):
         return value
 
 
-class DeviceSummaryPlansUpdateSerializer(serializers.ModelSerializer):
+class DeviceCollectionPlansUpdateSerializer(serializers.ModelSerializer):
     """采集汇总方案更新序列化器"""
     vendor_display = serializers.CharField(source='get_vendor_display', read_only=True)
 
@@ -66,14 +66,14 @@ class DeviceSummaryPlansUpdateSerializer(serializers.ModelSerializer):
         return value
 
 
-class DeviceSummaryPlansDetailSerializer(serializers.ModelSerializer):
+class DeviceCollectionPlansDetailSerializer(serializers.ModelSerializer):
     """采集汇总方案详情序列化器"""
     vendor_display = serializers.CharField(source='get_vendor_display', read_only=True)
     collect_plans = serializers.SerializerMethodField()
 
     def get_collect_plans(self, obj):
         collect_plans = obj.collect_plans.all()
-        return DeviceCollectionPlanSerializer(collect_plans, many=True).data
+        return DeviceSubCollectionPlanSerializer(collect_plans, many=True).data
 
     class Meta:
         model = DeviceCollectionPlans
@@ -84,7 +84,7 @@ class DeviceSummaryPlansDetailSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'vendor_display', 'created_at', 'updated_at']
 
 
-class DeviceCollectionPlanSerializer(serializers.ModelSerializer):
+class DeviceSubCollectionPlanSerializer(serializers.ModelSerializer):
     """设备采集方案序列化器"""
     summary_plan_name = serializers.CharField(source='summary_plan.name', read_only=True)
     summary_plan_vendor = serializers.CharField(source='summary_plan.vendor', read_only=True)
@@ -97,11 +97,12 @@ class DeviceCollectionPlanSerializer(serializers.ModelSerializer):
         model = DeviceSubCollectionPlan
         fields = [
             'id', 'summary_plan', 'summary_plan_name', 'summary_plan_vendor', 'summary_plan_vendor_display',
-            'summary_plan_device_type', 'name', 'description', 'type', 'machine_room_ip',
+            'summary_plan_device_type', 'name', 'description', 'type',
             'textfsm_enabled', 'textfsm_template',
             'netmiko_enabled', 'netmiko_path', 'netmiko_method', 'netmiko_field_mappings',
-            'netconf_enabled', 'netconf_path', 'netconf_method', 'netconf_field_mappings',
-            'data_processor_enabled', 'data_processor', 'is_active', 'xml_templates',
+            'netmiko_processor_enabled', 'netmiko_processor',
+            'netconf_enabled', 'netconf_path', 'netconf_field_mappings',
+            'netconf_processor_enabled', 'netconf_processor', 'xml_templates',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'summary_plan_name', 'summary_plan_vendor', 'summary_plan_vendor_display',
@@ -125,7 +126,7 @@ class DeviceCollectionPlanSerializer(serializers.ModelSerializer):
             return []
 
 
-class DeviceCollectionPlanCreateSerializer(serializers.ModelSerializer):
+class DeviceSubCollectionPlanCreateSerializer(serializers.ModelSerializer):
     """设备采集方案创建序列化器"""
     summary_plan_id = serializers.IntegerField(
         write_only=True,
@@ -144,11 +145,12 @@ class DeviceCollectionPlanCreateSerializer(serializers.ModelSerializer):
         model = DeviceSubCollectionPlan
         fields = [
             'id', 'summary_plan_id', 'summary_plan', 'summary_plan_name', 'summary_plan_vendor',
-            'summary_plan_device_type', 'name', 'description', 'type', 'machine_room_ip',
+            'summary_plan_device_type', 'name', 'description', 'type',
             'textfsm_enabled', 'textfsm_template',
             'netmiko_enabled', 'netmiko_path', 'netmiko_method', 'netmiko_field_mappings',
-            'netconf_enabled', 'netconf_path', 'netconf_method', 'netconf_field_mappings',
-            'data_processor_enabled', 'data_processor', 'is_active', 'xml_templates',
+            'netmiko_processor_enabled', 'netmiko_processor',
+            'netconf_enabled', 'netconf_path', 'netconf_field_mappings',
+            'netconf_processor_enabled', 'netconf_processor', 'xml_templates',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'summary_plan', 'summary_plan_name', 'summary_plan_vendor',
@@ -184,7 +186,7 @@ class DeviceCollectionPlanCreateSerializer(serializers.ModelSerializer):
 
             # 验证XML模板数据的完整性
             for i, template in enumerate(xml_templates):
-                required_fields = ['name', 'xml_template']
+                required_fields = ['collect_method', 'xml_template']
                 for field in required_fields:
                     if not template.get(field):
                         raise serializers.ValidationError(f"XML模板 {i + 1} 缺少必需字段: {field}")
@@ -236,7 +238,7 @@ class DeviceCollectionPlanCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(f"创建失败: {str(e)}")
 
 
-class DeviceCollectionPlanUpdateSerializer(serializers.ModelSerializer):
+class DeviceSubCollectionPlanUpdateSerializer(serializers.ModelSerializer):
     """设备采集方案更新序列化器"""
     summary_plan_id = serializers.IntegerField(
         write_only=True,
@@ -252,11 +254,12 @@ class DeviceCollectionPlanUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = DeviceSubCollectionPlan
         fields = [
-            'id', 'summary_plan_id', 'name', 'description', 'type', 'machine_room_ip',
+            'id', 'summary_plan_id', 'name', 'description', 'type',
             'textfsm_enabled', 'textfsm_template',
             'netmiko_enabled', 'netmiko_path', 'netmiko_method', 'netmiko_field_mappings',
-            'netconf_enabled', 'netconf_path', 'netconf_method', 'netconf_field_mappings',
-            'data_processor_enabled', 'data_processor', 'is_active', 'xml_templates',
+            'netmiko_processor_enabled', 'netmiko_processor',
+            'netconf_enabled', 'netconf_path', 'netconf_field_mappings',
+            'netconf_processor_enabled', 'netconf_processor', 'xml_templates',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
@@ -294,8 +297,8 @@ class DeviceCollectionPlanUpdateSerializer(serializers.ModelSerializer):
 
             # 验证XML模板数据的完整性
             for i, template in enumerate(xml_templates):
-                if not template.get('name'):
-                    raise serializers.ValidationError(f"XML模板[{i}]必须包含名称")
+                if not template.get('collect_method'):
+                    raise serializers.ValidationError(f"XML模板[{i}]必须包含采集方法")
                 if not template.get('xml_template'):
                     raise serializers.ValidationError(f"XML模板[{i}]必须包含XML内容")
 
@@ -465,7 +468,7 @@ class NetconfXMLTemplateListSerializer(serializers.ModelSerializer):
     class Meta:
         model = NetconfXMLTemplate
         fields = [
-            'id', 'name', 'description', 'is_active',
+            'id', 'collect_method', 'description',
             'collection_plan_name', 'summary_plan_name', 'summary_plan_vendor', 'summary_plan_device_type',
             'created_at', 'updated_at'
         ]
