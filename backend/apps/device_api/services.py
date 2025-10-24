@@ -23,8 +23,7 @@ class DeviceCollectionService:
     def get_xml_templates_by_plan(plan_id: int) -> List[NetconfXMLTemplate]:
         """获取采集方案的XML模板"""
         queryset = NetconfXMLTemplate.objects.filter(
-            collection_plan_id=plan_id,
-            is_active=True
+            collection_plan_id=plan_id
         )
         return queryset
 
@@ -111,7 +110,7 @@ class DeviceCollectionService:
             vendor_alias = device.vendor.alias if device.vendor else 'Huawei'
             device_type = device_type_map.get(vendor_alias, 'huawei')
 
-            host_info = {"host": plan.machine_room_ip, "port": int(config.south_http_port)}
+            host_info = {"host": config.south_http_host, "port": int(config.south_http_port)}
 
             netpalm_info = {
                 "library": "netmiko",
@@ -163,7 +162,7 @@ class DeviceCollectionService:
             logger.info(f"开始执行NETCONF采集: 方案={plan.name}, 设备={device.manage_ip}")
 
             account = device.netconf_account
-            host_info = {"host": plan.machine_room_ip, "port": int(config.south_http_port)}
+            host_info = {"host": config.south_http_host, "port": int(config.south_http_port)}
 
             vendor_alias = device.vendor.alias if device.vendor else 'Cisco'
             
@@ -175,16 +174,24 @@ class DeviceCollectionService:
             }
             device_type = netconf_device_type_map.get(vendor_alias, "h3c")  # 默认使用h3c
                 
-            # 获取XML模板
-            xml_templates = plan.xml_templates.filter(is_active=True)
+            # 获取XML模板 - 支持多个模板，按采集方法选择
+            xml_templates = plan.xml_templates.all()
             if not xml_templates.exists():
                 error_msg = "采集方案未配置有效的NETCONF XML模板"
                 logger.error(error_msg)
-
                 return {"status": "failed", "data": {}}
 
-            # TODO 这个地方需要后期调整，因为不能永远只拿第一个，要不然后面的就没有意义
-            args_filter = xml_templates[0].xml_template
+            # 优先使用get方法，如果没有则使用第一个
+            selected_template = None
+            for template in xml_templates:
+                if template.collect_method == 'get':
+                    selected_template = template
+                    break
+            
+            if not selected_template:
+                selected_template = xml_templates[0]
+            
+            args_filter = selected_template.xml_template
             clean_xml = args_filter.strip()
             if "<filter type=" not in clean_xml:
                 filter_xml = f'<filter type="subtree">{clean_xml}</filter>'
@@ -301,7 +308,7 @@ class DeviceCollectionService:
                 }
             
             # 检查采集方案是否启用数据处理
-            if not plan.data_processor_enabled or not plan.data_processor:
+            if not plan.netmiko_processor_enabled or not plan.netmiko_processor:
                 return {
                     'success': False,
                     'error': '该采集方案未启用数据处理功能',
@@ -330,7 +337,7 @@ class DeviceCollectionService:
                         pass
                 
                 # 调用采集方案的数据处理方法
-                processed_data = plan.process_netconf_data(raw_data)
+                processed_data = plan.process_netmiko_data(raw_data)
                 
                 # 计算处理时间
                 processing_time = time.time() - start_time

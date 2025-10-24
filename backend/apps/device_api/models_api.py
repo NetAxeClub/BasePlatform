@@ -137,10 +137,10 @@ def process_raw_data(plan, collection_result, collection_method):
         has_error = False  # 跟踪是否有错误
         
         # 第一步：数据处理函数
-        if plan.data_processor_enabled and plan.data_processor:
+        if plan.netmiko_processor_enabled and plan.netmiko_processor:
             logging.info(f"执行数据处理函数: {plan.name}")
             try:
-                processed_data = plan.process_netconf_data(command_result)
+                processed_data = plan.process_netmiko_data(command_result)
                 logging.info(f"数据处理函数执行成功: {plan.name}")
             except Exception as e:
                 logging.error(f"数据处理函数执行失败: {plan.name} - {str(e)}")

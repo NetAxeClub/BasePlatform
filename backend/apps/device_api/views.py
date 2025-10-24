@@ -10,10 +10,10 @@ from apps.api.tools.custom_viewset_base import CustomViewBase
 from apps.device_api.models import DeviceCollectionPlans, DeviceSubCollectionPlan, NetconfXMLTemplate
 from apps.device_api.models_api import process_raw_data, netpalm_data_to_mongodb
 from apps.device_api.serializers import (
-    DeviceSummaryPlansSerializer, DeviceSummaryPlansCreateSerializer,
-    DeviceSummaryPlansUpdateSerializer, DeviceSummaryPlansDetailSerializer,
-    DeviceCollectionPlanSerializer, DeviceCollectionPlanCreateSerializer,
-    DeviceCollectionPlanUpdateSerializer,
+    DeviceCollectionPlansSerializer, DeviceCollectionPlansCreateSerializer,
+    DeviceCollectionPlansUpdateSerializer, DeviceCollectionPlansDetailSerializer,
+    DeviceSubCollectionPlanSerializer, DeviceSubCollectionPlanCreateSerializer,
+    DeviceSubCollectionPlanUpdateSerializer,
     NetconfXMLTemplateSerializer, NetconfXMLTemplateListSerializer,
     CollectionResultDetailSerializer, CollectionFilterSerializer
 )
@@ -28,10 +28,10 @@ from apps.device_api.services import FieldMappingDriver
 logger = logging.getLogger(__name__)
 
 
-class DeviceSummaryPlansViewSet(CustomViewBase):
-    """采集汇总方案视图集"""
+class DeviceCollectionPlansViewSet(CustomViewBase):
+    """父级采集方案视图"""
     queryset = DeviceCollectionPlans.objects.all()
-    serializer_class = DeviceSummaryPlansSerializer
+    serializer_class = DeviceCollectionPlansSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['vendor', 'device_type', 'is_active']
     pagination_class = LargeResultsSetPagination
@@ -42,12 +42,12 @@ class DeviceSummaryPlansViewSet(CustomViewBase):
     def get_serializer_class(self):
         """根据操作类型返回不同的序列化器"""
         if self.action == 'create':
-            return DeviceSummaryPlansCreateSerializer
+            return DeviceCollectionPlansCreateSerializer
         elif self.action in ['update', 'partial_update']:
-            return DeviceSummaryPlansUpdateSerializer
+            return DeviceCollectionPlansUpdateSerializer
         elif self.action == 'retrieve':
-            return DeviceSummaryPlansDetailSerializer
-        return DeviceSummaryPlansSerializer
+            return DeviceCollectionPlansDetailSerializer
+        return DeviceCollectionPlansSerializer
 
     def get_queryset(self):
         """获取查询集"""
@@ -79,7 +79,7 @@ class DeviceSummaryPlansViewSet(CustomViewBase):
         summary_plan.refresh_from_db()
 
         # 使用标准序列化器来序列化返回的对象
-        response_serializer = DeviceSummaryPlansSerializer(summary_plan)
+        response_serializer = DeviceCollectionPlansSerializer(summary_plan)
         return JsonResponse({
             'code': 201,
             'message': '创建成功',
@@ -128,7 +128,7 @@ class DeviceSummaryPlansViewSet(CustomViewBase):
         try:
             summary_plan = self.get_object()
             collect_plans = summary_plan.collect_plans.all()
-            serializer = DeviceCollectionPlanSerializer(collect_plans, many=True)
+            serializer = DeviceSubCollectionPlanSerializer(collect_plans, many=True)
 
             return JsonResponse({
                 'code': 200,
@@ -174,11 +174,11 @@ class DeviceSummaryPlansViewSet(CustomViewBase):
                 })
 
             # 获取所有启用的采集方案
-            collect_plans = summary_plan.collect_plans.filter(is_active=True)
+            collect_plans = summary_plan.collect_plans.all()
             if not collect_plans.exists():
                 return JsonResponse({
                     "code": 400,
-                    "message": f"汇总方案 '{summary_plan.name}' 下没有启用的采集方案"
+                    "message": f"汇总方案 '{summary_plan.name}' 下没有采集方案"
                 })
 
             # 执行所有采集方案
@@ -269,12 +269,12 @@ class DeviceSummaryPlansViewSet(CustomViewBase):
             })
 
 
-class DeviceCollectionPlanViewSet(CustomViewBase):
-    """设备采集方案视图集"""
+class DeviceSubCollectionPlanViewSet(CustomViewBase):
+    """子采集方案视图"""
     queryset = DeviceSubCollectionPlan.objects.all()
-    serializer_class = DeviceCollectionPlanSerializer
+    serializer_class = DeviceSubCollectionPlanSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['summary_plan', 'summary_plan__vendor', 'summary_plan__device_type', 'is_active', 'description']
+    filterset_fields = ['summary_plan', 'summary_plan__vendor', 'summary_plan__device_type', 'description']
     pagination_class = LargeResultsSetPagination
     search_fields = ['name', 'description']
     ordering_fields = ['id', 'name', 'summary_plan__vendor', 'summary_plan__device_type', 'created_at', 'updated_at']
@@ -283,10 +283,10 @@ class DeviceCollectionPlanViewSet(CustomViewBase):
     def get_serializer_class(self):
         """根据操作类型返回不同的序列化器"""
         if self.action == 'create':
-            return DeviceCollectionPlanCreateSerializer
+            return DeviceSubCollectionPlanCreateSerializer
         elif self.action in ['update', 'partial_update']:
-            return DeviceCollectionPlanUpdateSerializer
-        return DeviceCollectionPlanSerializer
+            return DeviceSubCollectionPlanUpdateSerializer
+        return DeviceSubCollectionPlanSerializer
 
     def get_queryset(self):
         """获取查询集"""
@@ -325,7 +325,7 @@ class DeviceCollectionPlanViewSet(CustomViewBase):
         collection_plan.refresh_from_db()
         
         # 使用标准序列化器来序列化返回的对象
-        response_serializer = DeviceCollectionPlanSerializer(collection_plan)
+        response_serializer = DeviceSubCollectionPlanSerializer(collection_plan)
         return JsonResponse({
             'code': 201,
             'message': '创建成功',
@@ -461,7 +461,7 @@ class DeviceCollectionPlanViewSet(CustomViewBase):
         )
 
         if updated_plan['success']:
-            serializer = DeviceCollectionPlanSerializer(updated_plan['plan'])
+            serializer = DeviceSubCollectionPlanSerializer(updated_plan['plan'])
             return JsonResponse({
                 "code": 200,
                 "message": "字段映射更新成功",
@@ -487,8 +487,8 @@ class DeviceCollectionPlanViewSet(CustomViewBase):
                 data={"code": 400, "message": "数据处理函数代码必须包含函数定义 (def)。"}
             )
 
-        plan.data_processor_enabled = True
-        plan.data_processor = data_processor_code
+        plan.netmiko_processor_enabled = True
+        plan.netmiko_processor = data_processor_code
         plan.save()
 
         return JsonResponse(data={
@@ -797,11 +797,11 @@ class NetconfXMLTemplateViewSet(CustomViewBase):
     queryset = NetconfXMLTemplate.objects.all()
     serializer_class = NetconfXMLTemplateSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['collection_plan', 'is_active']
+    filterset_fields = ['collection_plan']
     pagination_class = LargeResultsSetPagination
-    search_fields = ['name', 'description', 'collection_plan__name']
-    ordering_fields = ['name', 'created_at', 'updated_at']
-    ordering = ['collection_plan', 'name']
+    search_fields = ['collect_method', 'description', 'collection_plan__name']
+    ordering_fields = ['collect_method', 'created_at', 'updated_at']
+    ordering = ['collection_plan', 'collect_method']
     
     def get_serializer_class(self):
         """根据操作类型返回不同的序列化器"""
