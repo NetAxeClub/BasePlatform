@@ -203,14 +203,14 @@ def backup_device_config_sub(**kwargs):
                         vendor=kwargs['vendor__alias'],
                         model_name=kwargs['model__name'],
                         file_path=res[cmd],
-                        last_time=today)
+                        last_time=today, detail='')
                 else:
                     ConfigBackup.objects.create(name=kwargs['name'], manage_ip=hostip, config_type=cmd_map[cmd],
                                                 config_status='SUCCESS',
                                                 status=kwargs['status'], idc_name=kwargs['idc__name'],
                                                 vendor=kwargs['vendor__alias'],
                                                 model_name=kwargs['model__name'], file_path=res[cmd],
-                                                last_time=today)
+                                                last_time=today, detail='')
         else:
             device_q = ConfigBackup.objects.filter(manage_ip=hostip)
             if device_q:
