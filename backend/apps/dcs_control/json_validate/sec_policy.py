@@ -63,7 +63,8 @@ sec_policy_schema = {
                     "type": "array",
                     "items": [
                         {
-                            "type": "string", "pattern": "^[\u4e00-\u9fa5a-zA-Z][\u4e00-\u9fa5a-zA-Z0-9_]*$"
+                            # "type": "string", "pattern": "^[\u4e00-\u9fa5a-zA-Z][\u4e00-\u9fa5a-zA-Z0-9_]*$"
+                            "type": "string"
                         }
                     ]
                 },

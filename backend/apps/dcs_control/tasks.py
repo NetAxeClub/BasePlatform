@@ -2199,8 +2199,8 @@ class FirewallMain(object):
             _vars = {
                 'ops': 'create',
                 'name': kwargs['name'],  # 低版本不支持name
-                'from_zone': kwargs['from_zone'],  # {'object': 'address-book'} | {'ip':'A.B.C.D '} | {'any': True}
-                'to_zone': kwargs['to_zone'],  # {'object': 'address-book'} | {'ip':'A.B.C.D'}
+                'from_zone': kwargs['from']['zone'],  # {'object': 'address-book'} | {'ip':'A.B.C.D '} | {'any': True}
+                'to_zone': kwargs['to']['zone'],  # {'object': 'address-book'} | {'ip':'A.B.C.D'}
                 'service': kwargs['service'],  # 服务对象名
                 'from_addr': kwargs['from_addr'],
                 'to_addr': kwargs['to_addr'],
@@ -5372,13 +5372,13 @@ class SecPolicyMain(object):
     def get_h3c_service_obj(host):
         dev_infos = get_device_info_v2(manage_ip=host)
         if dev_infos:
-            if 'netconf' in dev_infos[0]['protocol']:
+            if dev_infos[0]['netconf_enable']:
                 dev_info = {
                     'device_type': 'h3c',
                     'ip': host,
-                    'port': dev_infos[0]['netconf_port'],
-                    'username': dev_infos[0]['netconf_username'],
-                    'password': dev_infos[0]['netconf_password'],
+                    'port': dev_infos[0]['netconf']['port'],
+                    'username': dev_infos[0]['netconf']['username'],
+                    'password': dev_infos[0]['netconf']['password'],
                     'timeout': 200,  # float，连接超时时间，默认为100
                     'session_timeout': 100,  # float，每个请求的超时时间，默认为60
                     'patch_version': dev_infos[0].get('patch_version'),
@@ -6986,8 +6986,8 @@ def config_sec_policy(self, **post_param):
         class_method = 'Hillstone'  # 类方法，山石直接下发命令，所以不需要，主要给华三华为对应对应类方法使用
         try:
             cmds, back_off_cmds = _FirewallMain.hillstone_sec_policy_detail(**post_param)
-            print(cmds)
-            print(back_off_cmds)
+            print('\n'.join(cmds))
+            print('\n'.join(back_off_cmds))
             _data = dict(
                 order_code=post_param.get('order_code') if post_param.get('order_code') else ' ',
                 task_id=str(self.request.id),
@@ -7004,7 +7004,7 @@ def config_sec_policy(self, **post_param):
                 back_off_commands=json.dumps(back_off_cmds)
             )
             print(_data)
-            # _FirewallMain.flow_engine(*[cmds, back_off_cmds, class_method], **_data)
+            _FirewallMain.flow_engine(*[cmds, back_off_cmds, class_method], **_data)
         except Exception as e:
             print(traceback.print_exc())
             send_msg_sec_manage("安全纳管引擎\n安全策略下发\n任务状态：失败\n原因:生成配置过程异常\n提示:{}".format(str(e)))
