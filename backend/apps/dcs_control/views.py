@@ -11,7 +11,8 @@ from apps.dcs_control.json_validate.deny_by_addr_obj import deny_schema
 from apps.dcs_control.json_validate.address_schema import address_schema
 from apps.dcs_control.json_validate.dnat_schema import post_dnat_schema
 from apps.dcs_control.json_validate.service_schema import service_schema
-from apps.dcs_control.tasks import bulk_deny_by_address, address_set, config_dnat
+from apps.dcs_control.json_validate.sec_policy import sec_policy_schema
+from apps.dcs_control.tasks import bulk_deny_by_address, address_set, config_dnat, config_sec_policy
 
 if DEBUG:
     CELERY_QUEUE = 'dev'
@@ -250,8 +251,6 @@ class ServiceSet(APIView):
         return JsonResponse(dict(code=400, message='没有任何匹配'))
 
 
-
-
 class DestAddTranslate(APIView):
     permission_classes = ()
 
@@ -396,33 +395,33 @@ class SecPolicy(APIView):
         # 获取设备安全域列表
         if all(k in get_param for k in ("vendor", "get_sec_zone")):
             if get_param['vendor'] == 'H3C':
-                _FirewallMain = FirewallMain(get_param['get_address_obj'])
+                _FirewallMain = FirewallMain(get_param['get_sec_zone'])
                 _res = _FirewallMain.get_h3c_sec_zone()
                 if isinstance(_res, list):
-                    res = json.dumps({'results': _res, 'count': len(_res),
+                    res = json.dumps({'data': [{'name': x['Name']} for x in _res], 'count': len(_res),
                                       'code': 200})
                 else:
-                    res = json.dumps({'results': [], 'count': 0,
+                    res = json.dumps({'data': [], 'count': 0,
                                       'code': 400})
                 return HttpResponse(res, content_type="application/json")
             elif get_param['vendor'] == 'Huawei':
                 _res = SecPolicyMain.get_huawei_sec_zone(get_param['get_sec_zone'])
                 if isinstance(_res, list):
-                    res = json.dumps({'results': _res, 'count': len(_res),
+                    res = json.dumps({'data': _res, 'count': len(_res),
                                       'code': 200})
                 else:
                     res = json.dumps({'results': [], 'count': 0,
                                       'code': 400})
                 return HttpResponse(res, content_type="application/json")
             elif get_param['vendor'] == 'Hillstone':
-                _res = MongoOps(db='Automation', coll='Hillstone_zone') \
-                    .find(query_dict=dict(hostip=get_param['get_sec_zone'], type='L3'), fields={'_id': 0})
+                _res = MongoOps(db='Automation', coll='hillstone_zone').find(
+                    query_dict=dict(hostip=get_param['get_sec_zone'], type='L3'), fields={'_id': 0})
                 if _res:
-                    res = json.dumps({'results': _res, 'count': len(_res),
-                                      'code': 200})
+                    res = json.dumps({'data': _res, 'count': len(_res),
+                                      'code': 200, 'msg': '成功'})
                 else:
-                    res = json.dumps({'results': _res, 'count': len(_res),
-                                      'code': 400})
+                    res = json.dumps({'data': _res, 'count': len(_res),
+                                      'code': 400, 'msg': '没有该防火墙安全域数据'})
                 return HttpResponse(res, content_type="application/json")
         # 获取设备地址组
         if all(k in get_param for k in ("vendor", "get_address_obj")):
@@ -459,13 +458,19 @@ class SecPolicy(APIView):
         # 获取设备服务组
         if all(k in get_param for k in ("vendor", "get_service_obj")):
             if get_param['vendor'] == 'H3C':
+                service_res = []
                 _res = SecPolicyMain.get_h3c_service_obj(get_param['get_service_obj'])
-                if isinstance(_res, list):
-                    res = json.dumps({'results': _res, 'count': len(_res),
-                                      'code': 200})
+                service_res.append({
+                    'label': '自定义服务',
+                    'options': [{'label': x['Name'], 'value': x['Name'], 'protocol': ''}
+                                for x in _res] + [{'label': 'Any', 'value': 'Any', 'protocol': ''}]
+                })
+                if service_res:
+                    res = json.dumps({'data': service_res, 'count': len(service_res),
+                                      'code': 200, 'msg': '成功'})
                 else:
-                    res = json.dumps({'results': [], 'count': 0,
-                                      'code': 400})
+                    res = json.dumps({'data': service_res, 'count': len(service_res),
+                                      'code': 400, 'msg': '没有该防火墙服务对象数据'})
                 return HttpResponse(res, content_type="application/json")
             elif get_param['vendor'] == 'Huawei':
                 _res = SecPolicyMain.get_huawei_service_obj(get_param['get_service_obj'])
@@ -477,14 +482,42 @@ class SecPolicy(APIView):
                                       'code': 400})
                 return HttpResponse(res, content_type="application/json")
             elif get_param['vendor'] == 'Hillstone':
-                _res = MongoOps(db='Automation', coll='Hillstone_servgroup') \
+                service_res = []
+                custom_services = MongoOps(db='Automation', coll='hillstone_service') \
                     .find(query_dict=dict(hostip=get_param['get_service_obj']), fields={'_id': 0})
-                if _res:
-                    res = json.dumps({'results': _res, 'count': len(_res),
-                                      'code': 200})
+                predefined_services = MongoOps(db='Automation', coll='hillstone_service_predefined') \
+                    .find(query_dict=dict(hostip=get_param['get_service_obj']), fields={'_id': 0})
+                custom_services_options = []
+                for x in custom_services:
+                    protocol_parts = []
+                    for a in x['items']:
+                        if a.get('dst-port-max', ''):
+                            protocol_str = f"{a['protocol']}:{a.get('dst-port-min', '')}-{a.get('dst-port-max', '')}"
+                        else:
+                            protocol_str = f"{a['protocol']}:{a.get('dst-port-min', '')}"
+                        protocol_parts.append(protocol_str)
+
+                    item = {
+                        'label': x['name'],
+                        'value': x['name'],
+                        'protocol': ','.join(protocol_parts)
+                    }
+                    custom_services_options.append(item)
+                service_res.append({
+                    'label': '自定义服务',
+                    'options': custom_services_options
+                })
+                # service_res.append({
+                #     'label': '预定义服务',
+                #     'options': [{'label': x['name'], 'value': x['name'], 'protocol': f"{x['protocol']}-{x['dstport']}"}
+                #                 for x in predefined_services] + [{'label': 'Any', 'value': 'Any', 'protocol': ''}]
+                # })
+                if service_res:
+                    res = json.dumps({'data': service_res, 'count': len(service_res),
+                                      'code': 200, 'msg': '成功'})
                 else:
-                    res = json.dumps({'results': _res, 'count': len(_res),
-                                      'code': 400})
+                    res = json.dumps({'data': service_res, 'count': len(service_res),
+                                      'code': 400, 'msg': '没有该防火墙服务对象数据'})
                 return HttpResponse(res, content_type="application/json")
         # 获取单个设备地址组信息
         if all(k in get_param for k in ("vendor", "hostip")):
@@ -520,12 +553,10 @@ class SecPolicy(APIView):
     def post(self, request):
         post_param = request.data
         risks_port = [23, 22, 20, 21, 3306, 1521, 6379, 1433, 445, 3389, 5432]
-        # print(post_param)
+        print(post_param)
         # 获取设备地址组
         if all(k in post_param for k in ("vendor", "hostip", "name", "id")):
             if post_param['vendor'] == 'H3C':
-                # _FirewallMain = FirewallMain(post_param['hostip'])
-                # _res = _FirewallMain.get_h3c_address_obj()
                 type_map = {
                     '0': 'Nested group',
                     '1': 'protocol',
@@ -698,7 +729,24 @@ class SecPolicy(APIView):
                                         'type': security_type
                                     })
                 return JsonResponse({'code': 200, 'data': result, 'msg': 'ok'}, content_type="application/json")
-
+        if all(k in post_param for k in ("vendor", "hostid", "action")):
+            schema_res, msg = single_json_validate(post_param, sec_policy_schema)
+            print(schema_res, msg)
+            # json数据验证通过
+            if schema_res:
+                post_param['remote_ip'] = str(request.META.get("REMOTE_ADDR"))
+                post_param['user'] = str(request.user.username)
+                res = config_sec_policy.apply_async(kwargs=post_param, queue=CELERY_QUEUE,
+                                                    retry=True)  # config_backup
+                if str(res) == 'None':
+                    print('forget')
+                    res.forget()
+                    return JsonResponse({'code': 400, 'message': 'duplicate task execution', 'data': []})
+                if res:
+                    return JsonResponse({'code': 200, 'message': 'OK', 'data': str(res)})
+            else:
+                return JsonResponse(msg, safe=False)
+            return JsonResponse(dict(code=400, message='操作不被允许', data=[]))
         return JsonResponse({'code': 400}, content_type="application/json")
     #     # 更新单个设备策略
     #     if all(k in post_param for k in ("vendor", "update_device")):
