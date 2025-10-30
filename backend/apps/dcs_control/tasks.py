@@ -4860,9 +4860,9 @@ class SecPolicyMain(object):
         cmds = ['show configuration policy']
         dev_infos = get_device_info_v2(manage_ip=host)
         if dev_infos:
-            username = dev_infos[0]['username']  # 用户名
-            password = dev_infos[0]['password']  # 密码
-            port = dev_infos[0]['port']
+            username = dev_infos[0]['ssh']['username']  # 用户名
+            password = dev_infos[0]['ssh']['password']  # 密码
+            port = dev_infos[0]['ssh']['port']
             if dev_infos[0]['soft_version'].startswith('Version 5.0'):
                 cmds = ['show configuration']
             device_ios = 'ruijie_os'
