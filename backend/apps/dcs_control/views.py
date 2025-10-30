@@ -63,7 +63,7 @@ class DenyByAddrObj(APIView):
             if str(res) == 'None':
                 print('forget')
                 res.forget()
-                return JsonResponse({'code': 400, 'message': 'duplicate task execution', 'data': []})
+                return JsonResponse({'code': 400, 'message': '重复的任务参数', 'data': []})
             if res:
                 return JsonResponse({'code': 200, 'message': 'OK', 'data': str(res)})
         else:
@@ -148,7 +148,7 @@ class AddressSet(APIView):
                     print('forget')
                     res.forget()
                     return HttpResponse(json.dumps({'code': 400,
-                                                    'message': 'duplicate task execution', 'data': []}),
+                                                    'message': '重复的任务参数', 'data': []}),
                                         content_type="application/json")
                 if res:
                     return HttpResponse(json.dumps({'code': 200, 'message': 'OK', 'data': str(res)}),
@@ -238,7 +238,7 @@ class ServiceSet(APIView):
                     print('forget')
                     res.forget()
                     return HttpResponse(json.dumps({'code': 400,
-                                                    'message': 'duplicate task execution', 'data': []}),
+                                                    'message': '重复的任务参数', 'data': []}),
                                         content_type="application/json")
                 if res:
                     return HttpResponse(json.dumps({'code': 200, 'message': 'OK', 'data': str(res)}),
@@ -312,7 +312,7 @@ class DestAddTranslate(APIView):
                 if str(res) == 'None':
                     print('forget')
                     res.forget()
-                    return JsonResponse({'code': 400, 'message': 'duplicate task execution', 'data': []})
+                    return JsonResponse({'code': 400, 'message': '重复的任务参数', 'data': []})
                 if res:
                     return JsonResponse({'code': 200, 'message': 'OK', 'data': str(res)})
             else:
@@ -519,7 +519,7 @@ class SecPolicy(APIView):
                     res = json.dumps({'data': service_res, 'count': len(service_res),
                                       'code': 400, 'msg': '没有该防火墙服务对象数据'})
                 return HttpResponse(res, content_type="application/json")
-        # 获取单个设备地址组信息
+        # 获取单个设备安全策略
         if all(k in get_param for k in ("vendor", "hostip")):
             if get_param['vendor'] == 'H3C':
                 _FirewallMain = FirewallMain(get_param['hostip'])
@@ -729,9 +729,23 @@ class SecPolicy(APIView):
                                         'type': security_type
                                     })
                 return JsonResponse({'code': 200, 'data': result, 'msg': 'ok'}, content_type="application/json")
+
+        if all(k in post_param for k in ("vendor", "update_device")):
+            if post_param['vendor'] == 'H3C':
+                _res = SecPolicyMain.get_single_h3c(post_param['update_device'])
+                if _res:
+                    return HttpResponse(json.dumps(dict(code=200, msg='刷新成功', data=[])), content_type="application/json")
+            elif post_param['vendor'] == 'Huawei':
+                _res = SecPolicyMain.get_single_huawei(post_param['update_device'])
+                if _res:
+                    return HttpResponse(json.dumps(dict(code=200, msg='刷新成功', data=[])), content_type="application/json")
+            elif post_param['vendor'] == 'Hillstone':
+                _res = SecPolicyMain.get_single_hillstone(post_param['update_device'])
+                if _res:
+                    return HttpResponse(json.dumps(dict(code=200, msg='刷新成功', data=[])), content_type="application/json")
+            return HttpResponse(json.dumps(dict(code=400)), content_type="application/json")
         if all(k in post_param for k in ("vendor", "hostid", "action")):
             schema_res, msg = single_json_validate(post_param, sec_policy_schema)
-            print(schema_res, msg)
             # json数据验证通过
             if schema_res:
                 post_param['remote_ip'] = str(request.META.get("REMOTE_ADDR"))
@@ -741,9 +755,9 @@ class SecPolicy(APIView):
                 if str(res) == 'None':
                     print('forget')
                     res.forget()
-                    return JsonResponse({'code': 400, 'message': 'duplicate task execution', 'data': []})
+                    return JsonResponse({'code': 400, 'msg': '重复的任务参数', 'data': []})
                 if res:
-                    return JsonResponse({'code': 200, 'message': 'OK', 'data': str(res)})
+                    return JsonResponse({'code': 200, 'msg': 'OK', 'data': str(res)})
             else:
                 return JsonResponse(msg, safe=False)
             return JsonResponse(dict(code=400, message='操作不被允许', data=[]))
@@ -883,7 +897,7 @@ class SecPolicy(APIView):
     #                         print('forget')
     #                         res.forget()
     #                         return HttpResponse(json.dumps({'code': 400,
-    #                                                         'message': 'duplicate task execution', 'data': []}),
+    #                                                         'message': '重复的任务参数', 'data': []}),
     #                                             content_type="application/json")
     #                     if res:
     #                         return HttpResponse(json.dumps({'code': 200, 'message': 'OK', 'data': str(res)}),
