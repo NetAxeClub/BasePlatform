@@ -10,6 +10,6 @@ Start
   ^Total configured
   ^Show predefine service:
   #^${Name}\s+${Protocol}\s+${DstPort}\s+${SrcPort}\s+${Timeout} -> Record
-  ^${Name}\s+${Protocol}\s+(\S+\s/*\s+)?${DstPort}\s+${SrcPort}\s+${Timeout}\s*$$ -> Continue.Record
-  ^${Name}\s+${Protocol}\s+(\S+\s/*\s+)?${DstPort}\s+${SrcPort}\s*$$ -> Continue.Record
-  ^\s+${Protocol}\s+${DstPort}\s+${SrcPort}\s+${Timeout} -> Continue.Record
+  ^${Name}\s+${Protocol}\s+(\S+\s/*\s+)?${DstPort}\s+${SrcPort}\s+${Timeout}\s*$$ -> Record
+  ^${Name}\s+${Protocol}\s+(\S+\s/*\s+)?${DstPort}\s+${SrcPort}\s*$$ -> Record
+  ^\s+${Protocol}\s+${DstPort}\s+${SrcPort}\s+${Timeout} -> Record

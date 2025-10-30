@@ -1303,41 +1303,101 @@ class HillstoneProc(BaseConn):
             print(traceback.print_exc())
             send_msg_netops('山石配置文件SNAT拼接解析异常\n设备:{}\n异常:{}'.format(self.hostip, str(e)))
 
-    def _hillstone_service_predefined(self, res):
-        service_predefined_res = []
-        for i in res:
-            i['hostip'] = self.hostip
-            if re.match("^\\d+-\\d+", i['dstport']):
-                """
-                参考10.254.12.251
-                配置文件摘要如下：
-                AFS                               TCP         7002-7009                 -        -
-                需要识别出端口范围并生成range遍历添加
-                {'name': 'AFS', 'protocol': 'TCP', 'dstport': ['7002', '7003', '7004', '7005', '7006', '7007', '7008', '7009'], 'srcport': '-', 'timeout': '-'}
-                """
-                dstport_start = int(i['dstport'].split('-')[0])
-                dstport_end = int(i['dstport'].split('-')[1])
-                service_list = [str(item) for item in
-                                range(dstport_start, dstport_end + 1)]
-                for _tmp_service in service_list:
-                    service_predefined_res.append(dict(
-                        name=i['name'],
-                        protocol=i['protocol'].lower(),
-                        dstport=_tmp_service,
-                        srcport=i['srcport'],
-                        timeout=i['timeout'],
-                        dstport_start=dstport_start,
-                        dstport_end=dstport_end,
-                        hostip=self.hostip
-                    ))
+    def _hillstone_service_predefined(self, data_list):
+        result_dict = {}
+
+        for item in data_list:
+            name = item['name']
+            if not re.match('(ICMP|NDP|PING)', name):
+                # 处理dstport
+                dstport = item['dstport']
+                if dstport.find('type') != -1 or dstport == 'Any':
+                    dst_port_min = 0
+                    dst_port_max = 65535
+                elif '-' in dstport:
+                    dst_port_min, dst_port_max = map(int, dstport.split('-'))
+                else:
+                    dst_port_min = dst_port_max = int(dstport)
+
+                # 处理srcport
+                srcport = item['srcport']
+                if srcport.find('type') != -1 or srcport == 'Any' or srcport.find('code') != -1:
+                    src_port_min = 0
+                    src_port_max = 65535
+                elif '-' in srcport:
+                    src_port_min, src_port_max = map(int, srcport.split('-'))
+                else:
+                    src_port_min = src_port_max = int(srcport)
+
+                # 创建service项
+                service_item = {
+                    'dst-port-min': dst_port_min,
+                    'dst-port-max': dst_port_max,
+                    'protocol': item['protocol'].lower(),
+                    'src-port-max': src_port_max,
+                    'src-port-min': src_port_min
+                }
+
+                # 添加到结果字典
+                if name not in result_dict:
+                    result_dict[name] = {
+                        'name': name,
+                        'hostip': self.hostip,
+                        'items': [service_item]
+                    }
+                else:
+                    result_dict[name]['items'].append(service_item)
             else:
-                service_predefined_res.append(i)
+                # 添加到结果字典
+                if name not in result_dict:
+                    result_dict[name] = {
+                        'name': name,
+                        'hostip': self.hostip,
+                        'items': []
+                    }
+        service_predefined_res = list(result_dict.values())
         if service_predefined_res:
             service_predefined_mongo = MongoOps(
                 db='Automation', coll='hillstone_service_predefined')
             service_predefined_mongo.delete_many(query=dict(hostip=self.hostip))
             service_predefined_mongo.insert_many(service_predefined_res)
         return
+
+    # def _hillstone_service_predefined(self, res):
+    #     service_predefined_res = []
+    #     for i in res:
+    #         i['hostip'] = self.hostip
+    #         if re.match("^\\d+-\\d+", i['dstport']):
+    #             """
+    #             参考10.254.12.251
+    #             配置文件摘要如下：
+    #             AFS                               TCP         7002-7009                 -        -
+    #             需要识别出端口范围并生成range遍历添加
+    #             {'name': 'AFS', 'protocol': 'TCP', 'dstport': ['7002', '7003', '7004', '7005', '7006', '7007', '7008', '7009'], 'srcport': '-', 'timeout': '-'}
+    #             """
+    #             dstport_start = int(i['dstport'].split('-')[0])
+    #             dstport_end = int(i['dstport'].split('-')[1])
+    #             service_list = [str(item) for item in
+    #                             range(dstport_start, dstport_end + 1)]
+    #             for _tmp_service in service_list:
+    #                 service_predefined_res.append(dict(
+    #                     name=i['name'],
+    #                     protocol=i['protocol'].lower(),
+    #                     dstport=_tmp_service,
+    #                     srcport=i['srcport'],
+    #                     timeout=i['timeout'],
+    #                     dstport_start=dstport_start,
+    #                     dstport_end=dstport_end,
+    #                     hostip=self.hostip
+    #                 ))
+    #         else:
+    #             service_predefined_res.append(i)
+    #     if service_predefined_res:
+    #         service_predefined_mongo = MongoOps(
+    #             db='Automation', coll='hillstone_service_predefined')
+    #         service_predefined_mongo.delete_many(query=dict(hostip=self.hostip))
+    #         service_predefined_mongo.insert_many(service_predefined_res)
+    #     return
 
     def _zone_proc(self, res):
         if isinstance(res, list):
