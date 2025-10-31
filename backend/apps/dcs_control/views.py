@@ -503,15 +503,31 @@ class SecPolicy(APIView):
                         'protocol': ','.join(protocol_parts)
                     }
                     custom_services_options.append(item)
+
+                predefined_services_options = []
+                for x in predefined_services:
+                    protocol_parts = []
+                    for a in x['items']:
+                        if a.get('dst-port-max', ''):
+                            protocol_str = f"{a['protocol']}:{a.get('dst-port-min', '')}-{a.get('dst-port-max', '')}"
+                        else:
+                            protocol_str = f"{a['protocol']}:{a.get('dst-port-min', '')}"
+                        protocol_parts.append(protocol_str)
+
+                    item = {
+                        'label': x['name'],
+                        'value': x['name'],
+                        'protocol': ','.join(protocol_parts)
+                    }
+                    predefined_services_options.append(item)
                 service_res.append({
                     'label': '自定义服务',
                     'options': custom_services_options
                 })
-                # service_res.append({
-                #     'label': '预定义服务',
-                #     'options': [{'label': x['name'], 'value': x['name'], 'protocol': f"{x['protocol']}-{x['dstport']}"}
-                #                 for x in predefined_services] + [{'label': 'Any', 'value': 'Any', 'protocol': ''}]
-                # })
+                service_res.append({
+                    'label': '预定义服务',
+                    'options': predefined_services_options + [{'label': 'Any', 'value': 'Any', 'protocol': ''}]
+                })
                 if service_res:
                     res = json.dumps({'data': service_res, 'count': len(service_res),
                                       'code': 200, 'msg': '成功'})
