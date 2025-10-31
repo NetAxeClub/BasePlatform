@@ -117,7 +117,6 @@ class AddressSet(APIView):
         print(request.user)
         remote_ip = request.META.get("REMOTE_ADDR")
         post_param = request.data
-        print("地址组", post_param)
         # 更新单个设备地址组信息(山石)
         if all(k in post_param for k in ("vendor", "update_device", "hostip")):
             if post_param['vendor'] == 'Hillstone':
@@ -207,7 +206,6 @@ class ServiceSet(APIView):
         print(request.user)
         remote_ip = request.META.get("REMOTE_ADDR")
         post_param = request.data
-        print("服务组", post_param)
         # 更新单个设备服务信息(山石)
         if all(k in post_param for k in ("vendor", "update_device", "hostip")):
             if post_param['vendor'] == 'Hillstone':
@@ -292,7 +290,6 @@ class DestAddTranslate(APIView):
     # 表单验证
     def post(self, request):
         post_param = request.data
-        print("DNAT", post_param)
         # 更新单个设备DNAT信息
         if all(k in post_param for k in ("vendor", "update_device", "hostip")):
             if post_param['vendor'] == 'Hillstone':
@@ -569,7 +566,7 @@ class SecPolicy(APIView):
     def post(self, request):
         post_param = request.data
         risks_port = [23, 22, 20, 21, 3306, 1521, 6379, 1433, 445, 3389, 5432]
-        print(post_param)
+        # print(post_param)
         # 获取设备地址组
         if all(k in post_param for k in ("vendor", "hostip", "name", "id")):
             if post_param['vendor'] == 'H3C':
