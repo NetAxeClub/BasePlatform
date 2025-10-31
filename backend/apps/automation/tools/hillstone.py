@@ -1325,7 +1325,8 @@ class HillstoneProc(BaseConn):
                     src_port_min = 0
                     src_port_max = 65535
                 elif '-' in srcport:
-                    src_port_min, src_port_max = map(int, srcport.split('-'))
+                    # src_port_min, src_port_max = map(int, srcport.split('-'))
+                    src_port_min, src_port_max = 0, 65535
                 else:
                     src_port_min = src_port_max = int(srcport)
 
