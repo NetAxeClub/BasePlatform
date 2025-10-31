@@ -28,7 +28,7 @@ sec_policy_schema = {
                         "to_addr"],
         "del_object": ["hostip", "id", "hostid", "vendor", "name"],
         "sort_object": ["hostip", "id", "hostid", "insert", "name"],
-        "additionalProperties": False,
+        "additionalProperties": True,
     },
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "post_sec_policy",
