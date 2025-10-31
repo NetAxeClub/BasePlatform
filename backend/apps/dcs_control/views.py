@@ -726,6 +726,10 @@ class SecPolicy(APIView):
                             service_query = MongoOps(db='Automation', coll='hillstone_service').find(
                                 query_dict=dict(hostip=post_param['hostip'], name=ser['object']), fields={'_id': 0}
                             )
+                            if not service_query:
+                                service_query = MongoOps(db='Automation', coll='hillstone_service_predefined').find(
+                                    query_dict=dict(hostip=post_param['hostip'], name=ser['object']), fields={'_id': 0}
+                                )
                             if service_query:
                                 for x in service_query[0]['items']:
                                     security_type = 'default'
