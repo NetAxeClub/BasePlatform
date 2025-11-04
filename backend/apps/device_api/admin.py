@@ -43,12 +43,12 @@ class DeviceSubCollectionPlanAdmin(admin.ModelAdmin):
     """设备采集方案管理"""
     list_display = [
         'name', 'summary_plan', 'vendor_display', 'device_type_display', 'netmiko_enabled', 'netconf_enabled', 
-        'netmiko_method', 'textfsm_enabled', 
+        'netmiko_method', 
         'netmiko_processor_enabled', 'netconf_processor_enabled', 'xml_templates_count', 'created_at'
     ]
     list_filter = [
         'summary_plan__vendor', 'summary_plan__device_type', 'netmiko_enabled', 'netconf_enabled',
-        'textfsm_enabled', 'netmiko_processor_enabled', 'netconf_processor_enabled', 'created_at'
+        'netmiko_processor_enabled', 'netconf_processor_enabled', 'created_at'
     ]
     search_fields = ['name', 'description', 'netmiko_method', 'summary_plan__name']
     readonly_fields = ['created_at', 'updated_at', 'vendor_display', 'device_type_display']
@@ -70,7 +70,7 @@ class DeviceSubCollectionPlanAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
         ('TextFSM配置', {
-            'fields': ('textfsm_enabled', 'textfsm_template'),
+            'fields': ('textfsm_template',),
             'classes': ('collapse',)
         }),
         ('时间信息', {

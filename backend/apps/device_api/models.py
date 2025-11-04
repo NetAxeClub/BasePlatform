@@ -55,7 +55,7 @@ class DeviceSubCollectionPlan(models.Model):
 
     # 基本信息
     name = models.CharField(max_length=50, verbose_name='子采集方案名称', unique=True)
-    type = models.CharField(max_length=20, default='arp', verbose_name='采集类型')
+    collection_type = models.CharField(max_length=20, default='arp', verbose_name='采集类型')
     description = models.TextField(blank=True, verbose_name='方案描述')
 
     # 采集方式配置,Netmiko配置
@@ -75,7 +75,6 @@ class DeviceSubCollectionPlan(models.Model):
     netconf_processor = models.TextField(blank=True, null=True, verbose_name='NETCONF数据处理代码')
 
     # TextFSM配置
-    textfsm_enabled = models.BooleanField(default=False, verbose_name='启用TextFSM模板')
     textfsm_template = models.CharField(blank=True, max_length=100, default='', verbose_name='TextFSM模板路径')
 
     # 时间戳
@@ -96,7 +95,7 @@ class DeviceSubCollectionPlan(models.Model):
 
     def get_netmiko_method(self):
         """获取Netmiko方法名称"""
-        return self.netmiko_method.strip().split(',') if self.netmiko_method else []
+        return self.netmiko_method.strip() if self.netmiko_method else ''
 
     def get_netmiko_field_mappings_dict(self):
         """获取Netmiko字段映射字典"""
@@ -126,9 +125,9 @@ class DeviceSubCollectionPlan(models.Model):
 
         return errors
 
-    def process_netmiko_data(self, data):
-        """处理采集到的数据"""
-        if not self.netmiko_processor_enabled or not self.netmiko_processor:
+    def _process_with_exec(self, enabled: bool, code: str, data):
+        """通用的基于 exec 的数据处理执行器"""
+        if not enabled or not code:
             return data
 
         try:
@@ -138,11 +137,10 @@ class DeviceSubCollectionPlan(models.Model):
             }
 
             # 执行数据处理代码
-            exec(self.netmiko_processor, globals(), local_vars)
+            exec(code, globals(), local_vars)
 
             # 检查函数是否定义成功，并调用它
             if 'process_data' in local_vars:
-                # 调用在 exec 中定义的函数，传入数据
                 processed_result = local_vars['process_data'](local_vars['data'])
             else:
                 raise RuntimeError("在执行代码后未找到 'process_data' 函数。")
@@ -159,40 +157,14 @@ class DeviceSubCollectionPlan(models.Model):
             logger = logging.getLogger(__name__)
             logger.error(f"执行数据处理代码失败: {str(e)}")
             return data
+
+    def process_netmiko_data(self, data):
+        """处理采集到的数据"""
+        return self._process_with_exec(self.netmiko_processor_enabled, self.netmiko_processor, data)
 
     def process_netconf_data(self, data):
         """处理采集到的数据"""
-        if not self.netconf_processor_enabled or not self.netconf_processor:
-            return data
-
-        try:
-            # 创建安全的执行环境
-            local_vars = {
-                'data': data,
-            }
-
-            # 执行数据处理代码
-            exec(self.netconf_processor, globals(), local_vars)
-
-            # 检查函数是否定义成功，并调用它
-            if 'process_data' in local_vars:
-                # 调用在 exec 中定义的函数，传入数据
-                processed_result = local_vars['process_data'](local_vars['data'])
-            else:
-                raise RuntimeError("在执行代码后未找到 'process_data' 函数。")
-
-            # 获取处理结果
-            if processed_result is not None:
-                return processed_result
-
-            # 如果没有明确的返回值，返回处理后的数据
-            return data
-
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"执行数据处理代码失败: {str(e)}")
-            return data
+        return self._process_with_exec(self.netconf_processor_enabled, self.netconf_processor, data)
 
     def save(self, *args, **kwargs):
         """保存时确保字段映射有正确的默认值"""
@@ -210,7 +182,7 @@ class NetconfXMLTemplate(models.Model):
     COLLECT_METHOD_CHOICES = [
         ('get', 'GET'),
         ('get_bulk', 'GET_BULK'),
-        ('get_config', 'GET_CONFIG'),
+        ('rpc', 'RPC'),
     ]
     collect_method = models.CharField(
         max_length=20, 

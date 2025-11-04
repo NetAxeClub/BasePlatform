@@ -1,14 +1,11 @@
 # -*- coding: utf-8 -*-
 import logging
 from datetime import datetime
-from apps.device_api import (
-    COLLECTION_RESULTS_DB, COLLECTION_ARP, COLLECTION_MAC, COLLECTION_LLDP, 
-    COLLECTION_IP_INTERFACE, COLLECTION_INTERFACE_BRIEF, COLLECTION_AGGRE_PORT
-)
 from apps.device_api.models import DeviceSubCollectionPlan
+from apps.device_api import COLLECTION_RESULTS_DB
 
 
-def netpalm_data_to_mongodb(**kwargs):
+def plan_data_to_mongodb(**kwargs):
     """NetPalm webhook回调函数，将采集结果保存到MongoDB
     
     Args:
@@ -38,7 +35,7 @@ def netpalm_data_to_mongodb(**kwargs):
         device_name = webhook_args.get("device_name")
         idc_name = webhook_args.get("idc_name", "")
         collection_method = webhook_args.get("collection_method", "netmiko")
-        collection_type = webhook_args.get("type", "arp")
+        collection_type = webhook_args.get("collection_type", "arp")
 
         logging.info(f"提取参数 - plan_id: {plan_id}, device_ip: {device_ip}, device_name: {device_name}, collection_method: {collection_method}")
 
@@ -52,9 +49,11 @@ def netpalm_data_to_mongodb(**kwargs):
         
         # 获取任务ID
         task_id = task_info.get("task_id")
-        task_result = task_info.get("task_result", {})
         created_on = task_info.get("created_on", "")
+        task_queue = task_info.get("task_queue", "")
         task_status = task_info.get("task_status", "")
+        task_result = task_info.get("task_result", {})
+        task_errors = task_info.get("task_errors", [])
 
         logging.info(f"任务信息 - task_id: {task_id}, task_status: {task_status}, created_on: {created_on}")
         logging.info(f"采集结果数量: {len(task_result)} 条命令")
@@ -71,40 +70,25 @@ def netpalm_data_to_mongodb(**kwargs):
                 'device_type': plan.summary_plan.device_type,
                 'vendor': plan.summary_plan.vendor,
                 'collection_method': collection_method,
-                'method_name': command_name,
+                'collection_type': collection_type,
+                'method_name': command_name,   # 这个地方有点问题，当是netconf的时候，应该没有command_name
                 'data': command_result,
                 'processed_data': None,  # 可以在这里添加数据处理逻辑
                 'collected_at': created_on,
                 'task_id': task_id,
                 'task_status': task_status,
+                'task_queue': task_queue,
+                'task_errors': task_errors,
                 'status': status
             }
 
             # 处理原始数据
-            processing_status, processed_data = process_raw_data(plan, collection_result, collection_method)
-            collection_result["processed_data"] = processed_data
-            collection_result["processing_status"] = processing_status
+            processed_status, processed_error, processed_data = process_raw_data(plan, collection_result, collection_method)
             
-            # 根据处理状态记录日志
-            if processing_status:
-                logging.info(f"数据处理成功: {device_ip} - 命令: {command_name}")
+            collection_result["processed_data"] = processed_data
+            collection_result["processed_status"] = "success" if processed_status else "failed"
+            collection_result["processed_error"] = processed_error
 
-                # 保存数据到指定MongoDB，比如arp、mac
-                result_dict = save_to_collection_db(
-                    content=processed_data if isinstance(processed_data, list) else [],
-                    hostip=device_ip,
-                    collection_type=collection_type,
-                    plan=plan,
-                    device_name=device_name,
-                    created_on=created_on
-                )
-
-                if not result_dict.get("status"):
-                    logging.error(f"保存数据失败，错误信息为 {result_dict['message']}")
-
-            else:
-                logging.error(f"数据处理失败: {device_ip} - 命令: {command_name}")
-      
             # 保存当前执行流程结果到MongoDB
             try:
                 COLLECTION_RESULTS_DB.insert_one(collection_result)
@@ -121,7 +105,7 @@ def netpalm_data_to_mongodb(**kwargs):
 
 
 def process_raw_data(plan, collection_result, collection_method):
-    """处理原始数据
+    """数据处理函数，处理原始数据
     
     Args:
         plan: 采集方案对象
@@ -129,33 +113,89 @@ def process_raw_data(plan, collection_result, collection_method):
         collection_method: 采集方法 (netmiko/netconf)
         
     Returns:
-        tuple: (status, processed_data) - (True/False, 处理后的数据/空列表)
+        tuple: (status, error_message, processed_data)
     """
     try:
-        command_result = collection_result["data"]
-        processed_data = []  # 初始化processed_data
-        has_error = False  # 跟踪是否有错误
+        command_result = collection_result["data"]      # 原始数据
+        method = (collection_method or "").lower()
         
-        # 第一步：数据处理函数
-        if plan.netmiko_processor_enabled and plan.netmiko_processor:
-            logging.info(f"执行数据处理函数: {plan.name}")
-            try:
-                processed_data = plan.process_netmiko_data(command_result)
-                logging.info(f"数据处理函数执行成功: {plan.name}")
-            except Exception as e:
-                logging.error(f"数据处理函数执行失败: {plan.name} - {str(e)}")
-                has_error = True
+        # 数据处理函数（按采集方式通过分发表调用，异常立即返回）
+        try:
+            dispatch = {
+                "netmiko": (getattr(plan, "netmiko_processor_enabled", False), getattr(plan, "netmiko_processor", None), getattr(plan, "process_netmiko_data", None)),
+                "netconf": (getattr(plan, "netconf_processor_enabled", False), getattr(plan, "netconf_processor", None), getattr(plan, "process_netconf_data", None)),
+            }
+            enabled, code, func = dispatch.get(method, (False, None, None))
+
+            if enabled and code and callable(func):
+                logging.info(f"执行{method}数据处理函数: {plan.name}")
+                processed_data = func(command_result)
+                logging.info(f"数据处理函数执行完成: {plan.name}")
+            else:
+                # 未启用处理器或无处理函数                 
+                logging.info(f"未启用处理器，透传原始数据: {plan.name}")
+                processed_data = []
+        except Exception as e:
+            logging.error(f"数据处理函数执行失败: {plan.name} - {str(e)}", exc_info=True)
+            return False, f"{method}_processor_failed: {str(e)}", []
+         
+        return True, "", processed_data
+        
+    except Exception as e:
+        logging.error(f"数据处理异常: {plan.name} - {str(e)}", exc_info=True)
+        return False, f"exception: {str(e)}", []
+
+
+def resolve_raw_data(plan, collection_result, collection_method):
+    """函数处理+字段映射原始数据
+    
+    Args:
+        plan: 采集方案对象
+        collection_result: 原始数据
+        collection_method: 采集方法 (netmiko/netconf)
+        
+    Returns:
+        tuple: (status, error_message, mapping_data)
+    """
+    try:
+        command_result = collection_result["data"]      # 原始数据
+        mapping_data = []                               # 映射数据
+        error_message = ""                              # 记录错误信息
+        has_error = False                               # 是否存在错误
+        method = collection_method.lower()
+        
+        # 第一步：数据处理函数（按采集方式通过分发表调用，异常立即返回）, 有函数则添加中间层processed_data
+        try:
+            dispatch = {
+                "netmiko": (getattr(plan, "netmiko_processor_enabled", False), getattr(plan, "netmiko_processor", None), getattr(plan, "process_netmiko_data", None)),
+                "netconf": (getattr(plan, "netconf_processor_enabled", False), getattr(plan, "netconf_processor", None), getattr(plan, "process_netconf_data", None)),
+            }
+            enabled, code, func = dispatch.get(method, (False, None, None))
+
+            if enabled and code and callable(func):
+                logging.info(f"执行{method}数据处理函数: {plan.name}")
+                processed_data = func(command_result)
+                collection_result["processed_data"] = processed_data
+            else:
+                # 未启用处理器或无处理函数，则透传原始数据
+                collection_result["processed_data"] = []
+            logging.info(f"数据处理函数执行完成: {plan.name}")
+        except Exception as e:
+            logging.error(f"数据处理函数执行失败: {plan.name} - {str(e)}", exc_info=True)
+            method_tag = (collection_method or "unknown").lower()
+            return False, f"{method_tag}_processor_failed: {str(e)}", []
         
         # 第二步：字段映射
+        # 获取字段映射配置
         field_mappings = None
         path_config = None
         
-        if collection_method == "netmiko":
+        if method == "netmiko":
             if plan.netmiko_path and plan.netmiko_field_mappings:
                 field_mappings = plan.netmiko_field_mappings
                 path_config = plan.netmiko_path
                 logging.info(f"使用Netmiko字段映射: {plan.name}")
-        elif collection_method == "netconf":
+        elif method == "netconf":
             if plan.netconf_path and plan.netconf_field_mappings:
                 field_mappings = plan.netconf_field_mappings
                 path_config = plan.netconf_path
@@ -163,26 +203,25 @@ def process_raw_data(plan, collection_result, collection_method):
         
         if field_mappings and path_config:
             try:
-                # 应用字段映射
-                mapped_data = apply_field_mappings(collection_result, field_mappings, path_config)
-                if mapped_data:
-                    processed_data = mapped_data
-                    logging.info(f"字段映射执行成功: {plan.name} - 映射了 {len(mapped_data)} 条记录")
+                mapping_data = apply_field_mappings(collection_result, field_mappings, path_config)
+                if mapping_data:
+                    logging.info(f"字段映射执行成功: {plan.name} - 映射了 {len(mapping_data)} 条记录")
                 else:
                     logging.warning(f"字段映射未返回数据: {plan.name}")
             except Exception as e:
-                logging.error(f"字段映射执行失败: {plan.name} - {str(e)}")
-                has_error = True
+                logging.error(f"字段映射执行失败: {plan.name} - {str(e)}", exc_info=True)
+                method_tag = (collection_method or "unknown").lower()
+                return False, f"{method_tag}_mapping_failed(path={path_config}): {str(e)}", []
         
         # 如果有错误，返回失败状态
         if has_error:
-            return False, []
+            return False, error_message, []
         
-        return True, processed_data
+        return True, "", mapping_data
         
     except Exception as e:
         logging.error(f"数据处理异常: {plan.name} - {str(e)}")
-        return False, []
+        return False, f"exception: {str(e)}", []
 
 
 def apply_field_mappings(data_dict, field_mappings, path_config=None):
@@ -306,59 +345,3 @@ def apply_field_mappings(data_dict, field_mappings, path_config=None):
         logging.error(f"应用字段映射失败: {str(e)}", exc_info=True)
         return []
 
-
-def save_to_collection_db(content: list, hostip: str, collection_type: str, plan: dict, device_name: str, created_on: str) -> dict:
-    """保存采集数据到采集数据
-    
-    :param content: 采集结果
-    :param hostip: 设备ip
-    :param collection_type: 采集类型
-    :param plan: plan对象
-    :param device_name: 设备名称
-    :param created_on: 采集时间
-    :return:
-    """
-    # 获取MongoDB数据库集合
-    collection_map = {
-        "arp": COLLECTION_ARP,
-        "mac": COLLECTION_MAC,
-        "lldp": COLLECTION_LLDP,
-        "ip_interface": COLLECTION_IP_INTERFACE,
-        "interface_brief": COLLECTION_INTERFACE_BRIEF,
-        "aggre_port": COLLECTION_AGGRE_PORT
-    }
-    
-    my_mongo = collection_map.get(collection_type, None)
-
-    if len(content) == 0:
-        logging.info("processed_data is []")
-        return {"status": True, "message": "processed_data is []"}
-        
-    if not my_mongo:
-        logging.error(f"找不到对应的集合: {collection_type}")
-        return {"status": False, "message": f"找不到对应的集合: {collection_type}"}
-    
-    try:
-        # 删除该设备的已有数据
-        my_mongo.delete_many(query={"hostip": hostip})
-        logging.info(f"已删除设备 {hostip} 的旧数据")
-
-        datas = []
-        for item in content:
-            # 创建新的数据项，避免修改原始数据
-            new_item = item.copy()  # 复制原数据
-            new_item['hostip'] = hostip
-            new_item['collected_at'] = created_on
-            datas.append(new_item)
-    
-        # 批量插入原始数据
-        my_mongo.insert_many(datas)
-        
-        logging.info(f"数据传输成功: {hostip} - 类型: {collection_type}")
-        return {'status': True}
-        
-    except Exception as e:
-        logging.error(f"insert_many_failed:{str(e)}")
-        logging.error(f"保存到数据库失败: hostip={hostip}, collection_type={collection_type}")
-        logging.error(f"数据传输失败: {hostip} - 类型: {collection_type} - {str(e)}")
-        return {"status": False, "message": f"保存到数据库失败: {str(e)}"}
