@@ -97,8 +97,8 @@ class DeviceSubCollectionPlanSerializer(serializers.ModelSerializer):
         model = DeviceSubCollectionPlan
         fields = [
             'id', 'summary_plan', 'summary_plan_name', 'summary_plan_vendor', 'summary_plan_vendor_display',
-            'summary_plan_device_type', 'name', 'description', 'type',
-            'textfsm_enabled', 'textfsm_template',
+            'summary_plan_device_type', 'name', 'description', 'collection_type',
+            'textfsm_template',
             'netmiko_enabled', 'netmiko_path', 'netmiko_method', 'netmiko_field_mappings',
             'netmiko_processor_enabled', 'netmiko_processor',
             'netconf_enabled', 'netconf_path', 'netconf_field_mappings',
@@ -145,8 +145,8 @@ class DeviceSubCollectionPlanCreateSerializer(serializers.ModelSerializer):
         model = DeviceSubCollectionPlan
         fields = [
             'id', 'summary_plan_id', 'summary_plan', 'summary_plan_name', 'summary_plan_vendor',
-            'summary_plan_device_type', 'name', 'description', 'type',
-            'textfsm_enabled', 'textfsm_template',
+            'summary_plan_device_type', 'name', 'description', 'collection_type',
+            'textfsm_template',
             'netmiko_enabled', 'netmiko_path', 'netmiko_method', 'netmiko_field_mappings',
             'netmiko_processor_enabled', 'netmiko_processor',
             'netconf_enabled', 'netconf_path', 'netconf_field_mappings',
@@ -254,8 +254,8 @@ class DeviceSubCollectionPlanUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = DeviceSubCollectionPlan
         fields = [
-            'id', 'summary_plan_id', 'name', 'description', 'type',
-            'textfsm_enabled', 'textfsm_template',
+            'id', 'summary_plan_id', 'name', 'description', 'collection_type',
+            'textfsm_template',
             'netmiko_enabled', 'netmiko_path', 'netmiko_method', 'netmiko_field_mappings',
             'netmiko_processor_enabled', 'netmiko_processor',
             'netconf_enabled', 'netconf_path', 'netconf_field_mappings',
@@ -544,5 +544,14 @@ class CollectionResultListSerializer(serializers.Serializer):
 class CollectionResultDetailSerializer(CollectionResultListSerializer):
     """采集结果详情序列化器"""
     data = serializers.JSONField(help_text='原始数据')
-    processed_data = serializers.JSONField(help_text='处理后数据')
+    processed_data = serializers.JSONField(help_text='中间层数据')
+    processed_status = serializers.CharField(help_text='处理状态')
+    processed_error = serializers.CharField(help_text='处理报错信息')
+
+
+class CollectionResultByPlanSerializer(CollectionResultListSerializer):
+    """采集结果不展示报错信息序列化器"""
+    data = serializers.JSONField(help_text='原始数据')
+    processed_data = serializers.JSONField(help_text='函数处理后的数据')
+
 

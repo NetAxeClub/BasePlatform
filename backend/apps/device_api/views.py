@@ -8,22 +8,23 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from apps.api.tools.custom_viewset_base import CustomViewBase
 from apps.device_api.models import DeviceCollectionPlans, DeviceSubCollectionPlan, NetconfXMLTemplate
-from apps.device_api.models_api import process_raw_data, netpalm_data_to_mongodb
+from apps.device_api.models_api import resolve_raw_data, plan_data_to_mongodb
 from apps.device_api.serializers import (
     DeviceCollectionPlansSerializer, DeviceCollectionPlansCreateSerializer,
     DeviceCollectionPlansUpdateSerializer, DeviceCollectionPlansDetailSerializer,
     DeviceSubCollectionPlanSerializer, DeviceSubCollectionPlanCreateSerializer,
     DeviceSubCollectionPlanUpdateSerializer,
     NetconfXMLTemplateSerializer, NetconfXMLTemplateListSerializer,
-    CollectionResultDetailSerializer, CollectionFilterSerializer
+    CollectionResultDetailSerializer, CollectionFilterSerializer,
+    CollectionResultByPlanSerializer
 )
 from apps.device_api.services import DeviceCollectionService
 from apps.device_api import COLLECTION_RESULTS_DB
 from apps.api.tools.custom_pagination import LargeResultsSetPagination
 from apps.asset.models import NetworkDevice
-from apps.device_api import COLLECTION_LOG_DB
 from apps.device_api.fields_mapping import field_mapping
 from apps.device_api.services import FieldMappingDriver
+from confload.confload import config
 
 logger = logging.getLogger(__name__)
 
@@ -386,12 +387,8 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
                 device = NetworkDevice.objects.select_related('idc').get(manage_ip=device_ip)
             except NetworkDevice.DoesNotExist:
                 return False, f"设备 {device_ip} 不存在", None
-            
-            # 3. 验证采集方案状态
-            if not plan.is_active:
-                return False, "采集方案已禁用，无法执行", None
-            
-            # 4. 根据采集类型进行特定验证
+
+            # 3. 根据采集类型进行特定验证
             if collection_type == 'netmiko':
                 if not plan.netmiko_enabled:
                     return False, "采集方案未启用Netmiko采集方式", None
@@ -434,146 +431,11 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
             return False, f"验证失败: {str(e)}", None
 
     @action(detail=True, methods=['post'])
-    def update_field_mappings(self, request, *args, **kwargs):
-        """更新字段映射"""
-
+    def execute_sub_plan(self, request, *args, **kwargs):
+        """执行子采集方案 NETCONF和 NETMIKO"""
         plan = self.get_object()
-        field_mappings_type = request.data.get('field_mappings_type')
-        field_mappings = request.data.get('field_mappings')
-
-        if not field_mappings_type or field_mappings is None:
-            return JsonResponse({
-                "code": 400,
-                "message": "缺少必要参数: field_mappings_type, field_mappings",
-                "data": ""
-            })
-
-        # 验证字段映射类型
-        if field_mappings_type not in ['netconf', 'netmiko']:
-            return JsonResponse({
-                "code": 400,
-                "message": "字段映射类型必须是 'netconf' 或 'netmiko'",
-                "data": ""
-            })
-
-        updated_plan = DeviceCollectionService.update_field_mappings(
-            plan, field_mappings_type, field_mappings
-        )
-
-        if updated_plan['success']:
-            serializer = DeviceSubCollectionPlanSerializer(updated_plan['plan'])
-            return JsonResponse({
-                "code": 200,
-                "message": "字段映射更新成功",
-                "data": serializer.data
-            })
-        else:
-            return JsonResponse({
-                "code": 500,
-                "message": f"更新失败: {updated_plan['error']}",
-                "data": ""
-            })
-
-    @action(detail=True, methods=['post'])
-    def update_data_processor(self, request, *args, **kwargs):
-        """根据执行结果ID更新数据处理函数"""
-
-        plan = self.get_object()
-
-        data_processor_code = request.data.get('data_processor', '').strip()    # 去除首尾空白
-
-        if data_processor_code and 'def' not in data_processor_code:
-            return JsonResponse(
-                data={"code": 400, "message": "数据处理函数代码必须包含函数定义 (def)。"}
-            )
-
-        plan.netmiko_processor_enabled = True
-        plan.netmiko_processor = data_processor_code
-        plan.save()
-
-        return JsonResponse(data={
-            "code": 200,
-            "message": "更新成功"
-        })
-
-    @action(detail=True, methods=['post'])
-    def execute_netmiko(self, request, *args, **kwargs):
-        """执行Netmiko采集"""
-        plan = self.get_object()
-        device_ip = request.data.get('device_ip')
-
-        try:
-            # 数据验证
-            is_valid, error_msg, device = self.validate_execution_params(plan, device_ip, 'netmiko')
-            if not is_valid:
-                return JsonResponse({
-                    "code": 400,
-                    "message": error_msg
-                })
-            
-            # 执行Netmiko采集
-            collection_result = DeviceCollectionService.execute_netmiko_collection(plan, device)
-            if not collection_result.get("success"):
-                return JsonResponse({
-                    "code": 500,
-                    "message": f"Netmiko采集失败"
-                })
-                       
-            return JsonResponse({
-                "code": 200,
-                "message": "Netmiko采集执行成功",
-                "data": collection_result
-            })
-
-        except Exception as e:
-            logger.error(f"Netmiko采集执行失败: 方案={plan.name}, 设备={device_ip}, 错误={str(e)}")
-            return JsonResponse({
-                "code": 500,
-                "message": f"Netmiko采集失败: {str(e)}"
-            })
-
-    @action(detail=True, methods=['post'])
-    def execute_netconf(self, request, *args, **kwargs):
-        """执行NETCONF采集"""
-        plan = self.get_object()
-        device_ip = request.data.get('device_ip')
-
-        try:
-            # 数据验证
-            is_valid, error_msg, device = self.validate_execution_params(plan, device_ip, 'netconf')
-            if not is_valid:
-                return JsonResponse({
-                    "code": 400,
-                    "message": error_msg
-                })
-            
-            # 执行NETCONF采集
-            collection_result = DeviceCollectionService.execute_netconf_collection(plan, device)
-
-            if not collection_result.get("success"):
-                return JsonResponse({
-                    "code": 500,
-                    "message": f"Netconf采集失败"
-                })
-
-            return JsonResponse({
-                "code": 200,
-                "message": "NETCONF采集执行成功",
-                "data": collection_result
-            })
-
-        except Exception as e:
-            logger.error(f"NETCONF采集执行失败: 方案={plan.name}, 设备={device_ip}, 错误={str(e)}")
-            return JsonResponse({
-                "code": 500,
-                "message": f"NETCONF采集失败: {str(e)}"
-            })
-
-    @action(detail=True, methods=['post'])
-    def execute_both_collection(self, request, *args, **kwargs):
-        """同时执行NETCONF和Netmiko采集"""
-        plan = self.get_object()
-        device_ip = request.data.get('device_ip')
+        device_ip = request.data.get('device_ip')           # 设备IP
+        south_driver = request.data.get('south_driver')     # 南向驱动
 
         try:
             # 使用统一的参数验证方法
@@ -585,7 +447,7 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
                 })
 
             # 执行双重采集
-            result = DeviceCollectionService.execute_both_collection(plan, device)
+            result = DeviceCollectionService.execute_both_collection(plan, device, south_driver)
             
             if result['success']:
                 return JsonResponse({
@@ -613,42 +475,9 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
                 "message": f"双重采集失败: {str(e)}"
             })
 
-    @action(detail=False, methods=['post'])
-    def execute_data_processor(self, request, *args, **kwargs):
-        """执行数据处理函数，将采集结果转换为标准数据格式"""
-        try:
-            # 获取请求参数
-            result_id = request.data.get('result_id')
-
-            # 调用服务层执行数据处理
-            result = DeviceCollectionService.execute_data_processor(result_id)
-            
-            if result['success']:
-                return JsonResponse({
-                    'code': 200,
-                    'message': '数据处理执行成功',
-                    'data': result['data']
-                })
-            else:
-                # 根据错误类型返回相应的状态码
-                error_code = result.get('code', 500)
-                return JsonResponse({
-                    'code': error_code,
-                    'message': result['error'],
-                    'data': result.get('data', None)
-                })
-                
-        except Exception as e:
-            logger.error(f"执行数据处理失败: {str(e)}")
-            return JsonResponse({
-                'code': 500,
-                'message': f'执行失败: {str(e)}',
-                'data': None
-            })
-
     @action(detail=False, methods=['get'])
     def model_fields(self, request):
-        """获取模型字段"""
+        """根据采集类型获取模型字段"""
         model_type = request.query_params.get('model_type')
              
         if model_type in field_mapping:
@@ -690,67 +519,15 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
                 "message": str(e)
             })
 
-    @action(detail=False, methods=['post'])
-    def push_test_data(self, request, *args, **kwargs):
-        """推送测试数据到MongoDB
-        
-        Args:
-            request: HTTP请求对象
-            
-        Returns:
-            JsonResponse: 包含处理结果的JSON响应
-        """
-        try:
-            data = request.data
-            
-            # 验证请求数据
-            if not data:
-                return JsonResponse({
-                    'code': 400,
-                    'data': {},
-                    'message': '请求数据为空'
-                })
-            
-            # 记录接收到的数据信息
-            logging.info(f"接收到测试数据推送请求，数据keys: {list(data.keys()) if isinstance(data, dict) else '非字典类型'}")
-            
-            # 调用服务方法插入数据
-            result = DeviceCollectionService.insert_data_to_mongodb(data)
-            
-            if result.get('success', True):  # 默认成功，兼容原有简单实现
-                logging.info("测试数据推送成功")
-                return JsonResponse({
-                    'code': 200,
-                    'data': result.get('data', {}),
-                    'message': result.get('message', 'success')
-                })
-            else:
-                logging.error(f"测试数据推送失败: {result.get('error', '未知错误')}")
-                return JsonResponse({
-                    'code': result.get('code', 500),
-                    'data': {},
-                    'message': result.get('error', '数据插入失败')
-                })
-                
-        except Exception as e:
-            logging.error(f"推送测试数据异常: {str(e)}", exc_info=True)
-            return JsonResponse({
-                'code': 500,
-                'data': {},
-                'message': f'服务器内部错误: {str(e)}'
-            })
-        
     @action(detail=False, methods=['get'])
-    def machine_room_list(self, request):
+    def south_driver_list(self, request):
         """获取模型字段"""
-        data_list = [
-            {"label": "北京森华", "value": "10.105.251.101"},
-            {"label": "合肥B3", "value": "10.103.251.13"},
-            {"label": "北京酒仙桥", "value": "10.107.251.101"},
-            {"label": "广州华新园", "value": "10.108.251.101"},
-            {"label": "北京鲁谷", "value": "10.106.251.101"},
-            {"label": "开发环境", "value": "10.254.2.111"}
-        ]
+        data_list = []
+        server_info = config.service_dicovery('south_driver')
+        server_hosts = server_info['hosts']
+        for server in server_hosts:
+            metadata = server['metadata']
+            data_list.append({"label": metadata["machine_room"], "value": server["ip"]})
 
         return JsonResponse({
             'code': 200,
@@ -758,9 +535,21 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
             'data': data_list
         })
 
+    @action(detail=False, methods=['post'])
+    def record_plan_data(self, request, *args, **kwargs):
+        """接收南向驱动数据，存入db"""
+
+        data = request.data
+        result = plan_data_to_mongodb(**data)
+
+        return JsonResponse({
+            'code': 200 if result.get("status") == "success" else 500,
+            'message': result.get("message", "")
+        })
+
     @action(detail=False, methods=['get'])
     def machine_room_list1(self, request):
-        """获取模型字段"""
+        """测试接口"""
 
         plan_id = 50
         query = {"plan_id": plan_id, "collection_method": "netmiko"}
@@ -769,7 +558,7 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
         collection_data = data[-1]
 
         plan = DeviceSubCollectionPlan.objects.get(id=plan_id)
-        processed_data = process_raw_data(plan, collection_data, "netmiko")
+        processed_data = resolve_raw_data(plan, collection_data, "netmiko")
 
         COLLECTION_RESULTS_DB.delete_many(query=query)
 
@@ -777,18 +566,6 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
             'code': 200,
             'message': '获取成功',
             'data': processed_data
-        })
-
-    @action(detail=False, methods=['post'])
-    def record_plan_data(self, request, *args, **kwargs):
-        """接收南向驱动数据，存入db"""
-
-        data = request.data
-        result = netpalm_data_to_mongodb(**data)
-
-        return JsonResponse({
-            'code': 200 if result.get("status") == "success" else 500,
-            'message': result.get("message", "")
         })
 
 
@@ -982,7 +759,7 @@ class CollectionResultViewSet(CustomViewBase):
             results = list(cursor)
 
             # 序列化结果
-            serializer = CollectionResultDetailSerializer(results, many=True)
+            serializer = CollectionResultByPlanSerializer(results, many=True)
             
             response_data = {
                 'code': 200,
@@ -1149,83 +926,4 @@ class CollectionResultViewSet(CustomViewBase):
                 'code': 500,
                 'message': f'获取失败: {str(e)}',
                 'data': None
-            })
-
-
-class CollectionLogViewSet(CustomViewBase):
-    """采集日志视图集"""
-
-    queryset = None
-    serializer_class = None
-    pagination_class = None
-
-    @action(detail=False, methods=['get'])
-    def list_logs(self, request):
-        """获取采集日志列表"""
-        try:
-            # 获取查询参数
-            summary_plan_id = request.query_params.get('summary_plan_id')
-            plan_id = request.query_params.get('plan_id')
-            device_ip = request.query_params.get('device_ip')
-            collection_type = request.query_params.get('collection_type')
-            status = request.query_params.get('status')
-            start_time = request.query_params.get('start_time')
-            end_time = request.query_params.get('end_time')
-            page = int(request.query_params.get('page', 1))
-            page_size = int(request.query_params.get('page_size', 10))
-            
-            # 构建查询条件
-            query = {}
-            
-            if device_ip:
-                query['device_ip'] = device_ip
-            if summary_plan_id:
-                query['summary_plan_id'] = int(summary_plan_id)
-            if plan_id:
-                query['plan_id'] = int(plan_id)
-            if collection_type:
-                query['collection_type'] = collection_type
-            if status:
-                query['status'] = status
-                
-            # 时间范围查询
-            if start_time or end_time:
-                time_query = {}
-                if start_time:
-                    time_query['$gte'] = start_time
-                if end_time:
-                    time_query['$lte'] = end_time
-                query['executed_at'] = time_query
-            
-            # 执行查询，按执行时间逆序排列（最新的在前面）
-            # 计算分页参数
-            skip = page_size * (page - 1)
-            
-            # 直接使用MongoDB原生查询确保正确的排序
-            cursor = COLLECTION_LOG_DB.coll.find(query).sort('executed_at', -1).limit(page_size).skip(skip)
-            logs = list(cursor)
-
-            # 获取总数
-            total_count = COLLECTION_LOG_DB.count_documents(query)
-            
-            # 转换为列表
-            log_list = []
-            for log in logs:
-                log['_id'] = str(log['_id'])
-                log_list.append(log)
-
-            return JsonResponse(data={
-                'code': 200,
-                'message': '获取成功',
-                'count': total_count,
-                'results': log_list
-            })
-
-        except Exception as e:
-            logger.error(f"获取采集日志失败: {str(e)}")
-            return JsonResponse({
-                'code': 500,
-                'message': f'获取失败: {str(e)}',
-                'count': 0,
-                'results': None
             })

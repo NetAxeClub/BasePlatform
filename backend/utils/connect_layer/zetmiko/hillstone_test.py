@@ -16,7 +16,6 @@ hs_fw1 = {
     'password': '',
 }
 
-
 # Show command that we execute
 command = "display version"
 with ConnectHandler(**hs_fw1) as net_connect:
