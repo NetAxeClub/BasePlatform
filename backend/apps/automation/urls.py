@@ -2,6 +2,7 @@ from django.urls import path, include
 from rest_framework_extensions.routers import (
     ExtendedDefaultRouter as DefaultRouter
 )
+
 from .views import (
     CollectionPlanViewSet, CollectionRuleViewSet,
     CollectionMatchRuleViewSet, VueCollectionRule, AutomationInventoryViewSet, AutoVarsViewSet,

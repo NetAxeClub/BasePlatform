@@ -12,12 +12,14 @@
 """
 import json
 import logging
+
 from confload.confload import config
 from pika import BasicProperties
 from netaxe.settings import DEBUG
 from bus.bus_sync import SyncMessageBus
 from apps.dcs_control.tasks import FirewallMain
 from apps.automation.tools.models_api import get_firewall_list, get_device_name
+from apps.device_api.models_api import plan_data_to_mongodb
 from apps.dcs_control.tasks import address_set, bulk_deny_by_address, get_firewall_zone, config_sec_policy
 
 log = logging.getLogger(__name__)
@@ -32,6 +34,11 @@ def dispatcher(method, data):
     log.info(f"method:{method}")
     log.info(f"data:{data}")
     try:
+        if method == "netpalm_data_to_mongodb":
+            log.info("开始执行netpalm_data_to_mongodb")
+            res = plan_data_to_mongodb(**data)
+            log.info("执行结束netpalm_data_to_mongodb")
+            return {"data": res}
         # if method == 'get_firewall_list':
         #     res = get_firewall_list()
         #     return list(res)

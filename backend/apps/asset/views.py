@@ -764,6 +764,17 @@ class NetworkDeviceViewSet(CustomViewBase):
             'msg': 'success'
         })
 
+    @action(detail=False, methods=['get'])
+    def asset_list(self, request):
+        """获取在线状态的设备IP列表"""
+        asset_list = list(NetworkDevice.objects.filter(status=0).values_list("manage_ip", flat=True))
+
+        return JsonResponse({
+            'code': 200,
+            'message': '获取成功',
+            'data': asset_list
+        })
+    
     # 重新update方法主要用来捕获更改前的字段值并赋值给self.log
     # def update(self, request, *args, **kwargs):
     #     print('更新', super().update(request, *args, **kwargs))
