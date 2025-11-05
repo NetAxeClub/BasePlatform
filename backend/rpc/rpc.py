@@ -35,9 +35,7 @@ def dispatcher(method, data):
     log.info(f"data:{data}")
     try:
         if method == "netpalm_data_to_mongodb":
-            log.info("开始执行netpalm_data_to_mongodb")
             res = plan_data_to_mongodb(**data)
-            log.info("执行结束netpalm_data_to_mongodb")
             return {"data": res}
         # if method == 'get_firewall_list':
         #     res = get_firewall_list()

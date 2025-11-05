@@ -544,6 +544,7 @@ class CollectionResultListSerializer(serializers.Serializer):
 class CollectionResultDetailSerializer(CollectionResultListSerializer):
     """采集结果详情序列化器"""
     data = serializers.JSONField(help_text='原始数据')
+    task_errors = serializers.ListField(child=serializers.CharField(), help_text='执行错误信息')
     processed_data = serializers.JSONField(help_text='中间层数据')
     processed_status = serializers.CharField(help_text='处理状态')
     processed_error = serializers.CharField(help_text='处理报错信息')
@@ -553,5 +554,3 @@ class CollectionResultByPlanSerializer(CollectionResultListSerializer):
     """采集结果不展示报错信息序列化器"""
     data = serializers.JSONField(help_text='原始数据')
     processed_data = serializers.JSONField(help_text='函数处理后的数据')
-
-

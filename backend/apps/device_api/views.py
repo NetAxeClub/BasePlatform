@@ -639,101 +639,6 @@ class CollectionResultViewSet(CustomViewBase):
     pagination_class = None
 
     @action(detail=False, methods=['get'])
-    def list_results(self, request):
-        """获取采集结果列表"""
-        try:
-            # 验证查询参数
-            filter_serializer = CollectionFilterSerializer(data=request.GET)
-            if not filter_serializer.is_valid():
-                return JsonResponse({
-                    'code': 400,
-                    'message': '查询参数无效',
-                    'data': filter_serializer.errors
-                })
-            
-            filter_data = filter_serializer.validated_data
-            
-            # 构建MongoDB查询条件
-            query = {}
-            
-            # 基本字段过滤
-            if filter_data.get('plan_id'):
-                query['plan_id'] = filter_data['plan_id']
-            if filter_data.get('plan_name'):
-                query['plan_name'] = {'$regex': filter_data['plan_name'], '$options': 'i'}
-            if filter_data.get('device_ip'):
-                query['device_ip'] = filter_data['device_ip']
-            if filter_data.get('device_name'):
-                query['device_name'] = {'$regex': filter_data['device_name'], '$options': 'i'}
-            if filter_data.get('collection_method'):
-                query['collection_method'] = filter_data['collection_method']
-            if filter_data.get('method_name'):
-                query['method_name'] = {'$regex': filter_data['method_name'], '$options': 'i'}
-            if filter_data.get('status'):
-                query['status'] = filter_data['status']
-            if filter_data.get('vendor'):
-                query['vendor'] = filter_data['vendor']
-            if filter_data.get('device_type'):
-                query['device_type'] = filter_data['device_type']
-            
-            # 时间范围过滤
-            time_query = {}
-            if filter_data.get('start_date') and filter_data.get('end_date'):
-                start_date = f"{filter_data['start_date']}T00:00:00"
-                end_date = f"{filter_data['end_date']}T23:59:59"
-                time_query = {'$gte': start_date, '$lte': end_date}
-            elif filter_data.get('start_time') and filter_data.get('end_time'):
-                time_query = {'$gte': filter_data['start_time'], '$lte': filter_data['end_time']}
-            elif filter_data.get('days'):
-                end_time = timezone.now()
-                start_time = end_time - timedelta(days=filter_data['days'])
-                time_query = {'$gte': start_time.isoformat(), '$lte': end_time.isoformat()}
-            
-            if time_query:
-                query['collected_at'] = time_query
-            
-            # 分页和排序参数
-            page = filter_data.get('page', 1)
-            page_size = filter_data.get('page_size', 10)
-            sort_by = filter_data.get('sort_by', 'collected_at')
-            sort_order = filter_data.get('sort_order', 'desc')
-            sort_direction = -1 if sort_order == 'desc' else 1
-            
-            # 计算分页参数
-            skip = page_size * (page - 1)
-            
-            # 直接使用MongoDB原生查询确保正确的分页和排序
-            cursor = COLLECTION_RESULTS_DB.coll.find(query).sort(sort_by, sort_direction).limit(page_size).skip(skip)
-            results = list(cursor)
-            
-            # 获取总数
-            total_count = COLLECTION_RESULTS_DB.count_documents(query)
-            
-            # 序列化结果
-            serializer = CollectionResultDetailSerializer(results, many=True)
-            
-            # 构建分页响应
-            total_pages = (total_count + page_size - 1) // page_size
-            response_data = {
-                'code': 200,
-                'message': '获取成功',
-                'count': total_count,
-                'next': page + 1 if page < total_pages else None,
-                'previous': page - 1 if page > 1 else None,
-                'results':  serializer.data
-            }
-            
-            return JsonResponse(response_data)
-                
-        except Exception as e:
-            logger.error(f"获取采集结果列表失败: {str(e)}")
-            return JsonResponse({
-                'code': 500,
-                'message': f'获取失败: {str(e)}',
-                'data': None
-            })
-
-    @action(detail=False, methods=['get'])
     def by_plan(self, request):
         """根据采集方案ID查询最新的10条结果，逆序返回"""
         try:
@@ -752,8 +657,7 @@ class CollectionResultViewSet(CustomViewBase):
                 query['device_ip'] = device_ip
             if status:
                 query['status'] = status
-            
-            # 直接使用MongoDB原生查询确保正确的排序和限制
+
             # 查询最新的10条结果，按collected_at倒序排列
             cursor = COLLECTION_RESULTS_DB.coll.find(query).sort('collected_at', -1).limit(10)
             results = list(cursor)
@@ -776,6 +680,147 @@ class CollectionResultViewSet(CustomViewBase):
             return JsonResponse({
                 'code': 500,
                 'message': f'查询失败: {str(e)}',
+                'data': None
+            })
+
+    @action(detail=False, methods=['get'])
+    def list_results(self, request):
+        """获取采集结果列表"""
+        try:
+            # 验证查询参数
+            filter_serializer = CollectionFilterSerializer(data=request.GET)
+            if not filter_serializer.is_valid():
+                return JsonResponse({
+                    'code': 400,
+                    'message': '查询参数无效',
+                    'data': filter_serializer.errors
+                })
+
+            filter_data = filter_serializer.validated_data
+
+            # 构建MongoDB查询条件
+            query = {}
+
+            # 基本字段过滤
+            if filter_data.get('plan_id'):
+                query['plan_id'] = filter_data['plan_id']
+            if filter_data.get('plan_name'):
+                query['plan_name'] = {'$regex': filter_data['plan_name'], '$options': 'i'}
+            if filter_data.get('device_ip'):
+                query['device_ip'] = filter_data['device_ip']
+            if filter_data.get('device_name'):
+                query['device_name'] = {'$regex': filter_data['device_name'], '$options': 'i'}
+            if filter_data.get('collection_method'):
+                query['collection_method'] = filter_data['collection_method']
+            if filter_data.get('method_name'):
+                query['method_name'] = {'$regex': filter_data['method_name'], '$options': 'i'}
+            if filter_data.get('status'):
+                query['status'] = filter_data['status']
+            if filter_data.get('vendor'):
+                query['vendor'] = filter_data['vendor']
+            if filter_data.get('device_type'):
+                query['device_type'] = filter_data['device_type']
+
+            # 时间范围过滤
+            time_query = {}
+            if filter_data.get('start_date') and filter_data.get('end_date'):
+                start_date = f"{filter_data['start_date']}T00:00:00"
+                end_date = f"{filter_data['end_date']}T23:59:59"
+                time_query = {'$gte': start_date, '$lte': end_date}
+            elif filter_data.get('start_time') and filter_data.get('end_time'):
+                time_query = {'$gte': filter_data['start_time'], '$lte': filter_data['end_time']}
+            elif filter_data.get('days'):
+                end_time = timezone.now()
+                start_time = end_time - timedelta(days=filter_data['days'])
+                time_query = {'$gte': start_time.isoformat(), '$lte': end_time.isoformat()}
+
+            if time_query:
+                query['collected_at'] = time_query
+
+            # 分页和排序参数
+            page = filter_data.get('page', 1)
+            page_size = filter_data.get('page_size', 10)
+            sort_by = filter_data.get('sort_by', 'collected_at')
+            sort_order = filter_data.get('sort_order', 'desc')
+            sort_direction = -1 if sort_order == 'desc' else 1
+
+            # 计算分页参数
+            skip = page_size * (page - 1)
+
+            # 直接使用MongoDB原生查询确保正确的分页和排序
+            cursor = COLLECTION_RESULTS_DB.coll.find(query).sort(sort_by, sort_direction).limit(page_size).skip(skip)
+            results = list(cursor)
+
+            # 获取总数
+            total_count = COLLECTION_RESULTS_DB.count_documents(query)
+
+            # 序列化结果
+            serializer = CollectionResultDetailSerializer(results, many=True)
+
+            # 构建分页响应
+            total_pages = (total_count + page_size - 1) // page_size
+            response_data = {
+                'code': 200,
+                'message': '获取成功',
+                'count': total_count,
+                'next': page + 1 if page < total_pages else None,
+                'previous': page - 1 if page > 1 else None,
+                'results': serializer.data
+            }
+
+            return JsonResponse(response_data)
+
+        except Exception as e:
+            logger.error(f"获取采集结果列表失败: {str(e)}")
+            return JsonResponse({
+                'code': 500,
+                'message': f'获取失败: {str(e)}',
+                'data': None
+            })
+
+    @action(detail=False, methods=['get'])
+    def result_detail(self, request, *args, **kwargs):
+        """获取采集结果详情"""
+        try:
+            # 验证ObjectId格式
+            try:
+                object_id_str = self.request.query_params.get('result_id', "")
+                object_id = ObjectId(object_id_str)
+            except Exception as e:
+                logger.error(f"{e}")
+                return JsonResponse({
+                    'code': 400,
+                    'message': '无效的结果ID格式',
+                    'data': None
+                })
+            
+            # 使用 MongoOps 查询单个文档
+            results = COLLECTION_RESULTS_DB.find({'_id': object_id})
+            
+            if not results:
+                return JsonResponse({
+                    'code': 404,
+                    'message': '采集结果不存在',
+                    'data': None
+                })
+            
+            # 获取第一个匹配的文档
+            result = results[0]
+            
+            # 序列化结果
+            serializer = CollectionResultDetailSerializer(result)
+            
+            return JsonResponse({
+                'code': 200,
+                'message': '获取成功',
+                'data': serializer.data
+            })
+                
+        except Exception as e:
+            logger.error(f"获取采集结果详情失败: {str(e)}")
+            return JsonResponse({
+                'code': 500,
+                'message': f'获取失败: {str(e)}',
                 'data': None
             })
 
@@ -876,52 +921,6 @@ class CollectionResultViewSet(CustomViewBase):
 
         except Exception as e:
             logger.error(f"获取采集结果统计信息失败: {str(e)}")
-            return JsonResponse({
-                'code': 500,
-                'message': f'获取失败: {str(e)}',
-                'data': None
-            })
-
-    @action(detail=False, methods=['get'])
-    def result_detail(self, request, *args, **kwargs):
-        """获取采集结果详情"""
-        try:
-            # 验证ObjectId格式
-            try:
-                object_id_str = self.request.query_params.get('result_id', "")
-                object_id = ObjectId(object_id_str)
-            except Exception as e:
-                logger.error(f"{e}")
-                return JsonResponse({
-                    'code': 400,
-                    'message': '无效的结果ID格式',
-                    'data': None
-                })
-            
-            # 使用 MongoOps 查询单个文档
-            results = COLLECTION_RESULTS_DB.find({'_id': object_id})
-            
-            if not results:
-                return JsonResponse({
-                    'code': 404,
-                    'message': '采集结果不存在',
-                    'data': None
-                })
-            
-            # 获取第一个匹配的文档
-            result = results[0]
-            
-            # 序列化结果
-            serializer = CollectionResultDetailSerializer(result)
-            
-            return JsonResponse({
-                'code': 200,
-                'message': '获取成功',
-                'data': serializer.data
-            })
-                
-        except Exception as e:
-            logger.error(f"获取采集结果详情失败: {str(e)}")
             return JsonResponse({
                 'code': 500,
                 'message': f'获取失败: {str(e)}',

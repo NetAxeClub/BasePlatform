@@ -180,9 +180,9 @@ class DeviceSubCollectionPlan(models.Model):
 class NetconfXMLTemplate(models.Model):
     """NETCONF XML模板模型"""
     COLLECT_METHOD_CHOICES = [
-        ('get', 'GET'),
-        ('get_bulk', 'GET_BULK'),
         ('rpc', 'RPC'),
+        ('get', 'GET'),
+        ('get_config', 'GET_CONFIG'),
     ]
     collect_method = models.CharField(
         max_length=20, 
