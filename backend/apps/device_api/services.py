@@ -160,13 +160,14 @@ class DeviceCollectionService:
             account = device.netconf_account
             host_info = {"host": south_driver, "port": int(config.south_http_port)}
 
-            vendor_alias = device.vendor.alias if device.vendor else 'Cisco'
+            vendor_alias = device.vendor.alias if device.vendor else 'Default'
             
             # NETCONF设备类型映射
             netconf_device_type_map = {
                 "H3C": "h3c",
-                "Huawei": "huaweiyang",  # 华为设备使用huaweiyang类型
-                "Cisco": "nexus"
+                "Huawei": "huaweiyang",             # 华为设备使用huaweiyang类型
+                "Cisco": "nexus",
+                "Default": "default"
             }
             device_type = netconf_device_type_map.get(vendor_alias, "h3c")  # 默认使用h3c
                 
@@ -218,12 +219,21 @@ class DeviceCollectionService:
                 "queue_strategy": "fifo",
             }
 
-            if selected_template.collect_method == "get":
-                netpalm_info["args"]["get"] = True
-            elif selected_template.collect_method == "rpc":
-                netpalm_info["args"]["rpc"] = True
+            # 根据收集方法设置参数和URL前缀
+            collect_method = selected_template.collect_method
+            if collect_method in ("get", "rpc"):
+                netpalm_info["args"][collect_method] = True
+                url_prefix = '/getconfig/ncclient/get'
+            else:
+                netpalm_info["args"]["source"] = "running"
+                url_prefix = '/getconfig/ncclient'
+            
+            netconf_result = south_driver_runner.get_device_config(
+                url_prefix=url_prefix,
+                host_info=host_info,
+                netpalm_info=netpalm_info
+            )
 
-            netconf_result = south_driver_runner.get_device_config(url_prefix='/getconfig/ncclient/get', host_info=host_info, netpalm_info=netpalm_info)
             logger.info(f"执行CLI采集: {device.manage_ip}")
 
             return netconf_result
