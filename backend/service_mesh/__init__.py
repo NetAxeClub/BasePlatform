@@ -11,7 +11,9 @@
 -------------------------------------------------
 """
 from .msg_gateway import SendRunner
+from .south_gateway import SouthDriverRunner
 
-__all__ = ["msg_gateway_runner"]
+__all__ = ["msg_gateway_runner", "south_driver_runner"]
 
 msg_gateway_runner = SendRunner()
+south_driver_runner = SouthDriverRunner()
