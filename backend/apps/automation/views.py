@@ -286,6 +286,20 @@ class XunMiView(APIView):
     def get(self, request):
         get_param = request.GET.dict()
         mongo_data = dict()
+
+        if get_param.get('get_layer2interface_hostip'):
+            hostip = get_param['get_layer2interface_hostip']
+            interface_str = get_param['interfaces']
+            interface_list = [iface.strip() for iface in interface_str.split(',') if iface.strip()]
+
+            if not interface_list:
+                return JsonResponse({"code": 200, "results": {}}, safe=False)
+
+            query_dict = {'hostip': hostip, 'interface': {'$in': interface_list}}
+            layer2interface_res = interface_mongo.find(query_dict=query_dict, fields={'interface': 1, 'description': 1})
+            results = {r["interface"]: r["description"] for r in layer2interface_res}
+            return JsonResponse({"code": 200, "results": results}, safe=False)
+
         if get_param.get('get_interface_by_hostip'):
             hostip = get_param['get_interface_by_hostip']
             layer3interface_res = show_ip_mongo.find(query_dict={'hostip': hostip}, fields={'interface': 1})
@@ -410,9 +424,8 @@ class XunMiView(APIView):
                     "count": len(res)
                 }
                 return JsonResponse(result, safe=False)
-            # else:
             else:
-                page_size = int(get_param["page_size"]) if get_param.get("page_size") else 10
+                page_size = int(get_param["limit"]) if get_param.get("limit") else 10
                 page_num = int(get_param["start"]) + 1 if get_param.get("start") else 1
                 skip = (page_num - 1) * page_size
                 
