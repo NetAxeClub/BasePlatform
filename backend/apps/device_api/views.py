@@ -7,6 +7,7 @@ from rest_framework.decorators import action
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from apps.api.tools.custom_viewset_base import CustomViewBase
+from apps.device_api.filters import DeviceCollectionPlansFilter, DeviceSubCollectionPlanFilter
 from apps.device_api.models import DeviceCollectionPlans, DeviceSubCollectionPlan, NetconfXMLTemplate
 from apps.device_api.models_api import resolve_raw_data, plan_data_to_mongodb
 from apps.device_api.serializers import (
@@ -34,11 +35,11 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
     queryset = DeviceCollectionPlans.objects.all()
     serializer_class = DeviceCollectionPlansSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['vendor', 'device_type', 'is_active']
-    pagination_class = LargeResultsSetPagination
+    filterset_class = DeviceCollectionPlansFilter
     search_fields = ['name', 'description']
     ordering_fields = ['id', 'name', 'vendor', 'device_type', 'created_at', 'updated_at']
     ordering = ['-created_at']
+    pagination_class = LargeResultsSetPagination
 
     def get_serializer_class(self):
         """根据操作类型返回不同的序列化器"""
@@ -275,11 +276,11 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
     queryset = DeviceSubCollectionPlan.objects.all()
     serializer_class = DeviceSubCollectionPlanSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['summary_plan', 'summary_plan__vendor', 'summary_plan__device_type', 'description']
-    pagination_class = LargeResultsSetPagination
+    filterset_class = DeviceSubCollectionPlanFilter
     search_fields = ['name', 'description']
     ordering_fields = ['id', 'name', 'summary_plan__vendor', 'summary_plan__device_type', 'created_at', 'updated_at']
     ordering = ['-created_at']
+    pagination_class = LargeResultsSetPagination
     
     def get_serializer_class(self):
         """根据操作类型返回不同的序列化器"""

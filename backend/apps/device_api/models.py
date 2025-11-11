@@ -12,7 +12,7 @@ class DeviceCollectionPlans(models.Model):
         ('Cisco', '思科'),
         ('Mellanox', 'Mellanox'),
         ('ZTE', '中兴'),
-        ('Centec', '盛科'),
+        ('centec', '盛科'),
         ('colasoft', '科来'),
         ('DELL', '戴尔'),
         ('F5', 'F5'),
