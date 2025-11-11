@@ -548,27 +548,6 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
             'message': result.get("message", "")
         })
 
-    @action(detail=False, methods=['get'])
-    def machine_room_list1(self, request):
-        """测试接口"""
-
-        plan_id = 50
-        query = {"plan_id": plan_id, "collection_method": "netmiko"}
-
-        data = COLLECTION_RESULTS_DB.find(query_dict=query, fields={"_id": 0})
-        collection_data = data[-1]
-
-        plan = DeviceSubCollectionPlan.objects.get(id=plan_id)
-        processed_data = resolve_raw_data(plan, collection_data, "netmiko")
-
-        COLLECTION_RESULTS_DB.delete_many(query=query)
-
-        return JsonResponse({
-            'code': 200,
-            'message': '获取成功',
-            'data': processed_data
-        })
-
 
 class NetconfXMLTemplateViewSet(CustomViewBase):
     """NETCONF XML模板视图集"""
@@ -708,7 +687,7 @@ class CollectionResultViewSet(CustomViewBase):
             if filter_data.get('plan_name'):
                 query['plan_name'] = {'$regex': filter_data['plan_name'], '$options': 'i'}
             if filter_data.get('device_ip'):
-                query['device_ip'] = filter_data['device_ip']
+                query['device_ip'] = {'$regex': filter_data['device_ip'], '$options': 'i'}
             if filter_data.get('device_name'):
                 query['device_name'] = {'$regex': filter_data['device_name'], '$options': 'i'}
             if filter_data.get('collection_method'):
