@@ -1,10 +1,11 @@
 # 采集类型 需要入库的标准字段
 
 APR_MAPPING = [
-    {"label": "主机IP: hostip", "value": "hostip"},
-    {"label": "主机名称: hostname", "value": "hostname"},
-    {"label": "机房名称: idc_name", "value": "idc_name"},
+    # {"label": "主机IP: hostip", "value": "hostip"},
+    # {"label": "主机名称: hostname", "value": "hostname"},
+    # {"label": "机房名称: idc_name", "value": "idc_name"},
     {"label": "网络地址: ipaddress", "value": "ipaddress"},
+    {"label": "Mac地址: macaddress", "value": "macaddress"},
     {"label": "age: aging", "value": "aging"},
     {"label": "类型: type", "value": "type"},
     {"label": "vlan: vlan", "value": "vlan"},
@@ -14,17 +15,17 @@ APR_MAPPING = [
 
 
 MAC_MAPPING = [
-    {"label": "主机IP: hostip", "value": "hostip"},
-    {"label": "主机名称: hostname", "value": "hostname"},
-    {"label": "机房名称: idc_name", "value": "idc_name"},
+    # {"label": "主机IP: hostip", "value": "hostip"},
+    # {"label": "主机名称: hostname", "value": "hostname"},
+    # {"label": "机房名称: idc_name", "value": "idc_name"},
     {"label": "mac地址: macaddress", "value": "macaddress"},
     {"label": "vlan地址: vlan", "value": "vlan"},
-    {"label": "简介: interface", "value": "interface"},
+    {"label": "接口: interface", "value": "interface"},
     {"label": "类型: type", "value": "type"}
 ]
 
 LLDP_MAPPING = [
-    {"label": "主机IP: hostip", "value": "hostip"},
+    # {"label": "主机IP: hostip", "value": "hostip"},
     {"label": "本地接口: local_interface", "value": "local_interface"},
     {"label": "chassis_id: chassis_id", "value": "chassis_id"},
     {"label": "邻居端口: neighbor_port", "value": "neighbor_port"},
@@ -36,16 +37,20 @@ LLDP_MAPPING = [
 ]
 
 IP_INTERFACE_MAPPING = [
-    {"label": "主机IP: hostip", "value": "hostip"},
+    # {"label": "主机IP: hostip", "value": "hostip"},
     {"label": "简介: interface", "value": "interface"},
     {"label": "当前状态: line_status", "value": "line_status"},
-    {"label": "协议状态: protocol_status", "value": "protocol_status"}
+    {"label": "协议状态: protocol_status", "value": "protocol_status"},
+    {"label": "网络地址: ipaddress", "value": "ipaddress"},
+    {"label": "ip掩码地址:  ipmask", "value": " ipmask"},
+    {"label": "IP类型:  ip_type", "value": " ip_type"},
+    {"label": "mtu: mtu", "value": "mtu"}
 ]
 
 
 INTERFACE_BRIEF_MAPPING = [
-    {"label": "主机IP: hostip", "value": "hostip"},
-    {"label": "简介: interface", "value": "interface"},
+    # {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "接口: interface", "value": "interface"},
     {"label": "状态: status", "value": "status"},
     {"label": "速率: speed", "value": "speed"},
     {"label": "duplex: duplex", "value": "duplex"},
@@ -53,7 +58,7 @@ INTERFACE_BRIEF_MAPPING = [
 ]
 
 AGGRE_PORT_MAPPING = [
-    {"label": "主机IP: hostip", "value": "hostip"},
+    # {"label": "主机IP: hostip", "value": "hostip"},
     {"label": "aggregroup: aggregroup", "value": "aggregroup"},
     {"label": "成员端口: memberports", "value": "memberports"},
     {"label": "状态: status", "value": "status"},

@@ -15,8 +15,6 @@ class SouthDriverRunner:
         self.timeout = 30
         self.api_key = config.south_api_key
 
-        log.info("南向驱动运行器初始化完成")
-
     def _make_request(self, method, endpoint, host_info, data=None, params=None, headers=None):
         """发起HTTP请求的通用方法
         
