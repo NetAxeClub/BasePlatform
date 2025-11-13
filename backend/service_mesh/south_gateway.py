@@ -15,8 +15,6 @@ class SouthDriverRunner:
         self.timeout = 30
         self.api_key = config.south_api_key
 
-        log.info("南向驱动运行器初始化完成")
-
     def _make_request(self, method, endpoint, host_info, data=None, params=None, headers=None):
         """发起HTTP请求的通用方法
         
@@ -118,8 +116,6 @@ class SouthDriverRunner:
         library = netpalm_info.get('library')
         connection_args = netpalm_info.get('connection_args', {})
         command = netpalm_info.get('command', [])
-        webhook = netpalm_info.get('webhook')
-        queue_strategy = netpalm_info.get('queue_strategy', 'default')
         
         device_ip = connection_args.get('host', connection_args.get('ip', 'unknown'))
         log.info(f"开始获取设备配置 - 设备: {device_ip}, 库: {library}, 命令数: {len(command)}, 目标服务器: {host_info.get('host')}:{host_info.get('port')}")

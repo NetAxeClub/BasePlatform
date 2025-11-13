@@ -7,6 +7,7 @@ from rest_framework.decorators import action
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from apps.api.tools.custom_viewset_base import CustomViewBase
+from apps.device_api.filters import DeviceCollectionPlansFilter, DeviceSubCollectionPlanFilter
 from apps.device_api.models import DeviceCollectionPlans, DeviceSubCollectionPlan, NetconfXMLTemplate
 from apps.device_api.models_api import resolve_raw_data, plan_data_to_mongodb
 from apps.device_api.serializers import (
@@ -34,11 +35,11 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
     queryset = DeviceCollectionPlans.objects.all()
     serializer_class = DeviceCollectionPlansSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['vendor', 'device_type', 'is_active']
-    pagination_class = LargeResultsSetPagination
+    filterset_class = DeviceCollectionPlansFilter
     search_fields = ['name', 'description']
     ordering_fields = ['id', 'name', 'vendor', 'device_type', 'created_at', 'updated_at']
     ordering = ['-created_at']
+    pagination_class = LargeResultsSetPagination
 
     def get_serializer_class(self):
         """根据操作类型返回不同的序列化器"""
@@ -275,11 +276,11 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
     queryset = DeviceSubCollectionPlan.objects.all()
     serializer_class = DeviceSubCollectionPlanSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['summary_plan', 'summary_plan__vendor', 'summary_plan__device_type', 'description']
-    pagination_class = LargeResultsSetPagination
+    filterset_class = DeviceSubCollectionPlanFilter
     search_fields = ['name', 'description']
     ordering_fields = ['id', 'name', 'summary_plan__vendor', 'summary_plan__device_type', 'created_at', 'updated_at']
     ordering = ['-created_at']
+    pagination_class = LargeResultsSetPagination
     
     def get_serializer_class(self):
         """根据操作类型返回不同的序列化器"""
@@ -547,27 +548,6 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
             'message': result.get("message", "")
         })
 
-    @action(detail=False, methods=['get'])
-    def machine_room_list1(self, request):
-        """测试接口"""
-
-        plan_id = 50
-        query = {"plan_id": plan_id, "collection_method": "netmiko"}
-
-        data = COLLECTION_RESULTS_DB.find(query_dict=query, fields={"_id": 0})
-        collection_data = data[-1]
-
-        plan = DeviceSubCollectionPlan.objects.get(id=plan_id)
-        processed_data = resolve_raw_data(plan, collection_data, "netmiko")
-
-        COLLECTION_RESULTS_DB.delete_many(query=query)
-
-        return JsonResponse({
-            'code': 200,
-            'message': '获取成功',
-            'data': processed_data
-        })
-
 
 class NetconfXMLTemplateViewSet(CustomViewBase):
     """NETCONF XML模板视图集"""
@@ -707,7 +687,7 @@ class CollectionResultViewSet(CustomViewBase):
             if filter_data.get('plan_name'):
                 query['plan_name'] = {'$regex': filter_data['plan_name'], '$options': 'i'}
             if filter_data.get('device_ip'):
-                query['device_ip'] = filter_data['device_ip']
+                query['device_ip'] = {'$regex': filter_data['device_ip'], '$options': 'i'}
             if filter_data.get('device_name'):
                 query['device_name'] = {'$regex': filter_data['device_name'], '$options': 'i'}
             if filter_data.get('collection_method'):
