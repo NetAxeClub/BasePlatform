@@ -5,6 +5,37 @@ from apps.device_api.models import DeviceSubCollectionPlan
 from apps.device_api import COLLECTION_RESULTS_DB
 
 
+def _build_base_collection_result(plan, webhook_args, task_info, status):
+    """构建基础采集结果字典
+    
+    Args:
+        plan: 采集方案对象
+        webhook_args: webhook参数字典
+        task_info: 任务信息字典
+        status: 状态字符串
+        
+    Returns:
+        dict: 基础采集结果字典
+    """
+    return {
+        'plan_id': plan.id,
+        'plan_name': plan.name,
+        'device_ip': webhook_args.get("device_ip"),
+        'device_name': webhook_args.get("device_name"),
+        'idc_name': webhook_args.get("idc_name", ""),
+        'device_type': plan.summary_plan.device_type,
+        'vendor': plan.summary_plan.vendor,
+        'collection_method': webhook_args.get("collection_method", "netmiko"),
+        'collection_type': webhook_args.get("collection_type", "arp"),
+        'collected_at': task_info.get("created_on", ""),
+        'task_id': task_info.get("task_id"),
+        'task_status': task_info.get("task_status", ""),
+        'task_queue': task_info.get("task_queue", ""),
+        'task_errors': task_info.get("task_errors", []),
+        'status': status
+    }
+
+
 def plan_data_to_mongodb(**kwargs):
     """NetPalm webhook回调函数，将采集结果保存到MongoDB
     
@@ -12,7 +43,7 @@ def plan_data_to_mongodb(**kwargs):
         **kwargs: 包含status, task_info, webhook_args等参数
         
     Returns:
-        dict: 处理结果字典
+        dict: 处理结果字典，包含status和message字段
     """
     logging.info("开始执行采集方案webhook回调")
     
@@ -33,9 +64,11 @@ def plan_data_to_mongodb(**kwargs):
         plan_id = webhook_args.get("plan_id")
         device_ip = webhook_args.get("device_ip")
         device_name = webhook_args.get("device_name")
-        idc_name = webhook_args.get("idc_name", "")
         collection_method = webhook_args.get("collection_method", "netmiko")
-        collection_type = webhook_args.get("collection_type", "arp")
+
+        if not plan_id:
+            logging.error("plan_id参数缺失")
+            return {"status": "failed", "message": "plan_id参数缺失"}
 
         logging.info(f"提取参数 - plan_id: {plan_id}, device_ip: {device_ip}, device_name: {device_name}, collection_method: {collection_method}")
 
@@ -46,62 +79,80 @@ def plan_data_to_mongodb(**kwargs):
         except DeviceSubCollectionPlan.DoesNotExist:
             logging.error(f"采集方案不存在: plan_id={plan_id}")
             return {"status": "failed", "message": f"采集方案不存在: plan_id={plan_id}"}
+        except Exception as e:
+            logging.error(f"查询采集方案失败: {str(e)}", exc_info=True)
+            return {"status": "failed", "message": f"查询采集方案失败: {str(e)}"}
         
-        # 获取任务ID
-        task_id = task_info.get("task_id")
-        created_on = task_info.get("created_on", "")
-        task_queue = task_info.get("task_queue", "")
+        # 获取任务信息
         task_status = task_info.get("task_status", "")
         task_result = task_info.get("task_result", {})
-        task_errors = task_info.get("task_errors", [])
 
-        logging.info(f"任务信息 - task_id: {task_id}, task_status: {task_status}, created_on: {created_on}")
+        logging.info(f"任务信息 - task_id: {task_info.get('task_id')}, task_status: {task_status}, created_on: {task_info.get('created_on', '')}")
         logging.info(f"采集结果数量: {len(task_result)} 条命令")
 
-        # task_result 是一个字典，键是命令名，值是对应的结果
-        for command_name, command_result in task_result.items():
-            
+        # 构建基础结果字典
+        base_result = _build_base_collection_result(plan, webhook_args, task_info, status)
+        
+        # 处理失败情况
+        if task_status == "failed":
             collection_result = {
-                'plan_id': plan.id,
-                'plan_name': plan.name,
-                'device_ip': device_ip,
-                'device_name': device_name,
-                'idc_name': idc_name,
-                'device_type': plan.summary_plan.device_type,
-                'vendor': plan.summary_plan.vendor,
-                'collection_method': collection_method,
-                'collection_type': collection_type,
-                'method_name': command_name,   # 这个地方有点问题，当是netconf的时候，应该没有command_name
+                **base_result,
+                'method_name': None,
+                'data': None,
+                'processed_data': None,
+                'processed_status': 'success',
+                'processed_error': None,
+            }
+            try:
+                COLLECTION_RESULTS_DB.insert_one(collection_result)
+                logging.info(f"失败记录已保存: {device_ip} - {plan.name}")
+                return {"status": "success", "message": "失败记录已保存到MongoDB"}
+            except Exception as e:
+                logging.error(f"保存失败记录到MongoDB失败: {device_ip} - 错误: {str(e)}", exc_info=True)
+                return {"status": "failed", "message": f"保存失败记录失败: {str(e)}"}
+
+        # 处理成功情况：构建结果并插入
+        # task_result 一般只有一条数据，键是命令名，值是对应的结果
+        if not task_result:
+            logging.warning(f"task_result为空: {device_ip} - {plan.name}")
+            return {"status": "failed", "message": "task_result为空，无数据可保存"}
+        
+        collection_results = []
+        
+        # 遍历处理每条命令结果
+        for command_name, command_result in task_result.items():
+            collection_result = {
+                **base_result,
+                'method_name': command_name,
                 'data': command_result,
-                'processed_data': None,  # 可以在这里添加数据处理逻辑
-                'collected_at': created_on,
-                'task_id': task_id,
-                'task_status': task_status,
-                'task_queue': task_queue,
-                'task_errors': task_errors,
-                'status': status
+                'processed_data': None,
             }
 
             # 处理原始数据
-            processed_status, processed_error, processed_data = process_raw_data(plan, collection_result, collection_method)
+            processed_status, processed_error, processed_data = process_raw_data(
+                plan, collection_result, collection_method
+            )
             
             collection_result["processed_data"] = processed_data
-            collection_result["processed_status"] = "success" if processed_status else "failed"
+            collection_result["processed_status"] = "success" if processed_status else "error"
             collection_result["processed_error"] = processed_error
 
-            # 保存当前执行流程结果到MongoDB
-            try:
-                COLLECTION_RESULTS_DB.insert_one(collection_result)
-                logging.info(f"采集结果已保存: {device_ip} - {plan.name} - 命令: {command_name}")
-            except Exception as e:
-                logging.error(f"保存采集结果失败: {device_ip} - 命令: {command_name} - 错误: {str(e)}")
+            collection_results.append(collection_result)
 
+        # 批量插入MongoDB（虽然通常只有一条，但使用批量插入保持一致性）
+        try:
+            COLLECTION_RESULTS_DB.insert_many(collection_results)
+            logging.info(f"采集结果已保存: {device_ip} - {plan.name} - 共 {len(collection_results)} 条记录")
+        except Exception as e:
+            logging.error(f"保存采集结果到MongoDB失败: {device_ip} - 错误: {str(e)}", exc_info=True)
+            return {"status": "failed", "message": f"保存采集结果失败: {str(e)}"}
+        
         logging.info(f"webhook回调处理完成: {device_ip} - 共处理 {len(task_result)} 条命令")
         return {"status": "success", "message": "结果插入mongodb成功"}
         
     except Exception as e:
         logging.error(f"webhook回调执行失败: {str(e)}", exc_info=True)
-        return {"status": "failed", "message": "webhook回调执行失败"}
+        return {"status": "failed", "message": f"webhook回调执行失败: {str(e)}"}
 
 
 def process_raw_data(plan, collection_result, collection_method):
