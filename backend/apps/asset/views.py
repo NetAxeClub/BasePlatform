@@ -3,8 +3,10 @@ import operator
 import os
 import re
 import time
-from datetime import date, datetime
+import paramiko
 import django_filters
+from ncclient import manager
+from datetime import date, datetime
 from django.core.cache import cache
 from django.db.models import Count, Case, When, Value, IntegerField
 from django.db.models.expressions import RawSQL
@@ -774,7 +776,130 @@ class NetworkDeviceViewSet(CustomViewBase):
             'message': '获取成功',
             'data': asset_list
         })
-    
+
+    @action(detail=True, methods=['post'])
+    def test_ssh_connection(self, request, *args, **kwargs):
+        """测试SSH连接"""
+        try:
+            device = self.get_object()
+            ssh_account_id = request.data.get('ssh_account')
+            
+            # 验证账户ID是否存在
+            if not ssh_account_id:
+                return JsonResponse({'code': 400, 'msg': '未提供账户ID', 'data': {'ssh_status': False}})
+            
+            # 获取账户，如果不存在会抛出 DoesNotExist 异常
+            try:
+                account = AssetAccount.objects.get(id=ssh_account_id)
+            except (AssetAccount.DoesNotExist, ValueError, TypeError):
+                return JsonResponse({'code': 400, 'msg': '指定的账户不存在', 'data': {'ssh_status': False}})
+            
+            # 验证账户必要字段
+            if not account.username or not account.password:
+                return JsonResponse({'code': 400, 'msg': '账户用户名或密码未配置', 'data': {'ssh_status': False}})
+
+            crypt = CryptPwd()
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            
+            try:
+                ssh.connect(
+                    device.manage_ip,
+                    port=account.port or 22,
+                    username=account.username.strip(),
+                    password=crypt.decrypt_pwd(account.password).strip(),
+                    timeout=10,
+                    allow_agent=False,
+                    look_for_keys=False
+                )
+                device.ssh_status = True
+                msg, code = 'SSH连接测试成功', 200
+            except Exception as e:
+                device.ssh_status = False
+                msg, code = f'SSH连接失败: {str(e)}', 400
+            finally:
+                try:
+                    if ssh.get_transport():
+                        ssh.get_transport().close()
+                    ssh.close()
+                except:
+                    pass
+            
+            device.save(update_fields=['ssh_status'])
+            return JsonResponse({
+                'code': code,
+                'msg': msg,
+                'data': {'ssh_status': device.ssh_status, 'device_ip': device.manage_ip, 'port': account.port or 22}
+            })
+        except NetworkDevice.DoesNotExist:
+            return JsonResponse({'code': 404, 'msg': '设备不存在', 'data': {}})
+        except Exception as e:
+            return JsonResponse({'code': 500, 'msg': f'测试SSH连接时发生错误: {str(e)}', 'data': {}})
+
+    @action(detail=True, methods=['post'])
+    def test_netconf_connection(self, request, *args, **kwargs):
+        """测试NETCONF连接"""
+        try:
+            device = self.get_object()
+            netconf_account_id = request.data.get('netconf_account')
+            
+            # 验证账户ID是否存在
+            if not netconf_account_id:
+                return JsonResponse({'code': 400, 'msg': '未提供账户ID', 'data': {'netconf_status': False}})
+            
+            # 获取账户，如果不存在会抛出 DoesNotExist 异常
+            try:
+                account = AssetAccount.objects.get(id=netconf_account_id)
+            except (AssetAccount.DoesNotExist, ValueError, TypeError):
+                return JsonResponse({'code': 400, 'msg': '指定的账户不存在', 'data': {'netconf_status': False}})
+            
+            # 验证账户必要字段
+            if not account.username or not account.password:
+                return JsonResponse({'code': 400, 'msg': '账户用户名或密码未配置', 'data': {'netconf_status': False}})
+
+            crypt = CryptPwd()
+            # 设备参数映射，根据厂商别名确定设备类型
+            device_params_map = {'H3C': 'h3c', 'Huawei': 'huawei', 'Cisco': 'nexus'}
+            vendor_alias = device.vendor.alias if device.vendor and hasattr(device.vendor, 'alias') else None
+            device_params = device_params_map.get(vendor_alias, 'huawei')
+            
+            netconf_session = None
+            try:
+                netconf_session = manager.connect(
+                    device_params={"name": device_params},
+                    host=device.manage_ip,
+                    port=account.port or 830,
+                    timeout=10,
+                    username=account.username.strip(),
+                    password=crypt.decrypt_pwd(account.password).strip(),
+                    hostkey_verify=False,
+                    allow_agent=False,
+                    look_for_keys=False
+                )
+                netconf_session.server_capabilities  # 验证连接
+                device.netconf_status = True
+                msg, code = 'NETCONF连接测试成功', 200
+            except Exception as e:
+                device.netconf_status = False
+                msg, code = f'NETCONF连接失败: {str(e)}', 400
+            finally:
+                if netconf_session:
+                    try:
+                        netconf_session.close_session()
+                    except:
+                        pass
+       
+            device.save(update_fields=['netconf_status'])
+            return JsonResponse({
+                'code': code,
+                'msg': msg,
+                'data': {'netconf_status': device.netconf_status, 'device_ip': device.manage_ip, 'port': account.port or 830}
+            })
+        except NetworkDevice.DoesNotExist:
+            return JsonResponse({'code': 404, 'msg': '设备不存在', 'data': {}})
+        except Exception as e:
+            return JsonResponse({'code': 500, 'msg': f'测试NETCONF连接时发生错误: {str(e)}', 'data': {}})
+
     # 重新update方法主要用来捕获更改前的字段值并赋值给self.log
     # def update(self, request, *args, **kwargs):
     #     print('更新', super().update(request, *args, **kwargs))

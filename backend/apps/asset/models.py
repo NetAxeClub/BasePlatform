@@ -428,8 +428,10 @@ class NetworkDevice(models.Model):
     slot = models.IntegerField(verbose_name='槽位编号', default=0)
     auto_enable = models.BooleanField(verbose_name="自动化纳管", null=False, default=True)
     account = models.ManyToManyField('AssetAccount', verbose_name='管理账户', blank=True)
-    plan = models.ForeignKey("automation.CollectionPlan", verbose_name='采集方案',
-                             blank=True, null=True, related_name='releate_device', on_delete=models.SET_NULL)
+    plan = models.ForeignKey("device_api.DeviceCollectionPlans", verbose_name='采集方案',             
+                             blank=True, null=True, related_name='releate_device', on_delete=models.SET_NULL)       # 修改关联模型
+
+    execute_node = models.CharField(verbose_name="执行节点", blank=True, null=True, max_length=50)          # 新增：执行节点
     snmp_version = models.CharField(verbose_name="SNMP version", default="v2c", null=False, max_length=50)
     snmp_community = models.CharField(verbose_name="SNMP community", default="-", null=False, max_length=50)
     snmp_port = models.IntegerField(verbose_name="snmp port", default=161, null=False)
@@ -438,11 +440,13 @@ class NetworkDevice(models.Model):
                                   max_length=50)
     ssh_account = models.ForeignKey('AssetAccount', verbose_name='ssh纳管关联账户', blank=True, null=True,
                                     related_name="releate_ssh", on_delete=models.SET_NULL)
+    ssh_status = models.BooleanField(verbose_name="ssh状态", null=False, default=False)               # 新增
     # NETCONF
     netconf_enable = models.CharField(verbose_name="NETCONF是否纳管", null=False, default="0", choices=manage_choices,
                                       max_length=50)
     netconf_account = models.ForeignKey('AssetAccount', verbose_name='netconf纳管关联账户', blank=True, null=True,
                                         related_name="releate_netconf", on_delete=models.SET_NULL)
+    netconf_status = models.BooleanField(verbose_name="netconf状态", null=False, default=False)       # 新增
     is_monitor = models.BooleanField(verbose_name='是否监控', default=False, null=False)
     history = HistoricalRecords()
 
