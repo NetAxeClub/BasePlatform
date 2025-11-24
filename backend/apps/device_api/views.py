@@ -9,7 +9,7 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from apps.api.tools.custom_viewset_base import CustomViewBase
 from apps.device_api.filters import DeviceCollectionPlansFilter, DeviceSubCollectionPlanFilter
 from apps.device_api.models import DeviceCollectionPlans, DeviceSubCollectionPlan, NetconfXMLTemplate
-from apps.device_api.models_api import resolve_raw_data, plan_data_to_mongodb
+from apps.device_api.models_api import plan_data_to_mongodb, celery_data_mongodb
 from apps.device_api.serializers import (
     DeviceCollectionPlansSerializer, DeviceCollectionPlansCreateSerializer,
     DeviceCollectionPlansUpdateSerializer, DeviceCollectionPlansDetailSerializer,
@@ -20,12 +20,13 @@ from apps.device_api.serializers import (
     CollectionResultByPlanSerializer
 )
 from apps.device_api.services import DeviceCollectionService
-from apps.device_api import COLLECTION_RESULTS_DB
+from apps.device_api import COLLECTION_RESULTS_DB, COLLECTION_PLAN, COLLECTION_SUB_PLAN
 from apps.api.tools.custom_pagination import LargeResultsSetPagination
 from apps.asset.models import NetworkDevice
 from apps.device_api.fields_mapping import field_mapping
 from apps.device_api.services import FieldMappingDriver
 from confload.confload import config
+from utils.db.mongo_ops import MongoOps
 
 logger = logging.getLogger(__name__)
 
@@ -477,6 +478,19 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
             })
 
     @action(detail=False, methods=['get'])
+    def collect_type_list(self, request):
+        """根据采集类型获取模型字段"""
+        result = []
+        for k, v in field_mapping.items():
+            result.append({"label": v["label"], "value": v["value"], "icon": v["icon"]})
+
+        return JsonResponse({
+            'code': 200,
+            'message': '获取成功',
+            'data': result
+        })
+
+    @action(detail=False, methods=['get'])
     def model_fields(self, request):
         """根据采集类型获取模型字段"""
         model_type = request.query_params.get('model_type')
@@ -485,7 +499,7 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
             return JsonResponse({
                 'code': 200,
                 'message': '获取成功',
-                'data': field_mapping[model_type]
+                'data': field_mapping[model_type]["mapping_fields"]
             })
         else:
             return JsonResponse({
@@ -522,7 +536,7 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
 
     @action(detail=False, methods=['get'])
     def south_driver_list(self, request):
-        """获取模型字段"""
+        """获取南向驱动列表"""
         data_list = []
         server_info = config.service_dicovery('south_driver')
         server_hosts = server_info['hosts']
@@ -538,7 +552,7 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
 
     @action(detail=False, methods=['post'])
     def record_plan_data(self, request, *args, **kwargs):
-        """接收南向驱动数据，存入db"""
+        """验证-接收南向驱动数据，存入db"""
 
         data = request.data
         result = plan_data_to_mongodb(**data)
@@ -546,6 +560,32 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
         return JsonResponse({
             'code': 200 if result.get("status") == "success" else 500,
             'message': result.get("message", "")
+        })
+
+    @action(detail=False, methods=['post'])
+    def record_collection(self, request, *args, **kwargs):
+        """celery-接收南向驱动数据，存入mongodb"""
+
+        data = request.data
+        print("##########################################################################################################################")
+        result = celery_data_mongodb(**data)
+
+        return JsonResponse({
+            'code': 200 if result.get("status") == "success" else 500,
+            'message': result.get("message", "")
+        })
+
+    @action(detail=False, methods=['get'])
+    def test_api(self, request):
+        """获取采集结果统计信息"""
+        from apps.device_api.tasks import plan_collect_device_main
+
+        plan_collect_device_main()
+
+        return JsonResponse({
+            'code': 200,
+            'message': "获取成功",
+            'results': "data"
         })
 
 
@@ -617,6 +657,266 @@ class CollectionResultViewSet(CustomViewBase):
     queryset = None
     serializer_class = None
     pagination_class = None
+
+    @action(detail=False, methods=['get'])
+    def overview(self, request):
+        """根据厂商统计4个指标：
+          1. 覆盖率：参与自动化任务的网络设备数 / 网络设备总数 * 100
+          2. 成功率：成功执行采集任务的网络设备数 / 参与采集任务的网络设备数 * 100
+          3. 纳管设备总数：纯数字展示，单位(台)
+          4. 采集方案数：纯数字展示
+        """
+        try:
+            vendor = request.GET.get('vendor', None)
+            
+            # 构建基础查询条件
+            device_filters = {'status': 0}  # 在线状态
+            plan_filters = {'is_active': True}
+            
+            if vendor:
+                device_filters['vendor__alias'] = vendor
+                plan_filters['vendor'] = vendor
+
+            # 1. 纳管设备总数：在线状态的网络设备数
+            total_devices = NetworkDevice.objects.filter(**device_filters).count()
+
+            # 2. 采集方案数：启用的采集方案数
+            plan_count = DeviceCollectionPlans.objects.filter(**plan_filters).count()
+
+            # 3. 参与自动化任务的网络设备数：关联了采集方案且启用自动化的设备数
+            participated_filters = {**device_filters, 'auto_enable': True, 'plan__isnull': False}
+            participated_devices = NetworkDevice.objects.filter(**participated_filters).count()
+
+            # 4. 覆盖率计算：参与自动化任务的设备数 / 总设备数 * 100
+            coverage_rate = round((participated_devices / total_devices * 100), 2) if total_devices > 0 else 0.0
+
+            # 5. 成功率计算：从COLLECTION_PLAN获取最新execute_time，统计该次执行成功的数量
+            success_rate = 0.0
+            if participated_devices > 0:
+                try:
+                    # 构建MongoDB查询条件，获取最新的execute_time
+                    mongo_query = {}
+                    if vendor:
+                        mongo_query['vendor'] = vendor
+                    
+                    # 获取最新的一条记录的execute_time
+                    latest_record = COLLECTION_PLAN.coll.find(mongo_query).sort('execute_time', -1).limit(1)
+                    latest_records = list(latest_record)
+                    
+                    if latest_records and latest_records[0].get('execute_time'):
+                        latest_execute_time = latest_records[0]['execute_time']
+                        
+                        # 根据execute_time和task_status="success"统计成功的数量
+                        success_query = {
+                            'execute_time': latest_execute_time,
+                            'task_status': 'success'
+                        }
+                        if vendor:
+                            success_query['vendor'] = vendor
+
+                        success_count = COLLECTION_PLAN.count_documents(success_query)
+                        
+                        # 计算成功率：成功数量 / 参与设备数 * 100
+                        success_rate = round((success_count / participated_devices * 100), 2) if participated_devices > 0 else 0.0
+                    else:
+                        logger.warning("未找到最新的execute_time记录")
+                except Exception as e:
+                    logger.error(f"计算成功率失败: {str(e)}", exc_info=True)
+                    success_rate = 0.0
+
+            data = {
+                "total_devices": total_devices,
+                "plan_count": plan_count,
+                "success_rate": success_rate,
+                "coverage_rate": coverage_rate
+            }
+
+            return JsonResponse({
+                'code': 200,
+                'message': "获取成功",
+                'results': data
+            })
+        except Exception as e:
+            logger.error(f"获取概览数据失败: {str(e)}", exc_info=True)
+            return JsonResponse({
+                'code': 500,
+                'message': f"获取失败: {str(e)}",
+                'results': None
+            })
+
+    @action(detail=False, methods=['get'])
+    def parent_collection_list(self, request):
+        """分页查询主采集方案记录列表
+        
+        查询条件（模糊查询）：
+        - idc_name: 机房名称
+        - vendor: 厂商
+        - device_name: 设备名称
+        - device_ip: 设备IP
+        - execute_node: 执行节点
+        
+        分页参数：
+        - page: 页码，默认1
+        - page_size: 每页数量，默认10
+        """
+        try:
+            # 获取查询参数
+            search = request.GET.get('search', '').strip()
+            idc_name = request.GET.get('idc_name', '').strip()
+            vendor = request.GET.get('vendor', '').strip()
+            device_name = request.GET.get('device_name', '').strip()
+            device_ip = request.GET.get('device_ip', '').strip()
+            execute_node = request.GET.get('execute_node', '').strip()
+            page = int(request.GET.get('page', 1))
+            page_size = int(request.GET.get('page_size', 10))
+            
+            # 构建MongoDB查询条件
+            query = {}
+            
+            # search字段：同时对summary_plan_name、device_ip和device_name进行模糊查询
+            if search:
+                query['$or'] = [
+                    {'summary_plan_name': {'$regex': search, '$options': 'i'}},
+                    {'device_ip': {'$regex': search, '$options': 'i'}},
+                    {'device_name': {'$regex': search, '$options': 'i'}}
+                ]
+            
+            # 其他模糊查询条件
+            if idc_name:
+                query['idc_name'] = {'$regex': idc_name, '$options': 'i'}
+            if vendor:
+                query['vendor'] = {'$regex': vendor, '$options': 'i'}
+            # 如果提供了search，device_name已经在$or中处理，这里不再单独处理
+            # 如果没提供search但提供了device_name，则单独处理
+            if device_name and not search:
+                query['device_name'] = {'$regex': device_name, '$options': 'i'}
+            # 如果提供了search，device_ip已经在$or中处理，这里不再单独处理
+            # 如果没提供search但提供了device_ip，则单独处理
+            if device_ip and not search:
+                query['device_ip'] = {'$regex': device_ip, '$options': 'i'}
+            if execute_node:
+                query['execute_node'] = {'$regex': execute_node, '$options': 'i'}
+            
+            # 计算分页参数
+            skip = page_size * (page - 1)
+            
+            # 查询总数
+            total = COLLECTION_PLAN.count_documents(query)
+            
+            # 查询数据（按创建时间倒序排列）
+            cursor = COLLECTION_PLAN.coll.find(query).sort('log_time', -1).limit(page_size).skip(skip)
+            results = list(cursor)
+            
+            # 处理ObjectId，转换为字符串
+            for result in results:
+                if '_id' in result:
+                    result['_id'] = str(result['_id'])
+            
+
+            # 构建响应数据
+            response_data = {
+                'code': 200,
+                'message': '获取成功',
+                'data': {
+                    'results': results,
+                    'total': total
+                }
+            }
+            
+            return JsonResponse(response_data)
+            
+        except Exception as e:
+            logger.error(f"分页查询主采集方案记录失败: {str(e)}", exc_info=True)
+            return JsonResponse({
+                'code': 500,
+                'message': f'查询失败: {str(e)}',
+                'data': None
+            })
+
+    @action(detail=False, methods=['get'])
+    def sub_collection_detail(self, request):
+        """根据主采集方案ID和采集类型查询子采集方案详情"""
+        try:
+            summary_plan_id = request.GET.get('summary_plan_id', '').strip()
+            collection_type = request.GET.get('collection_type', 'arp').strip()
+            page = int(request.GET.get('page', 1))
+            page_size = int(request.GET.get('page_size', 10))
+
+            # 参数验证
+            if not summary_plan_id:
+                return JsonResponse({
+                    'code': 400,
+                    'message': 'summary_plan_id 参数不能为空',
+                    'data': None
+                })
+
+            # 查询子采集方案数据
+            query = {
+                'summary_plan_id': int(summary_plan_id),
+                'collection_type': collection_type
+            }
+            sub_plan_data = COLLECTION_SUB_PLAN.coll.find_one(query, {'_id': 0})
+
+            if not sub_plan_data:
+                return JsonResponse({
+                    'code': 404,
+                    'message': '未找到对应的子采集方案数据',
+                    'data': None
+                })
+
+            collection_method = sub_plan_data.get("collection_method")
+
+            # 查询出对应采集类型下的数据
+            collection_name = f"plan_{collection_type}"
+            collection_db = MongoOps(db='Automation', coll=collection_name)
+            # 获取总记录数
+            total = collection_db.coll.count_documents({})
+            # 计算分页参数
+            skip = (page - 1) * page_size
+            # 使用聚合管道查询，在查询时添加 collection_type 字段
+            pipeline = [
+                {'$addFields': {'collection_method': collection_method}},  # 添加 collection_method 字段
+                {'$project': {'_id': 0}},  # 排除 _id 字段
+                {'$skip': skip},  # 跳过记录
+                {'$limit': page_size}  # 限制返回数量
+            ]
+            collection_data = list(collection_db.coll.aggregate(pipeline)) 
+
+            # 根据 collection_type 获取表头信息
+            columns = [{"label": "时间", "value": "log_time"}, {"label": "设备IP", "value": "hostip"}, {"label": "采集方式", "value": "collection_method"}]
+            if collection_type in field_mapping:
+                mapping_fields = field_mapping[collection_type].get('mapping_fields', [])
+                for field in mapping_fields:
+                    label = field.get('label', '')
+                    value = field.get('value', '')
+                    # 提取冒号之前的内容作为 label
+                    if ':' in label:
+                        label = label.split(':')[0].strip()
+                    columns.append({
+                        'label': label,
+                        'value': value
+                    })
+
+            # 构建返回数据
+            response_data = {
+                'code': 200,
+                'message': '获取成功',
+                'data': {
+                    'sub_plan': sub_plan_data,
+                    'columns': columns,
+                    'collection_data': collection_data,
+                    'total': total
+                }
+            }
+            return JsonResponse(response_data)
+
+        except Exception as e:
+            logger.error(f"查询子采集方案详情失败: {str(e)}", exc_info=True)
+            return JsonResponse({
+                'code': 500,
+                'message': f'查询失败: {str(e)}',
+                'data': None
+            })
 
     @action(detail=False, methods=['get'])
     def by_plan(self, request):

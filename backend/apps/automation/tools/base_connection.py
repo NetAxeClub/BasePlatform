@@ -71,6 +71,37 @@ class InterfaceFormat(object):
         return interface
 
     @staticmethod
+    def h3c_interface_format(interface):
+        if re.search(r'^(GE)', interface):
+            return interface.replace('GE', 'GigabitEthernet')
+
+        elif re.search(r'^(BAGG)', interface):
+            return interface.replace('BAGG', 'Bridge-Aggregation')
+
+        elif re.search(r'^(RAGG)', interface):
+            return interface.replace('RAGG', 'Route-Aggregation')
+
+        elif re.search(r'^(XGE)', interface):
+            return interface.replace('XGE', 'Ten-GigabitEthernet')
+
+        elif re.search(r'^(TGE)', interface):
+            return interface.replace('TGE', 'TwentyGigE')
+
+        elif re.search(r'^(HGE)', interface):
+            return interface.replace('HGE', 'HundredGigE')
+
+        elif re.search(r'^(FGE)', interface):
+            return interface.replace('FGE', 'FortyGigE')
+
+        elif re.search(r'^(MGE)', interface):
+            return interface.replace('MGE', 'M-GigabitEthernet')
+
+        elif re.search(r'^(M-GE)', interface):
+            return interface.replace('M-GE', 'M-GigabitEtherne')
+
+        return interface
+
+    @staticmethod
     def maipu_interface_format(interface):
         if re.search(r'^(te)', interface):
             return interface.replace('te', 'tengigabitethernet')
