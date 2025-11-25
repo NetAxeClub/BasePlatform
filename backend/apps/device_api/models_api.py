@@ -204,7 +204,7 @@ def celery_data_mongodb(**kwargs):
         device_name = webhook_args.get("device_name")
         collection_method = webhook_args.get("collection_method", "netmiko")
         collection_type = webhook_args.get("collection_type")       # 采集类型，用于选择MongoDB集合
-        execute_time = webhook_args.get("execute_time")
+        execute_time = webhook_args.get("execute_time")             # 主采集方案执行时间
 
         if not plan_id:
             logging.error("plan_id参数缺失")
@@ -239,7 +239,7 @@ def celery_data_mongodb(**kwargs):
 
         # 数据回填，进行更新任务状态
         # 如果任务失败，添加错误信息并直接返回
-        if task_status == "failed":
+        if status in ["error", "failed"] or task_status == "failed":
             # 1. 先更新子采集任务状态
             error_info = task_info.get("task_errors", [])
             update_sub_task_status("failed", summary_plan_id, plan_id, task_id, error_info)
@@ -250,7 +250,7 @@ def celery_data_mongodb(**kwargs):
         
         # 如果任务完成，添加完成时间（只更新一次，后续不再更新）
         if task_status in ["finished", "success"]:
-            # 1. 只更新子采集任务状态,标记为成功
+            # 1. 只更新子采集任务状态,标记为成功, 主采集任务记录默认为成功，不需要记录
             update_sub_task_status(task_status, summary_plan_id, plan_id, task_id, [])
 
         # 构建基础结果字典
@@ -298,11 +298,11 @@ def celery_data_mongodb(**kwargs):
             update_parent_task_status("failed", summary_plan_id, device_ip, execute_time)
             return {"status": "failed", "message": f"数据处理失败: {data_process_errors}"}
 
-        # 同时保存到通用集合和按类型分类的集合
+        # 如果数据处理没有数据
         if not collection_results:
             logging.warning(f"没有可保存的采集结果: {device_ip} - {plan.name}")
             # 1. 更新子采集任务记录，数据为空，更新状态为失败
-            update_sub_task_status("failed", summary_plan_id, plan_id, task_id, ["数据处理后结尾为空"])
+            update_sub_task_status("failed", summary_plan_id, plan_id, task_id, ["数据处理后的结果为空"])
             # 2. 更新主采集任务记录
             update_parent_task_status("failed", summary_plan_id, device_ip, execute_time)
             return {"status": "failed", "message": "没有可保存的采集结果，所有数据处理后都为空"}
