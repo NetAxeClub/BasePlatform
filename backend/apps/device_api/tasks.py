@@ -83,8 +83,8 @@ from netaxe.celery import AxeTask
 from apps.asset.models import NetworkDevice
 from apps.device_api.services import DeviceCollectionService
 from apps.device_api.tools.collect_device import get_auto_device
-from apps.automation.cache_utils import get_cached_network_data, cache_network_data
-from apps.device_api import COLLECTION_SUB_PLAN, COLLECTION_PLAN
+from apps.automation.cache_utils import cache_network_data
+from apps.device_api import COLLECTION_SUB_PLAN
 from apps.device_api import arp_mongo, mac_mongo, lldp_mongo, aggre_port_mongo
 from utils.db.mongo_ops import MongoOps, MongoNetOps
 
@@ -170,7 +170,7 @@ def datas_to_cache():
                 3600 * 12)
 
     # lagg 以 hostip aggregroup 作为key
-    def lagg_to_cache():
+    def aggre_to_cache():
         lagg_res = aggre_port_mongo.find(fields=tables['plan_aggre'])
         lagg_result = dict()
         for _lagg in lagg_res:
@@ -197,13 +197,13 @@ def datas_to_cache():
     mac_to_cache()
     content += "{}缓存耗时{}秒\n".format('MAC地址库', int(time.time() - start_time))
 
-    start_time = time.time()
-    lldp_to_cache()
-    content += "{}缓存耗时{}秒\n".format('LLDP库', int(time.time() - start_time))
-
-    start_time = time.time()
-    lagg_to_cache()
-    content += "{}缓存耗时{}秒\n".format('聚合端口库', int(time.time() - start_time))
+    # start_time = time.time()
+    # lldp_to_cache()
+    # content += "{}缓存耗时{}秒\n".format('LLDP库', int(time.time() - start_time))
+    #
+    # start_time = time.time()
+    # aggre_to_cache()
+    # content += "{}缓存耗时{}秒\n".format('聚合端口库', int(time.time() - start_time))
 
     content += "{}缓存耗时{}秒\n".format('总写入', int(time.time() - init_time))
     logger.debug(content)
@@ -355,15 +355,13 @@ def plan_collect_device_main(**kwargs):
     # 批量下发任务
     for host in hosts:
         host_ip = host.get('manage_ip')
-        if host_ip in ["10.254.17.40", "10.254.22.132"]:
-            print(host_ip)
-            plan_collect_device(**host)
-        # task = plan_collect_device.apply_async(
-        #     kwargs=host,
-        #     queue='config',
-        #     retry=True)
-        # net_tower_tasks.append(task)
-        # logger.debug(f"已下发采集任务: {host_ip}, task_id: {task.id}")
+
+        task = plan_collect_device.apply_async(
+            kwargs=host,
+            queue='config',
+            retry=True)
+        net_tower_tasks.append(task)
+        logger.debug(f"已下发采集任务: {host_ip}, task_id: {task.id}")
 
     logger.info('批量下发任务结束')
     total_time = (time.time() - start_time) / 60

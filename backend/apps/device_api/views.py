@@ -567,7 +567,6 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
         """celery-接收南向驱动数据，存入mongodb"""
 
         data = request.data
-        print("##########################################################################################################################")
         result = celery_data_mongodb(**data)
 
         return JsonResponse({
@@ -576,15 +575,15 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
         })
 
     @action(detail=False, methods=['get'])
-    def test_api(self, request):
-        """获取采集结果统计信息"""
+    def execute_plan_celery(self, request):
+        """获取采集结果统计信息，可以直接删除"""
         from apps.device_api.tasks import plan_collect_device_main
 
         plan_collect_device_main()
 
         return JsonResponse({
             'code': 200,
-            'message': "获取成功",
+            'message': "采集方案定时任务执行成功",
             'results': "data"
         })
 
@@ -667,7 +666,8 @@ class CollectionResultViewSet(CustomViewBase):
           4. 采集方案数：纯数字展示
         """
         try:
-            vendor = request.GET.get('vendor', None)
+            vendor = request.GET.get('vendor')
+            vendor = None if vendor == "All" else vendor
             
             # 构建基础查询条件
             device_filters = {'status': 0}  # 在线状态
@@ -811,7 +811,6 @@ class CollectionResultViewSet(CustomViewBase):
             for result in results:
                 if '_id' in result:
                     result['_id'] = str(result['_id'])
-            
 
             # 构建响应数据
             response_data = {
@@ -1098,109 +1097,6 @@ class CollectionResultViewSet(CustomViewBase):
                 
         except Exception as e:
             logger.error(f"获取采集结果详情失败: {str(e)}")
-            return JsonResponse({
-                'code': 500,
-                'message': f'获取失败: {str(e)}',
-                'data': None
-            })
-
-    @action(detail=False, methods=['get'])
-    def statistics(self, request):
-        """获取采集结果统计信息"""
-        try:
-            # 获取查询参数
-            plan_id = request.GET.get('plan_id')
-            collection_method = request.GET.get('collection_method')
-            days = int(request.GET.get('days', 7))
-
-            # 构建查询条件
-            query = {}
-            if plan_id:
-                try:
-                    query['plan_id'] = int(plan_id)
-                except ValueError:
-                    return JsonResponse({
-                        'code': 400,
-                        'message': 'plan_id必须是整数',
-                        'data': None
-                    })
-
-            if collection_method:
-                if collection_method not in ['netmiko', 'netconf']:
-                    return JsonResponse({
-                        'code': 400,
-                        'message': 'collection_method必须是 netmiko 或 netconf',
-                        'data': None
-                    })
-                query['collection_method'] = collection_method
-
-            # 时间范围
-            end_time = timezone.now()
-            start_time = end_time - timedelta(days=days)
-            query['collected_at'] = {
-                '$gte': start_time.isoformat(),
-                '$lte': end_time.isoformat()
-            }
-
-            # 统计总数
-            total_count = COLLECTION_RESULTS_DB.count_documents(query)
-
-            # 按状态统计
-            status_pipeline = [
-                {'$match': query},
-                {'$group': {'_id': '$status', 'count': {'$sum': 1}}}
-            ]
-            status_stats = list(COLLECTION_RESULTS_DB.aggregate(status_pipeline))
-
-            # 按采集方式统计
-            method_pipeline = [
-                {'$match': query},
-                {'$group': {'_id': '$collection_method', 'count': {'$sum': 1}}}
-            ]
-            method_stats = list(COLLECTION_RESULTS_DB.aggregate(method_pipeline))
-
-            # 按天统计
-            daily_pipeline = [
-                {'$match': query},
-                {
-                    '$group': {
-                        '_id': {
-                            '$dateToString': {
-                                'format': '%Y-%m-%d',
-                                'date': {'$dateFromString': {'dateString': '$collected_at'}}
-                            }
-                        },
-                        'count': {'$sum': 1}
-                    }
-                },
-                {'$sort': {'_id': 1}}
-            ]
-            daily_stats = list(COLLECTION_RESULTS_DB.aggregate(daily_pipeline))
-
-            response_data = {
-                'code': 200,
-                'message': '获取成功',
-                'data': {
-                    'total_count': total_count,
-                    'status_statistics': status_stats,
-                    'method_statistics': method_stats,
-                    'daily_statistics': daily_stats,
-                    'time_range': {
-                        'start': start_time.isoformat(),
-                        'end': end_time.isoformat(),
-                        'days': days
-                    },
-                    'filters': {
-                        'plan_id': plan_id,
-                        'collection_method': collection_method
-                    }
-                }
-            }
-
-            return JsonResponse(response_data)
-
-        except Exception as e:
-            logger.error(f"获取采集结果统计信息失败: {str(e)}")
             return JsonResponse({
                 'code': 500,
                 'message': f'获取失败: {str(e)}',

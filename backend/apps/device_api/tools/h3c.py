@@ -1,6 +1,9 @@
+import json
 import re
 from netaddr import IPNetwork, IPAddress
+from django.core.cache import cache
 from apps.automation.tools.base_connection import InterfaceFormat
+from apps.asset.models import NetworkDevice
 
 
 class H3CPlan:
@@ -8,279 +11,238 @@ class H3CPlan:
     @staticmethod
     def get_arp(data_list):
         arp_datas = []
-        if isinstance(data_list, list):
-            for i in data_list:
-                temp = dict(
-                    hostip=i.get("hostip", ""),
-                    hostname=i.get("hostname", ""),
-                    idc_name=i.get("idc_name", ""),
-                    ipaddress=i.get("ipaddress", ""),
-                    macaddress=i.get("macaddress", ""),
-                    aging=i.get("aging", ""),
-                    type=i.get("type", ""),
-                    vlan=i.get("vlan", ""),
-                    interface=InterfaceFormat.h3c_interface_format(i.get("interface", "")),
-                    vpninstance=i.get("vpninstance", ""),
-                    log_time=i.get("log_time", ""),
-                )
-                arp_datas.append(temp)
+
+        for i in data_list:
+            temp = dict(
+                hostip=i.get("hostip", ""),
+                hostname=i.get("hostname", ""),
+                idc_name=i.get("idc_name", ""),
+                ipaddress=i.get("ipaddress", ""),
+                macaddress=i.get("macaddress", ""),
+                aging=i.get("aging", ""),
+                type=i.get("type", ""),
+                vlan=i.get("vlan", ""),
+                interface=InterfaceFormat.h3c_interface_format(i.get("interface", "")),
+                vpninstance=i.get("vpninstance", ""),
+                log_time=i.get("log_time", ""),
+            )
+            arp_datas.append(temp)
         return arp_datas
 
     @staticmethod
     def get_mac(data_list):
         mac_data = []
-        if isinstance(data_list, list):
-            for i in data_list:
-                temp = dict(
-                    hostip=i.get("hostip", ""),
-                    hostname=i.get("hostname", ""),
-                    idc_name=i.get("idc_name", ""),
-                    macaddress=i.get("macaddress", ""),
-                    vlan=i.get("vlan", ""),
-                    interface=InterfaceFormat.h3c_interface_format(i.get("interface", "")),
-                    type=i.get("type", "") or i.get("state", ""),
-                    log_time=i.get("log_time", ""),
-                )
-                mac_data.append(temp)
+
+        for i in data_list:
+            temp = dict(
+                hostip=i.get("hostip", ""),
+                hostname=i.get("hostname", ""),
+                idc_name=i.get("idc_name", ""),
+                macaddress=i.get("macaddress", ""),
+                vlan=i.get("vlan", ""),
+                interface=InterfaceFormat.h3c_interface_format(i.get("interface", "")),
+                type=i.get("type", "") or i.get("state", ""),
+                log_time=i.get("log_time", ""),
+            )
+            mac_data.append(temp)
         return mac_data
 
     @staticmethod
     def get_lldp(data_list):
         """处理LLDP数据"""
         lldp_datas = []
-        if isinstance(data_list, list):
-            for i in data_list:
-                # 处理接口名称格式化
-                local_interface = i.get("local_interface", "")
-                if local_interface:
-                    local_interface = InterfaceFormat.h3c_interface_format(local_interface)
-                
-                temp = dict(
-                    hostip=i.get("hostip", ""),
-                    local_interface=local_interface,
-                    chassis_id=i.get("chassis_id", ""),
-                    neighbor_port=i.get("neighbor_port", ""),
-                    portdescription=i.get("portdescription", ""),
-                    neighborsysname=i.get("neighborsysname", ""),
-                    management_ip=i.get("management_ip", ""),
-                    management_type=i.get("management_type", ""),
-                    neighbor_ip=i.get("neighbor_ip", ""),
-                    log_time=i.get("log_time", ""),
-                )
-                lldp_datas.append(temp)
+
+        for i in data_list:
+            # 根据neighborsysname查询neighbor_ip（与旧代码逻辑保持一致）
+            neighbor_ip = ''
+            neighborsysname = i.get("neighborsysname", "")
+            if neighborsysname:
+                tmp_neighbor_ip = cache.get('cmdb_' + neighborsysname)
+                if tmp_neighbor_ip:
+                    tmp_neighbor_ip = json.loads(tmp_neighbor_ip)
+                    neighbor_ip = tmp_neighbor_ip[0]['manage_ip']
+                else:
+                    tmp_neighbor_ip = NetworkDevice.objects.filter(name=neighborsysname).values('manage_ip').first()
+                    neighbor_ip = tmp_neighbor_ip['manage_ip'] if tmp_neighbor_ip else ''
+
+            temp = dict(
+                hostip=i.get("hostip", ""),
+                local_interface=i.get("local_interface", ""),
+                chassis_id=i.get("chassis_id", ""),
+                neighbor_port=i.get("neighbor_port", ""),
+                portdescription=i.get("portdescription", ""),
+                neighborsysname=neighborsysname,
+                management_ip=i.get("management_ip", ""),
+                management_type=i.get("management_type", ""),
+                neighbor_ip=neighbor_ip,
+                log_time=i.get("log_time", ""),
+            )
+            lldp_datas.append(temp)
         return lldp_datas
 
     @staticmethod
     def get_ip_interface(data_list):
         """处理三层接口数据（包含IP地址的接口）"""
         layer3datas = []
-        if isinstance(data_list, list):
-            for i in data_list:
-                # H3C设备可能使用ipaddr或ipaddress字段
-                ipaddr = i.get("ipaddr", "") or i.get("ipaddress", "") or i.get("internet_address", "")
-                
-                if not ipaddr:
-                    continue
-                
-                # 处理接口名称，可能使用intf或interface字段
-                interface = i.get("intf", "") or i.get("interface", "")
-                
-                # 处理IP地址列表或单个IP地址
-                if isinstance(ipaddr, list):
-                    ip_type_list = i.get("ip_type", [])
-                    if not isinstance(ip_type_list, list):
-                        ip_type_list = [ip_type_list] if ip_type_list else ["Primary"]
-                    
-                    for idx, _ip in enumerate(ipaddr):
-                        try:
-                            ip_type = ip_type_list[idx] if idx < len(ip_type_list) else "Primary"
-                            
-                            if '/' in str(_ip):
-                                _ipnet = IPNetwork(_ip)
-                                location = [dict(start=_ipnet.first, end=_ipnet.last)]
-                                
-                                temp = dict(
-                                    hostip=i.get("hostip", ""),
-                                    interface=InterfaceFormat.h3c_interface_format(interface),
-                                    line_status=i.get("line_status", ""),
-                                    protocol_status=i.get("protocol_status", ""),
-                                    ipaddress=_ipnet.ip.format(),
-                                    ipmask=_ipnet.netmask.format(),
-                                    ip_type=ip_type,
-                                    location=location,
-                                    mtu=i.get("mtu", ""),
-                                    log_time=i.get("log_time", ""),
-                                )
-                                layer3datas.append(temp)
-                            else:
-                                _ipnet = IPAddress(_ip)
-                                location = [dict(start=_ipnet.value, end=_ipnet.value)]
-                                
-                                temp = dict(
-                                    hostip=i.get("hostip", ""),
-                                    interface=InterfaceFormat.h3c_interface_format(interface),
-                                    line_status=i.get("line_status", ""),
-                                    protocol_status=i.get("protocol_status", ""),
-                                    ipaddress=_ipnet.format(),
-                                    ipmask='255.255.255.255',
-                                    ip_type=ip_type,
-                                    location=location,
-                                    mtu=i.get("mtu", ""),
-                                    log_time=i.get("log_time", ""),
-                                )
-                                layer3datas.append(temp)
-                        except Exception:
-                            # 如果IP地址解析失败，跳过该记录
-                            continue
+
+        for i in data_list:
+            ipaddr = i.get("ipaddr", '')
+           
+            # 处理IP地址列表或单个IP地址（与旧代码逻辑保持一致）
+            if isinstance(ipaddr, list):
+                ip_type_list = i.get("ip_type", [])
+                for _ip in range(len(ipaddr)):
+                    # _ip 为数组下标 0，1，2，3
+                    if str(ipaddr[_ip]).find('/') != -1:
+                        _ipnet = IPNetwork(ipaddr[_ip])
+                        location = [dict(start=_ipnet.first, end=_ipnet.last)]
+                        temp = dict(
+                            hostip=i.get("hostip", ""),
+                            interface=InterfaceFormat.h3c_interface_format(i.get("intf", "")),
+                            line_status=i.get("line_status", ""),
+                            protocol_status=i.get("protocol_status", ""),
+                            ipaddress=_ipnet.ip.format(),
+                            ipmask=_ipnet.netmask.format(),
+                            ip_type=ip_type_list[_ip],
+                            location=location,
+                            mtu=i.get("mtu", ""),
+                            log_time=i.get("log_time", ""),
+                        )
+                        layer3datas.append(temp)
+                    else:
+                        _ipnet = IPAddress(ipaddr[_ip])
+                        location = [dict(start=_ipnet.value, end=_ipnet.value)]
+                        temp = dict(
+                            hostip=i.get("hostip", ""),
+                            interface=InterfaceFormat.h3c_interface_format(i.get("intf", "")),
+                            line_status=i.get("line_status", ""),
+                            protocol_status=i.get("protocol_status", ""),
+                            ipaddress=_ipnet.format(),
+                            ipmask='255.255.255.255',
+                            ip_type=ip_type_list[_ip],
+                            location=location,
+                            mtu=i.get("mtu", ""),
+                            log_time=i.get("log_time", ""),
+                        )
+                        layer3datas.append(temp)
+            else:
+                # 单个IP地址
+                if str(ipaddr).find('/') != -1:
+                    _ipnet = IPNetwork(ipaddr)
+                    location = [dict(start=_ipnet.first, end=_ipnet.last)]
+                    temp = dict(
+                        hostip=i.get("hostip", ""),
+                        interface=InterfaceFormat.h3c_interface_format(i.get("intf", "")),
+                        line_status=i.get("line_status", ""),
+                        protocol_status=i.get("protocol_status", ""),
+                        ipaddress=_ipnet.ip.format(),
+                        ipmask=_ipnet.netmask.format(),
+                        ip_type=i.get("ip_type", ""),
+                        location=location,
+                        mtu=i.get("mtu", ""),
+                        log_time=i.get("log_time", ""),
+                    )
+                    layer3datas.append(temp)
                 else:
-                    # 单个IP地址
-                    try:
-                        if '/' in str(ipaddr):
-                            _ipnet = IPNetwork(ipaddr)
-                            location = [dict(start=_ipnet.first, end=_ipnet.last)]
-                            
-                            temp = dict(
-                                hostip=i.get("hostip", ""),
-                                interface=InterfaceFormat.h3c_interface_format(interface),
-                                line_status=i.get("line_status", ""),
-                                protocol_status=i.get("protocol_status", ""),
-                                ipaddress=_ipnet.ip.format(),
-                                ipmask=_ipnet.netmask.format(),
-                                ip_type=i.get("ip_type", "Primary"),
-                                location=location,
-                                mtu=i.get("mtu", ""),
-                                log_time=i.get("log_time", ""),
-                            )
-                            layer3datas.append(temp)
-                        else:
-                            _ipnet = IPAddress(ipaddr)
-                            location = [dict(start=_ipnet.value, end=_ipnet.value)]
-                            
-                            temp = dict(
-                                hostip=i.get("hostip", ""),
-                                interface=InterfaceFormat.h3c_interface_format(interface),
-                                line_status=i.get("line_status", ""),
-                                protocol_status=i.get("protocol_status", ""),
-                                ipaddress=_ipnet.format(),
-                                ipmask='255.255.255.255',
-                                ip_type=i.get("ip_type", "Primary"),
-                                location=location,
-                                mtu=i.get("mtu", ""),
-                                log_time=i.get("log_time", ""),
-                            )
-                            layer3datas.append(temp)
-                    except Exception:
-                        # 如果IP地址解析失败，跳过该记录
-                        continue
+                    _ipnet = IPAddress(ipaddr)
+                    location = [dict(start=_ipnet.value, end=_ipnet.value)]
+                    temp = dict(
+                        hostip=i.get("hostip", ""),
+                        interface=InterfaceFormat.h3c_interface_format(i.get("intf", "")),
+                        line_status=i.get("line_status", ""),
+                        protocol_status=i.get("protocol_status", ""),
+                        ipaddress=_ipnet.format(),
+                        ipmask='255.255.255.255',
+                        ip_type=i.get("ip_type", ""),
+                        location=location,
+                        mtu=i.get("mtu", ""),
+                        log_time=i.get("log_time", ""),
+                    )
+                    layer3datas.append(temp)
+
         return layer3datas
 
     @staticmethod
     def get_interface_brief(data_list):
         """处理二层接口数据（不包含IP地址的接口）"""
         layer2datas = []
-        if isinstance(data_list, list):
-            for i in data_list:
-                interface = i.get("interface", "")
-                
-                # 跳过某些特殊接口
-                if interface:
-                    if interface.startswith('BAGG'):
-                        continue
-                    if interface.startswith('RAGG'):
-                        continue
-                    if interface.startswith('Vlan'):
-                        continue
-                    if interface.startswith('Loop'):
-                        continue
-                    if interface.startswith('InLoop'):
-                        continue
-                
-                # 检查是否有IP地址，如果有则跳过（应该由get_ip_interface处理）
-                ipaddr = i.get("ipaddr", "") or i.get("ipaddress", "") or i.get("internet_address", "")
-                if ipaddr:
-                    continue
-                
-                # 处理速度字段
-                speed = i.get("speed", "")
-                if speed:
-                    # 处理特殊速度值
-                    if isinstance(speed, str):
-                        if speed.find('-') != -1:
-                            speed = 'IRF'
-                        elif speed.find('(') != -1:
-                            speed = speed.split('(')[0]
-                        elif speed == 'auto':
-                            # 根据接口名称推断速度
-                            speed = H3CPlan._h3c_speed_format(interface)
-                        elif speed == 'UP':
-                            speed = H3CPlan._h3c_speed_format(interface)
-                    
-                    try:
-                        speed = InterfaceFormat.mathintspeed(int(speed))
-                    except (ValueError, TypeError):
-                        try:
-                            speed = InterfaceFormat.mathintspeed(speed) if isinstance(speed, str) else ""
-                        except:
-                            speed = ""
-                
-                # 处理双工模式
-                duplex = i.get("duplex", "")
-                if isinstance(duplex, str) and duplex.find('-') != -1:
-                    duplex = 'IRF'
-                
-                temp = dict(
-                    hostip=i.get("hostip", ""),
-                    interface=InterfaceFormat.h3c_interface_format(interface),
-                    status=i.get("status", "") or i.get("protocol_status", ""),
-                    speed=speed,
-                    duplex=duplex,
-                    description=i.get("description", "") or i.get("interface_description", ""),
-                    log_time=i.get("log_time", ""),
-                )
-                layer2datas.append(temp)
+
+        for i in data_list:
+            interface = i.get("interface", "")
+
+            # 跳过某些特殊接口（与旧代码逻辑保持一致）
+            if interface.startswith('BAGG'):
+                continue
+            elif interface.startswith('RAGG'):
+                continue
+            elif interface.startswith('Vlan'):
+                continue
+            elif interface.startswith('Loop'):
+                continue
+            elif interface.startswith('InLoop'):
+                continue
+
+            # 处理速度字段（与旧代码逻辑保持一致）
+            speed = i.get("speed", "")
+            if speed and isinstance(speed, str):
+                if speed.find('-') != -1:
+                    speed = 'IRF'
+                elif speed.find('(') != -1:
+                    speed = speed.split('(')[0]
+
+            # 处理双工模式（与旧代码逻辑保持一致）
+            duplex = i.get("duplex", "")
+            if duplex and isinstance(duplex, str) and duplex.find('-') != -1:
+                duplex = 'IRF'
+
+            # 处理特殊速度值
+            if speed == 'auto':
+                speed = H3CPlan._h3c_speed_format(interface)
+            if speed == 'UP':
+                speed = H3CPlan._h3c_speed_format(interface)
+                duplex = '--'
+
+            # 格式化速度（与旧代码逻辑保持一致）
+            if speed:
+                speed = InterfaceFormat.mathintspeed(speed)
+
+            temp = dict(
+                hostip=i.get("hostip", ""),
+                interface=InterfaceFormat.h3c_interface_format(interface),
+                status=i.get("status", ""),  # 旧代码只用status字段
+                speed=speed,
+                duplex=duplex,
+                description=i.get("description", ""),  # 旧代码只用description字段
+                log_time=i.get("log_time", ""),
+            )
+            layer2datas.append(temp)
         return layer2datas
 
     @staticmethod
     def get_aggre_port(data_list):
         """处理聚合端口数据"""
         aggre_datas = []
-        if isinstance(data_list, list):
-            for i in data_list:
-                # 处理聚合组名称，可能使用aggname或aggregroup字段
-                aggregroup = i.get("aggname", "") or i.get("aggregroup", "")
-                
-                # 处理成员端口，可能是列表或字符串
-                memberports = i.get("memberports", "")
-                if isinstance(memberports, list):
-                    memberports_list = memberports
-                elif isinstance(memberports, str):
-                    # 如果是字符串，尝试分割（可能是逗号分隔）
-                    memberports_list = [p.strip() for p in memberports.split(',') if p.strip()]
-                else:
-                    memberports_list = []
-                
-                # 格式化每个成员端口
+
+        for i in data_list:
+            # 处理成员端口（与旧代码逻辑保持一致）
+            memberports = i.get("memberports", "")
+            if isinstance(memberports, list):
                 formatted_memberports = []
-                for port in memberports_list:
-                    formatted_port = InterfaceFormat.h3c_interface_format(port)
-                    formatted_memberports.append(formatted_port)
-                
-                # 处理状态，可能是列表或字符串
-                status = i.get("status", "")
-                if isinstance(status, list):
-                    status_list = status
-                else:
-                    status_list = [status] if status else []
-                
-                temp = dict(
-                    hostip=i.get("hostip", ""),
-                    aggregroup=InterfaceFormat.h3c_interface_format(aggregroup),
-                    memberports=formatted_memberports,
-                    status=status_list,
-                    mode=i.get("mode", ""),
-                    log_time=i.get("log_time", ""),
-                )
-                aggre_datas.append(temp)
+                for member in memberports:
+                    formatted_memberports.append(InterfaceFormat.h3c_interface_format(member))
+            else:
+                # 如果不是列表，直接使用（不格式化）
+                formatted_memberports = memberports
+
+            temp = dict(
+                hostip=i.get("hostip", ""),
+                aggregroup=i.get("aggname", ""),  # 旧代码不格式化
+                memberports=formatted_memberports,
+                status=i.get("status", ""),  # 旧代码直接使用
+                mode=i.get("mode", ""),
+                log_time=i.get("log_time", ""),
+            )
+            aggre_datas.append(temp)
         return aggre_datas
 
     @staticmethod
