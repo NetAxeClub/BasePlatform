@@ -579,12 +579,12 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
         """获取采集结果统计信息，可以直接删除"""
         from apps.device_api.tasks import plan_collect_device_main
 
-        plan_collect_device_main()
+        data = plan_collect_device_main()
 
         return JsonResponse({
             'code': 200,
             'message': "采集方案定时任务执行成功",
-            'results': "data"
+            'results': data
         })
 
 
@@ -841,14 +841,6 @@ class CollectionResultViewSet(CustomViewBase):
             page = int(request.GET.get('page', 1))
             page_size = int(request.GET.get('page_size', 10))
 
-            # 参数验证
-            if not summary_plan_id:
-                return JsonResponse({
-                    'code': 400,
-                    'message': 'summary_plan_id 参数不能为空',
-                    'data': None
-                })
-
             # 查询子采集方案数据
             query = {
                 'summary_plan_id': int(summary_plan_id),
@@ -858,7 +850,7 @@ class CollectionResultViewSet(CustomViewBase):
 
             if not sub_plan_data:
                 return JsonResponse({
-                    'code': 404,
+                    'code': 200,
                     'message': '未找到对应的子采集方案数据',
                     'data': None
                 })

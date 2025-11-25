@@ -356,7 +356,6 @@ def plan_collect_device_main(**kwargs):
     # 批量下发任务
     for host in hosts:
         host_ip = host.get('manage_ip')
-
         task = plan_collect_device.apply_async(
             kwargs=host,
             queue='config',
