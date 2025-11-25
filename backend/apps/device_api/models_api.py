@@ -242,7 +242,7 @@ def celery_data_mongodb(**kwargs):
         if task_status == "failed":
             # 1. 先更新子采集任务状态
             error_info = task_info.get("task_errors", [])
-            update_sub_task_status("failed", summary_plan_id, plan_id, task_id, error_msg=error_info)
+            update_sub_task_status("failed", summary_plan_id, plan_id, task_id, error_info)
 
             # 2. 再更新主采集任务状态，然后不用继续往下走了
             update_parent_task_status("failed", summary_plan_id, device_ip, execute_time)
@@ -251,7 +251,7 @@ def celery_data_mongodb(**kwargs):
         # 如果任务完成，添加完成时间（只更新一次，后续不再更新）
         if task_status in ["finished", "success"]:
             # 1. 只更新子采集任务状态,标记为成功
-            update_sub_task_status(task_status, summary_plan_id, plan_id, task_id)
+            update_sub_task_status(task_status, summary_plan_id, plan_id, task_id, [])
 
         # 构建基础结果字典
         base_result = _build_base_collection_result(plan, webhook_args, task_info, status)
@@ -259,7 +259,6 @@ def celery_data_mongodb(**kwargs):
         # 没有拿到数据的情况
         if not task_result:
             logging.warning(f"task_result为空: {device_ip} - {plan.name}")
-            return {"status": "failed", "message": "task_result为空，无数据可保存"}
 
         collection_results = []
         data_process_errors = []  # 记录数据处理错误
@@ -293,7 +292,7 @@ def celery_data_mongodb(**kwargs):
         # 如果数据处理失败，更新状态为失败（覆盖之前的finished状态）
         if data_process_errors:
             # 1. 先更新子采集任务记录
-            update_sub_task_status("failed", summary_plan_id, plan_id, task_id, error_msg=data_process_errors)
+            update_sub_task_status("failed", summary_plan_id, plan_id, task_id, data_process_errors)
             logging.error(f"子采集任务数据处理失败: {device_ip} - {plan.name} - 错误: {data_process_errors}")
             # 2. 再更新主采集任务记录
             update_parent_task_status("failed", summary_plan_id, device_ip, execute_time)
@@ -303,7 +302,7 @@ def celery_data_mongodb(**kwargs):
         if not collection_results:
             logging.warning(f"没有可保存的采集结果: {device_ip} - {plan.name}")
             # 1. 更新子采集任务记录，数据为空，更新状态为失败
-            update_sub_task_status("failed", summary_plan_id, plan_id, task_id, error_msg="所有数据处理后都为空")
+            update_sub_task_status("failed", summary_plan_id, plan_id, task_id, ["数据处理后结尾为空"])
             # 2. 更新主采集任务记录
             update_parent_task_status("failed", summary_plan_id, device_ip, execute_time)
             return {"status": "failed", "message": "没有可保存的采集结果，所有数据处理后都为空"}
@@ -324,7 +323,7 @@ def celery_data_mongodb(**kwargs):
         except Exception as e:
             logging.error(f"保存采集结果到MongoDB失败: {device_ip} - 错误: {str(e)}", exc_info=True)
             # 1. 更新子采集任务记录，保存失败，更新状态为失败（覆盖之前的finished状态）
-            update_sub_task_status("failed", summary_plan_id, plan_id, task_id, error_msg=f"保存采集结果失败: {str(e)}")
+            update_sub_task_status("failed", summary_plan_id, plan_id, task_id, [f"保存采集结果失败: {str(e)}"])
             # 2. 更新主采集任务记录
             update_parent_task_status("failed", summary_plan_id, device_ip, execute_time)
             return {"status": "failed", "message": f"保存采集结果失败: {str(e)}"}
@@ -395,17 +394,16 @@ def update_parent_task_status(task_status, summary_plan_id, device_ip, execute_t
         return False
 
 
-def update_sub_task_status(new_status, summary_plan_id, plan_id, task_id, error_msg=None):
+def update_sub_task_status(new_status, summary_plan_id, plan_id, task_id, error_msg):
     """更新子采集任务状态到COLLECTION_DEVICE_MONGODB"""
     try:
         update_data = {
             "$set": {
                 "task_status": new_status,
+                "task_errors": error_msg,
                 "updated_at": datetime.now().isoformat()
             }
         }
-        if error_msg:
-            update_data["$set"]["error"] = error_msg
 
         result = COLLECTION_SUB_PLAN.update_one(
             filter={"summary_plan_id": summary_plan_id, "plan_id": plan_id, "task_id": task_id},

@@ -72,6 +72,7 @@
    - 通过南向驱动服务（south_gateway）统一执行采集
    - 支持字段映射和自定义数据处理
 """
+from __future__ import absolute_import, unicode_literals
 import logging
 import time
 import json
