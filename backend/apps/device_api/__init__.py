@@ -19,4 +19,5 @@ lldp_mongo = MongoOps(db='Automation', coll='plan_lldp')
 ip_interface_mongo = MongoOps(db='Automation', coll='plan_ip_interface')
 interface_brief_mongo = MongoOps(db='Automation', coll='plan_interface_brief')
 aggre_port_mongo = MongoOps(db='Automation', coll='plan_aggre_port')
+
 # cmdb_mongo = MongoOps(db='Automation', coll='networkdevice')

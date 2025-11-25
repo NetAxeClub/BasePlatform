@@ -503,8 +503,7 @@ def resolve_raw_data(plan, collection_result, collection_method):
             logging.info(f"数据处理函数执行完成: {plan.name}")  
         except Exception as e:
             logging.error(f"数据处理函数执行失败: {plan.name} - {str(e)}", exc_info=True)
-            method_tag = (collection_method or "unknown").lower()
-            return False, f"{method_tag}_processor_failed: {str(e)}", []
+            return False, f"{collection_method}_process_data_function_failed: {str(e)}", []
         
         # 第二步：字段映射，获取字段映射配置
         field_mappings = None
@@ -530,17 +529,20 @@ def resolve_raw_data(plan, collection_result, collection_method):
                     logging.warning(f"字段映射未返回数据: {plan.name}")
             except Exception as e:
                 logging.error(f"字段映射执行失败: {plan.name} - {str(e)}", exc_info=True)
-                method_tag = (collection_method or "unknown").lower()
-                return False, f"{method_tag}_mapping_failed(path={path_config}): {str(e)}", []
+                return False, f"{collection_method}_apply_field_mappings_failed(path={path_config}): {str(e)}", []
 
         # 3. 根据厂商和类型，调用对应的处理方法
-        resolved_data = apply_vendor_processor(plan, mapping_data)
+        try:
+            resolved_data = apply_vendor_processor(plan, mapping_data)
+        except Exception as e:
+            logging.error(f"厂商处理方法执行失败: {plan.name} - {str(e)}", exc_info=True)
+            return False, f"{collection_method}_apply_vendor_processor_failed: {str(e)}", []
 
         return True, "", resolved_data
         
     except Exception as e:
-        logging.error(f"数据处理异常: {plan.name} - {str(e)}")
-        return False, f"exception: {str(e)}", []
+        logging.error(f"数据处理异常: {plan.name} - {str(e)}", exc_info=True)
+        return False, f"resolve_raw_data_exception: {str(e)}", []
 
 
 def apply_field_mappings(data_dict, field_mappings, path_config=None):

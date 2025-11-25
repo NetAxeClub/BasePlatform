@@ -83,37 +83,24 @@ class HuaweiPlan:
         """处理三层接口数据（包含IP地址的接口）"""
         layer3datas = []
         for i in data_list:
-            internet_address = i.get("internet_address", "") or i.get("ipaddress", "")
-            if internet_address:
-                try:
-                    # 处理IP地址格式，可能包含掩码
-                    if '/' not in internet_address:
-                        # 如果没有掩码，尝试从ipmask获取
-                        ipmask = i.get("ipmask", "") or i.get("subnet_mask", "")
-                        if ipmask:
-                            internet_address = f"{internet_address}/{ipmask}"
-                        else:
-                            internet_address = f"{internet_address}/32"
-                    
-                    _ip = IPNetwork(internet_address)
-                    location = [dict(start=_ip.first, end=_ip.last)]
-                    
-                    temp = dict(
-                        hostip=i.get("hostip", ""),
-                        interface=i.get("interface", ""),
-                        line_status=i.get("line_status", ""),
-                        protocol_status=i.get("protocol_status", "") or i.get("protocol_status", ""),
-                        ipaddress=_ip.ip.format(),
-                        ipmask=_ip.netmask.format(),
-                        ip_type=i.get("ip_type", "Primary"),
-                        location=location,
-                        mtu=i.get("mtu", ""),
-                        log_time=i.get("log_time", ""),
-                    )
-                    layer3datas.append(temp)
-                except Exception:
-                    # 如果IP地址解析失败，跳过该记录
-                    continue
+            internet_address = i.get("internet_address", "")
+            if internet_address:  
+                _ip = IPNetwork(internet_address)
+                location = [dict(start=_ip.first, end=_ip.last)]
+                
+                temp = dict(
+                    hostip=i.get("hostip", ""),
+                    interface=i.get("interface", ""),
+                    line_status=i.get("line_status", ""),
+                    protocol_status=i.get("protocol_status", ""),
+                    ipaddress=_ip.ip.format(),
+                    ipmask=_ip.netmask.format(),
+                    ip_type='Primary',
+                    location=location,
+                    mtu="",
+                    log_time=i.get("log_time", ""),
+                )
+                layer3datas.append(temp)
         return layer3datas
 
     @staticmethod
@@ -122,9 +109,8 @@ class HuaweiPlan:
         layer2datas = []
         for i in data_list:
             interface = i.get("interface", "")
-            internet_address = i.get("internet_address", "") or i.get("ipaddress", "")
             
-            # 跳过某些特殊接口
+            # 跳过某些特殊接口（与旧代码逻辑保持一致）
             if interface:
                 if interface.startswith('LoopBack'):
                     continue
@@ -134,26 +120,14 @@ class HuaweiPlan:
                     continue
                 if interface.startswith('Ethernet0/0/0'):
                     continue
-            
-            # 如果有IP地址，跳过（应该由get_ip_interface处理）
-            if internet_address:
-                continue
-            
-            # 处理速度字段
-            speed = i.get("speed", "")
-            if speed:
-                try:
-                    speed = InterfaceFormat.mathintspeed(int(speed))
-                except (ValueError, TypeError):
-                    speed = InterfaceFormat.mathintspeed(speed) if isinstance(speed, str) else ""
-            
+                  
             temp = dict(
                 hostip=i.get("hostip", ""),
-                interface=InterfaceFormat.huawei_interface_format(interface),
-                status=i.get("protocol_status", "") or i.get("status", ""),
-                speed=speed,
+                interface=interface, 
+                status=i.get("status", ""),  # 旧代码只用Status字段
+                speed=InterfaceFormat.mathintspeed(i.get("speed", "")),
                 duplex=i.get("duplex", ""),
-                description=i.get("interface_description", "") or i.get("description", ""),
+                description=i.get("description", ""),  # 旧代码只用Description字段
                 log_time=i.get("log_time", ""),
             )
             layer2datas.append(temp)
@@ -164,36 +138,21 @@ class HuaweiPlan:
         """处理聚合端口数据"""
         aggre_datas = []
         for i in data_list:
-            # 处理成员端口，可能是列表或字符串
-            memberports = i.get("memberports", "") or i.get("portname", "")
-            if isinstance(memberports, list):
-                memberports_list = memberports
-            elif isinstance(memberports, str):
-                # 如果是字符串，尝试分割（可能是逗号分隔）
-                memberports_list = [p.strip() for p in memberports.split(',') if p.strip()]
+            # 处理成员端口（与旧代码逻辑保持一致）
+            if isinstance(i.get("portname"), list):
+                memberports = []
+                for member in i['portname']:
+                    memberports.append(member)
             else:
-                memberports_list = []
-            
-            # 格式化每个成员端口
-            formatted_memberports = []
-            for port in memberports_list:
-                formatted_port = InterfaceFormat.huawei_interface_format(port)
-                formatted_memberports.append(formatted_port)
-            
-            # 处理状态，可能是列表或字符串
-            status = i.get("status", "") or i.get("portstatus", "") or i.get("member_port_status", "")
-            if isinstance(status, list):
-                status_list = status
-            else:
-                status_list = [status] if status else []
+                memberports = i.get("memberports", [])
             
             temp = dict(
                 hostip=i.get("hostip", ""),
-                aggregroup=InterfaceFormat.huawei_interface_format(i.get("aggregroup", "") or i.get("trunk_num", "")),
-                memberports=formatted_memberports,
-                status=status_list,
-                mode=i.get("mode", ""),
+                aggregroup=i.get("aggregroup", "") or i.get("trunk_num", ""),  # 旧代码不格式化
+                memberports=memberports,  
+                status=i.get("status", "") or i.get("portstatus", ""),  
+                mode=i.get("mode", "") or "",
                 log_time=i.get("log_time", ""),
             )
-            aggre_datas.append(temp)
+            aggre_datas.append(temp)  
         return aggre_datas
