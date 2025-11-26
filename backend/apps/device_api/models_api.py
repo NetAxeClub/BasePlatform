@@ -203,7 +203,7 @@ def celery_data_mongodb(**kwargs):
         device_ip = webhook_args.get("device_ip")
         device_name = webhook_args.get("device_name")
         collection_method = webhook_args.get("collection_method", "netmiko")
-        collection_type = webhook_args.get("collection_type")       # 采集类型，用于选择MongoDB集合
+        collection_type = webhook_args.get("collection_type", "arp")       # 采集类型，用于选择MongoDB集合
         execute_time = webhook_args.get("execute_time")             # 主采集方案执行时间
 
         if not plan_id:
@@ -221,10 +221,6 @@ def celery_data_mongodb(**kwargs):
         try:
             plan = DeviceSubCollectionPlan.objects.select_related('summary_plan').get(id=plan_id)
             logging.info(f"成功获取采集方案: {plan.name} (ID: {plan_id})")
-            # 如果webhook参数中没有collection_type，从plan中获取
-            if not collection_type:
-                collection_type = plan.collection_type
-                logging.info(f"从采集方案中获取collection_type: {collection_type}")
         except DeviceSubCollectionPlan.DoesNotExist:
             logging.error(f"采集方案不存在: plan_id={plan_id}")
             return {"status": "failed", "message": f"采集方案不存在: plan_id={plan_id}"}
@@ -333,15 +329,15 @@ def celery_data_mongodb(**kwargs):
 
     except Exception as e:
         logging.error(f"webhook回调执行失败: {str(e)}", exc_info=True)
-        # 如果已经获取到必要参数，更新主任务状态为失败
-        try:
-            # 直接使用 try 块中已获取的变量（如果异常发生在获取这些参数之后，变量已存在）
-            if summary_plan_id and device_ip and execute_time:
-                update_parent_task_status("failed", summary_plan_id, device_ip, execute_time)
-                logging.info(f"已更新主任务状态为失败: device_ip={device_ip}, summary_plan_id={summary_plan_id}")
-        except (NameError, Exception) as update_error:
-            # 如果变量不存在或更新失败，记录警告但不影响主流程
-            logging.warning(f"更新主任务状态失败: {str(update_error)}")
+        # # 如果已经获取到必要参数，更新主任务状态为失败
+        # try:
+        #     # 直接使用 try 块中已获取的变量（如果异常发生在获取这些参数之后，变量已存在）
+        #     if summary_plan_id and device_ip and execute_time:
+        #         update_parent_task_status("failed", summary_plan_id, device_ip, execute_time)
+        #         logging.info(f"已更新主任务状态为失败: device_ip={device_ip}, summary_plan_id={summary_plan_id}")
+        # except (NameError, Exception) as update_error:
+        #     # 如果变量不存在或更新失败，记录警告但不影响主流程
+        #     logging.warning(f"更新主任务状态失败: {str(update_error)}")
         return {"status": "failed", "message": f"webhook回调执行失败: {str(e)}"}
 
 
@@ -531,7 +527,10 @@ def resolve_raw_data(plan, collection_result, collection_method):
 
         # 3. 根据厂商和类型，调用对应的处理方法
         try:
-            resolved_data = apply_vendor_processor(plan, mapping_data)
+            if method == "netmiko":
+                resolved_data = apply_vendor_processor(plan, mapping_data)
+            else:
+                resolved_data = mapping_data
         except Exception as e:
             logging.error(f"厂商处理方法执行失败: {plan.name} - {str(e)}", exc_info=True)
             return False, f"{collection_method}_apply_vendor_processor_failed: {str(e)}", []
