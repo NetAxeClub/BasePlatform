@@ -48,4 +48,5 @@ urlpatterns = [
     path('server_account', ServerAccountView.as_view(), name='server_account'),
     path('cmdbChart', CmdbChart.as_view(), name='cmdbChart'),
     path('gateway_search/', GatewayView.as_view(), name='gateway_search'),
+    path('metric/', Metric.as_view(), name='metric'),
 ]
