@@ -70,8 +70,8 @@ field_mapping = {
     "arp": {"label": "ARP", "value": "arp", "icon": "arp", "mapping_fields": APR_MAPPING},
     "mac": {"label": "MAC", "value": "mac", "icon": "mac", "mapping_fields": MAC_MAPPING},
     "lldp": {"label": "LLDP", "value": "lldp", "icon": "lldp", "mapping_fields": LLDP_MAPPING},
+    "interface_brief": {"label": "二层接口", "value": "interface_brief", "icon": "interface-summary", "mapping_fields": INTERFACE_BRIEF_MAPPING},
     "ip_interface": {"label": "三层接口", "value": "ip_interface", "icon": "ip-interface", "mapping_fields": IP_INTERFACE_MAPPING},
-    "interface_brief": {"label": "接口摘要", "value": "interface_brief", "icon": "interface-summary", "mapping_fields": INTERFACE_BRIEF_MAPPING},
     "aggre_port": {"label": "聚合端口", "value": "aggre_port", "icon": "aggregation-port", "mapping_fields": AGGRE_PORT_MAPPING}
 }
 

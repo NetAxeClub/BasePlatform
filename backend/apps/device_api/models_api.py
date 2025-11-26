@@ -252,9 +252,14 @@ def celery_data_mongodb(**kwargs):
         # 构建基础结果字典
         base_result = _build_base_collection_result(plan, webhook_args, task_info, status)
 
-        # 没有拿到数据的情况
+        # 没有拿到数据的情况，应该提前返回
         if not task_result:
             logging.warning(f"task_result为空: {device_ip} - {plan.name}")
+            # 更新子采集任务记录，数据为空，更新状态为失败
+            update_sub_task_status("failed", summary_plan_id, plan_id, task_id, ["task_result为空，无数据可处理"])
+            # 更新主采集任务记录
+            update_parent_task_status("failed", summary_plan_id, device_ip, execute_time)
+            return {"status": "failed", "message": "task_result为空，无数据可处理"}
 
         collection_results = []
         data_process_errors = []  # 记录数据处理错误
