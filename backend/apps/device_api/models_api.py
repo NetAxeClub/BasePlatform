@@ -314,8 +314,9 @@ def celery_data_mongodb(**kwargs):
             else:
                 logging.info(f"使用MongoDB集合: Automation.{collection_name} (采集类型: {collection_type})")
             
+            # 执行插入清洗后的数据
             collection_db.insert_many(collection_results)
-            logging.info(f"采集结果已保存: {device_ip} - {plan.name} - 共 {len(collection_results)} 条记录 - 集合: {collection_name}")
+            logging.info(f"采集结果已保存: {device_ip} - 采集类型: {collection_type} - 共 {len(collection_results)} 条记录 - 集合: {collection_name}")
         except Exception as e:
             logging.error(f"保存采集结果到MongoDB失败: {device_ip} - 错误: {str(e)}", exc_info=True)
             # 1. 更新子采集任务记录，保存失败，更新状态为失败（覆盖之前的finished状态）
@@ -324,7 +325,7 @@ def celery_data_mongodb(**kwargs):
             update_parent_task_status("failed", summary_plan_id, device_ip, execute_time)
             return {"status": "failed", "message": f"保存采集结果失败: {str(e)}"}
 
-        logging.info(f"webhook回调处理完成: {device_ip} - 共处理 {len(task_result)} 条命令")
+        logging.info(f"webhook回调处理完成: {device_ip} - 采集类型: {collection_type}")
         return {"status": "success", "message": "结果插入mongodb成功"}
 
     except Exception as e:
