@@ -1,8 +1,26 @@
 # -*- coding: utf-8 -*-
 import logging
+import importlib
 from datetime import datetime
+
+from apps.device_api.fields_mapping import vendor_mapping
 from apps.device_api.models import DeviceSubCollectionPlan
-from apps.device_api import COLLECTION_RESULTS_DB
+from apps.device_api import (
+    COLLECTION_RESULTS_DB, COLLECTION_SUB_PLAN, COLLECTION_PLAN,
+    arp_mongo, mac_mongo, lldp_mongo, ip_interface_mongo, 
+    interface_brief_mongo, aggre_port_mongo
+)
+from utils.db.mongo_ops import MongoOps
+
+# collection_type 到 MongoDB 实例的映射
+COLLECTION_TYPE_MONGO_MAP = {
+    'arp': arp_mongo,
+    'mac': mac_mongo,
+    'lldp': lldp_mongo,
+    'ip_interface': ip_interface_mongo,
+    'interface_brief': interface_brief_mongo,
+    'aggre_port': aggre_port_mongo,
+}
 
 
 def _build_base_collection_result(plan, webhook_args, task_info, status):
@@ -155,6 +173,249 @@ def plan_data_to_mongodb(**kwargs):
         return {"status": "failed", "message": f"webhook回调执行失败: {str(e)}"}
 
 
+def celery_data_mongodb(**kwargs):
+    """NetPalm webhook回调函数，将采集结果保存到MongoDB
+
+    Args:
+        **kwargs: 包含status, task_info, webhook_args等参数
+
+    Returns:
+        dict: 处理结果字典，包含status和message字段
+    """
+    logging.info("开始执行采集方案webhook回调")
+
+    try:
+        # 获取3个基本参数
+        status = kwargs.get("status", "")
+        task_info = kwargs.get("task_info", {})
+        webhook_args = kwargs.get("webhook_args", {})
+
+        logging.info(f"接收到的参数 - status: {status}, task_info keys: {list(task_info.keys())}, webhook_args keys: {list(webhook_args.keys())}")
+
+        # 验证必要参数
+        if not webhook_args:
+            logging.error("webhook_args参数为空")
+            return {"status": "failed", "message": "webhook_args参数为空"}
+
+        # 提取webhook参数内容
+        summary_plan_id = webhook_args.get("summary_plan_id")
+        plan_id = webhook_args.get("plan_id")
+        device_ip = webhook_args.get("device_ip")
+        device_name = webhook_args.get("device_name")
+        collection_method = webhook_args.get("collection_method", "netmiko")
+        collection_type = webhook_args.get("collection_type", "arp")       # 采集类型，用于选择MongoDB集合
+        execute_time = webhook_args.get("execute_time")             # 主采集方案执行时间
+
+        if not plan_id:
+            logging.error("plan_id参数缺失")
+            return {"status": "failed", "message": "plan_id参数缺失"}
+
+        if not collection_type:
+            logging.error(f"collection_type为空，无法确定MongoDB集合")
+            return {"status": "failed", "message": "collection_type为空，无法保存数据"}
+
+        logging.info(
+            f"提取参数 - plan_id: {plan_id}, device_ip: {device_ip}, device_name: {device_name}, collection_method: {collection_method}, collection_type: {collection_type}")
+
+        # 查询采集方案
+        try:
+            plan = DeviceSubCollectionPlan.objects.select_related('summary_plan').get(id=plan_id)
+            logging.info(f"成功获取采集方案: {plan.name} (ID: {plan_id})")
+        except DeviceSubCollectionPlan.DoesNotExist:
+            logging.error(f"采集方案不存在: plan_id={plan_id}")
+            return {"status": "failed", "message": f"采集方案不存在: plan_id={plan_id}"}
+        except Exception as e:
+            logging.error(f"查询采集方案失败: {str(e)}", exc_info=True)
+            return {"status": "failed", "message": f"查询采集方案失败: {str(e)}"}
+
+        # 获取任务信息
+        task_status = task_info.get("task_status", "")
+        task_result = task_info.get("task_result", {})
+        task_id = task_info.get("task_id")
+
+        # 数据回填，进行更新任务状态
+        # 如果任务失败，添加错误信息并直接返回
+        if status in ["error", "failed"] or task_status == "failed":
+            # 1. 先更新子采集任务状态
+            error_info = task_info.get("task_errors", [])
+            update_sub_task_status("failed", summary_plan_id, plan_id, task_id, error_info)
+
+            # 2. 再更新主采集任务状态，然后不用继续往下走了
+            update_parent_task_status("failed", summary_plan_id, device_ip, execute_time)
+            return {"status": "failed", "message": "任务失败状态已更新"}
+        
+        # 如果任务完成，添加完成时间（只更新一次，后续不再更新）
+        if task_status in ["finished", "success"]:
+            # 1. 只更新子采集任务状态,标记为成功, 主采集任务记录默认为成功，不需要记录
+            update_sub_task_status(task_status, summary_plan_id, plan_id, task_id, [])
+
+        # 构建基础结果字典
+        base_result = _build_base_collection_result(plan, webhook_args, task_info, status)
+
+        # 没有拿到数据的情况
+        if not task_result:
+            logging.warning(f"task_result为空: {device_ip} - {plan.name}")
+
+        collection_results = []
+        data_process_errors = []  # 记录数据处理错误
+
+        # 遍历处理每条命令结果（通常只有一条）
+        for command_name, command_result in task_result.items():
+            collection_result = {
+                **base_result,
+                'method_name': command_name,
+                'data': command_result,                 # 原始数据
+            }
+
+            # 处理原始数据
+            resolve_status, resolve_error, resolve_data = resolve_raw_data(
+                plan, collection_result, collection_method
+            )
+
+            if resolve_status:
+                # resolve_data 是列表，需要展开添加到 collection_results
+                if isinstance(resolve_data, list):
+                    collection_results.extend(resolve_data)
+                else:
+                    # 如果不是列表，直接添加
+                    collection_results.append(resolve_data)
+            else:
+                # 数据处理失败，记录错误
+                error_msg = f"数据处理失败: command={command_name}, error={resolve_error}"
+                logging.warning(error_msg)
+                data_process_errors.append(error_msg)
+
+        # 如果数据处理失败，更新状态为失败（覆盖之前的finished状态）
+        if data_process_errors:
+            # 1. 先更新子采集任务记录
+            update_sub_task_status("failed", summary_plan_id, plan_id, task_id, data_process_errors)
+            logging.error(f"子采集任务数据处理失败: {device_ip} - {plan.name} - 错误: {data_process_errors}")
+            # 2. 再更新主采集任务记录
+            update_parent_task_status("failed", summary_plan_id, device_ip, execute_time)
+            return {"status": "failed", "message": f"数据处理失败: {data_process_errors}"}
+
+        # 如果数据处理没有数据
+        if not collection_results:
+            logging.warning(f"没有可保存的采集结果: {device_ip} - {plan.name}")
+            # 1. 更新子采集任务记录，数据为空，更新状态为失败
+            update_sub_task_status("failed", summary_plan_id, plan_id, task_id, ["数据处理后的结果为空"])
+            # 2. 更新主采集任务记录
+            update_parent_task_status("failed", summary_plan_id, device_ip, execute_time)
+            return {"status": "failed", "message": "没有可保存的采集结果，所有数据处理后都为空"}
+
+        try:
+            # 根据collection_type选择MongoDB集合，优先使用预定义的实例
+            collection_name = f"plan_{collection_type}"
+            collection_db = COLLECTION_TYPE_MONGO_MAP.get(collection_type)
+            if not collection_db:
+                # 如果不在预定义列表中，则动态创建（向后兼容）
+                collection_db = MongoOps(db='Automation', coll=collection_name)
+                logging.warning(f"使用动态创建的MongoDB集合: Automation.{collection_name} (采集类型: {collection_type})")
+            else:
+                logging.info(f"使用MongoDB集合: Automation.{collection_name} (采集类型: {collection_type})")
+            
+            # 执行插入清洗后的数据
+            collection_db.insert_many(collection_results)
+            logging.info(f"采集结果已保存: {device_ip} - 采集类型: {collection_type} - 共 {len(collection_results)} 条记录 - 集合: {collection_name}")
+        except Exception as e:
+            logging.error(f"保存采集结果到MongoDB失败: {device_ip} - 错误: {str(e)}", exc_info=True)
+            # 1. 更新子采集任务记录，保存失败，更新状态为失败（覆盖之前的finished状态）
+            update_sub_task_status("failed", summary_plan_id, plan_id, task_id, [f"保存采集结果失败: {str(e)}"])
+            # 2. 更新主采集任务记录
+            update_parent_task_status("failed", summary_plan_id, device_ip, execute_time)
+            return {"status": "failed", "message": f"保存采集结果失败: {str(e)}"}
+
+        logging.info(f"webhook回调处理完成: {device_ip} - 采集类型: {collection_type}")
+        return {"status": "success", "message": "结果插入mongodb成功"}
+
+    except Exception as e:
+        logging.error(f"webhook回调执行失败: {str(e)}", exc_info=True)
+        # # 如果已经获取到必要参数，更新主任务状态为失败
+        # try:
+        #     # 直接使用 try 块中已获取的变量（如果异常发生在获取这些参数之后，变量已存在）
+        #     if summary_plan_id and device_ip and execute_time:
+        #         update_parent_task_status("failed", summary_plan_id, device_ip, execute_time)
+        #         logging.info(f"已更新主任务状态为失败: device_ip={device_ip}, summary_plan_id={summary_plan_id}")
+        # except (NameError, Exception) as update_error:
+        #     # 如果变量不存在或更新失败，记录警告但不影响主流程
+        #     logging.warning(f"更新主任务状态失败: {str(update_error)}")
+        return {"status": "failed", "message": f"webhook回调执行失败: {str(e)}"}
+
+
+def update_parent_task_status(task_status, summary_plan_id, device_ip, execute_time):
+    """
+    更新主采集方案记录的状态
+
+    :param task_status: 任务状态
+    :param summary_plan_id: 主采集方案ID
+    :param device_ip: 设备IP地址
+    :param execute_time: 执行时间（用于关联主采集方案和子采集方案）
+    :return: 更新结果，True表示成功，False表示失败
+    """
+    try:
+        if not execute_time:
+            logging.warning("execute_time为空，无法更新主采集方案记录")
+            return False
+
+        if not summary_plan_id or not device_ip:
+            logging.warning(
+                f"参数不完整，无法更新主采集方案记录: summary_plan_id={summary_plan_id}, device_ip={device_ip}")
+            return False
+
+        # 更新主采集方案记录的更新时间
+        update_result = COLLECTION_PLAN.update_one(
+            filter={
+                "summary_plan_id": summary_plan_id,
+                "device_ip": device_ip,
+                "execute_time": execute_time  # 使用execute_time精确定位记录
+            },
+            update={
+                "$set": {
+                    "task_status": task_status,
+                    "updated_at": datetime.now().isoformat()
+                }
+            }
+        )
+
+        if update_result.matched_count > 0:
+            logging.debug(
+                f"主采集方案记录已更新: device_ip={device_ip}, summary_plan_id={summary_plan_id}, execute_time={execute_time}")
+            return True
+        else:
+            logging.warning(
+                f"未找到主采集方案记录: device_ip={device_ip}, summary_plan_id={summary_plan_id}, execute_time={execute_time}")
+            return False
+
+    except Exception as e:
+        logging.error(f"更新主采集方案记录失败: {str(e)}", exc_info=True)
+        return False
+
+
+def update_sub_task_status(new_status, summary_plan_id, plan_id, task_id, error_msg):
+    """更新子采集任务状态到COLLECTION_DEVICE_MONGODB"""
+    try:
+        update_data = {
+            "$set": {
+                "task_status": new_status,
+                "task_errors": error_msg,
+                "updated_at": datetime.now().isoformat()
+            }
+        }
+
+        result = COLLECTION_SUB_PLAN.update_one(
+            filter={"summary_plan_id": summary_plan_id, "plan_id": plan_id, "task_id": task_id},
+            update=update_data
+        )
+        if result.matched_count == 0:
+            logging.warning(f"未找到匹配的任务记录: task_id={task_id}")
+        else:
+            logging.info(f"任务状态已更新: task_id={task_id}, status={new_status}, matched={result.matched_count}, modified={result.modified_count}")
+        return True
+    except Exception as e:
+        logging.error(f"更新任务状态失败: task_id={task_id}, 错误: {str(e)}", exc_info=True)
+        return False
+
+
 def process_raw_data(plan, collection_result, collection_method):
     """数据处理函数，处理原始数据
     
@@ -209,10 +470,14 @@ def resolve_raw_data(plan, collection_result, collection_method):
         tuple: (status, error_message, mapping_data)
     """
     try:
-        command_result = collection_result["data"]      # 原始数据
+        # 首先判断结果是否正常， 如果是 netmiko 采集方式，且 data 字段是字符串，说明 Textfsm 模板解析失败
+        if collection_method.lower() == "netmiko" and isinstance(collection_result.get("data", ''), str):
+            return False, f"Textfsm 模板解析失败", []
+
+        copy_data = collection_result.copy()            # 首先进行拷贝数据
+
+        command_result = copy_data["data"]              # 原始数据
         mapping_data = []                               # 映射数据
-        error_message = ""                              # 记录错误信息
-        has_error = False                               # 是否存在错误
         method = collection_method.lower()
         
         # 第一步：数据处理函数（按采集方式通过分发表调用，异常立即返回）, 有函数则添加中间层processed_data
@@ -226,18 +491,16 @@ def resolve_raw_data(plan, collection_result, collection_method):
             if enabled and code and callable(func):
                 logging.info(f"执行{method}数据处理函数: {plan.name}")
                 processed_data = func(command_result)
-                collection_result["processed_data"] = processed_data
+                copy_data["processed_data"] = processed_data
             else:
                 # 未启用处理器或无处理函数，则透传原始数据
-                collection_result["processed_data"] = []
-            logging.info(f"数据处理函数执行完成: {plan.name}")
+                copy_data["processed_data"] = []
+            logging.info(f"数据处理函数执行完成: {plan.name}")  
         except Exception as e:
             logging.error(f"数据处理函数执行失败: {plan.name} - {str(e)}", exc_info=True)
-            method_tag = (collection_method or "unknown").lower()
-            return False, f"{method_tag}_processor_failed: {str(e)}", []
+            return False, f"{collection_method}_process_data_function_failed: {str(e)}", []
         
-        # 第二步：字段映射
-        # 获取字段映射配置
+        # 第二步：字段映射，获取字段映射配置
         field_mappings = None
         path_config = None
         
@@ -254,25 +517,30 @@ def resolve_raw_data(plan, collection_result, collection_method):
         
         if field_mappings and path_config:
             try:
-                mapping_data = apply_field_mappings(collection_result, field_mappings, path_config)
+                mapping_data = apply_field_mappings(copy_data, field_mappings, path_config)
                 if mapping_data:
                     logging.info(f"字段映射执行成功: {plan.name} - 映射了 {len(mapping_data)} 条记录")
                 else:
                     logging.warning(f"字段映射未返回数据: {plan.name}")
             except Exception as e:
                 logging.error(f"字段映射执行失败: {plan.name} - {str(e)}", exc_info=True)
-                method_tag = (collection_method or "unknown").lower()
-                return False, f"{method_tag}_mapping_failed(path={path_config}): {str(e)}", []
-        
-        # 如果有错误，返回失败状态
-        if has_error:
-            return False, error_message, []
-        
-        return True, "", mapping_data
+                return False, f"{collection_method}_apply_field_mappings_failed(path={path_config}): {str(e)}", []
+
+        # 3. 根据厂商和类型，调用对应的处理方法
+        try:
+            if method == "netmiko":
+                resolved_data = apply_vendor_processor(plan, mapping_data)
+            else:
+                resolved_data = mapping_data
+        except Exception as e:
+            logging.error(f"厂商处理方法执行失败: {plan.name} - {str(e)}", exc_info=True)
+            return False, f"{collection_method}_apply_vendor_processor_failed: {str(e)}", []
+
+        return True, "", resolved_data
         
     except Exception as e:
-        logging.error(f"数据处理异常: {plan.name} - {str(e)}")
-        return False, f"exception: {str(e)}", []
+        logging.error(f"数据处理异常: {plan.name} - {str(e)}", exc_info=True)
+        return False, f"resolve_raw_data_exception: {str(e)}", []
 
 
 def apply_field_mappings(data_dict, field_mappings, path_config=None):
@@ -344,6 +612,7 @@ def apply_field_mappings(data_dict, field_mappings, path_config=None):
 
         processed_data = []
         log_time = datetime.now()
+        host_ip = data_dict.get("device_ip")
 
         # 遍历数组中的每个元素
         for item in array_data:
@@ -387,6 +656,7 @@ def apply_field_mappings(data_dict, field_mappings, path_config=None):
 
             # 将结果添加到数组中
             result_item['log_time'] = log_time
+            result_item["hostip"] = host_ip
             processed_data.append(result_item)
 
         logging.info(f"字段映射完成: 处理了 {len(processed_data)} 条记录，使用了 {len(sorted_fields)} 个字段")
@@ -396,3 +666,62 @@ def apply_field_mappings(data_dict, field_mappings, path_config=None):
         logging.error(f"应用字段映射失败: {str(e)}", exc_info=True)
         return []
 
+
+def apply_vendor_processor(plan, processed_data):
+    """根据厂商和采集类型调用对应的处理方法处理数据
+
+    Args:
+        plan: 采集方案对象或字典，包含厂商和采集类型信息
+        processed_data: 已处理的数据列表
+
+    Returns:
+        处理后的数据列表，如果处理失败则返回原始数据
+    """
+    try:
+        if not plan or not processed_data:
+            return processed_data
+
+        # 获取厂商和采集类型
+        vendor = plan.summary_plan.vendor
+        collection_type = plan.collection_type
+
+        # 获取模块名和类名
+        module_name, class_name = vendor_mapping.get(vendor, (None, None))
+
+        if not module_name or not class_name:
+            logging.warning(f"不支持的厂商: {vendor}，跳过厂商处理")
+            return processed_data
+
+        # 动态导入模块
+        try:
+            module = importlib.import_module(f'apps.device_api.tools.{module_name}')
+            plan_class = getattr(module, class_name, None)
+
+            if not plan_class:
+                logging.warning(f"未找到类: {class_name}，跳过厂商处理")
+                return processed_data
+
+            # 构建方法名：get_{collection_type}
+            method_name = f'get_{collection_type}'
+            method = getattr(plan_class, method_name, None)
+
+            if method and callable(method):
+                # 调用方法处理数据
+                resolved_data = method(processed_data)
+                logging.info(f"已应用厂商处理方法: {vendor}.{class_name}.{method_name}()")
+                return resolved_data
+            else:
+                logging.warning(f"未找到方法: {class_name}.{method_name}()，跳过厂商处理")
+                return processed_data
+
+        except ImportError as e:
+            logging.warning(f"导入模块失败: apps.device_api.tools.{module_name}, 错误: {str(e)}")
+            return processed_data
+        except Exception as e:
+            logging.error(f"调用厂商处理方法失败: {str(e)}", exc_info=True)
+            return processed_data
+
+    except Exception as e:
+        logging.error(f"执行厂商处理方法时发生错误: {str(e)}", exc_info=True)
+        # 即使处理失败，也返回原始数据
+        return processed_data
