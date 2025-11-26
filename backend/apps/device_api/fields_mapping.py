@@ -2,9 +2,9 @@
 
 APR_MAPPING = [
     # {"label": "主机IP: hostip", "value": "hostip"},
-    # {"label": "主机名称: hostname", "value": "hostname"},
-    # {"label": "机房名称: idc_name", "value": "idc_name"},
-    {"label": "网络地址: ipaddress", "value": "ipaddress"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "IP地址: ipaddress", "value": "ipaddress"},
     {"label": "Mac地址: macaddress", "value": "macaddress"},
     {"label": "age: aging", "value": "aging"},
     {"label": "类型: type", "value": "type"},
@@ -16,8 +16,8 @@ APR_MAPPING = [
 
 MAC_MAPPING = [
     # {"label": "主机IP: hostip", "value": "hostip"},
-    # {"label": "主机名称: hostname", "value": "hostname"},
-    # {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
     {"label": "mac地址: macaddress", "value": "macaddress"},
     {"label": "vlan地址: vlan", "value": "vlan"},
     {"label": "接口: interface", "value": "interface"},
@@ -39,10 +39,10 @@ LLDP_MAPPING = [
 IP_INTERFACE_MAPPING = [
     # {"label": "主机IP: hostip", "value": "hostip"},
     {"label": "简介: interface", "value": "interface"},
-    {"label": "当前状态: line_status", "value": "line_status"},
+    {"label": "线路状态: line_status", "value": "line_status"},
     {"label": "协议状态: protocol_status", "value": "protocol_status"},
-    {"label": "网络地址: ipaddress", "value": "ipaddress"},
-    {"label": "ip掩码地址:  ipmask", "value": " ipmask"},
+    {"label": "IP地址: ipaddress", "value": "ipaddress"},
+    {"label": "ip掩码:  ipmask", "value": " ipmask"},
     {"label": "IP类型:  ip_type", "value": " ip_type"},
     {"label": "mtu: mtu", "value": "mtu"}
 ]
@@ -67,11 +67,25 @@ AGGRE_PORT_MAPPING = [
 
 
 field_mapping = {
-    "arp": APR_MAPPING,
-    "mac": MAC_MAPPING,
-    "lldp": LLDP_MAPPING,
-    "ip_interface": IP_INTERFACE_MAPPING,
-    "interface_brief": INTERFACE_BRIEF_MAPPING,
-    "aggre_port": AGGRE_PORT_MAPPING
+    "arp": {"label": "ARP", "value": "arp", "icon": "arp", "mapping_fields": APR_MAPPING},
+    "mac": {"label": "MAC", "value": "mac", "icon": "mac", "mapping_fields": MAC_MAPPING},
+    "lldp": {"label": "LLDP", "value": "lldp", "icon": "lldp", "mapping_fields": LLDP_MAPPING},
+    "ip_interface": {"label": "三层接口", "value": "ip_interface", "icon": "ip-interface", "mapping_fields": IP_INTERFACE_MAPPING},
+    "interface_brief": {"label": "接口摘要", "value": "interface_brief", "icon": "interface-summary", "mapping_fields": INTERFACE_BRIEF_MAPPING},
+    "aggre_port": {"label": "聚合端口", "value": "aggre_port", "icon": "aggregation-port", "mapping_fields": AGGRE_PORT_MAPPING}
 }
 
+# 厂商到模块名和类名的映射
+vendor_mapping = {
+    'H3C': ('h3c', 'H3CPlan'),
+    'Huawei': ('huawei', 'HuaweiPlan'),
+    'Cisco': ('cisco', 'CiscoPlan'),
+    'CISCO': ('cisco', 'CiscoPlan'),
+    'cisco': ('cisco', 'CiscoPlan'),
+    'centec': ('centec', 'CentecPlan'),
+    'Hillstone': ('hillstone', 'HillstonePlan'),
+    'Maipu': ('maipu', 'MaipuPlan'),
+    'Mellanox': ('mellanox', 'MellanoxPlan'),
+    'Ruijie': ('ruijie', 'RuiJiePlan'),
+    'ZTE': ('zte', 'ZtePlan'),
+}
