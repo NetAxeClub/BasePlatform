@@ -1139,3 +1139,82 @@ class GatewayView(APIView):
                 'data': '',
             }
             return JsonResponse(result, safe=False)
+
+
+def get_network_device_vendor_distribution():
+    # 按vendor.name分组统计，并计算每个厂商的设备数量
+    vendor_stats = NetworkDevice.objects.values(
+        'vendor__name'
+    ).annotate(
+        count=Count('id')
+    ).order_by('-count')  # 按数量降序排列
+
+    # 构建返回的数据结构
+    result = {
+        "name": "网络设备厂商分布",
+        "value": [
+            {
+                "name": item['vendor__name'] if item['vendor__name'] else "未知厂商",
+                "value": str(item['count'])
+            }
+            for item in vendor_stats
+        ]
+    }
+
+    return [result]
+
+
+def get_network_device_idc_distribution():
+    # 按vendor.name分组统计，并计算每个厂商的设备数量
+    vendor_stats = NetworkDevice.objects.values(
+        'idc__name'
+    ).annotate(
+        count=Count('id')
+    ).order_by('-count')  # 按数量降序排列
+
+    # 构建返回的数据结构
+    result = {
+        "name": "网络设备机房分布",
+        "value": [
+            {
+                "name": item['idc__name'] if item['idc__name'] else "未知",
+                "value": str(item['count'])
+            }
+            for item in vendor_stats
+        ]
+    }
+
+    return [result]
+
+def get_network_device_category_distribution():
+    # 按vendor.name分组统计，并计算每个厂商的设备数量
+    vendor_stats = NetworkDevice.objects.values(
+        'category__name'
+    ).annotate(
+        count=Count('id')
+    ).order_by('-count')  # 按数量降序排列
+
+    # 构建返回的数据结构
+    result = {
+        "name": "网络设备类型分布",
+        "value": [
+            {
+                "name": item['category__name'] if item['category__name'] else "未知",
+                "value": str(item['count'])
+            }
+            for item in vendor_stats
+        ]
+    }
+
+    return [result]
+
+
+class Metric(APIView):
+    def get(self, request):
+        params = request.GET.dict()
+        if params.get('get_device_provide'):
+            return JsonResponse({'code': 200, 'data': get_network_device_vendor_distribution()})
+        if params.get('get_idc_provide'):
+            return JsonResponse({'code': 200, 'data': get_network_device_idc_distribution()})
+        if params.get('get_device_category_provide'):
+            return JsonResponse({'code': 200, 'data': get_network_device_category_distribution()})

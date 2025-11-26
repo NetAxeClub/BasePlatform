@@ -1548,10 +1548,12 @@ if __name__ == '__main__':
     # res = BatManMain.info_fsm(path='automation/huawei/display_eth-trunk.txt', fsm_platform='huawei_vrp')
     # res = BatManMain.info_fsm(path='automation/huawei/display_lldp_neighbor.txt', fsm_platform='huawei_vrp')
     # res = BatManMain.info_fsm(path='automation/huawei/display_version.txt', fsm_platform='huawei_vrp')
-    res = BatManMain.info_fsm(path='automation/h3c/display_ip_routing-table.txt', fsm_platform='hp_comware')
+    res = BatManMain.info_fsm(path='automation/10.254.25.112/show_service_predefined.txt', fsm_platform='hillstone')
+    # res = BatManMain.info_fsm(path='automation/h3c/display_ip_routing-table.txt', fsm_platform='hp_comware')
     # res = BatManMain.info_fsm(path='automation/10.1.1.2/show_lldp_neighbors_detail.txt', fsm_platform='cisco_ios')
     if isinstance(res, list):
         for i in res:
             print(i)
     else:
         print(res)
+    # dnat_res, no_parse = HillstoneFsm.dnat_proc_new(path=path)
