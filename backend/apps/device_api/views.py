@@ -385,10 +385,11 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
                 return False, "缺少必要参数: device_ip", None
             
             # 2. 查询设备信息
-            try:
-                device = NetworkDevice.objects.select_related('idc').get(manage_ip=device_ip)
-            except NetworkDevice.DoesNotExist:
+            devices = NetworkDevice.objects.select_related('idc').filter(manage_ip=device_ip)
+            
+            if not devices.exists():
                 return False, f"设备 {device_ip} 不存在", None
+            device = devices.first()
 
             # 3. 根据采集类型进行特定验证
             if collection_type == 'netmiko':
