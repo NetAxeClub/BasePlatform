@@ -428,10 +428,8 @@ class NetworkDevice(models.Model):
     slot = models.IntegerField(verbose_name='槽位编号', default=0)
     auto_enable = models.BooleanField(verbose_name="自动化纳管", null=False, default=True)
     account = models.ManyToManyField('AssetAccount', verbose_name='管理账户', blank=True)
-    plan = models.ForeignKey("device_api.DeviceCollectionPlans", verbose_name='采集方案',             
-                             blank=True, null=True, related_name='releate_device', on_delete=models.SET_NULL)       # 修改关联模型
-
-    execute_node = models.CharField(verbose_name="执行节点", blank=True, null=True, max_length=50)          # 新增：执行节点
+    plan = models.ForeignKey("automation.CollectionPlan", verbose_name='采集方案',
+                             blank=True, null=True, related_name='releate_device', on_delete=models.SET_NULL)
     snmp_version = models.CharField(verbose_name="SNMP version", default="v2c", null=False, max_length=50)
     snmp_community = models.CharField(verbose_name="SNMP community", default="-", null=False, max_length=50)
     snmp_port = models.IntegerField(verbose_name="snmp port", default=161, null=False)
