@@ -732,7 +732,7 @@ class MainIn:
                                                         'rack').prefetch_related('bind_ip', 'account').filter(
             status=0).values(
             'name', 'idc__name', 'serial_num', 'manage_ip', 'status', 'chassis', 'slot', 'idc_model__name',
-            'u_location_start', 'u_location_end', 'rack__name')
+            'u_location_start', 'u_location_end', 'rack__name', 'role__name', 'category__name')
         MongoNetOps.post_cmdb(all_devs)
         return
 
@@ -742,7 +742,7 @@ class MainIn:
                               log_time, memberport, macaddress) -> None:
         hostinfo = cmdb_mongo.find(query_dict=dict(manage_ip=hostip, status=0),
                                    fields={'_id': 0, 'idc__name': 1, 'name': 1, 'serial_num': 1, 'idc_model__name': 1,
-                                           'rack__name': 1, 'u_location_start': 1, 'u_location_end': 1})
+                                           'rack__name': 1, 'u_location_start': 1, 'u_location_end': 1, 'category__name': 1})
         node_location = ','.join([str(
             x.get('idc_model__name')) +
                                   '_' +
@@ -765,6 +765,7 @@ class MainIn:
                 'node_location': node_location,
                 'idc_name': hostinfo[0]['idc__name'],
                 'serial_num': hostinfo[0]['serial_num'],
+                'category_name': hostinfo[0]['category__name'],
                 'node_interface': memberport,
                 'memberport': memberport_list,
                 'server_ip_address': ip_address,
