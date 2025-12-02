@@ -1,5 +1,6 @@
 import json
 import operator
+import requests
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 from urllib.parse import quote
@@ -23,7 +24,8 @@ from apps.automation.serializers import (
 from apps.api.tools.custom_viewset_base import CustomViewBase
 from django.db.models import CharField, ForeignKey, GenericIPAddressField
 from apps.automation.tasks import DiagnoseProc
-from utils.db.mongo_ops import MongoOps, MongoNetOps
+from utils.db.mongo_ops import MongoOps
+from confload.confload import config
 from driver import auto_driver_map
 from .tools.models_api import get_firewall_list
 
@@ -291,13 +293,16 @@ class XunMiView(APIView):
             hostip = get_param['get_layer2interface_hostip']
             interface_str = get_param['interfaces']
             interface_list = [iface.strip() for iface in interface_str.split(',') if iface.strip()]
-
-            if not interface_list:
-                return JsonResponse({"code": 200, "results": {}}, safe=False)
-
-            query_dict = {'hostip': hostip, 'interface': {'$in': interface_list}}
-            layer2interface_res = interface_mongo.find(query_dict=query_dict, fields={'interface': 1, 'description': 1})
-            results = {r["interface"]: r["description"] for r in layer2interface_res}
+            results = {}
+            for interface in interface_list:
+                query_string = f'ifHCInOctets{{instance="{hostip}", ifName="{interface}"}}'
+                grafana_api = config.grafana_net_device_resource_api
+                grafana_token = config.grafana_net_device_resource_api_token
+                headers = {
+                    'Authorization': f'Bearer {grafana_token}'
+                }
+                response = requests.request("POST", grafana_api, headers=headers, params={'query': query_string})
+                results[interface] = response.json()['data']['result'][0]['metric']['interface']
             return JsonResponse({"code": 200, "results": results}, safe=False)
 
         if get_param.get('get_interface_by_hostip'):
