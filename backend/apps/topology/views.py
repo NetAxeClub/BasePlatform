@@ -9,6 +9,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions, filters
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
+from rest_framework.decorators import action
 from apps.topology.icon_manage import IconTree
 from apps.topology.tasks import TopologyTask
 from apps.topology.models import Topology
@@ -16,7 +17,7 @@ from .serializers import TopologySerializer
 from utils.db.mongo_ops import MongoOps, MongoNetOps
 from apps.api.tools.custom_viewset_base import CustomViewBase
 from apps.api.tools.custom_pagination import LargeResultsSetPagination
-
+topology_mongo = MongoOps(db='Automation', coll='topology')
 # Create your views here.
 # 设备二层接口表
 interface_mongo = MongoOps(db='Automation', coll='layer2interface')
@@ -49,18 +50,34 @@ class TopologyViewSet(CustomViewBase):
     pagination_class = LargeResultsSetPagination
 
 
+class TopologyList(APIView):
+    def get(self, request):
+        data = topology_mongo.find(query_dict={}, fields={'_id': 0, 'name': 1, 'parent': 1})
+        return JsonResponse(dict(code=200, data=data, msg='获取拓扑数据成功'), content_type="application/json",
+                            safe=False)
+
+class TopologyCreate(APIView):
+    def post(self, request):
+        post_param = request.data
+        topology_mongo.insert(post_param['create_graph'])
+        data = {
+            "code": 200,
+            "data": [],
+            "msg": "新建拓扑图成功"
+        }
+        return JsonResponse(data, content_type="application/json", safe=False)
+
 # 拓扑显示
 class TopologyShow(APIView):
     # permission_classes = (IsAuthenticated,)
     permission_classes = ()
     authentication_classes = ()
-
     def get(self, request):
         get_param = request.GET.dict()
         if get_param.get('graph'):
             content = MongoNetOps.get_topology(get_param['graph'])
             if content:
-                return JsonResponse(dict(code=200, data=content['graph'], msg='获取拓扑数据成功'), content_type="application/json",
+                return JsonResponse(dict(code=200, data=content, msg='获取拓扑数据成功'), content_type="application/json",
                                     safe=False)
             else:
                 return JsonResponse(dict(code=400, msg='没有拓扑数据'), content_type="application/json", safe=False)
@@ -81,16 +98,13 @@ class TopologyShow(APIView):
         }
         return JsonResponse(data)
 
+
     def post(self, request):
         post_param = request.data
         # 保存拓扑图
-        if all(k in post_param for k in ("name", "graph")):
-            _TopologyTask = TopologyTask(post_param['name'])
-            # 只有link 连线需要重写source 和 target ，d3.js会把source和target改成对应node的字典格式, 默认给到前端是字符串格式的设备ID
-            # for i in post_param['graph']['links']:
-            #     i['target'] = i['target']['name']
-            #     i['source'] = i['source']['name']
-            _TopologyTask.save_graph(post_param)
+        if post_param.get('save_graph'):
+            _TopologyTask = TopologyTask(post_param['save_graph']['name'])
+            _TopologyTask.save_graph(post_param['save_graph'])
             data = {
                 "code": 200,
                 "data": [],
@@ -190,6 +204,16 @@ class TopologyShow(APIView):
         }
         return JsonResponse(data, content_type="application/json", safe=False)
 
+    def delete(self, request):
+        get_param = request.GET.dict()
+        print(get_param)
+        data = {
+            "code": 400,
+            "data": [],
+            "msg": "没有匹配的操作"
+        }
+        return JsonResponse(data)
+
 
 # 图标库
 class IconView(APIView):
@@ -199,21 +223,12 @@ class IconView(APIView):
     def get(self, request):
         get_param = request.GET.dict()
         # print(get_param)
-        if get_param.get('get_tree'):
-            _tree = IconTree()
-            _tree.produce_tree()
-            res = _tree.tree_final
-            if res:
-                return JsonResponse(dict(code=200, data=res, msg='获取图标库成功'), content_type="application/json",
-                                    safe=False)
-            else:
-                return JsonResponse(dict(code=400, msg='没有数据'), content_type="application/json", safe=False)
-        data = {
-            "code": 400,
-            "data": [],
-            "msg": "没有匹配的操作"
-        }
-        return JsonResponse(data)
+        _tree = IconTree()
+        _tree.produce_tree()
+        res = _tree.tree_final
+        if res:
+            return JsonResponse(dict(code=200, data=res, msg='获取图标库成功'), content_type="application/json", safe=False)
+        return JsonResponse(dict(code=400, msg='没有数据'), content_type="application/json", safe=False)
 
     def post(self, request):
         post_param = request.data

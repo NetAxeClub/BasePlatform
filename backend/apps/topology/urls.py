@@ -7,11 +7,13 @@ app_name = 'topology'
 router = DefaultRouter()
 
 
-router.register(r'index', TopologyViewSet)
+# router.register(r'index', TopologyViewSet)
 
 
 urlpatterns = [
     path(r'', include(router.urls)),
-    path('show/', TopologyShow.as_view(), name='show'),
-    path('topology_icon/', IconView.as_view(), name='topology_icon'),
+    path('list/', TopologyList.as_view(), name='list'),
+    path('create/', TopologyCreate.as_view(), name='create'),
+    path('index/', TopologyShow.as_view(), name='show'),
+    path('icon/', IconView.as_view(), name='icon'),
 ]

@@ -19,14 +19,15 @@ interface_mongo = MongoOps(db='Automation', coll='layer2interface')
 layer3int_mongo = MongoOps(db='Automation', coll='layer3interface')
 cmdb_mongo = MongoOps(db='XunMiData', coll='networkdevice')
 lagg_mongo = MongoOps(db='Automation', coll='AggreTable')
-
+topology_mongo = MongoOps(db='Automation', coll='topology')
 
 # 拓扑数据生成
 class TopologyTask:
     def __init__(self, name):
         # 初始化待处理的数据模型
-        self.topology = Topology.objects.get(name=name)
-        self.host_q = MongoNetOps.get_topology(self.topology.name)
+        # self.topology = Topology.objects.get(name=name)
+        self.topology = topology_mongo.find(query_dict={'name': name}, fields={'_id': 0})
+        self.host_q = MongoNetOps.get_topology(self.topology[0]['name'])
         self.NODE_HIERARCHY = [
             ('^.*.AS..*', "1", "AC.png"),
             ('^.*.AR..*', "4", "L3.png")
@@ -41,17 +42,26 @@ class TopologyTask:
 
     # 获取拓扑
     def get_graph(self):
-        return MongoNetOps.get_topology(self.topology.name)
+        _query = topology_mongo.find(query_dict={'name': self.topology[0]['name']}, fields={'_id': 0})
+        if _query:
+            return _query[0]
+        return []
 
     # 删除拓扑
     def del_graph(self):
-        self.topology.delete()
-        MongoNetOps.del_topology(self.topology.name)
+        topology_mongo.delete_many(query={'name': self.topology[0]['name']})
+        # self.topology.delete()
+        # MongoNetOps.del_topology(self.topology.name)
         return
 
     # 保存拓扑
     def save_graph(self, obj):
-        MongoNetOps.topology_ops(obj)
+        _query = topology_mongo.find(query_dict={'name': obj['name']}, fields={'_id': 0})
+        if _query:
+            topology_mongo.update(filter={'name': obj['name']}, update={'$set': obj})
+        else:
+            topology_mongo.insert(obj)
+        return
 
     # 根据设备IP和接口返回接口速率
     def foo_speed(self, hostip, interface_name):
@@ -211,9 +221,9 @@ class TopologyTask:
         result = {
             "links": self.host_q['links'],
             "nodes": self.host_q['nodes'],
-            "name": self.topology.name,
-            "cmdb": '',
-            "interface": []
+            "name": self.topology[0]['name'],
+            # "cmdb": '',
+            # "interface": []
         }
         if self.is_link_duplicate(source_ip, source_interface, target_ip, target_interface):
             data = {
@@ -245,9 +255,9 @@ class TopologyTask:
         result = {
             "links": [],
             "nodes": self.host_q['nodes'],
-            "name": self.topology.name,
-            "cmdb": '',
-            "interface": []
+            "name": self.topology[0]['name'],
+            # "cmdb": '',
+            # "interface": []
         }
         # 保留手动连线
         if self.host_q['links']:
@@ -278,7 +288,7 @@ class TopologyTask:
 
         MongoNetOps.topology_ops(result)
 
-        self.topology.save()
+        # self.topology.save()
         return result
 
     # 增加节点
@@ -292,7 +302,7 @@ class TopologyTask:
             self.host_q = {
                 "links": [],
                 "nodes": [],
-                "name": self.topology.name,
+                "name": self.topology[0]['name'],
                 "cmdb": '',
                 "interface": []
             }
