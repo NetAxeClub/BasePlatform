@@ -43,7 +43,6 @@ def get_mongo_json_res(data):
     res = JSONEncoder().encode(data)
     return res
 
-
 mongo_client = pymongo.MongoClient(
     host=config.mongodb_host,
     port=config.mongodb_port,
@@ -299,8 +298,8 @@ class MongoNetOps(object):
     def topology_ops(data):
         _query = topology_mongo.find(query_dict={'name': data['name']}, fields={'_id': 0})
         if _query:
-            topology_mongo.delete_many(query={'name': data['name']})
-            topology_mongo.insert(data)
+            topology_mongo.update(filter={'name': data['name']}, update={'$set': data})
+            # topology_mongo.insert(data)
         else:
             topology_mongo.insert(data)
         return
