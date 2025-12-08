@@ -56,6 +56,7 @@ class TopologyList(APIView):
         return JsonResponse(dict(code=200, data=data, msg='获取拓扑数据成功'), content_type="application/json",
                             safe=False)
 
+
 class TopologyCreate(APIView):
     def post(self, request):
         post_param = request.data
@@ -206,7 +207,14 @@ class TopologyShow(APIView):
 
     def delete(self, request):
         get_param = request.GET.dict()
-        print(get_param)
+        if get_param.get('graph'):
+            topology_mongo.delete_many(query={'name': get_param['graph']})
+            data = {
+                "code": 200,
+                "data": [],
+                "msg": "删除成功"
+            }
+            return JsonResponse(data)
         data = {
             "code": 400,
             "data": [],
