@@ -27,6 +27,9 @@ speed_map = {
             "25G": 25,
             "40G": 40,
             "100G": 100,
+            "200G": 200,
+            "250G": 250,
+            "400G": 400,
         }
 # 根据IP 和接口返回当前接口三层IP信息
 def foo_layer3_ip(hostip, interface_name):
@@ -56,13 +59,13 @@ def foo_speed(hostip, interface_name):
 
 
 # 生成连线
-def foo_link(nodes, manual_links, strict=True):
+def foo_link(nodes, links, strict=True):
     """
     """
     # 排除重复连线
-    def is_duplicate(links):
+    def is_duplicate(_links):
         tmp_result = []
-        for a in links:
+        for a in _links:
             source = a['source_manage_ip'] + a['source_interfaces']
             target = a['target_manage_ip'] + a['target_interfaces']
             # 正向和反向都去重
@@ -101,7 +104,7 @@ def foo_link(nodes, manual_links, strict=True):
             result.append(out_link)
         return result
 
-    links = []
+    res_links = []
     # 遍历节点
     for node in nodes:
         neighbor_q = lldp_mongo.find(query_dict={"hostip": node['manage_ip']}, fields={"_id": 0})
@@ -130,7 +133,7 @@ def foo_link(nodes, manual_links, strict=True):
                                                                       _neighbor['neighbor_port']),
                             "mode": "auto"  # 自动计算标识  手动添加的连线为 manual
                         }
-                        links.append(data)
+                        res_links.append(data)
                 else:  # 开放模式  计算不相关
                     data = {
                         "highest_utilization": 0,
@@ -143,8 +146,8 @@ def foo_link(nodes, manual_links, strict=True):
                         "target_interfaces": _neighbor['neighbor_port'],
                         "mode": "auto"  # 自动计算标识  手动添加的连线为 manual
                     }
-                    links.append(data)
-    return is_duplicate(links + manual_links)
+                    res_links.append(data)
+    return is_duplicate(links + res_links)
 
 
 # 本地计算生成拓扑
