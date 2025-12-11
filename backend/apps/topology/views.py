@@ -146,17 +146,17 @@ class TopologyShow(APIView):
         #     }
         #     return JsonResponse(data, content_type="application/json", safe=False)
         # 删除节点
-        # if all(k in post_param for k in ("name", "del_nodes")):
-        #     print(post_param)
-        #     _TopologyTask = TopologyTask(post_param['name'])
-        #     # del_nodes = json.loads(post_param['del_nodes'])
-        #     _TopologyTask.del_node(post_param['del_nodes'])
-        #     data = {
-        #         "code": 200,
-        #         "data": [],
-        #         "msg": "删除节点成功"
-        #     }
-        #     return JsonResponse(data, content_type="application/json", safe=False)
+        if all(k in post_param for k in ("name", "del_nodes")):
+            print(post_param)
+            _TopologyTask = TopologyTask(post_param['name'])
+            # del_nodes = json.loads(post_param['del_nodes'])
+            _TopologyTask.del_node(post_param['del_nodes'])
+            data = {
+                "code": 200,
+                "data": [],
+                "msg": "删除节点成功"
+            }
+            return JsonResponse(data, content_type="application/json", safe=False)
         # 删除拓扑图
         if all(k in post_param for k in ("name", "del_graph")):
             _TopologyTask = TopologyTask(post_param['name'])
