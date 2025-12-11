@@ -1,6 +1,6 @@
 import json
 import os
-from collections import OrderedDict
+import requests
 from datetime import datetime, date
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
@@ -11,8 +11,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.decorators import action
 from apps.topology.icon_manage import IconTree
-from apps.topology.tasks import TopologyTask
+from apps.topology.tasks import TopologyTask, auto_path
 from apps.topology.models import Topology
+from confload.confload import config
 from .serializers import TopologySerializer
 from utils.db.mongo_ops import MongoOps, MongoNetOps
 from apps.api.tools.custom_viewset_base import CustomViewBase
@@ -82,15 +83,18 @@ class TopologyShow(APIView):
                                     safe=False)
             else:
                 return JsonResponse(dict(code=400, msg='没有拓扑数据'), content_type="application/json", safe=False)
-        if get_param.get('get_interface_by_manage_ip'):
-            content = interface_mongo.find(query_dict={"hostip": get_param['get_interface_by_manage_ip']},
-                                           fields={"_id": 0})
-            if content:
-                return JsonResponse(dict(code=200, data=content, msg='success'), content_type="application/json",
-                                    safe=False)
-            else:
-                return JsonResponse(dict(code=400, data='没有匹配的数据', msg='success'), content_type="application/json",
-                                    safe=False)
+        if get_param.get('get_layer2interface'):
+            hostip = get_param['get_layer2interface']
+            query_string = f'ifHCInOctets{{instance="{hostip}"}}'
+            grafana_api = config.grafana_net_device_resource_api
+            grafana_token = config.grafana_net_device_resource_api_token
+            headers = {
+                'Authorization': f'Bearer {grafana_token}'
+            }
+            response = requests.request("POST", grafana_api, headers=headers, params={'query': query_string})
+            req = response.json()['data']['result']
+            results = [{'name': x['metric']['ifName'], 'value': x['metric']['interface']} for x in req]
+            return JsonResponse({"code": 200, "data": {'interfaces': results}}, safe=False)
 
         data = {
             "code": 400,
@@ -112,38 +116,47 @@ class TopologyShow(APIView):
                 "msg": "保存拓扑图成功"
             }
             return JsonResponse(data, content_type="application/json", safe=False)
-        # 新建节点
-        if all(k in post_param for k in ("name", "add_nodes")):
-            _TopologyTask = TopologyTask(post_param['name'])
-            graph_data = _TopologyTask.get_graph()
-            if not graph_data:
-                nodes = post_param['add_nodes']
-                result = OrderedDict()
-                # 多字典合并去重
-                for item in nodes:
-                    result.setdefault(item['manage_ip'], {**item})
-                result = list(result.values())
-                # print(result)
-                _TopologyTask.add_node(result)
-            else:
-                _TopologyTask.add_node(post_param['add_nodes'])
+        if post_param.get('auto_path'):
+            results = auto_path(data=post_param['auto_path'])
             data = {
                 "code": 200,
-                "data": [],
-                "msg": "新建节点成功"
+                "data": results,
+                "msg": "计算连线成功"
             }
             return JsonResponse(data, content_type="application/json", safe=False)
+        # # 新建节点
+        # if all(k in post_param for k in ("name", "add_nodes")):
+        #     _TopologyTask = TopologyTask(post_param['name'])
+        #     graph_data = _TopologyTask.get_graph()
+        #     if not graph_data:
+        #         nodes = post_param['add_nodes']
+        #         result = OrderedDict()
+        #         # 多字典合并去重
+        #         for item in nodes:
+        #             result.setdefault(item['manage_ip'], {**item})
+        #         result = list(result.values())
+        #         # print(result)
+        #         _TopologyTask.add_node(result)
+        #     else:
+        #         _TopologyTask.add_node(post_param['add_nodes'])
+        #     data = {
+        #         "code": 200,
+        #         "data": [],
+        #         "msg": "新建节点成功"
+        #     }
+        #     return JsonResponse(data, content_type="application/json", safe=False)
         # 删除节点
-        if all(k in post_param for k in ("name", "del_nodes")):
-            _TopologyTask = TopologyTask(post_param['name'])
-            del_nodes = json.loads(post_param['del_nodes'])
-            _TopologyTask.del_node(del_nodes)
-            data = {
-                "code": 200,
-                "data": [],
-                "msg": "删除节点成功"
-            }
-            return JsonResponse(data, content_type="application/json", safe=False)
+        # if all(k in post_param for k in ("name", "del_nodes")):
+        #     print(post_param)
+        #     _TopologyTask = TopologyTask(post_param['name'])
+        #     # del_nodes = json.loads(post_param['del_nodes'])
+        #     _TopologyTask.del_node(post_param['del_nodes'])
+        #     data = {
+        #         "code": 200,
+        #         "data": [],
+        #         "msg": "删除节点成功"
+        #     }
+        #     return JsonResponse(data, content_type="application/json", safe=False)
         # 删除拓扑图
         if all(k in post_param for k in ("name", "del_graph")):
             _TopologyTask = TopologyTask(post_param['name'])
