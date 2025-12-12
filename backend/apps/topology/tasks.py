@@ -115,7 +115,7 @@ def foo_link(nodes, links, strict=True):
                     # 排除自己连接自己
                     if _neighbor['neighbor_ip'] == node['manage_ip']:
                         continue
-                    if _neighbor['neighbor_ip'] in [x['manage_ip'] for x in nodes]:
+                    if _neighbor['neighborsysname'] in [x['name'] for x in nodes]:
                         data = {
                             "highest_utilization": 0,
                             "source": node['name'],
