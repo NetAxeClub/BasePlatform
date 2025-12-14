@@ -277,7 +277,7 @@ LOGGING = {
             'propagate': False,  # 向不向更高级别的logger传递
         },
         "server": {
-            "handlers": [],
+            "handlers": ['server'],
             "level": "INFO",
         },
         "custom_middleware": {
@@ -293,7 +293,7 @@ LOGGING = {
             "level": "DEBUG",
         },
         "django": {
-            "handlers": [],
+            "handlers": ['server'],
             "level": "INFO",
         },
         "celery": {
@@ -310,12 +310,12 @@ LOGGING = {
         },
         # 数据库相关日志
         "django.db.backends": {
-            "handlers": [],
+            "handlers": ['db'],
             "propagate": True,
             "level": "INFO",
         },
         'django.utils.autoreload': {
-            'handlers': [],
+            'handlers': ['server'],
             'propagate': False,
         },
     },
