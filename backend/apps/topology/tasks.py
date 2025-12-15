@@ -9,6 +9,7 @@
 from __future__ import absolute_import, unicode_literals
 import math
 from apps.topology.models import Topology
+from apps.asset.models import NetworkDevice
 from utils.db.mongo_ops import MongoOps, MongoNetOps
 
 # import json
@@ -167,24 +168,24 @@ def auto_path(data):
             if link.get('mode') == 'manual':
                 result['links'].append(link)
     # 完善/更新节点信息
-    # for host in self.host_q['nodes']:
-    #     host['image'] = "AC.png"
-    #     tmp_info = cmdb_mongo.find(query_dict={"manage_ip": host['manage_ip']}, fields={"_id": 0})
-    #     if tmp_info:
-    #         tmp_info = tmp_info[0]
-    #         host['name'] = tmp_info['name']
-    #         host['id'] = tmp_info['name']
-    #         host['device_id'] = tmp_info['id']
-    #         host['serial_num'] = tmp_info['serial_num']
-    #         host['location'] = tmp_info['idc_name'] + '_' + tmp_info['idc_model_name'] + '_' + tmp_info[
-    #             'rack_name'] + '_' + str(tmp_info['u_location_start']) + '_' + str(tmp_info['u_location_end'])
-    #         host['vendor_model'] = tmp_info['vendor_name'] + '_' + tmp_info.get('model_name', ' ')
-    #         host['expire'] = tmp_info['expire']
-        # tmp_node = {
-        #     "id": host.name,  # 设备名
-        #     "manage_ip": host.host,  # 设备IP
-        #     "image": self.hostname_to_image(host.name)  # 设备图标
-        # }
+    for host in data['nodes']:
+        if host.get('node_type') == 'physical':
+            tmp_info = NetworkDevice.objects.filter(manage_ip=host['manage_ip']).values(
+                'id', 'name', 'idc_model__name', 'rack__name', 'vendor__name', 'model__name',
+                'idc__name', 'serial_num', 'u_location_start', 'u_location_end', 'expire').first()
+            # tmp_info = cmdb_mongo.find(query_dict={"manage_ip": host['manage_ip']}, fields={"_id": 0})
+            if tmp_info:
+                # tmp_info = tmp_info[0]
+                host['name'] = tmp_info['name']
+                host['id'] = tmp_info['name']
+                host['device_id'] = tmp_info['id']
+                host['serial_num'] = tmp_info['serial_num']
+                host['location'] = tmp_info['idc__name'] + '_' + tmp_info['idc_model__name'] + '_' + tmp_info[
+                    'rack__name'] + '_' + str(tmp_info['u_location_start']) + '_' + str(tmp_info['u_location_end'])
+                host['vendor_model'] = tmp_info['vendor__name'] + '_' + tmp_info.get('model__name', ' ')
+                host['expire'] = tmp_info['expire']
+            else:
+                data['nodes'].remove(host)
 
     result['links'] += foo_link(result['nodes'], result['links'], strict=True)
 
