@@ -4,6 +4,7 @@ import requests
 from datetime import datetime, date
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
+from netaxe.settings import BASE_DIR
 from django.http import JsonResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions, filters
@@ -23,8 +24,8 @@ topology_mongo = MongoOps(db='Automation', coll='topology')
 # 设备二层接口表
 interface_mongo = MongoOps(db='Automation', coll='layer2interface')
 
-ICON_PATH = 'topology/img/'
-
+# ICON_PATH = 'topology/img/'
+ICON_PATH = os.path.join(BASE_DIR, 'media/topology/img/')
 
 class DateEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -69,11 +70,13 @@ class TopologyCreate(APIView):
         }
         return JsonResponse(data, content_type="application/json", safe=False)
 
+
 # 拓扑显示
 class TopologyShow(APIView):
     # permission_classes = (IsAuthenticated,)
     permission_classes = ()
     authentication_classes = ()
+
     def get(self, request):
         get_param = request.GET.dict()
         if get_param.get('graph'):
@@ -102,7 +105,6 @@ class TopologyShow(APIView):
             "msg": "没有匹配的操作"
         }
         return JsonResponse(data)
-
 
     def post(self, request):
         post_param = request.data
@@ -243,7 +245,7 @@ class IconView(APIView):
 
     def get(self, request):
         get_param = request.GET.dict()
-        # print(get_param)
+        print(get_param)
         _tree = IconTree()
         _tree.produce_tree()
         res = _tree.tree_final
@@ -296,3 +298,18 @@ class IconView(APIView):
             "msg": "没有匹配的动作"
         }
         return JsonResponse(data, content_type="application/json", safe=False)
+
+    def delete(self, request):
+        get_param = request.GET.dict()
+        data = {
+            "code": 400,
+            "data": [],
+            "msg": "没有匹配的操作"
+        }
+        if get_param.get('delete_path'):
+            if os.path.exists(ICON_PATH + get_param['delete_path']):
+                os.remove(ICON_PATH + get_param['delete_path'])
+                data['code'] = 200
+                data['msg'] = '删除成功'
+            return JsonResponse(data)
+        return JsonResponse(data)
