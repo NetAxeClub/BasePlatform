@@ -44,6 +44,7 @@ router.register(r'login_record', AdminRecordViewSet)
 urlpatterns = [
     path(r'', include(router.urls)),
     path('import_template', ResourceManageExcelView.as_view(), name='import_template'),
+    path('import_server_template', ServerResourceManageExcelView.as_view(), name='import_server_template'),
     path('device_account/', DeviceAccountView, name='device_account'),
     path('server_account', ServerAccountView.as_view(), name='server_account'),
     path('cmdbChart', CmdbChart.as_view(), name='cmdbChart'),

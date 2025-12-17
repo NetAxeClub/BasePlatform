@@ -2,7 +2,8 @@ import logging
 import os
 from datetime import datetime
 
-from git import Actor, Repo, Git
+# from git import Actor, Repo, Git
+from git import Actor, Repo
 from pydriller import Repository
 from netaxe.settings import BASE_DIR
 from confload.confload import config

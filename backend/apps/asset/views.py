@@ -26,8 +26,9 @@ from apps.asset.serializers import IdcSerializer, AssetAccountSerializer, AssetV
     CategorySerializer, ModelSerializer, AttributeSerializer, FrameworkSerializer, NetworkDeviceSerializer, \
     IdcModelSerializer, NetZoneSerializer, CmdbRackSerializer, AdminRecordSerializer, ServerSerializer, \
     ServerModelSerializer, ContainerServiceSerializer, ServerVendorSerializer, AssetIpInfoSerializer
-from utils.cmdb_import import pandas_read_file, new_import_parse
-from utils.db.mongo_ops import MongoNetOps, MongoOps
+from utils.cmdb_import import pandas_read_file, new_import_parse, new_import_server_parse
+from utils.db.mongo_ops import MongoOps
+from utils.connect_layer.snmp.snmp_test import probe_snmp
 from openpyxl.utils import get_column_letter
 from rest_framework.decorators import action
 from urllib.parse import quote
@@ -88,6 +89,51 @@ class ResourceManageExcelView(APIView):
     def get(self, request):
         try:
             file_name = "ImportNetworkTemplate.xlsx"
+            file_path = os.path.join(MEDIA_ROOT, f'cmdbExcelTemplate/{file_name}')
+            response = FileResponse((open(file_path, 'rb')))
+            response['Content-Type'] = 'application/octet-stream'
+            response['Content-Disposition'] = f'attachment;filename="{file_name}"'
+            response["Access-Control-Allow-Methods"] = "*"
+            response["Access-Control-Allow-Credentials"] = True
+            response['Access-Control-Allow-Headers'] = "Authorization"
+            response["Access-Control-Allow-Origin"] = "/".join(request.META.get("HTTP_REFERER").split("/")[0:3])
+            return response
+        except Exception:
+            raise Http404
+
+
+class ServerResourceManageExcelView(APIView):
+    permission_classes = (AllowAny,)
+    authentication_classes = ()
+
+    def post(self, request):
+        file = request.FILES.get('file')
+        # 获取文件位置
+        filename = os.path.join(MEDIA_ROOT, 'upload', file.name)
+        if not os.path.exists(os.path.dirname(filename)):
+            os.makedirs(os.path.dirname(filename))
+        with open(filename, 'wb') as f:
+            for chunk in file.chunks():
+                f.write(chunk)
+
+        # pandas文件内容解析
+        import_content_df = pandas_read_file(filename)
+        import_list = []
+        for i in import_content_df.values:
+            import_list.append(i.tolist())
+        import_success_list, import_exists_list, import_fail_list, detail = new_import_server_parse(import_list)
+
+        if detail == "success":
+            return JsonResponse({"code": 200, "msg": "导入成功！",
+                                 "data": {"import_success_list": import_success_list,
+                                          "import_exists_list": import_exists_list,
+                                          "import_fail_list": import_fail_list}})
+        else:
+            return JsonResponse({"code": 500, "msg": f"导入失败！{detail}"})
+
+    def get(self, request):
+        try:
+            file_name = "ImportServerTemplate.xlsx"
             file_path = os.path.join(MEDIA_ROOT, f'cmdbExcelTemplate/{file_name}')
             response = FileResponse((open(file_path, 'rb')))
             response['Content-Type'] = 'application/octet-stream'
@@ -900,6 +946,34 @@ class NetworkDeviceViewSet(CustomViewBase):
         except Exception as e:
             return JsonResponse({'code': 500, 'msg': f'测试NETCONF连接时发生错误: {str(e)}', 'data': {}})
 
+    @action(detail=True, methods=['post'])
+    def test_snmp_connection(self, request, *args, **kwargs):
+        """测试SNMP连接"""
+        try:
+            msg, code = 'SNMP连接测试成功', 200
+            device = self.get_object()
+            snmp_version = request.data.get('snmp_version')
+            snmp_community = request.data.get('snmp_community')
+            snmp_port = request.data.get('snmp_port')
+            # msg, code = probe_snmp(device.manage_ip, snmp_version, snmp_community, int(snmp_port))
+            flag, msg = probe_snmp(device.manage_ip, 'v2c', snmp_community, int(snmp_port))
+            if flag:
+                # device.netconf_status = True
+                msg, code = 'SNMP连接测试成功', 200
+            else:
+                code = 400
+            return JsonResponse({
+                'code': code,
+                'msg': msg,
+                'data': {'snmp_status': True, 'device_ip': device.manage_ip}
+            })
+        except NetworkDevice.DoesNotExist:
+            return JsonResponse({'code': 404, 'msg': '设备不存在', 'data': {}})
+        except Exception as e:
+            return JsonResponse({'code': 500, 'msg': f'测试SNMP连接时发生错误: {str(e)}', 'data': {}})
+
+
+
     # 重新update方法主要用来捕获更改前的字段值并赋值给self.log
     # def update(self, request, *args, **kwargs):
     #     print('更新', super().update(request, *args, **kwargs))
@@ -1185,6 +1259,7 @@ def get_network_device_idc_distribution():
     }
 
     return [result]
+
 
 def get_network_device_category_distribution():
     # 按vendor.name分组统计，并计算每个厂商的设备数量

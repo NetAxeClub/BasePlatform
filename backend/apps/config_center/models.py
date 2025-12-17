@@ -129,6 +129,9 @@ class ConfigBackup(models.Model):
         indexes = [models.Index(fields=['manage_ip', 'last_time'])]
 
 
+
+
+
 # 配置合规检查表
 class ConfigComplianceResult(models.Model):
     compliance = models.CharField(verbose_name="结果", null=True, blank=True, max_length=100)

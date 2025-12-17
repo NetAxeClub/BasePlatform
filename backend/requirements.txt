@@ -27,8 +27,8 @@ django-timezone-field==7.0
 djangorestframework==3.13.1
 djangorestframework-simplejwt==5.2.0
 drf-extensions==0.7.1
-gitdb==4.0.9
-GitPython==3.1.41
+gitdb==4.0.12
+GitPython==3.1.45
 channels==2.3.1
 django-simple-history==3.2.0
 pycryptodome==3.17
@@ -79,3 +79,6 @@ textfsm==1.1.0
 autopep8==2.0.4
 nacos-sdk-python==1.0.0
 openai==1.61.1
+pysnmp==7.1.21
+pyasn1>=0.4.8
+pyasn1-modules>=0.2.8
