@@ -17,7 +17,7 @@ import traceback
 import threading
 from socket import timeout
 from django.conf import settings
-from openai import OpenAI
+# from openai import OpenAI
 from confload.confload import config
 from channels.generic.websocket import WebsocketConsumer
 
@@ -66,80 +66,80 @@ fort_logger = logging.getLogger('webssh')
 #         self.chan.close()
 #         # self.record()
 
-class SparkChatConsumer(WebsocketConsumer):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.api_key = config.sparkapi['api_key']
-        self.api_base = config.sparkapi['api_base']
-        self.client = OpenAI(api_key=self.api_key, base_url=self.api_base)
-
-    def connect(self):
-        self.accept()
-        print('accept')
-
-    def disconnect(self, close_code):
-        print('断开连接', close_code)
-        # self.channel_layer.group_discard(
-        #     self.room_group_name,
-        #     self.channel_name
-        # )
-
-    def receive(self, text_data=None, bytes_data=None):
-        text_data_json = json.loads(text_data)
-        message = text_data_json['message']
-        try:
-            try:
-                response = self.client.chat.completions.create(
-                    model=config.sparkapi['serviceId'],
-                    messages=[{"role": "user", "content": message}],
-                    stream=True,
-                    temperature=0.7,
-                    max_tokens=6144,
-                    extra_headers={"lora_id": "0"},
-                    stream_options={"include_usage": True}
-                )
-
-                full_response = ""
-                for chunk in response:
-                    # 只对支持深度思考的模型才有此字段
-                    if hasattr(chunk.choices[0].delta, 'reasoning_content') and chunk.choices[
-                        0].delta.reasoning_content is not None:
-                        reasoning_content = chunk.choices[0].delta.reasoning_content
-                        # print(reasoning_content, end="", flush=True)  # 实时打印思考模型输出的思考过程每个片段
-                        self.send(json.dumps({'message': {"content": '', 'reasoning_content': reasoning_content, 'end': False}}))
-                        # self.channel_layer.group_send(
-                        #     self.room_group_name,
-                        #     {
-                        #         'type': 'deepseek_message',
-                        #         'message': {'reasoning_content': reasoning_content, 'content': ''}
-                        #     }
-                        # )
-                    if hasattr(chunk.choices[0].delta, 'content') and chunk.choices[0].delta.content is not None:
-                        content = chunk.choices[0].delta.content
-                        # print(content, end="", flush=True)  # 实时打印每个片段
-                        full_response += content
-                        self.send(json.dumps({'message': {"content": content, 'reasoning_content': '', 'end': False}}))
-                        # self.channel_layer.group_send(
-                        #     self.room_group_name,
-                        #     {
-                        #         'type': 'deepseek_message',
-                        #         'message': {'reasoning_content': '', 'content': content}
-                        #     }
-                        #
-                        # )
-                self.send(json.dumps({'message': {"content": '', 'reasoning_content': '', 'end': True}}))
-                # print("\n\n ------完整响应：", full_response)
-            except Exception as e:
-                print(traceback.print_exc())
-                print(f"Error: {e}")
-        except:
-            self.websocket_disconnect(message=dict(code=4004))
-
-    # def deepseek_message(self, event):
-    #     message = event['message']
-    #
-    #     # Send message to WebSocket
-    #     self.send(text_data=json.dumps({
-    #         'message': message
-    #     }))
+# class SparkChatConsumer(WebsocketConsumer):
+#
+#     def __init__(self, *args, **kwargs):
+#         super().__init__(*args, **kwargs)
+#         self.api_key = config.sparkapi['api_key']
+#         self.api_base = config.sparkapi['api_base']
+#         self.client = OpenAI(api_key=self.api_key, base_url=self.api_base)
+#
+#     def connect(self):
+#         self.accept()
+#         print('accept')
+#
+#     def disconnect(self, close_code):
+#         print('断开连接', close_code)
+#         # self.channel_layer.group_discard(
+#         #     self.room_group_name,
+#         #     self.channel_name
+#         # )
+#
+#     def receive(self, text_data=None, bytes_data=None):
+#         text_data_json = json.loads(text_data)
+#         message = text_data_json['message']
+#         try:
+#             try:
+#                 response = self.client.chat.completions.create(
+#                     model=config.sparkapi['serviceId'],
+#                     messages=[{"role": "user", "content": message}],
+#                     stream=True,
+#                     temperature=0.7,
+#                     max_tokens=6144,
+#                     extra_headers={"lora_id": "0"},
+#                     stream_options={"include_usage": True}
+#                 )
+#
+#                 full_response = ""
+#                 for chunk in response:
+#                     # 只对支持深度思考的模型才有此字段
+#                     if hasattr(chunk.choices[0].delta, 'reasoning_content') and chunk.choices[
+#                         0].delta.reasoning_content is not None:
+#                         reasoning_content = chunk.choices[0].delta.reasoning_content
+#                         # print(reasoning_content, end="", flush=True)  # 实时打印思考模型输出的思考过程每个片段
+#                         self.send(json.dumps({'message': {"content": '', 'reasoning_content': reasoning_content, 'end': False}}))
+#                         # self.channel_layer.group_send(
+#                         #     self.room_group_name,
+#                         #     {
+#                         #         'type': 'deepseek_message',
+#                         #         'message': {'reasoning_content': reasoning_content, 'content': ''}
+#                         #     }
+#                         # )
+#                     if hasattr(chunk.choices[0].delta, 'content') and chunk.choices[0].delta.content is not None:
+#                         content = chunk.choices[0].delta.content
+#                         # print(content, end="", flush=True)  # 实时打印每个片段
+#                         full_response += content
+#                         self.send(json.dumps({'message': {"content": content, 'reasoning_content': '', 'end': False}}))
+#                         # self.channel_layer.group_send(
+#                         #     self.room_group_name,
+#                         #     {
+#                         #         'type': 'deepseek_message',
+#                         #         'message': {'reasoning_content': '', 'content': content}
+#                         #     }
+#                         #
+#                         # )
+#                 self.send(json.dumps({'message': {"content": '', 'reasoning_content': '', 'end': True}}))
+#                 # print("\n\n ------完整响应：", full_response)
+#             except Exception as e:
+#                 print(traceback.print_exc())
+#                 print(f"Error: {e}")
+#         except:
+#             self.websocket_disconnect(message=dict(code=4004))
+#
+#     # def deepseek_message(self, event):
+#     #     message = event['message']
+#     #
+#     #     # Send message to WebSocket
+#     #     self.send(text_data=json.dumps({
+#     #         'message': message
+#     #     }))

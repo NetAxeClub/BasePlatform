@@ -169,6 +169,56 @@ def search_cmdb_vendor_id(cmdb_vendor_name):
         return None
 
 
+def new_import_server_parse(import_list):
+    data_list = import_list
+    new_lst = []
+    import_fail_list = []  # 导入错误
+    import_success_list = []  # 导入成功
+    import_exists_list = []  # 导入失败-已存在
+    # 预收集所有序列号用于批量检查
+    all_serials = [str(item[0]).strip() for item in data_list if len(item) > 0]
+
+    try:
+        with transaction.atomic():
+            devices_to_create = []
+            for index, data in enumerate(data_list):
+                if not data:  # 没有数据直接continue
+                    continue
+
+                # ok, msg = check_row(data, new_lst)  # 检查行数据是否完整，同时检查序列化是否相同
+                # if not ok:
+                #     import_fail_list.append({'reason': f"第{index + 1}行 {msg}"})
+                #     continue
+
+                new_lst.append(str(data[0]).strip())
+                name = str(data[0]).strip()  # 名称
+                manege_ip = str(data[1]).strip()  # 管理IP
+                cmdb_idc_id = search_cmdb_idc_id(data[2])  # 机房
+
+                server = {
+                    'name': name,
+                    'manage_ip': manege_ip,
+                    'idc': Idc.objects.filter(id=cmdb_idc_id).first() if cmdb_idc_id else None,
+                }
+                try:
+                    # 构造设备对象但不立即保存
+                    device = Server(**server)
+                    devices_to_create.append(device)
+                    import_success_list.append({"manage_ip": manege_ip})
+                except Exception as e:
+                    print(f"数据校验失败: {e}")
+                    import_fail_list.append({"manage_ip": manege_ip, "reason": f"第{index + 1}行数据校验失败: {e}"})
+
+            # 批量创建所有有效设备
+            if devices_to_create:
+                Server.objects.bulk_create(devices_to_create, batch_size=100)
+
+        return import_success_list, import_exists_list, import_fail_list, 'success'
+    except Exception as e:
+        print(f"事务执行失败: {e}")
+        # 回滚事务后返回所有失败记录
+        return [], import_exists_list, [{"reason": str(e)} for _ in import_success_list + import_fail_list], "error"
+
 def new_import_parse(import_list):
     data_list = import_list
     new_lst = []
@@ -261,7 +311,6 @@ def new_import_parse(import_list):
 
 
 def check_row(data: list, serial_exists: list):
-    # SN1107500140038130	172.16.75.23	三层	信服	交换机	合肥	3号	J05	万兆接入	公网区域	11 	11 	在线	生产网络	公共综合业务交换机
     error_message = ""
     for i in range(len(data)):
         if i not in [3, 8, 9, 13, 14] and isinstance(data[i], float):

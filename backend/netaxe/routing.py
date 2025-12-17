@@ -15,7 +15,7 @@ from channels.routing import ProtocolTypeRouter, URLRouter
 from django.urls import re_path
 from apps.asset.consumers import WebSSHConsumer, SSHConsumer
 from apps.automation.consumers import SecDeviceConsumer
-from apps.system.consumers import SparkChatConsumer
+# from apps.system.consumers import SparkChatConsumer
 
 application = ProtocolTypeRouter({
 
