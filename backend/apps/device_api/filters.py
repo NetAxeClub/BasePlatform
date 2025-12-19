@@ -1,5 +1,13 @@
 import django_filters
-from apps.device_api.models import DeviceCollectionPlans, DeviceSubCollectionPlan
+from apps.device_api.models import DeviceCollectionPlans, DeviceSubCollectionPlan, PlansToDevice
+
+
+class PlansToDeviceFilter(django_filters.FilterSet):
+    manage_ip = django_filters.CharFilter(lookup_expr='icontains')
+
+    class Meta:
+        model = PlansToDevice
+        fields = ['manage_ip', 'execute_node']
 
 
 class DeviceCollectionPlansFilter(django_filters.FilterSet):

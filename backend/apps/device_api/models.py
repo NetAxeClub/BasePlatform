@@ -185,8 +185,8 @@ class NetconfXMLTemplate(models.Model):
         ('get_config', 'GET_CONFIG'),
     ]
     collect_method = models.CharField(
-        max_length=20, 
-        choices=COLLECT_METHOD_CHOICES, 
+        max_length=20,
+        choices=COLLECT_METHOD_CHOICES,
         verbose_name='采集方法'
     )
     xml_template = models.TextField(verbose_name='XML模板内容')
@@ -215,3 +215,22 @@ class NetconfXMLTemplate(models.Model):
     def __str__(self):
         return f"{self.collect_method} ({self.collection_plan.name})"
 
+
+class PlansToDevice(models.Model):
+    manage_ip = models.CharField(verbose_name="设备IP", max_length=100, null=False, blank=False)
+    execute_node = models.CharField(verbose_name="执行节点", blank=True, null=True, max_length=50)
+    plan = models.ForeignKey("DeviceCollectionPlans", on_delete=models.SET_NULL, null=True, related_name="device_plan",
+                             verbose_name="关联方案")
+    # 时间戳
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
+
+    class Meta:
+        verbose_name = '采集方案关系表'
+        verbose_name_plural = '采集方案关系表'
+        db_table = 'device_api_plan2device'
+        ordering = ['manage_ip', 'created_at']
+        # unique_together = (("name", "vendor"),)
+
+    def __str__(self):
+        return f"{self.manage_ip} ({self.plan.name})"
