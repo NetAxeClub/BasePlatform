@@ -80,9 +80,9 @@ class TopologyShow(APIView):
     def get(self, request):
         get_param = request.GET.dict()
         if get_param.get('graph'):
-            content = MongoNetOps.get_topology(get_param['graph'])
-            if content:
-                return JsonResponse(dict(code=200, data=content, msg='获取拓扑数据成功'), content_type="application/json",
+            _query = topology_mongo.find(query_dict={'name': get_param['graph']}, fields={'_id': 0})
+            if _query:
+                return JsonResponse(dict(code=200, data=_query[0], msg='获取拓扑数据成功'), content_type="application/json",
                                     safe=False)
             else:
                 return JsonResponse(dict(code=400, msg='没有拓扑数据'), content_type="application/json", safe=False)

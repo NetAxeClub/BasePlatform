@@ -7,8 +7,8 @@ from rest_framework.decorators import action
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from apps.api.tools.custom_viewset_base import CustomViewBase
-from apps.device_api.filters import DeviceCollectionPlansFilter, DeviceSubCollectionPlanFilter
-from apps.device_api.models import DeviceCollectionPlans, DeviceSubCollectionPlan, NetconfXMLTemplate
+from apps.device_api.filters import DeviceCollectionPlansFilter, DeviceSubCollectionPlanFilter, PlansToDeviceFilter
+from apps.device_api.models import DeviceCollectionPlans, DeviceSubCollectionPlan, NetconfXMLTemplate, PlansToDevice
 from apps.device_api.models_api import plan_data_to_mongodb, celery_data_mongodb
 from apps.device_api.serializers import (
     DeviceCollectionPlansSerializer, DeviceCollectionPlansCreateSerializer,
@@ -17,7 +17,7 @@ from apps.device_api.serializers import (
     DeviceSubCollectionPlanUpdateSerializer,
     NetconfXMLTemplateSerializer, NetconfXMLTemplateListSerializer,
     CollectionResultDetailSerializer, CollectionFilterSerializer,
-    CollectionResultByPlanSerializer
+    CollectionResultByPlanSerializer, PlansToDeviceSerializer
 )
 from apps.device_api.services import DeviceCollectionService
 from apps.device_api import COLLECTION_RESULTS_DB, COLLECTION_PLAN, COLLECTION_SUB_PLAN
@@ -29,6 +29,23 @@ from confload.confload import config
 from utils.db.mongo_ops import MongoOps
 
 logger = logging.getLogger(__name__)
+
+
+class PlansToDeviceViewSet(CustomViewBase):
+    """采集方案和设备关联序列化"""
+    queryset = PlansToDevice.objects.all()
+    serializer_class = PlansToDeviceSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_class = PlansToDeviceFilter
+    search_fields = ['manage_ip', 'execute_node']
+    ordering_fields = ['manage_ip', 'created_at', 'updated_at']
+    ordering = ['-created_at']
+    pagination_class = LargeResultsSetPagination
+
+    def get_queryset(self):
+        """获取查询集"""
+
+        return self.queryset
 
 
 class DeviceCollectionPlansViewSet(CustomViewBase):

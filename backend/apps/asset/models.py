@@ -438,6 +438,7 @@ class NetworkDevice(models.Model):
                                   max_length=50)
     ssh_account = models.ForeignKey('AssetAccount', verbose_name='ssh纳管关联账户', blank=True, null=True,
                                     related_name="releate_ssh", on_delete=models.SET_NULL)
+    snmp_status = models.BooleanField(verbose_name="snmp状态", null=False, default=False)               # 新增
     ssh_status = models.BooleanField(verbose_name="ssh状态", null=False, default=False)               # 新增
     # NETCONF
     netconf_enable = models.CharField(verbose_name="NETCONF是否纳管", null=False, default="0", choices=manage_choices,
