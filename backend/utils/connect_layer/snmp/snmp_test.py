@@ -80,8 +80,8 @@ def probe_snmp(
         priv_key: SNMP v3加密密钥（仅v3需要，可选）
 
     Returns:
-        Tuple[bool, Optional[str]]: (是否成功, 错误信息)
-        - 成功: (True, None)
+        Tuple[bool, Optional[str]]: (是否成功, system_name或错误信息)
+        - 成功: (True, system_name) - system_name为设备的系统名称
         - 失败: (False, 错误描述)
 
     Examples:
@@ -131,7 +131,6 @@ def probe_snmp(
             retries=retries,
         )
 
-
     return _probe_snmp_v2c_async(ip, snmp_community, port, timeout, retries)
 
 
@@ -150,7 +149,7 @@ def _probe_snmp_v2c_async(
                 dispatcher,
                 auth_data,
                 transport,
-                ObjectType(ObjectIdentity("1.3.6.1.2.1.1.1.0")),
+                ObjectType(ObjectIdentity("1.3.6.1.2.1.1.5.0")),  # sysName OID
             )
             return error_indication, error_status, error_index, var_binds
 
@@ -165,7 +164,27 @@ def _probe_snmp_v2c_async(
         if error_status:
             return False, f"SNMP错误状态: {error_status.prettyPrint()}"
 
-        return True, None
+        # 从var_binds中提取system name
+        # var_binds格式: ((ObjectType(ObjectIdentity(...), OctetString('system_name')),),)
+        # var_binds[0]是元组，包含ObjectType: (ObjectType,)
+        # var_binds[0][0]是ObjectType对象
+        # var_binds[0][0][1]是值部分
+        system_name = None
+        if var_binds and len(var_binds) > 0:
+            try:
+                # var_binds[0]是元组，包含ObjectType
+                obj_type = (
+                    var_binds[0][0] if isinstance(var_binds[0], tuple) else var_binds[0]
+                )
+                # ObjectType[1]是值部分
+                if hasattr(obj_type, "__getitem__"):
+                    value_obj = obj_type[1]
+                    system_name = str(value_obj) if value_obj else None
+            except (IndexError, TypeError, AttributeError) as e:
+                logger.warning(f"提取system name失败: {e}")
+                system_name = None
+
+        return True, system_name
 
     except Exception as e:
         logger.exception(f"SNMP v2c探测异常: IP={ip}")
@@ -200,7 +219,9 @@ def probe_snmp_v3(
         retries: 重试次数，默认1次
 
     Returns:
-        Tuple[bool, Optional[str]]: (是否成功, 错误信息)
+        Tuple[bool, Optional[str]]: (是否成功, system_name或错误信息)
+        - 成功: (True, system_name) - system_name为设备的系统名称
+        - 失败: (False, 错误描述)
     """
     if not PYSNMP_AVAILABLE:
         error_msg = "pysnmp库未安装或导入失败"
@@ -302,7 +323,7 @@ def _probe_snmp_v3_async(
                 dispatcher,
                 auth_data,
                 transport,
-                ObjectType(ObjectIdentity("1.3.6.1.2.1.1.1.0")),
+                ObjectType(ObjectIdentity("1.3.6.1.2.1.1.5.0")),  # sysName OID
             )
             return error_indication, error_status, error_index, var_binds
 
@@ -316,7 +337,27 @@ def _probe_snmp_v3_async(
         if error_status:
             return False, f"SNMP错误状态: {error_status.prettyPrint()}"
 
-        return True, None
+        # 从var_binds中提取system name
+        # var_binds格式: ((ObjectType(ObjectIdentity(...), OctetString('system_name')),),)
+        # var_binds[0]是元组，包含ObjectType: (ObjectType,)
+        # var_binds[0][0]是ObjectType对象
+        # var_binds[0][0][1]是值部分
+        system_name = None
+        if var_binds and len(var_binds) > 0:
+            try:
+                # var_binds[0]是元组，包含ObjectType
+                obj_type = (
+                    var_binds[0][0] if isinstance(var_binds[0], tuple) else var_binds[0]
+                )
+                # ObjectType[1]是值部分
+                if hasattr(obj_type, "__getitem__"):
+                    value_obj = obj_type[1]
+                    system_name = str(value_obj) if value_obj else None
+            except (IndexError, TypeError, AttributeError) as e:
+                logger.warning(f"提取system name失败: {e}")
+                system_name = None
+
+        return True, system_name
 
     except Exception as e:
         logger.exception(f"SNMP v3探测异常: IP={ip}, Username={username}")

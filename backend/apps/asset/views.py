@@ -956,16 +956,18 @@ class NetworkDeviceViewSet(CustomViewBase):
             snmp_community = request.data.get('snmp_community')
             snmp_port = request.data.get('snmp_port')
             # msg, code = probe_snmp(device.manage_ip, snmp_version, snmp_community, int(snmp_port))
-            flag, msg = probe_snmp(device.manage_ip, 'v2c', snmp_community, int(snmp_port))
+            flag, device_name = probe_snmp(device.manage_ip, 'v2c', snmp_community, int(snmp_port))
             if flag:
-                # device.netconf_status = True
+                device.snmp_status = True
+                device.name = device_name
+                device.save()
                 msg, code = 'SNMP连接测试成功', 200
             else:
                 code = 400
             return JsonResponse({
                 'code': code,
                 'msg': msg,
-                'data': {'snmp_status': True, 'device_ip': device.manage_ip}
+                'data': {'snmp_status': True, 'device_ip': device.manage_ip, 'name': device_name}
             })
         except NetworkDevice.DoesNotExist:
             return JsonResponse({'code': 404, 'msg': '设备不存在', 'data': {}})
