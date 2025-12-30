@@ -1073,49 +1073,134 @@ class H3CinfoCollection(H3CNetconf):
         指定type类型为1，获取补丁版本回填
         :return:
         """
-        data_xml = '''
-        <top xmlns="http://www.h3c.com/netconf/data:1.0">
-        <Package>
-        <ImageLists><ImageList>
-        <FileName></FileName><Model></Model>
-        <Type>1</Type>
-        <Service></Service>
-        <FilePlatVersion></FilePlatVersion>
-        <FileProductVersion></FileProductVersion>
-        </ImageList>
-        </ImageLists>
-        </Package>
-        </top>
-        '''
         # data_xml = '''
         # <top xmlns="http://www.h3c.com/netconf/data:1.0">
         # <Package>
-        # <BootLoaderList>
-        # <BootList>
-        # <DeviceNode>
-        # <Chassis></Chassis>
-        # <Slot></Slot>
-        # <CPUID></CPUID>
-        # </DeviceNode>
-        # <BootType>0</BootType>
-        # <ImageFiles>
-        # <FileName></FileName>
-        # </ImageFiles>
-        # </BootList>
-        # </BootLoaderList>
+        # <ImageLists><ImageList>
+        # <FileName></FileName><Model></Model>
+        # <Type>1</Type>
+        # <Service></Service>
+        # <FilePlatVersion></FilePlatVersion>
+        # <FileProductVersion></FileProductVersion>
+        # </ImageList>
+        # </ImageLists>
         # </Package>
         # </top>
         # '''
+        data_xml = '''
+        <top xmlns="http://www.h3c.com/netconf/data:1.0">
+        <Package>
+        <BootLoaderList>
+        <BootList>
+        <DeviceNode>
+        <Chassis></Chassis>
+        <Slot></Slot>
+        <CPUID></CPUID>
+        </DeviceNode>
+        <BootType>0</BootType>
+        <ImageFiles>
+        <FileName></FileName>
+        </ImageFiles>
+        </BootList>
+        </BootLoaderList>
+        </Package>
+        </top>
+        '''
         # type_map = {'0': 'bin', '1': 'patch'}
         # service_map = {'1': 'boot', '2': 'system', '3': 'feature'}
         # {'FileName': 'flash:/S6860-CMW710-SYSTEM-R2702H13.bin', 'Type': '1', 'Service': '2',
         # 'FilePlatVersion': 'Release 2702H13', 'FileProductVersion': 'Release 2702'}
         # BootType = {'0': 'current', '1': 'main next', '2': 'backup next'}
         res = self.netconf_get(data_xml)
+        # print(res)
         if res:
             # result = res["top"]['Package']['BootLoaderList']['BootList']
             # if isinstance(result, dict):
-            return res["top"]['Package']['ImageLists']['ImageList']
+            # return res["top"]['Package']['ImageLists']['ImageList']
+            return res["top"]['Package']['BootLoaderList']['BootList']
+        else:
+            return None
+
+    def get_PhysicalEntities(self):
+        data_xml = """
+        <top xmlns="http://www.h3c.com/netconf/data:1.0">
+        <Device>
+            <PhysicalEntities>
+            <Entity>
+            <PhysicalIndex></PhysicalIndex>
+            <Chassis></Chassis>
+            <Slot></Slot>
+            <SubSlot></SubSlot>
+            <Description></Description>
+            <VendorType></VendorType>
+            <ContainedIn></ContainedIn>
+            <Class></Class>
+            <ParentRelPos></ParentRelPos>
+            <Name></Name>
+            <HardwareRev></HardwareRev>
+            <FirmwareRev></FirmwareRev>
+            <SoftwareRev></SoftwareRev>
+            <SerialNumber></SerialNumber>
+            <MfgName></MfgName>
+            <Model></Model>
+            <Alias></Alias>
+            <AssetID></AssetID>
+            <FRU></FRU>
+            <MfgDate></MfgDate>
+            <Uris></Uris>
+            </Entity>
+            </PhysicalEntities>
+        </Device>
+        </top>
+        """
+        # request_info = self._action(data=data_xml)
+        # # print(request_info)
+        # if isinstance(request_info, tuple):
+        #     return request_info[0], request_info[1]
+        # elif isinstance(request_info, bool):
+        #     return request_info, ''
+        # return False, 'netconf未捕获到预期的返回结果'
+        res = self.netconf_get(data_xml)
+        if res:
+            # result = res["top"]['Package']['BootLoaderList']['BootList']
+            # if isinstance(result, dict):
+            return res["top"]['Device']['PhysicalEntities']['Entity']
+        else:
+            return None
+
+
+    def get_bootlooderlist(self):
+        data_xml = """
+        <top xmlns="http://www.h3c.com/netconf/data:1.0">
+            <Package>
+            <BootLoaderList>
+            <BootList>
+            <DeviceNode>
+            <Chassis></Chassis>
+            <Slot></Slot>
+            <CPUID></CPUID>
+            </DeviceNode>
+            <BootType></BootType>
+            <ImageFiles>
+            <FileName></FileName>
+            </ImageFiles>
+            </BootList>
+            </BootLoaderList>
+            </Package>
+        </top>
+        """
+        # request_info = self._action(data=data_xml)
+        # # print(request_info)
+        # if isinstance(request_info, tuple):
+        #     return request_info[0], request_info[1]
+        # elif isinstance(request_info, bool):
+        #     return request_info, ''
+        # return False, 'netconf未捕获到预期的返回结果'
+        res = self.netconf_get(data_xml)
+        if res:
+            # result = res["top"]['Package']['BootLoaderList']['BootList']
+            # if isinstance(result, dict):
+            return res["top"]['Package']['BootLoaderList']['BootList']
         else:
             return None
 

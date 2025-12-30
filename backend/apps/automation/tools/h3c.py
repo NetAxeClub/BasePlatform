@@ -1230,17 +1230,28 @@ class H3cProc(BaseConn):
     def _netconf_patch_version(self, res):
         if res:
             if isinstance(res, list):
-                patch_version = res[-1]['FilePlatVersion']
-                if patch_version != self.patch_version:
-                    NetworkDevice.objects.filter(
-                        manage_ip=self.hostip).update(
-                        patch_version=patch_version)
-            elif isinstance(res, dict):
-                patch_version = res['FilePlatVersion']
-                if patch_version != self.patch_version:
-                    NetworkDevice.objects.filter(
-                        manage_ip=self.hostip).update(
-                        patch_version=patch_version)
+                res = res[0]
+            regex = 'R\d+H\w?\d+'
+            if 'ImageFiles' in res.keys():
+                for filename in res['ImageFiles']['FileName']:
+                    match = re.search(regex, filename)
+                    if match:
+                        patch_version = match.group()
+                        NetworkDevice.objects.filter(
+                                    manage_ip=self.hostip).update(
+                                    patch_version=str(patch_version))
+            # if isinstance(res, list):
+            #     patch_version = res[-1]['FilePlatVersion']
+            #     if patch_version != self.patch_version:
+            #         NetworkDevice.objects.filter(
+            #             manage_ip=self.hostip).update(
+            #             patch_version=patch_version)
+            # elif isinstance(res, dict):
+            #     patch_version = res['FilePlatVersion']
+            #     if patch_version != self.patch_version:
+            #         NetworkDevice.objects.filter(
+            #             manage_ip=self.hostip).update(
+            #             patch_version=patch_version)
 
     # nat地址组
     def _netconf_netaddr_group(self, res):
