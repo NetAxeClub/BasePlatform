@@ -131,6 +131,7 @@ class DeviceCollectionService:
                         "device_ip": device.manage_ip,
                         "device_name": device.name,
                         "idc_name": device.idc.name,
+                        "vendor_alias": device.vendor.alias,
                         "collection_method": "netmiko",
                         "collection_type": plan.collection_type,
                         **host_info
@@ -333,7 +334,7 @@ class DeviceCollectionService:
 
         except Exception as e:
             error_msg = f"双重采集异常: {str(e)}"
-            logger.error(f"{error_msg}: 方案={plan['name']}, 设备={manage_ip}", exc_info=True)
+            logger.error(f"{error_msg}: 方案={plan['name']}, 设备={device_info.get('manage_ip') }", exc_info=True)
             return {
                 'success': False,
                 'netconf_result': None,
@@ -443,7 +444,7 @@ class DeviceCollectionService:
 
         except Exception as e:
             error_msg = f"Netmiko采集失败: {str(e)}"
-            logger.error(f"{error_msg}: 方案={plan['name']}, 设备={manage_ip}")
+            logger.error(f"{error_msg}: 方案={plan['name']}, 设备={device_info.get('manage_ip') }")
             return {"success": False, "error": error_msg}
 
     @staticmethod
@@ -595,7 +596,7 @@ class DeviceCollectionService:
 
         except Exception as e:
             error_msg = f"NETCONF采集失败: {str(e)}"
-            logger.error(f"{error_msg}: 方案={plan['name']}, 设备={manage_ip}")
+            logger.error(f"{error_msg}: 方案={plan['name']}, 设备={device_info.get('manage_ip') }")
             return {"success": False, "error": error_msg}
 
     @staticmethod
