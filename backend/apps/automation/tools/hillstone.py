@@ -547,7 +547,7 @@ class HillstoneProc(BaseConn):
             if i['SERVICE'] in self.service_predefined_map.keys():
                 _global_port = self.service_predefined_map[i['SERVICE']]
                 for _sub_global_port in _global_port:
-                    try:
+                    if all(k in _sub_global_port for k in ("dstport", "protocol")):
                         global_port.append(dict(start=int(_sub_global_port['dstport']),
                                                 end=int(
                                                     _sub_global_port['dstport']),
@@ -555,13 +555,12 @@ class HillstoneProc(BaseConn):
                                                 result=str(
                                                     _sub_global_port['dstport'])
                                                 ))
-                    except BaseException:
-                        global_port.append(dict(start=_sub_global_port['dstport'],
-                                                end=_sub_global_port['dstport'],
-                                                protocol=_sub_global_port['protocol'],
-                                                result=str(
-                                                    _sub_global_port['dstport'])
-                                                ))
+                    elif 'name' in _sub_global_port.keys():
+                        global_port.append(dict(start=0,
+                                                end=0,
+                                                protocol=_sub_global_port['name'],
+                                                result='0'))
+
             # 判断是否服务组
             elif i['SERVICE'] in self.servgroup_map.keys():
                 _servgroup = self.servgroup_map[i['SERVICE']]
