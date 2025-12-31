@@ -75,17 +75,95 @@ field_mapping = {
     "aggre_port": {"label": "聚合端口", "value": "aggre_port", "icon": "aggregation-port", "mapping_fields": AGGRE_PORT_MAPPING}
 }
 
-# 厂商到模块名和类名的映射
+# 厂商到模块名和类名的映射（支持根据vendor_alias和collection_method查找）
+# 格式: {vendor_alias: {method: (module_name, class_name)}}
+# 如果某个厂商的所有method都使用同一个类，可以使用 'default' 作为method
 vendor_mapping = {
-    'H3C': ('h3c', 'H3CPlan'),
-    'Huawei': ('huawei', 'HuaweiPlan'),
-    'Cisco': ('cisco', 'CiscoPlan'),
-    'CISCO': ('cisco', 'CiscoPlan'),
-    'cisco': ('cisco', 'CiscoPlan'),
-    'centec': ('centec', 'CentecPlan'),
-    'Hillstone': ('hillstone', 'HillstonePlan'),
-    'Maipu': ('maipu', 'MaipuPlan'),
-    'Mellanox': ('mellanox', 'MellanoxPlan'),
-    'Ruijie': ('ruijie', 'RuiJiePlan'),
-    'ZTE': ('zte', 'ZtePlan'),
+    'H3C': {
+        'netmiko': ('h3c', 'H3CPlan'),
+        'netconf': ('h3c', 'H3CPlan'),
+        'default': ('h3c', 'H3CPlan'),
+    },
+    'Huawei': {
+        'netmiko': ('huawei', 'HuaweiPlan'),
+        'netconf': ('huawei', 'HuaweiPlan'),
+        'default': ('huawei', 'HuaweiPlan'),
+    },
+    'Cisco': {
+        'netmiko': ('cisco', 'CiscoPlan'),
+        'netconf': ('cisco', 'CiscoPlan'),
+        'default': ('cisco', 'CiscoPlan'),
+    },
+    'CISCO': {
+        'netmiko': ('cisco', 'CiscoPlan'),
+        'netconf': ('cisco', 'CiscoPlan'),
+        'default': ('cisco', 'CiscoPlan'),
+    },
+    'cisco': {
+        'netmiko': ('cisco', 'CiscoPlan'),
+        'netconf': ('cisco', 'CiscoPlan'),
+        'default': ('cisco', 'CiscoPlan'),
+    },
+    'centec': {
+        'netmiko': ('centec', 'CentecPlan'),
+        'netconf': ('centec', 'CentecPlan'),
+        'default': ('centec', 'CentecPlan'),
+    },
+    'Hillstone': {
+        'netmiko': ('hillstone', 'HillstonePlan'),
+        'netconf': ('hillstone', 'HillstonePlan'),
+        'default': ('hillstone', 'HillstonePlan'),
+    },
+    'Maipu': {
+        'netmiko': ('maipu', 'MaipuPlan'),
+        'netconf': ('maipu', 'MaipuPlan'),
+        'default': ('maipu', 'MaipuPlan'),
+    },
+    'Mellanox': {
+        'netmiko': ('mellanox', 'MellanoxPlan'),
+        'netconf': ('mellanox', 'MellanoxPlan'),
+        'default': ('mellanox', 'MellanoxPlan'),
+    },
+    'Ruijie': {
+        'netmiko': ('ruijie', 'RuiJiePlan'),
+        'netconf': ('ruijie', 'RuiJiePlan'),
+        'default': ('ruijie', 'RuiJiePlan'),
+    },
+    'ZTE': {
+        'netmiko': ('zte', 'ZtePlan'),
+        'netconf': ('zte', 'ZtePlan'),
+        'default': ('zte', 'ZtePlan'),
+    },
 }
+
+
+def get_vendor_class(vendor_alias, method='default'):
+    """
+    根据vendor_alias和method获取对应的模块名和类名
+    
+    Args:
+        vendor_alias: 厂商别名
+        method: 采集方法 (netmiko/netconf/default)
+        
+    Returns:
+        tuple: (module_name, class_name) 或 (None, None) 如果未找到
+    """
+    vendor_config = vendor_mapping.get(vendor_alias)
+    if not vendor_config:
+        return None, None
+    
+    # 先尝试根据method查找
+    result = vendor_config.get(method.lower())
+    if result:
+        return result
+    
+    # 如果未找到，尝试使用default
+    result = vendor_config.get('default')
+    if result:
+        return result
+    
+    # 如果都没有，返回第一个值（向后兼容）
+    if vendor_config:
+        return list(vendor_config.values())[0]
+    
+    return None, None
