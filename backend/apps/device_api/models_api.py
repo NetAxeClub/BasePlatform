@@ -3,7 +3,7 @@ import logging
 import importlib
 from datetime import datetime
 
-from apps.device_api.fields_mapping import vendor_mapping
+from apps.device_api.fields_mapping import vendor_mapping, get_vendor_class
 from apps.device_api.models import DeviceSubCollectionPlan
 from apps.device_api import (
     COLLECTION_RESULTS_DB,
@@ -70,6 +70,8 @@ def plan_data_to_mongodb(**kwargs):
         dict: 处理结果字典，包含status和message字段
     """
     logging.info("开始执行采集方案webhook回调")
+    tmp_db = MongoOps(db='Automation', coll="tmp_data1")
+    tmp_db.insert(kwargs)
 
     try:
         # 获取基本参数
@@ -599,8 +601,8 @@ def resolve_raw_data(plan, collection_result, collection_method):
             vendor_alias = plan.summary_plan.vendor
             collection_type = plan.collection_type
 
-            # 从vendor_mapping获取模块名和类名
-            module_name, class_name = vendor_mapping.get(vendor_alias, (None, None))
+            # 从vendor_mapping获取模块名和类名（根据vendor_alias和method）
+            module_name, class_name = get_vendor_class(vendor_alias, method)
 
             if not module_name or not class_name:
                 logging.warning(f"不支持的厂商: {vendor_alias}，跳过数据处理")
@@ -866,8 +868,8 @@ def apply_vendor_processor(plan, processed_data):
         vendor = plan.summary_plan.vendor
         collection_type = plan.collection_type
 
-        # 获取模块名和类名
-        module_name, class_name = vendor_mapping.get(vendor, (None, None))
+        # 获取模块名和类名（使用default方法，因为apply_vendor_processor不区分采集方法）
+        module_name, class_name = get_vendor_class(vendor, "default")
 
         if not module_name or not class_name:
             logging.warning(f"不支持的厂商: {vendor}，跳过厂商处理")
