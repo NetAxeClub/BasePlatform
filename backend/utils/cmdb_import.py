@@ -39,14 +39,14 @@ def csv_attribute(attribute):
     return attribute_dict[attribute]
 
 
-def csv_framework(framework):
-    framework_dict = {
-        '其它': '0',
-        '大二层': '1',
-        '三层': '2',
-        '二层': '3',
-    }
-    return framework_dict[framework]
+# def csv_framework(framework):
+#     framework_dict = {
+#         '其它': '0',
+#         '大二层': '1',
+#         '三层': '2',
+#         '二层': '3',
+#     }
+#     return framework_dict[framework]
 
 
 # 根据机柜编号、机房ID进行检索，若机柜不存在，则创建并返回创建后机柜ID
@@ -146,14 +146,14 @@ def search_cmdb_attribute_id(attribute_name):
 
 
 # 根据设备架构名称查询设备架构ID
-def search_cmdb_framework_id(framework_name):
-    framework_id_instance = Framework.objects.filter(name=framework_name).values('id').first()
-    if framework_id_instance:
-        return framework_id_instance['id']
-
-    else:
-        instance = Framework.objects.create(name=framework_name)
-        return instance.id
+# def search_cmdb_framework_id(framework_name):
+#     framework_id_instance = Framework.objects.filter(name=framework_name).values('id').first()
+#     if framework_id_instance:
+#         return framework_id_instance['id']
+#
+#     else:
+#         instance = Framework.objects.create(name=framework_name)
+#         return instance.id
 
 
 # 根据厂商名称进行检索，若厂商不存在，则抛出msg
@@ -219,6 +219,7 @@ def new_import_server_parse(import_list):
         # 回滚事务后返回所有失败记录
         return [], import_exists_list, [{"reason": str(e)} for _ in import_success_list + import_fail_list], "error"
 
+
 def new_import_parse(import_list):
     data_list = import_list
     new_lst = []
@@ -247,7 +248,8 @@ def new_import_parse(import_list):
                 # SN1107500140038130	172.16.75.253	三层	深信服	交换机	合肥B3	4-3号	J05	万兆接入	公网区域	11 	11 	在线	生产网络	教育公共综合业务防火墙
                 serial_num = str(data[0]).strip()  # 序列号
                 manege_ip = str(data[1]).strip()  # 管理IP
-                cmdb_framework_id = search_cmdb_framework_id(data[2])  # 网络架构
+                # cmdb_framework_id = search_cmdb_framework_id(data[2])  # 网络架构
+                device_model_id = search_device_model_id(data[2], cmdb_vendor_id)  # 设备型号
                 cmdb_vendor_id = None if isinstance(data[3], float) else search_cmdb_vendor_id(
                     data[3].strip())  # 产商，非必填
                 cmdb_category_id = search_cmdb_category_id(data[4])  # 设备类型
@@ -261,7 +263,6 @@ def new_import_parse(import_list):
                 status = csv_device_status(data[12])  # 设备状态
                 cmdb_attribute_id = None if isinstance(data[13], float) else None  # 网络属性，非必填
                 memo = None if isinstance(data[14], float) else str(data[14]).strip()  # 备注，非非必填
-                device_model_id = search_device_model_id(data[15], cmdb_vendor_id)  # 设备型号
 
                 networkdevices = {
                     'serial_num': serial_num,
@@ -271,7 +272,7 @@ def new_import_parse(import_list):
                     'category': Category.objects.filter(id=cmdb_category_id).first() if cmdb_category_id else None,
                     'role': Role.objects.filter(id=cmdb_role_id).first() if cmdb_role_id else None,
                     "attribute": Attribute.objects.filter(id=cmdb_attribute_id).first() if cmdb_attribute_id else None,
-                    "framework": Framework.objects.filter(id=cmdb_framework_id).first() if cmdb_framework_id else None,
+                    # "framework": Framework.objects.filter(id=cmdb_framework_id).first() if cmdb_framework_id else None,
                     'zone': NetZone.objects.filter(id=cmdb_netzone_id).first() if cmdb_netzone_id else None,
                     'rack': Rack.objects.filter(id=cmdb_cabinet_id).first() if cmdb_cabinet_id else None,
                     'idc_model': IdcModel.objects.filter(id=cmdb_idc_model_id).first() if cmdb_idc_model_id else None,
