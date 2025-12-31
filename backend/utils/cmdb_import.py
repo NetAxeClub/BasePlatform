@@ -158,7 +158,7 @@ def search_cmdb_attribute_id(attribute_name):
 
 # 根据厂商名称进行检索，若厂商不存在，则抛出msg
 def search_cmdb_vendor_id(cmdb_vendor_name):
-    if type(cmdb_vendor_name) == str:
+    if isinstance(cmdb_vendor_name, str):
         cmdb_vendor_instance = Vendor.objects.filter(name=cmdb_vendor_name).values('id').first()
         if cmdb_vendor_instance:
             return cmdb_vendor_instance['id']
@@ -226,7 +226,6 @@ def new_import_parse(import_list):
     import_fail_list = []  # 导入错误
     import_success_list = []  # 导入成功
     import_exists_list = []  # 导入失败-已存在
-
     # 预收集所有序列号用于批量检查
     all_serials = [str(item[0]).strip() for item in data_list if len(item) > 0]
     existing_serials = set(
@@ -249,9 +248,8 @@ def new_import_parse(import_list):
                 serial_num = str(data[0]).strip()  # 序列号
                 manege_ip = str(data[1]).strip()  # 管理IP
                 # cmdb_framework_id = search_cmdb_framework_id(data[2])  # 网络架构
+                cmdb_vendor_id = search_cmdb_vendor_id(data[3].strip())  # 产商，非必填
                 device_model_id = search_device_model_id(data[2], cmdb_vendor_id)  # 设备型号
-                cmdb_vendor_id = None if isinstance(data[3], float) else search_cmdb_vendor_id(
-                    data[3].strip())  # 产商，非必填
                 cmdb_category_id = search_cmdb_category_id(data[4])  # 设备类型
                 cmdb_idc_id = search_cmdb_idc_id(data[5])  # 机房
                 cmdb_idc_model_id = search_cmdb_idc_model_id(data[6], cmdb_idc_id)  # 模块
@@ -306,7 +304,7 @@ def new_import_parse(import_list):
 
         return import_success_list, import_exists_list, import_fail_list, 'success'
     except Exception as e:
-        print(f"事务执行失败: {e}")
+        # print(f"事务执行失败: {e}")
         # 回滚事务后返回所有失败记录
         return [], import_exists_list, [{"reason": str(e)} for _ in import_success_list + import_fail_list], "error"
 
