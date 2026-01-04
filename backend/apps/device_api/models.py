@@ -1,5 +1,9 @@
 import json
+import logging
 from django.db import models
+from .processors import get_processor
+
+logger = logging.getLogger(__name__)
 
 
 class DeviceCollectionPlans(models.Model):
@@ -125,46 +129,51 @@ class DeviceSubCollectionPlan(models.Model):
 
         return errors
 
-    def _process_with_exec(self, enabled: bool, code: str, data):
-        """通用的基于 exec 的数据处理执行器"""
-        if not enabled or not code:
-            return data
+    def _process_data(self, processor_enabled: bool, processor_code: str, data, method: str = 'netmiko'):
+        """
+        数据处理核心逻辑：
+        1. 优先寻找并执行预定义的处理器方法（推荐方式，支持复杂逻辑与IDE维护）
+        2. 如果未找到预定义处理器，则尝试执行数据库中存储的动态代码（兼容旧方案）
+        """
+        vendor = self.summary_plan.vendor
+        device_type = self.summary_plan.device_type
+        collection_type = self.collection_type
 
-        try:
-            # 创建安全的执行环境
-            local_vars = {
-                'data': data,
-            }
+        # 1. 尝试使用注册的处理器
+        processor_func = get_processor(vendor, device_type, collection_type, method)
+        if processor_func:
+            try:
+                logger.info(f"执行预定义处理器: {vendor}:{device_type}:{collection_type}:{method}")
+                return processor_func(data)
+            except Exception as e:
+                logger.error(f"预定义处理器执行失败: {str(e)}", exc_info=True)
+                return data
 
-            # 执行数据处理代码
-            exec(code, globals(), local_vars)
+        # 2. 兼容性回退：执行数据库中的动态代码
+        # if processor_enabled and processor_code:
+        #     try:
+        #         logger.info(f"执行动态代码处理器: {self.name} ({method})")
+        #         local_vars = {'data': data}
+        #         # 在安全的局部命名空间中执行
+        #         exec(processor_code, globals(), local_vars)
+        #
+        #         if 'process_data' in local_vars and callable(local_vars['process_data']):
+        #             result = local_vars['process_data'](data)
+        #             return result if result is not None else data
+        #
+        #         logger.warning(f"动态代码中未找到有效的 'process_data' 函数: {self.name}")
+        #     except Exception as e:
+        #         logger.error(f"动态代码处理执行异常: {str(e)}", exc_info=True)
 
-            # 检查函数是否定义成功，并调用它
-            if 'process_data' in local_vars:
-                processed_result = local_vars['process_data'](local_vars['data'])
-            else:
-                raise RuntimeError("在执行代码后未找到 'process_data' 函数。")
-
-            # 获取处理结果
-            if processed_result is not None:
-                return processed_result
-
-            # 如果没有明确的返回值，返回处理后的数据
-            return data
-
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"执行数据处理代码失败: {str(e)}")
-            return data
+        return data
 
     def process_netmiko_data(self, data):
         """处理采集到的数据"""
-        return self._process_with_exec(self.netmiko_processor_enabled, self.netmiko_processor, data)
+        return self._process_data(self.netmiko_processor_enabled, self.netmiko_processor, data, method='netmiko')
 
     def process_netconf_data(self, data):
         """处理采集到的数据"""
-        return self._process_with_exec(self.netconf_processor_enabled, self.netconf_processor, data)
+        return self._process_data(self.netconf_processor_enabled, self.netconf_processor, data, method='netconf')
 
     def save(self, *args, **kwargs):
         """保存时确保字段映射有正确的默认值"""
