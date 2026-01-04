@@ -70,8 +70,8 @@ def plan_data_to_mongodb(**kwargs):
         dict: 处理结果字典，包含status和message字段
     """
     logging.info("开始执行采集方案webhook回调")
-    tmp_db = MongoOps(db='Automation', coll="tmp_data1")
-    tmp_db.insert(kwargs)
+    # tmp_db = MongoOps(db='Automation', coll="tmp_data1")
+    # tmp_db.insert(kwargs)
 
     try:
         # 获取基本参数
@@ -549,15 +549,15 @@ def process_raw_data(plan, collection_result, collection_method):
                 ),
             }
             enabled, code, func = dispatch.get(method, (False, None, None))
-
-            if enabled and code and callable(func):
+            # 修改：只要 func 可调用就执行，内部会处理映射或 exec 逻辑
+            if callable(func):
                 logging.info(f"执行{method}数据处理函数: {plan.name}")
                 processed_data = func(command_result)
                 logging.info(f"数据处理函数执行完成: {plan.name}")
             else:
-                # 未启用处理器或无处理函数
-                logging.info(f"未启用处理器，透传原始数据: {plan.name}")
-                processed_data = []
+                # 无处理函数
+                logging.info(f"无处理器函数，透传原始数据: {plan.name}")
+                processed_data = command_result  # 修改：透传原始数据应该是 command_result 而不是 []
         except Exception as e:
             logging.error(
                 f"数据处理函数执行失败: {plan.name} - {str(e)}", exc_info=True
