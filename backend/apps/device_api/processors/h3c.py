@@ -3,22 +3,50 @@ import math
 from .base import register_processor
 
 
-def mathintspeed(value):
-    """接口speed单位换算"""
-    k = 1000
+# 专门处理交换机端口速率的版本
+def format_switch_port_speed(speed_str):
+    """
+    针对交换机端口速率的格式化
+    输入: '10000000' -> 输出: '10G'
+    """
     try:
-        value = int(value) * 1000000
-    except:
-        return value
-    if value == 0:
-        return str(value)
-    # value = value * 8
-    sizes = ['bytes', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y']
-    c = math.floor(math.log(value) / math.log(k))
-    value = (value / math.pow(k, c))
-    value = '% 6.0f' % value
-    value = str(value) + sizes[c]
-    return value.strip()
+        speed = int(speed_str)
+
+        # 常见交换机端口速率映射
+        speed_mapping = {
+            10: "10M",
+            100: "100M",
+            1000: "1G",
+            10000: "10G",
+            25000: "25G",
+            40000: "40G",
+            100000: "100G",
+            200000: "200G",
+            400000: "400G"
+        }
+
+        # 尝试直接匹配常见速率
+        if speed in speed_mapping:
+            return speed_mapping[speed]
+
+        # 如果不是标准速率，按千进制计算
+        if speed >= 1000000:  # 1G以上
+            g_speed = speed / 1000000
+            if g_speed.is_integer():
+                return f"{int(g_speed)}G"
+            else:
+                return f"{g_speed}G"
+        elif speed >= 1000:  # 1M以上
+            m_speed = speed / 1000
+            if m_speed.is_integer():
+                return f"{int(m_speed)}M"
+            else:
+                return f"{m_speed}M"
+        else:
+            return f"{speed}bps"
+
+    except (ValueError, TypeError):
+        return "N/A"
 
 
 def h3c_speed_format(interface):
@@ -76,14 +104,13 @@ def process_interface_brief_netconf(data):
             if i['ActualSpeed'] == '0':
                 i['ActualSpeed'] = h3c_speed_format(
                     i['Name'])
-            if mathintspeed(
-                    i['ActualSpeed']) == '830G':
+            if format_switch_port_speed(i['ActualSpeed']) == '830G':
                 i['ActualSpeed'] = h3c_speed_format(
                     i['Name'])
             layer2datas.append(dict(
                         interface=i['Name'],
                         status=i['OperStatus'],
-                        speed=mathintspeed(
+                        speed=format_switch_port_speed(
                             i['ActualSpeed']),
                         duplex=i['ActualDuplex'],
                         description=i['Description']))
