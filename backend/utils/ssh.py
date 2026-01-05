@@ -15,11 +15,11 @@ import os
 import re
 import threading
 import time
-import traceback
 from socket import timeout
 
 import paramiko
-from channels.generic.websocket import WebsocketConsumer
+from channels.generic.websocket import AsyncWebsocketConsumer
+from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.http.request import QueryDict
 from apps.asset.models import AdminRecord
@@ -41,36 +41,47 @@ class MyThread(threading.Thread):
         self._stop_event.set()
 
     def run(self):
-        while not self._stop_event.is_set() or not self.chan.chan.exit_status_ready():
-            try:
-                data = self.chan.chan.recv(1024)
-                if data:
-                    str_data = data.decode('utf-8', 'ignore')
-                    self.chan.send(str_data)
-                    self.stdout.append([time.time() - self.start_time, 'o', str_data])
-                    # 捕获敲tab键的动作
-                    if self.chan.tab_mode:
-                        tmp = str_data.split(' ')
-                        if len(tmp) == 2 and tmp[1] == '' and tmp[0] != '':
-                            self.chan.cmd_tmp = self.chan.cmd_tmp + tmp[0].encode().replace(b'\x07', b'').decode()
-                        elif len(tmp) == 1 and tmp[0].encode() != b'\x07':  # \x07 蜂鸣声
-                            self.chan.cmd_tmp = self.chan.cmd_tmp + tmp[0].encode().replace(b'\x07', b'').decode()
-                        self.chan.tab_mode = False
-                    if self.chan.history_mode:
-                        self.chan.index = 0
-                        if str_data.strip() != '':
-                            self.chan.cmd_tmp = re.sub(r'(?:\x1B[@-_]|[\x80-\x9F])[0-?]*[ -/]*[@-~]|\x08', '', str_data)
-                        self.chan.history_mode = False
-                else:
-                    return
-            except timeout:
-                break
-        self.chan.send('\n由于长时间没有操作，连接已断开!', close=True)
-        self.stdout.append([time.time() - self.start_time, 'o', '\n由于长时间没有操作，连接已断开!'])
-        self.chan.close()
-        # self.record()
+        try:
+            while not self._stop_event.is_set():
+                if self.chan.chan.exit_status_ready():
+                    break
+                try:
+                    data = self.chan.chan.recv(1024)
+                    if data:
+                        str_data = data.decode('utf-8', 'ignore')
+                        # 使用 async_to_sync 调用异步的 send
+                        async_to_sync(self.chan.send)(text_data=str_data)
+                        self.stdout.append([time.time() - self.start_time, 'o', str_data])
+                        # 捕获敲tab键的动作
+                        if self.chan.tab_mode:
+                            tmp = str_data.split(' ')
+                            if len(tmp) == 2 and tmp[1] == '' and tmp[0] != '':
+                                self.chan.cmd_tmp = self.chan.cmd_tmp + tmp[0].encode().replace(b'\x07', b'').decode()
+                            elif len(tmp) == 1 and tmp[0].encode() != b'\x07':  # \x07 蜂鸣声
+                                self.chan.cmd_tmp = self.chan.cmd_tmp + tmp[0].encode().replace(b'\x07', b'').decode()
+                            self.chan.tab_mode = False
+                        if self.chan.history_mode:
+                            self.chan.index = 0
+                            if str_data.strip() != '':
+                                self.chan.cmd_tmp = re.sub(r'(?:\x1B[@-_]|[\x80-\x9F])[0-?]*[ -/]*[@-~]|\x08', '', str_data)
+                            self.chan.history_mode = False
+                    else:
+                        break
+                except timeout:
+                    continue
+                except Exception as e:
+                    fort_logger.error(f"SSH Thread error: {e}")
+                    break
+            
+            # 断开连接后的处理
+            if not self._stop_event.is_set():
+                async_to_sync(self.chan.send)(text_data='\n由于长时间没有操作或连接已断开!', close=True)
+            self.stdout.append([time.time() - self.start_time, 'o', '\n由于长时间没有操作或连接已断开!'])
+        finally:
+            self.chan.close_ssh()
 
     def record(self):
+        # 记录逻辑保持同步，在异步 consumer 中使用 sync_to_async 调用
         record_path = os.path.join(settings.MEDIA_ROOT, 'admin_ssh_records', self.chan.scope['user'].username,
                                    time.strftime('%Y-%m-%d'))
         if not os.path.exists(record_path):
@@ -83,7 +94,6 @@ class MyThread(threading.Thread):
             "width": self.chan.width,
             "height": self.chan.height,
             "timestamp": round(self.start_time),
-            # "title": "ssh",
             "title": "{}-{}".format(self.chan.ip, self.current_time),
             "env": {
                 "TERM": os.environ.get('TERM'),
@@ -94,14 +104,8 @@ class MyThread(threading.Thread):
         login_status_time = self.format_time(time.time() - self.start_time)
         login_user = self.chan.scope['user']
         login_server = r'{}@{}'.format(login_user.username, self.chan.ip)
-        # print('login_user', login_user) # AnonymousUser
-        # print('login_server', login_server) # None@10.254.23.47
-        # print(record_file_path) # None@10.254.23.47
         try:
-            # if login_user.is_superuser:
             admin_file.delay(record_file_path, self.stdout, header)
-            # admin_file(record_file_path, self.stdout, header)
-            # if not login_user.is_anonymous:
             AdminRecord.objects.create(
                 admin_login_user=login_user.username,
                 admin_server=login_server,
@@ -112,7 +116,6 @@ class MyThread(threading.Thread):
                 admin_record_cmds='\n'.join([x.strip() for x in self.chan.cmd])
             )
         except Exception as e:
-            print(traceback.print_exc())
             fort_logger.error('数据库添加用户操作记录失败，原因：{}'.format(e))
 
     @staticmethod
@@ -128,7 +131,7 @@ class MyThread(threading.Thread):
             return "%02ds" % s
 
 
-class MySSH(WebsocketConsumer):
+class MySSH(AsyncWebsocketConsumer):
     def __init__(self, *args, **kwargs):
         super(MySSH, self).__init__(*args, **kwargs)
         self.ssh = paramiko.SSHClient()
@@ -136,7 +139,7 @@ class MySSH(WebsocketConsumer):
         self.port = None
         self.username = None
         self.password = None
-        self.t1 = MyThread(self)
+        self.t1 = None
         self.query = QueryDict(query_string=self.scope.get('query_string'), encoding='utf-8')
         self.remote_ip = self.scope['query_string'].decode('utf8')
         self.width = 150
@@ -148,38 +151,41 @@ class MySSH(WebsocketConsumer):
         self.history_mode = False
         self.index = 0
 
-    def connect(self):
-        self.accept()
-        # print('accept')
+    async def connect(self):
+        await self.accept()
+        self.t1 = MyThread(self)
+        # 具体的连接逻辑由子类实现或在此扩展
+
+    def close_ssh(self):
+        """由线程或断开连接时调用，确保资源释放"""
         try:
-            self.ssh.load_system_host_keys()
-            self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            self.ssh.connect(self.ip, int(self.port), self.username, self.password, timeout=5)
+            if self.chan:
+                self.chan.close()
+            if self.ssh:
+                self.ssh.close()
         except Exception as e:
-            fort_logger.error('用户{}通过webssh连接{}失败！原因：{}'.format(self.username, self.ip, e))
-            self.send('用户{}通过webssh连接{}失败！原因：{}'.format(self.username, self.ip, e), close=True)
+            fort_logger.error(f"Error closing SSH: {e}")
 
-        self.chan = self.ssh.invoke_shell(term='ansi', width=self.width, height=self.height)
-        # 设置如果3分钟没有任何输入，就断开连接
-        self.chan.settimeout(60 * 3)
-        self.t1.setDaemon(True)
-        self.t1.start()
-
-    def disconnect(self, close_code):
-        # print('断开连接', close_code)
-        try:
-            self.handle_cmd()
-            self.t1.record()
-        finally:
-            self.ssh.close()
+    async def disconnect(self, close_code):
+        if self.t1:
             self.t1.stop()
+        
+        # 异步执行耗时操作
+        await sync_to_async(self.handle_cmd)()
+        if self.t1:
+            await sync_to_async(self.t1.record)()
+        
+        self.close_ssh()
 
-    def receive(self, text_data=None, bytes_data=None):
+    async def receive(self, text_data=None, bytes_data=None):
         try:
-            self.chan.send(text_data)
-            self.gen_cmd(text_data)
-        except:
-            self.websocket_disconnect(message=dict(code=4004))
+            if self.chan:
+                # 某些情况下 send 可能阻塞，但在 shell 模式下通常很快
+                self.chan.send(text_data)
+                self.gen_cmd(text_data)
+        except Exception as e:
+            fort_logger.error(f"Receive error: {e}")
+            await self.close()
 
     def gen_cmd(self, text_data):
         if text_data == '\r':
