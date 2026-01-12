@@ -955,12 +955,12 @@ def collect_device_main(**kwargs):
     #     .format(net_tower_tasks_counters, len(FAILURE_TASK), '\n'.join(failed_res_list), '\n'.join(failed_netconf_list),
     #             '\n'.join(ping_result), int(total_time))
     # logger.info(send_message)
-    # try:
-    #     standard_analysis_main()
-    #     interface_used.apply_async()
-    #     tracking_main.apply_async()
-    # except Exception as e:
-    #     pass
+    try:
+        standard_analysis_main()
+        interface_used.apply_async()
+        tracking_main.apply_async()
+    except Exception as e:
+        pass
     return
 
 
