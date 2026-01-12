@@ -899,62 +899,62 @@ def collect_device_main(**kwargs):
 
     logger.info('批量下发任务结束')
 
-    # # 去除结果中的<EagerResult: None>
-    # for task in net_tower_tasks:
-    #     if 'EagerResult' in str(type(task)):
-    #         logger.info("存在无效task")
-    #         net_tower_tasks.remove(task)
-    #
-    # # 获取tasks任务数量
-    # net_tower_tasks_counters = len(net_tower_tasks)
-    # net_tower_tasks_bak = net_tower_tasks.copy()
-    #
-    # # 等待子任务全部执行结束后执行下一步
-    # while len(net_tower_tasks) != 0:
-    #     for i in net_tower_tasks:
-    #         try:
-    #             if i.ready():
-    #                 net_tower_tasks.remove(i)
-    #         except Exception as e:
-    #             logger.error(str(e))
-    #             net_tower_tasks.remove(i)
-    #     time.sleep(10)
-    # logger.info('子任务全部执行结束')
-    #
-    # # 获取子任务执行结果，处理后发送
-    # FAILURE_TASK = []  # 失败任务
-    # for task_id in net_tower_tasks_bak:
-    #     try:
-    #         task_result = TaskResult.objects.filter(task_id=task_id).values('task_args', 'task_kwargs', 'status',
-    #                                                                         'result')
-    #         task_status = list(task_result)[0]['status']  # str
-    #         if task_status == 'FAILURE':  # celery执行失败
-    #             FAILURE_TASK.append((task_id, task_status))
-    #             logger.error(
-    #                 'celery执行失败,\ntask_id:{},\ntask_status{}\n'.format(
-    #                     task_id, task_status))
-    #     except Exception as e:  # 查询task_results失败
-    #         FAILURE_TASK.append((task_id, e))
-    #         logger.error(
-    #             '查询task_results失败,\nTask_id:{},\nERROR:{}\n'.format(
-    #                 task_id, e))
-    # logger.info('子任务执行结果查询结束')
-    # # 采集失败任务数量
-    # failed_logs_mongo = MongoOps(db='Automation', coll='collect_failed_logs')
-    # failed_res = failed_logs_mongo.find(fields={'_id': 0})  # type int
-    # failed_res_list = [x['ip'] for x in failed_res]
-    # # netconf 失败数
-    # failed_netconf_mongo = MongoOps(db='Automation', coll='netconf_failed')
-    # failed_netconf_res = failed_netconf_mongo.find(
-    #     fields={'_id': 0})  # type int
-    # failed_netconf_list = [x['ip'] for x in failed_netconf_res]
-    # # 结果发送微信、邮箱
-    # total_time = (time.time() - start_time) / 60
-    # send_message = '设备数据采集分析结束:\n任务总数: {}\ncelery任务失败数：{}\n采集失败数：{} 详见mongo collect_failed_logs\n' \
-    #                'netconf 失败设备:{}\nPing不通设备：{}\n总耗时：{}分钟\n' \
-    #     .format(net_tower_tasks_counters, len(FAILURE_TASK), '\n'.join(failed_res_list), '\n'.join(failed_netconf_list),
-    #             '\n'.join(ping_result), int(total_time))
-    # logger.info(send_message)
+    # 去除结果中的<EagerResult: None>
+    for task in net_tower_tasks:
+        if 'EagerResult' in str(type(task)):
+            logger.info("存在无效task")
+            net_tower_tasks.remove(task)
+
+    # 获取tasks任务数量
+    net_tower_tasks_counters = len(net_tower_tasks)
+    net_tower_tasks_bak = net_tower_tasks.copy()
+
+    # 等待子任务全部执行结束后执行下一步
+    while len(net_tower_tasks) != 0:
+        for i in net_tower_tasks:
+            try:
+                if i.ready():
+                    net_tower_tasks.remove(i)
+            except Exception as e:
+                logger.error(str(e))
+                net_tower_tasks.remove(i)
+        time.sleep(10)
+    logger.info('子任务全部执行结束')
+
+    # 获取子任务执行结果，处理后发送
+    FAILURE_TASK = []  # 失败任务
+    for task_id in net_tower_tasks_bak:
+        try:
+            task_result = TaskResult.objects.filter(task_id=task_id).values('task_args', 'task_kwargs', 'status',
+                                                                            'result')
+            task_status = list(task_result)[0]['status']  # str
+            if task_status == 'FAILURE':  # celery执行失败
+                FAILURE_TASK.append((task_id, task_status))
+                logger.error(
+                    'celery执行失败,\ntask_id:{},\ntask_status{}\n'.format(
+                        task_id, task_status))
+        except Exception as e:  # 查询task_results失败
+            FAILURE_TASK.append((task_id, e))
+            logger.error(
+                '查询task_results失败,\nTask_id:{},\nERROR:{}\n'.format(
+                    task_id, e))
+    logger.info('子任务执行结果查询结束')
+    # 采集失败任务数量
+    failed_logs_mongo = MongoOps(db='Automation', coll='collect_failed_logs')
+    failed_res = failed_logs_mongo.find(fields={'_id': 0})  # type int
+    failed_res_list = [x['ip'] for x in failed_res]
+    # netconf 失败数
+    failed_netconf_mongo = MongoOps(db='Automation', coll='netconf_failed')
+    failed_netconf_res = failed_netconf_mongo.find(
+        fields={'_id': 0})  # type int
+    failed_netconf_list = [x['ip'] for x in failed_netconf_res]
+    # 结果发送微信、邮箱
+    total_time = (time.time() - start_time) / 60
+    send_message = '设备数据采集分析结束:\n任务总数: {}\ncelery任务失败数：{}\n采集失败数：{} 详见mongo collect_failed_logs\n' \
+                   'netconf 失败设备:{}\nPing不通设备：{}\n总耗时：{}分钟\n' \
+        .format(net_tower_tasks_counters, len(FAILURE_TASK), '\n'.join(failed_res_list), '\n'.join(failed_netconf_list),
+                '\n'.join(ping_result), int(total_time))
+    logger.info(send_message)
     try:
         standard_analysis_main()
         interface_used.apply_async()
