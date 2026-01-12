@@ -1361,30 +1361,30 @@ def tracking_main():
     standard_analysis_main()
     interface_used.apply_async()
     xunmi_process_mongo.delete_many()
-    total_records = total_ip_mongo.count_documents()
+    # total_records = total_ip_mongo.count_documents()
     MongoNetOps.clear_xunmi()
-    # bus = SyncMessageBus()
-    page_size = 20
-    total_pages = math.ceil(total_records / page_size)
-    for page in range(1, total_pages + 1):
-        # bus.publish(queue=config.queue, routing_key=config.queue, body="xunmi_process_page{}".format(page))
-        xunmi_process_mongo.insert({'page': page, 'page_size': page_size})
-        tracking_sub.apply_async(kwargs={'page': page, 'page_size': page_size}, queue='xunmi', retry=True)
-    # start_time = time.time()
-    # total_ip_mongo = MongoOps(db='Automation', coll='Total_ip_list')
-    # # total_ip_res = total_ip_mongo.find(fields={'_id': 0})
-    # total_ip_res = total_ip_mongo.count_documents()
-    # # total_ip_res = total_ip_mongo.find_page_query(fields={'_id': 0}, page_size=20, page_num=1)
-    # # 20个队列，
-    # for ip_address in range(0, total_ip_res, 20):
-    #     # asyncio.run(tracking_sub(*total_ip_res[ip_address:ip_address + 20]))
-    #     tracking_sub.apply_async(args=total_ip_res[ip_address:ip_address + 20], queue='xunmi', retry=True)
-    # send_message = "【自动化】地址定位任务下发完成：\n总数量：{}个" \
-    #     .format(len(total_ip_res))
-    # logger.info(send_message)
-    # end_time = time.time()
-    # logger.info("耗时{}秒".format(str(int(end_time - start_time))))
-    # #send_msg_netops'step3:' + send_message)
+    # # bus = SyncMessageBus()
+    # page_size = 20
+    # total_pages = math.ceil(total_records / page_size)
+    # for page in range(1, total_pages + 1):
+    #     # bus.publish(queue=config.queue, routing_key=config.queue, body="xunmi_process_page{}".format(page))
+    #     xunmi_process_mongo.insert({'page': page, 'page_size': page_size})
+    #     tracking_sub.apply_async(kwargs={'page': page, 'page_size': page_size}, queue='xunmi', retry=True)
+    start_time = time.time()
+    total_ip_mongo = MongoOps(db='Automation', coll='Total_ip_list')
+    # total_ip_res = total_ip_mongo.find(fields={'_id': 0})
+    total_ip_res = total_ip_mongo.count_documents()
+    # total_ip_res = total_ip_mongo.find_page_query(fields={'_id': 0}, page_size=20, page_num=1)
+    # 20个队列，
+    for ip_address in range(0, total_ip_res, 20):
+        # asyncio.run(tracking_sub(*total_ip_res[ip_address:ip_address + 20]))
+        tracking_sub.apply_async(args=total_ip_res[ip_address:ip_address + 20], queue='xunmi', retry=True)
+    send_message = "【自动化】地址定位任务下发完成：\n总数量：{}个" \
+        .format(len(total_ip_res))
+    logger.info(send_message)
+    end_time = time.time()
+    logger.info("耗时{}秒".format(str(int(end_time - start_time))))
+    #send_msg_netops'step3:' + send_message)
 
 
 @shared_task(base=AxeTask, once={'graceful': True})
