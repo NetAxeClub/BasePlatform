@@ -1359,7 +1359,7 @@ def tracking_sub(**kwargs):
 @shared_task(base=AxeTask, once={'graceful': True})
 def tracking_main():
     connections.close_all()
-    standard_analysis_main()
+    # standard_analysis_main()
     interface_used.apply_async()
     xunmi_process_mongo.delete_many()
     # total_records = total_ip_mongo.count_documents()
