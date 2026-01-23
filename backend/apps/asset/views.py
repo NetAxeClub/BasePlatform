@@ -963,7 +963,7 @@ class NetworkDeviceViewSet(CustomViewBase):
                 device.save()
                 msg, code = 'SNMP连接测试成功', 200
             else:
-                code = 400
+                msg, code = device_name, 400
             return JsonResponse({
                 'code': code,
                 'msg': msg,
