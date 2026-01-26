@@ -1371,7 +1371,7 @@ def tracking_main():
         tracking_sub.apply_async(kwargs={'page': page, 'page_size': page_size}, queue='xunmi', retry=True)
     start_time = time.time()
     send_message = "【自动化】地址定位任务下发完成：\n总数量：{}个" \
-        .format(len(total_records))
+        .format(total_records)
     logger.info(send_message)
     end_time = time.time()
     logger.info("耗时{}秒".format(str(int(end_time - start_time))))
