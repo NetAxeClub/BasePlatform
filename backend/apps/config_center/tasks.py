@@ -68,7 +68,7 @@ def config_compliance(**kwargs):
             config_status='SUCCESS'
         )
         logger.info('当天无配置备份，使用前一天数据进行合规检查')
-
+    print(start_datetime, end_datetime)
     for config_file in config_files_qs.iterator():
         if config_file.vendor in vendor_map:
             if not default_storage.exists(f"device_config/{config_file.file_path}"):
