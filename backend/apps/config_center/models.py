@@ -141,8 +141,41 @@ class ConfigComplianceResult(models.Model):
     log_time = models.DateTimeField(verbose_name="检查时间", null=False, default=timezone.now)
     rule = models.CharField(verbose_name="检查项", null=False, default='', max_length=200)
     rule_id = models.IntegerField(verbose_name="检查项id", null=False, default=0)
-    # regex = models.TextField(verbose_name="正则表达式", null=False, default='')
-    # regex_result = models.TextField(verbose_name="正则表达式", null=False, default='')
+
+    # 以下为扩展字段，便于展示详细信息和追溯
+    config_file_path = models.CharField(
+        verbose_name="配置文件路径",
+        max_length=500,
+        null=True,
+        blank=True,
+        help_text="本次检查所基于的配置文件存储路径",
+    )
+    backup_time = models.DateTimeField(
+        verbose_name="配置备份时间",
+        null=True,
+        blank=True,
+        help_text="所检查的配置备份时间，便于追溯",
+    )
+    config_backup_id = models.IntegerField(
+        verbose_name="配置备份记录ID",
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="关联 ConfigBackup 主键，便于跳转查看备份详情",
+    )
+    rule_regex = models.TextField(
+        verbose_name="检查规则（正则等）",
+        null=True,
+        blank=True,
+        help_text="实际参与判断的规则摘要，如正则表达式，多条可换行",
+    )
+    match_detail = models.JSONField(
+        verbose_name="匹配详情",
+        null=True,
+        blank=True,
+        default=dict,
+        help_text="各子规则的匹配结果，如 [{\"pattern\": \"match-compliance\", \"regex\": \"...\", \"matched\": [...]}]",
+    )
 
     def __str__(self):
         return "{}-{}".format(self.manage_ip, self.log_time)
