@@ -41,7 +41,7 @@ def config_compliance(**kwargs):
         _regex = compliance['regex']
         return re.compile(pattern=_regex, flags=re.M).findall(string=kwargs['data_to_parse'])
 
-    vendor_map = ['H3C', 'HUAWEI']
+    vendor_map = ['H3C', 'Huawei', 'Hillstone']
     today = timezone.now().date()
 
     # 按优先级尝试多个日期范围：先当天（昨天至今），再依次往前一天
@@ -64,16 +64,14 @@ def config_compliance(**kwargs):
     else:
         logger.warning('近 3 天均无 SUCCESS 的配置备份，跳过合规检查')
         return
-
     for config_file in config_files_qs.iterator():
         if config_file.vendor in vendor_map:
-            if not default_storage.exists(f"device_config/{config_file.file_path}"):
+            if not default_storage.exists(config_file.file_path):
                 continue
-            data_to_parse = default_storage.open(f"device_config/{config_file.file_path}").read().decode('utf-8')
+            data_to_parse = default_storage.open(config_file.file_path).read().decode('utf-8')
             rules = ConfigComplianceRule.objects.all().iterator()
             for rule in rules:
                 childrens = rule.children.all()
-                # print(childrens)
                 # 按厂商分组，同一厂商的规则使用逻辑运算符 OR
                 for child in childrens:
                     logger.info(f"检查项：{child.name}")
@@ -90,22 +88,29 @@ def config_compliance(**kwargs):
                     # 根据厂商分类
                     for vendor_compliance in vendor_compliance_list.keys():
                         final_res = []
+                        rule_regex_lines = []
+                        match_detail_list = []
                         if vendor_compliance == config_file.vendor:
                             for sub_compliance in vendor_compliance_list[vendor_compliance]:
-                                print('sub_compliance', sub_compliance)
                                 _pattern = sub_compliance['pattern']  # match-compliance  mismatch-compliance
+                                _regex = sub_compliance.get('regex', '')
                                 res = compliance_proc(
                                     data_to_parse=data_to_parse,
                                     compliance=sub_compliance,
                                 )
+                                # 收集规则摘要（便于前端展示“检查规则”）
+                                rule_regex_lines.append(f"{_pattern}: {_regex}")
+                                # 收集匹配详情：匹配到的内容列表，便于展示“为什么合规/不合规”
+                                match_detail_list.append({
+                                    'pattern': _pattern,
+                                    'regex': _regex,
+                                    'matched': list(res) if res else [],
+                                    'passed': (True if res else False) if _pattern == 'match-compliance' else (False if res else True),
+                                })
                                 if _pattern == 'match-compliance':
                                     final_res.append(True if res else False)
-                                # 不匹配-合规 反之 匹配-不合规
                                 elif _pattern == 'mismatch-compliance':
                                     final_res.append(False if res else True)
-                            print(final_res)
-                            print("最终结果")
-                            print(any(final_res))
                             _data = {
                                 'compliance': '合规' if any(final_res) else '不合规',
                                 'rule_id': child.id,
@@ -113,9 +118,13 @@ def config_compliance(**kwargs):
                                 'hostname': config_file.name,
                                 'vendor': config_file.vendor,
                                 'rule': child.name,
-                                'log_time': timezone.now()
+                                'log_time': timezone.now(),
+                                'config_file_path': config_file.file_path or '',
+                                'backup_time': config_file.last_time,
+                                'config_backup_id': config_file.id,
+                                'rule_regex': '\n'.join(rule_regex_lines) if rule_regex_lines else None,
+                                'match_detail': match_detail_list if match_detail_list else None,
                             }
-                            print(_data)
                             res_query = ConfigComplianceResult.objects.filter(manage_ip=config_file.manage_ip,
                                                                               rule_id=child.id)
                             if res_query:
