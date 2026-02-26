@@ -42,33 +42,29 @@ def config_compliance(**kwargs):
         return re.compile(pattern=_regex, flags=re.M).findall(string=kwargs['data_to_parse'])
 
     vendor_map = ['H3C', 'HUAWEI']
-    # 获取时区感知的日期时间范围，先查当天（昨天至今）
     today = timezone.now().date()
-    start_datetime = timezone.make_aware(
-        datetime.combine(today - timedelta(days=1), datetime.min.time())
-    )
-    end_datetime = timezone.make_aware(
-        datetime.combine(today, datetime.max.time())
-    )
 
-    config_files_qs = ConfigBackup.objects.filter(
-        last_time__range=(start_datetime, end_datetime),
-        config_status='SUCCESS'
-    )
-    # 若当天无数据，则回退查前一天
-    if not config_files_qs.exists():
+    # 按优先级尝试多个日期范围：先当天（昨天至今），再依次往前一天
+    for days_back in range(0, 3):  # 0=昨天至今, 1=前天至昨天, 2=大前天至前天
         start_datetime = timezone.make_aware(
-            datetime.combine(today - timedelta(days=2), datetime.min.time())
+            datetime.combine(today - timedelta(days=days_back + 1), datetime.min.time())
         )
         end_datetime = timezone.make_aware(
-            datetime.combine(today - timedelta(days=1), datetime.max.time())
+            datetime.combine(today - timedelta(days=days_back), datetime.max.time())
         )
         config_files_qs = ConfigBackup.objects.filter(
             last_time__range=(start_datetime, end_datetime),
             config_status='SUCCESS'
         )
-        logger.info('当天无配置备份，使用前一天数据进行合规检查')
-    print(start_datetime, end_datetime)
+        count = config_files_qs.count()
+        if count > 0:
+            if days_back > 0:
+                logger.info('当天无配置备份，使用前 %s 天数据进行合规检查，共 %s 条', days_back, count)
+            break
+    else:
+        logger.warning('近 3 天均无 SUCCESS 的配置备份，跳过合规检查')
+        return
+
     for config_file in config_files_qs.iterator():
         if config_file.vendor in vendor_map:
             if not default_storage.exists(f"device_config/{config_file.file_path}"):
