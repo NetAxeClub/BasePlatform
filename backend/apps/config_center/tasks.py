@@ -16,7 +16,7 @@ from django.db import connections
 from apps.automation.tools.base_connection import BaseConn
 from apps.automation.tools.model_api import get_device_info_v2
 from apps.config_center.git_tools.git_proc import ConfigGit
-# from apps.config_center.config_parse.config_parse import config_file_parse
+from apps.config_center.config_parse.config_parse import config_file_parse
 from apps.config_center.git_tools.git_proc import push_file
 # from apps.config_center.my_nornir import config_backup_nornir
 from apps.config_center.models import ConfigBackup, BackupPolicy, ConfigComplianceResult, ConfigComplianceRule
@@ -42,7 +42,7 @@ def config_compliance(**kwargs):
         return re.compile(pattern=_regex, flags=re.M).findall(string=kwargs['data_to_parse'])
 
     vendor_map = ['H3C', 'HUAWEI']
-    # 获取时区感知的日期时间范围
+    # 获取时区感知的日期时间范围，先查当天（昨天至今）
     today = timezone.now().date()
     start_datetime = timezone.make_aware(
         datetime.combine(today - timedelta(days=1), datetime.min.time())
@@ -51,12 +51,25 @@ def config_compliance(**kwargs):
         datetime.combine(today, datetime.max.time())
     )
 
-    config_files = ConfigBackup.objects.filter(
+    config_files_qs = ConfigBackup.objects.filter(
         last_time__range=(start_datetime, end_datetime),
         config_status='SUCCESS'
-    ).iterator()
+    )
+    # 若当天无数据，则回退查前一天
+    if not config_files_qs.exists():
+        start_datetime = timezone.make_aware(
+            datetime.combine(today - timedelta(days=2), datetime.min.time())
+        )
+        end_datetime = timezone.make_aware(
+            datetime.combine(today - timedelta(days=1), datetime.max.time())
+        )
+        config_files_qs = ConfigBackup.objects.filter(
+            last_time__range=(start_datetime, end_datetime),
+            config_status='SUCCESS'
+        )
+        logger.info('当天无配置备份，使用前一天数据进行合规检查')
 
-    for config_file in config_files:
+    for config_file in config_files_qs.iterator():
         if config_file.vendor in vendor_map:
             if not default_storage.exists(f"device_config/{config_file.file_path}"):
                 continue
@@ -116,66 +129,6 @@ def config_compliance(**kwargs):
                             else:
                                 ConfigComplianceResult.objects.create(**_data)
 
-
-# @shared_task(base=AxeTask, once={'graceful': True})
-# def backup_device_config_sub(**kwargs):
-#     connections.close_all()
-#     today = kwargs['today']
-#     policy_map = kwargs['policy_map']
-#     # command_map = {
-#     #     'H3C': {'cmd': 'display current-configuration', 'expect_string': None, 'enable': False},
-#     #     'Huawei': {'cmd': 'display current-configuration', 'expect_string': None, 'enable': False},
-#     #     'Mellanox': {'cmd': 'show running-config', 'expect_string': None, 'enable': True},
-#     #     'Ruijie': {'cmd': 'show running-config', 'expect_string': None, 'enable': False},
-#     #     'centec': {'cmd': 'show running-config', 'expect_string': None, 'enable': False},
-#     #     'Hillstone': {'cmd': 'show configuration running', 'expect_string': None, 'enable': False},
-#     #     'inspur': {'cmd': 'show running-config', 'expect_string': None, 'enable': False},
-#     #     'Cisco': {'cmd': 'show running-config', 'expect_string': None, 'enable': False},
-#     #     'Maipu': {'cmd': 'show running-config', 'expect_string': ']'},
-#     #     'ZTE': {'cmd': 'show running-config', 'expect_string': ']'},
-#     # }
-#     hostip = kwargs['manage_ip']  # 设备管理IP地址
-#     class_instance = BaseConn(**kwargs)
-#     filename = f"current-configuration/{hostip}/{kwargs['vendor__alias']}_{hostip}.txt"
-#     try:
-#         content = class_instance.send_commands(cmd=policy_map['current_command'])
-#         if not os.path.exists(BASE_DIR + f"/media/device_config/current-configuration/{hostip}/"):
-#             os.mkdir(BASE_DIR + f"/media/device_config/current-configuration/{hostip}/")
-#         with open(BASE_DIR + "/media/device_config/" + filename, "w", encoding="utf-8") as f:
-#             f.write(content)
-#         device_q = ConfigBackup.objects.filter(manage_ip=hostip)
-#         if device_q:
-#             ConfigBackup.objects.filter(manage_ip=hostip).update(name=kwargs['name'],
-#                                                                  config_status='SUCCESS',
-#                                                                  status=kwargs['status'], idc_name=kwargs['idc__name'],
-#                                                                  vendor=kwargs['vendor__alias'],
-#                                                                  model_name=kwargs['model__name'], file_path=filename,
-#                                                                  last_time=today)
-#         else:
-#             ConfigBackup.objects.create(name=kwargs['name'], manage_ip=hostip,
-#                                         config_status='SUCCESS',
-#                                         status=kwargs['status'], idc_name=kwargs['idc__name'],
-#                                         vendor=kwargs['vendor__alias'],
-#                                         model_name=kwargs['model__name'], file_path=filename,
-#                                         last_time=today)
-#
-#     except RuntimeError as e:
-#         device_q = ConfigBackup.objects.filter(manage_ip=hostip)
-#         if device_q:
-#             ConfigBackup.objects.filter(manage_ip=hostip).update(name=kwargs['name'],
-#                                                                  config_status='FAILED',
-#                                                                  status=kwargs['status'], idc_name=kwargs['idc__name'],
-#                                                                  vendor=kwargs['vendor__alias'],
-#                                                                  model_name=kwargs['model__name'], file_path=filename,
-#                                                                  last_time=today)
-#         else:
-#             ConfigBackup.objects.create(
-#                 name=kwargs['name'], manage_ip=hostip,
-#                 config_status='FAILED',
-#                 status=kwargs['status'], idc_name=kwargs['idc__name'], vendor=kwargs['vendor__alias'],
-#                 model_name=kwargs['model__name'], last_time=today
-#             )
-#     return filename
 
 @shared_task(base=AxeTask, once={'graceful': True})
 def backup_device_config_sub(**kwargs):

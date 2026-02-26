@@ -51,6 +51,8 @@ class HuaweiProc(BaseConn):
         self.address_set = []
         # 服务对象
         self.service_set = {}
+        # 正常我拿mac地址只需要执行一个xml就可以，但是有的设备是存在特殊的配置，比如mac分为全局的和EVPN环境的，所以要执行多次不同的xml，最后结果放在全局的类变量下
+        # 这里面，netconf的mac地址分为bd的和全局的，要执行两个xml，最后结束的时候拼接在一起存储
         self.mac_data = []
 
     def _huawei_usg_sec_policy(self, datas):
@@ -384,6 +386,7 @@ class HuaweiProc(BaseConn):
 
     def _mac_proc(self, res):
         """
+        这个是netmiko的
         {'macaddress': '04d7-a541-2eea', 'vlan': '1001', 'interface': 'GE1/1/1', 'type': 'dynamic', 'age': '300'}
         :param res:
         :return:
@@ -1076,7 +1079,6 @@ class HuaweiProc(BaseConn):
                 intf_datas.append(i)
             MongoNetOps.insert_table(db='NETCONF', hostip=self.hostip, datas=intf_datas,
                                      tablename='huawei_usg_interface_ipv4v6')
-
     def _netconf_usg_vrrp_info(self, vrrp_res):
         if vrrp_res:
             host_ip_regex = re.compile('^\\d+.\\d+.\\d+.\\d+$')
@@ -1567,6 +1569,7 @@ class HuaweiProc(BaseConn):
                 MongoNetOps.insert_table(db='Automation', hostip=self.hostip,
                                          datas=self.mac_data, tablename='MACTable', delete=True)
             if self.layer3datas:
+                print(self.layer3datas)
                 MongoNetOps.insert_table(db='Automation', hostip=self.hostip, datas=self.layer3datas,
                                          tablename='layer3interface')
             if self.dnat_data:

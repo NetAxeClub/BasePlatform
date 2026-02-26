@@ -3,7 +3,7 @@ import json
 
 import yaml
 from ttp import ttp
-
+from utils.db.mongo_ops import MongoOps
 from netaxe.settings import BASE_DIR
 
 CONFIG_PATH = BASE_DIR + '/media/device_config/current-configuration/'
@@ -206,7 +206,7 @@ ip vpn-instance {{ name }}
 </group>
 <output macro="check"/>
 """
-
+config_mongo = MongoOps(db="Automation", coll="config_parse")
 
 class H3cParse:
     def __init__(self, host, _dir):
@@ -225,6 +225,14 @@ class H3cParse:
         if isinstance(self.parse_res, dict):
             for k in self.parse_res.keys():
                 self.yaml_dict[self.host][k] = self.parse_res[k]
+        print(self.yaml_dict)
+
+    def save(self):
+        query = config_mongo.find(query_dict={'host': self.host}, fields={'_id': 0})
+        if query:
+            config_mongo.update(filter={'host': self.host}, update={'$set': {'host': self.host, 'data': self.yaml_dict[self.host]}})
+        else:
+            config_mongo.insert({'host': self.host, 'data': self.yaml_dict[self.host]})
 
     def snmp(self, snmp):
         self.yaml_dict[self.host]['snmp'] = snmp

@@ -19,24 +19,27 @@ vendor_map = {
 }
 
 
-async def sub_file_proc(host_file, _dir, host):
+def sub_file_proc(host_file, _dir, host):
     with open("{}{}/{}".format(CONFIG_PATH, _dir, host), 'r', encoding='utf8') as f:
         vendor_host = host_file.split('_')
         vendor = vendor_host[0]
+        if vendor not in ['H3C', 'Huawei']:
+            return
         host = vendor_host[1]
         data_to_parse = f.read()
         try:
             if vendor in vendor_map.keys():
                 _Parse = vendor_map[vendor](host, _dir)
                 _Parse.parse(data_to_parse)
-                _Parse.get_yaml()
+                # _Parse.get_yaml()
+                _Parse.save()
         except Exception as e:
             print(e)
     return
 
 
 # 配置文件解析主调度任务，负责解析配置，并按指标拆分具体功能
-async def config_file_parse():
+def config_file_parse():
     dir_list = os.listdir(CONFIG_PATH)
     for _dir in dir_list:
         if os.path.isdir(CONFIG_PATH + _dir):
@@ -44,7 +47,7 @@ async def config_file_parse():
             for host in device_file_list:
                 if host[-4:] == '.txt':
                     host_file = host[:-4]
-                    await sub_file_proc(host_file, _dir, host)
+                    sub_file_proc(host_file, _dir, host)
 
 
 # 生成配置文件目录树
