@@ -1,14 +1,11 @@
-Value Filldown IPADDRESS (\d+.\d+.\d+.\d+)
-Value Filldown MACADDRESS (\w+-\w+-\w+)
-Value Filldown EXPIRE ((\d+)?)
-Value Filldown TYPE (D\s*\S+|I\s*\S+|S\s*\S+)
-Value VLAN (\d+)
-Value Filldown INTERFACE ((\S+)?)
-Value Filldown VPNINSTANCE ((\S+|\s+)?)
+Value IPADDRESS (\d+.\d+.\d+.\d+)
+Value MACADDRESS (\w+-\w+-\w+)
+Value VLAN (\S+|\d+)
+Value INTERFACE (\S+)
+Value AGING (\d*)
+Value TYPE (\S+)
+Value VPNINSTANCE (\S+)
 
 Start
-  ^${IPADDRESS}\s+${MACADDRESS}\s+${EXPIRE}\s+${TYPE}\s+${INTERFACE}(\s+)?${VPNINSTANCE} -> Continue.Record
-  ^\s+${VLAN}\/\S+ -> Record
-
-
-
+  ^${IPADDRESS}\s+${MACADDRESS}\s+${VLAN}\s+${INTERFACE}\s+${AGING}\s+${TYPE} -> Record
+  ^${IPADDRESS}\s+${MACADDRESS}\s+${AGING}\s+${TYPE}\s+${INTERFACE}\s+${VPNINSTANCE} -> Record

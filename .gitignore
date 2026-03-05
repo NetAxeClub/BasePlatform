@@ -1,4 +1,6 @@
 venv/
+.beads
+.claude
 .git
 .idea
 .github
@@ -7,6 +9,7 @@ venv/
 __pycache__/
 web/
 backend/logs
+backend/.claude
 config/config.json
 backend/logs/server.log
 backend/__pycahe__

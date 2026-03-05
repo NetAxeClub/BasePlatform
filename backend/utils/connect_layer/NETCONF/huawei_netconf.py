@@ -1798,7 +1798,12 @@ class HuaweiYunShanCollection(HuaweiyangNetconfConnect):
         </arp:arp>
         '''
         res = self.netconf_get(data_xml)
+        # 返回值是可以预期的，要么是None没有,要么xml和设备不适配，返回False (RPCError)
+        # 字段data_xml  结果路径 写法是arp.query-entries.query-entry,后端拿到结果路径，解析成递归解析拿结果，拿不到就是None或者空列表
+        print(res)  # 如果没有，固定就是None，这个是封装好的特性，前提是xml是适配该设备的
+        # path arp.query-entries.query-entry
         return res['arp']['query-entries']['query-entry']
+        # return res
 
     def collection_mac_table(self):
         data_xml = '''
@@ -1811,6 +1816,7 @@ class HuaweiYunShanCollection(HuaweiyangNetconfConnect):
         </vlan:vlan>
         '''
         res = self.netconf_get(data_xml)
+        print(res)  # 如果没有，固定就是None，这个是封装好的特性，前提是xml是适配该设备的
         return res['vlan']['vlans'] if res is not None else []
 
 

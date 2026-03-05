@@ -506,6 +506,7 @@ class HillstoneFsm:
     def get_map(flag):
         app_map = {
             "standard": HillstoneFsm.standard_ttp,
+            "dnat": HillstoneFsm.dnat_proc
         }
         return app_map[flag] if flag in app_map.keys() else False
 
@@ -962,6 +963,30 @@ Warning: {{ error | re(".*") }}
             return res[0]['results']
         else:
             return []
+
+    @staticmethod
+    def parse_dnat_config_after(path):
+        """
+        解析 DNAT 配置下发后的命令行结果，从中提取 rule ID 回填到 flow_record.ttp。
+        设备输出中通常包含 "rule ID=数字" 或 "Rule id 数字 is created" 等，此处匹配 rule ID= 后的取值。
+        """
+        data_to_parse = default_storage.open(path).read()
+        data_to_parse = data_to_parse.decode("utf-8")
+        # 从输出中提取 rule ID（不依赖调用方传入 rule_id）
+        ttp_template = """
+<group name="results">
+{{ ignore("\\s*") }}rule ID={{ rule_id }}
+</group>
+"""
+        parser = ttp(data=data_to_parse, template=ttp_template)
+        parser.parse()
+        results = parser.result(format="json")[0]
+        res = json.loads(results)
+        if not res or not isinstance(res[0], dict):
+            return {}
+        if "results" not in res[0]:
+            return {}
+        return res[0]["results"] if isinstance(res[0]["results"], dict) else {}
 
     # 输出DNAT下发前的rule校验
     @staticmethod
