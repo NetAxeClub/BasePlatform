@@ -2,6 +2,7 @@ import json
 import logging
 import pytz
 from datetime import datetime
+from django.db import transaction
 from rest_framework import serializers
 from apps.device_api.models import (
     DeviceCollectionPlans,
@@ -9,6 +10,7 @@ from apps.device_api.models import (
     NetconfXMLTemplate,
     PlansToDevice,
 )
+from apps.device_api.fields_mapping import DEFAULT_COLLECTION_TYPES
 
 
 class DeviceCollectionPlansSerializer(serializers.ModelSerializer):
@@ -50,7 +52,10 @@ class DeviceCollectionPlansSerializer(serializers.ModelSerializer):
 
 
 class DeviceCollectionPlansCreateSerializer(serializers.ModelSerializer):
-    """采集汇总方案创建序列化器"""
+    """采集汇总方案创建序列化器。
+
+    创建空白方案时会自动为该方案创建所有采集类型的空白子方案（仅名称与采集类型确定）。
+    """
 
     vendor_display = serializers.CharField(source="get_vendor_display", read_only=True)
 
@@ -73,6 +78,31 @@ class DeviceCollectionPlansCreateSerializer(serializers.ModelSerializer):
         if DeviceCollectionPlans.objects.filter(name=value).exists():
             raise serializers.ValidationError("采集汇总方案名称已存在")
         return value
+
+    def create(self, validated_data):
+        with transaction.atomic():
+            summary_plan = DeviceCollectionPlans.objects.create(**validated_data)
+            # 自动创建所有采集类型的空白子方案（仅名称和采集类型确定）
+            name_max_len = 50  # DeviceSubCollectionPlan.name 最大长度
+            for collection_type in DEFAULT_COLLECTION_TYPES:
+                suffix = f"-{collection_type}"
+                max_parent_len = name_max_len - len(suffix)
+                parent_part = summary_plan.name[:max_parent_len] if len(summary_plan.name) > max_parent_len else summary_plan.name
+                sub_name = f"{parent_part}{suffix}"
+                if DeviceSubCollectionPlan.objects.filter(name=sub_name).exists():
+                    for i in range(1, 100):
+                        # 预留 "-99" 的宽度，保证总长不超 name_max_len
+                        candidate = f"{parent_part[:max_parent_len - len(str(i)) - 1]}-{i}{suffix}"[:name_max_len]
+                        if not DeviceSubCollectionPlan.objects.filter(name=candidate).exists():
+                            sub_name = candidate
+                            break
+                DeviceSubCollectionPlan.objects.create(
+                    summary_plan=summary_plan,
+                    name=sub_name,
+                    collection_type=collection_type,
+                    description="",
+                )
+            return summary_plan
 
 
 class DeviceCollectionPlansUpdateSerializer(serializers.ModelSerializer):
@@ -189,6 +219,10 @@ class DeviceSubCollectionPlanSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+        extra_kwargs = {
+            "netmiko_processor": {"write_only": True},
+            "netconf_processor": {"write_only": True},
+        }
 
     def get_xml_templates(self, obj):
         """获取XML模板列表"""
@@ -211,7 +245,10 @@ class DeviceSubCollectionPlanSerializer(serializers.ModelSerializer):
 
 
 class DeviceSubCollectionPlanCreateSerializer(serializers.ModelSerializer):
-    """设备采集方案创建序列化器"""
+    """设备采集方案创建序列化器。
+
+    处理器相关字段为可选：未传或传 false/空 时按「未启用」处理，仅使用字段映射。
+    """
 
     summary_plan_id = serializers.IntegerField(write_only=True, help_text="汇总方案ID")
     summary_plan_name = serializers.CharField(
@@ -264,6 +301,12 @@ class DeviceSubCollectionPlanCreateSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+        extra_kwargs = {
+            "netmiko_processor_enabled": {"required": False, "default": False},
+            "netmiko_processor": {"required": False, "allow_blank": True, "default": ""},
+            "netconf_processor_enabled": {"required": False, "default": False},
+            "netconf_processor": {"required": False, "allow_blank": True, "default": ""},
+        }
 
     def validate(self, data):
         # 验证至少选择一种采集方式
@@ -359,7 +402,10 @@ class DeviceSubCollectionPlanCreateSerializer(serializers.ModelSerializer):
 
 
 class DeviceSubCollectionPlanUpdateSerializer(serializers.ModelSerializer):
-    """设备采集方案更新序列化器"""
+    """设备采集方案更新序列化器。
+
+    处理器相关字段为可选：未传或传 false/空 时按「未启用」处理，仅使用字段映射。
+    """
 
     summary_plan_id = serializers.IntegerField(
         write_only=True,
@@ -395,6 +441,12 @@ class DeviceSubCollectionPlanUpdateSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+        extra_kwargs = {
+            "netmiko_processor_enabled": {"required": False},
+            "netmiko_processor": {"required": False, "allow_blank": True},
+            "netconf_processor_enabled": {"required": False},
+            "netconf_processor": {"required": False, "allow_blank": True},
+        }
 
     def validate(self, data):
         # 在更新时，如果字段没有传入，从实例中获取现有值

@@ -9,12 +9,14 @@ https://docs.djangoproject.com/en/4.0/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.0/ref/settings/
 """
+
 import os
 import importlib
 import pkgutil
 import apps
 from datetime import timedelta
 from confload.confload import config
+
 # Build paths inside the project like this: BASE_DIR / "subdir".
 # BASE_DIR = Path(__file__).resolve().parent.parent
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -37,8 +39,7 @@ os.environ.setdefault("DJANGO_ALLOW_ASYNC_UNSAFE", "true")
 
 discovered_apps = [
     name
-    for finder, name, ispkg
-    in pkgutil.iter_modules(apps.__path__, apps.__name__ + ".")
+    for finder, name, ispkg in pkgutil.iter_modules(apps.__path__, apps.__name__ + ".")
 ]
 
 # # 插件配置
@@ -63,36 +64,40 @@ INSTALLED_APPS = [
     "django_celery_beat",
     "django_celery_results.apps.CeleryResultConfig",
     "rest_framework",
-    'django_filters',
+    "django_filters",
     "simple_history",
     # 'reversion',
-    'import_export',
+    "import_export",
 ] + discovered_apps
 
 DATABASES = {
-    'default': {
-        'NAME': config.mysql_db,
-        'ENGINE': 'django.db.backends.mysql',
-        'HOST': config.mysql_host,
-        'USER': config.mysql_user,
-        'PASSWORD': config.mysql_password,
-        'PORT': config.mysql_port,
+    "default": {
+        "NAME": config.mysql_db,
+        "ENGINE": "django.db.backends.mysql",
+        "HOST": config.mysql_host,
+        "USER": config.mysql_user,
+        "PASSWORD": config.mysql_password,
+        "PORT": config.mysql_port,
         # 'CONN_MAX_AGE': 21600,
-        'ATOMIC_REQUESTS': True,
-        'TEST_CHARSET': 'utf8mb4',
-        'TEST_COLLATION': 'utf8mb4_general_ci',
-        'TEST': {'NAME': 'net_axe_test',
-                 'CHARTSET': 'utf8mb4',
-                 'COLLATION': 'utf8mb4_general_ci'},
-        'OPTIONS': {
+        "ATOMIC_REQUESTS": True,
+        "TEST_CHARSET": "utf8mb4",
+        "TEST_COLLATION": "utf8mb4_general_ci",
+        "TEST": {
+            "NAME": "net_axe_test",
+            "CHARTSET": "utf8mb4",
+            "COLLATION": "utf8mb4_general_ci",
+        },
+        "OPTIONS": {
             # 'charset': 'utf8mb4',
             "init_command": "SET default_storage_engine='INNODB'",
             # "init_command": "SET foreign_key_checks = 0;",
-        }
+        },
     },
 }
 
-REDIS_URL = "redis://:{}@{}:{}/".format(config.redis_pwd, config.redis_host, config.redis_port)
+REDIS_URL = "redis://:{}@{}:{}/".format(
+    config.redis_pwd, config.redis_host, config.redis_port
+)
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -103,7 +108,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     # "utils.custom.middleware.CorsMiddleWare",  # 配置跨域访问支持
-    'utils.custom.iam.IamMiddleware',
+    "utils.custom.iam.IamMiddleware",
     "simple_history.middleware.HistoryRequestMiddleware",
 ]
 
@@ -179,14 +184,14 @@ LOGGING = {
             "format": "[%(asctime)s][%(name)s.%(funcName)s():%(lineno)d] [%(levelname)s] %(message)s",
             "datefmt": "%Y-%m-%d %H:%M:%S",
         },
-        'standard': {
-            'format': '[%(levelname)s][%(asctime)s][%(filename)s.%(funcName)s():%(lineno)d][%(message)s]',
+        "standard": {
+            "format": "[%(levelname)s][%(asctime)s][%(filename)s.%(funcName)s():%(lineno)d][%(message)s]",
             "datefmt": "%Y-%m-%d %H:%M:%S",
         },
     },
-    'filters': {
-        'require_debug_true': {
-            '()': 'django.utils.log.RequireDebugTrue',  # 过滤器，只有当setting的DEBUG = True时生效
+    "filters": {
+        "require_debug_true": {
+            "()": "django.utils.log.RequireDebugTrue",  # 过滤器，只有当setting的DEBUG = True时生效
         },
     },
     "handlers": {
@@ -262,22 +267,22 @@ LOGGING = {
             "formatter": "standard",
             "encoding": "utf-8",
         },
-        'console': {
-            'level': 'INFO',
+        "console": {
+            "level": "INFO",
             # 'filters': ['require_debug_true'],  # 只有在Django debug为True时才在屏幕打印日志
-            'class': 'logging.StreamHandler',
-            'formatter': 'standard'
+            "class": "logging.StreamHandler",
+            "formatter": "standard",
         },
     },
     "loggers": {
         # 默认的logger应用如下配置# default日志
-        '': {
-            'handlers': ['console'],  # 上线之后可以把'console'移除
-            'level': 'INFO',
-            'propagate': False,  # 向不向更高级别的logger传递
+        "": {
+            "handlers": ["console"],  # 上线之后可以把'console'移除
+            "level": "INFO",
+            "propagate": False,  # 向不向更高级别的logger传递
         },
         "server": {
-            "handlers": ['server'],
+            "handlers": ["server"],
             "level": "INFO",
         },
         "custom_middleware": {
@@ -293,7 +298,7 @@ LOGGING = {
             "level": "DEBUG",
         },
         "django": {
-            "handlers": ['server'],
+            "handlers": ["server"],
             "level": "INFO",
         },
         "celery": {
@@ -310,17 +315,17 @@ LOGGING = {
         },
         # 数据库相关日志
         "django.db.backends": {
-            "handlers": ['db'],
+            "handlers": ["db"],
             "propagate": True,
             "level": "INFO",
         },
-        'django.utils.autoreload': {
-            'handlers': ['server'],
-            'propagate': False,
+        "django.utils.autoreload": {
+            "handlers": ["server"],
+            "propagate": False,
         },
     },
 }
-TIME_FORMAT = '%Y-%m-%d %X'
+TIME_FORMAT = "%Y-%m-%d %X"
 # channel配置
 CHANNEL_LAYERS = {
     "default": {
@@ -344,7 +349,7 @@ CELERYD_CONCURRENCY = 60  # celery worker的并发数
 CELERY_MAX_TASKS_PER_CHILD = 20
 CELERYD_MAX_TASKS_PER_CHILD = 20
 # 这个表示每个工作的进程／线程／绿程 在执行 n 次任务后，主动销毁，之后会起一个新的。主要解决一些资源释放的问题。
-CELERY_RESULT_EXPIRES = 7200 * 2# celery任务执行结果的超时时间，
+CELERY_RESULT_EXPIRES = 7200 * 2  # celery任务执行结果的超时时间，
 CELERY_TASK_RESULT_EXPIRES = 7200 * 2
 # 这个表示保存任务结果的时长，这个时间会被设置到 redis 里面（假设 backend 是 redis ），如果抓取数据量大的话，是可以缩短保存的时间，
 # 节省 backend 的资源（ redis 主要是内存）消耗，默认是 24 小时（ 86400 ），单位是秒。
@@ -362,8 +367,8 @@ CELERY_TASK_TRACK_STARTED = True
 # STATIC_ROOT=os.path.join(BASE_DIR, "static") #正确
 
 
-STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+STATIC_URL = "/static/"
+STATIC_ROOT = os.path.join(BASE_DIR, "static")
 
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 MEDIA_URL = "/media/"
@@ -382,10 +387,10 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(hours=1),  # access token 有效期 30分钟
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),  # refresh token 有效期 2 天
     "ROTATE_REFRESH_TOKENS": True,
-    'ALGORITHM': 'HS256',
-    'SIGNING_KEY': SECRET_KEY,
-    'VERIFYING_KEY': None,
-    'AUTH_HEADER_TYPES': ('Bearer',),
+    "ALGORITHM": "HS256",
+    "SIGNING_KEY": SECRET_KEY,
+    "VERIFYING_KEY": None,
+    "AUTH_HEADER_TYPES": ("Bearer",),
 }
 APPEND_SLASH = True
 # restful api 配置
@@ -450,8 +455,8 @@ CACHES = {
         # "TIMEOUT": 7 * 24 * 60 * 60,
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
-        }
-    }
+        },
+    },
 }
 CACHE_TTL = 60 * 60 * 2  # 2小时
 # 认证配置
@@ -512,5 +517,5 @@ SWAGGER_SETTINGS = {
 # ******************** 其他配置 ******************** #
 # ================================================= #
 API_LOG_ENABLE = True
-API_LOG_METHODS = 'ALL'
+API_LOG_METHODS = "ALL"
 # API_LOG_METHODS = ["POST", "UPDATE", "DELETE", "PUT"]
