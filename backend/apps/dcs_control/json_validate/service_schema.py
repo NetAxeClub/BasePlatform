@@ -96,7 +96,7 @@ service_schema = {
                         }
                     ]
                 },
-            "miniItems": 1,
+            "minItems": 1,
             "maxItems": 40,
             "uniqueItems": True
         },
