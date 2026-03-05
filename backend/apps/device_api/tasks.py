@@ -76,13 +76,20 @@ from __future__ import absolute_import, unicode_literals
 import logging
 import time
 import json
+from datetime import datetime
 from celery import shared_task
 from django.core.cache import cache
 from django.db import connections
 from apps.device_api.fields_mapping import field_mapping
 from netaxe.celery import AxeTask
 from apps.asset.models import NetworkDevice
-from apps.device_api.services import DeviceCollectionService
+from apps.device_api.services_new import DeviceCollectionService
+from apps.device_api.connection_manager import DeviceConnectionManager
+from apps.device_api.models_api import (
+    resolve_raw_data,
+    inject_metadata,
+    COLLECTION_TYPE_MONGO_MAP,
+)
 from apps.device_api.tools.collect_device import get_auto_device
 from apps.automation.cache_utils import cache_network_data
 from apps.device_api import COLLECTION_SUB_PLAN
@@ -313,38 +320,289 @@ def plan_collect_device(**kwargs):
             sub_plans_count=len(sub_plans_list),
         )
 
-        for sub_plan in sub_plans_list:
-            try:
-                logger.info(f"执行子采集方案: {sub_plan['name']} (设备: {host_ip})")
+        # 使用连接管理器执行所有子采集方案，确保单设备只建立一次连接
+        try:
+            # 按采集方式分组子方案
+            netmiko_plans = [p for p in sub_plans_list if p.get("netmiko_enabled")]
+            netconf_plans = [p for p in sub_plans_list if p.get("netconf_enabled")]
+            snmp_plans = [p for p in sub_plans_list if p.get("snmp_enabled")]
+            restconf_plans = [p for p in sub_plans_list if p.get("restconf_enabled")]
+            telemetry_plans = [p for p in sub_plans_list if p.get("telemetry_enabled")]
 
-                # 执行采集（同时执行NETCONF和Netmiko）
-                result = DeviceCollectionService.celery_both_collection(
-                    plan=sub_plan, device_info=kwargs
-                )
+            # 使用连接管理器执行采集
+            with DeviceConnectionManager(host_ip, kwargs) as conn_mgr:
+                # 执行所有Netmiko采集（复用同一连接）
+                for sub_plan in netmiko_plans:
+                    try:
+                        logger.info(
+                            f"执行Netmiko采集: {sub_plan['name']} (设备: {host_ip})"
+                        )
+                        command = sub_plan.get("netmiko_method", "")
+                        textfsm_template = sub_plan.get("textfsm_template")
 
-                if result.get("success"):
-                    logger.info(
-                        f"子采集方案执行成功: {sub_plan['name']} (设备: {host_ip})"
-                    )
-                else:
-                    error_msg = result.get("error", "未知错误")
-                    logger.error(
-                        f"子采集方案执行失败: {sub_plan['name']} (设备: {host_ip}), 错误: {error_msg}"
-                    )
+                        result = conn_mgr.execute_netmiko_command(
+                            command=command,
+                            use_textfsm=True,
+                            textfsm_template=textfsm_template,
+                        )
 
-            except Exception as e:
-                logger.error(
-                    f"执行子采集方案异常: {sub_plan['name']} (设备: {host_ip}), 异常: {str(e)}",
-                    exc_info=True,
-                )
+                        # 处理并保存结果
+                        _process_and_save_result(
+                            plan=sub_plan,
+                            device_info=kwargs,
+                            raw_result=result,
+                            collection_method="netmiko",
+                        )
+                        logger.info(
+                            f"Netmiko采集完成: {sub_plan['name']} (设备: {host_ip})"
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"Netmiko采集异常: {sub_plan['name']} (设备: {host_ip}), {str(e)}",
+                            exc_info=True,
+                        )
+
+                # 执行所有NETCONF采集（复用同一连接）
+                for sub_plan in netconf_plans:
+                    try:
+                        logger.info(
+                            f"执行NETCONF采集: {sub_plan['name']} (设备: {host_ip})"
+                        )
+                        xml_templates = sub_plan.get("xml_templates", [])
+                        if xml_templates and len(xml_templates) > 0:
+                            selected_template = xml_templates[0]
+                            xml_template = selected_template.get("xml_template", "")
+                            collect_method = selected_template.get(
+                                "collect_method", "get"
+                            )
+
+                            if collect_method == "get":
+                                result = conn_mgr.execute_netconf_get(xml_template)
+                            elif collect_method == "get_config":
+                                result = conn_mgr.execute_netconf_get_config(
+                                    xml_template
+                                )
+                            else:
+                                result = conn_mgr.execute_netconf_get(xml_template)
+
+                            # 处理并保存结果
+                            _process_and_save_result(
+                                plan=sub_plan,
+                                device_info=kwargs,
+                                raw_result=result,
+                                collection_method="netconf",
+                            )
+                            logger.info(
+                                f"NETCONF采集完成: {sub_plan['name']} (设备: {host_ip})"
+                            )
+                    except Exception as e:
+                        logger.error(
+                            f"NETCONF采集异常: {sub_plan['name']} (设备: {host_ip}), {str(e)}",
+                            exc_info=True,
+                        )
+
+                # 执行所有SNMP采集（复用同一会话）
+                for sub_plan in snmp_plans:
+                    try:
+                        logger.info(
+                            f"执行SNMP采集: {sub_plan['name']} (设备: {host_ip})"
+                        )
+                        oids = sub_plan.get("snmp_oids", [])
+                        if oids:
+                            result = conn_mgr.execute_snmp_get(oids)
+
+                            # 处理并保存结果
+                            _process_and_save_result(
+                                plan=sub_plan,
+                                device_info=kwargs,
+                                raw_result=result,
+                                collection_method="snmp",
+                            )
+                            logger.info(
+                                f"SNMP采集完成: {sub_plan['name']} (设备: {host_ip})"
+                            )
+                    except Exception as e:
+                        logger.error(
+                            f"SNMP采集异常: {sub_plan['name']} (设备: {host_ip}), {str(e)}",
+                            exc_info=True,
+                        )
+
+                # 执行所有RESTCONF采集（复用同一会话）
+                for sub_plan in restconf_plans:
+                    try:
+                        logger.info(
+                            f"执行RESTCONF采集: {sub_plan['name']} (设备: {host_ip})"
+                        )
+                        endpoint = sub_plan.get("restconf_endpoint", "")
+                        if endpoint:
+                            result = conn_mgr.execute_restconf_get(endpoint)
+
+                            # 处理并保存结果
+                            _process_and_save_result(
+                                plan=sub_plan,
+                                device_info=kwargs,
+                                raw_result=result,
+                                collection_method="restconf",
+                            )
+                            logger.info(
+                                f"RESTCONF采集完成: {sub_plan['name']} (设备: {host_ip})"
+                            )
+                    except Exception as e:
+                        logger.error(
+                            f"RESTCONF采集异常: {sub_plan['name']} (设备: {host_ip}), {str(e)}",
+                            exc_info=True,
+                        )
+
+                # 执行所有Telemetry采集（复用同一通道）
+                for sub_plan in telemetry_plans:
+                    try:
+                        logger.info(
+                            f"执行Telemetry采集: {sub_plan['name']} (设备: {host_ip})"
+                        )
+                        subscription_path = sub_plan.get(
+                            "telemetry_subscription_path", ""
+                        )
+                        sampling_interval = sub_plan.get(
+                            "telemetry_sampling_interval", 10
+                        )
+                        if subscription_path:
+                            result = conn_mgr.execute_telemetry_subscribe(
+                                subscription_path=subscription_path,
+                                sampling_interval=sampling_interval,
+                            )
+
+                            # 处理并保存结果
+                            _process_and_save_result(
+                                plan=sub_plan,
+                                device_info=kwargs,
+                                raw_result=result,
+                                collection_method="telemetry",
+                            )
+                            logger.info(
+                                f"Telemetry采集完成: {sub_plan['name']} (设备: {host_ip})"
+                            )
+                    except Exception as e:
+                        logger.error(
+                            f"Telemetry采集异常: {sub_plan['name']} (设备: {host_ip}), {str(e)}",
+                            exc_info=True,
+                        )
+
+            # 连接自动关闭（通过上下文管理器）
+            logger.info(f"设备 {host_ip} 所有采集任务完成，连接已关闭")
+        except Exception as e:
+            logger.error(f"设备 {host_ip} 连接或采集异常: {str(e)}", exc_info=True)
+            raise
 
         logger.info(f"设备 {host_ip} 采集完成, 总计: {len(sub_plans_list)}")
 
         return {"host_ip": host_ip, "total": len(sub_plans_list)}
+    except Exception as e:
+        logger.error(f"设备 {host_ip} 采集任务异常: {str(e)}", exc_info=True)
+        return {}
+
+
+def _process_and_save_result(
+    plan: dict, device_info: dict, raw_result, collection_method: str
+):
+    """
+    处理并保存采集结果：数据预处理 → 元数据注入 → 写入 MongoDB。
+
+    Args:
+        plan: 子采集方案字典
+        device_info: 设备信息字典
+        raw_result: 原始采集结果
+        collection_method: 采集方式
+    """
+    try:
+        manage_ip = device_info.get("manage_ip")
+        execute_time = device_info.get("execute_time", datetime.now().isoformat())
+
+        # 构建 plan ORM 对象（用于 resolve_raw_data）
+        from apps.device_api.models import DeviceSubCollectionPlan
+
+        try:
+            plan_obj = DeviceSubCollectionPlan.objects.select_related(
+                "summary_plan"
+            ).get(id=plan.get("id"))
+        except DeviceSubCollectionPlan.DoesNotExist:
+            logger.warning(f"采集方案不存在: plan_id={plan.get('id')}")
+            return
+
+        # ── Layer 1 + 2：数据解析与规范化 ────────────────────────────────
+        collection_result = {"data": raw_result, "device_ip": manage_ip}
+        resolve_status, resolve_error, processed_data = resolve_raw_data(
+            plan_obj, collection_result, collection_method
+        )
+
+        if not resolve_status:
+            logger.error(
+                f"数据处理失败: {manage_ip}, method={collection_method}, error={resolve_error}"
+            )
+            return
+
+        # ── Layer 3：元数据注入 ──────────────────────────────────────────
+        meta = {
+            "hostip": manage_ip,
+            "hostname": device_info.get("device_name", ""),
+            "idc_name": device_info.get("idc_name", ""),
+        }
+        inject_metadata(processed_data, meta)
+
+        # ── 写入类型专属 MongoDB 集合 ─────────────────────────────────────
+        collection_type = plan.get("collection_type")
+        if isinstance(processed_data, list) and processed_data and collection_type:
+            collection_db = COLLECTION_TYPE_MONGO_MAP.get(collection_type)
+            if not collection_db:
+                from utils.db.mongo_ops import MongoOps
+
+                collection_db = MongoOps(
+                    db="Automation", coll=f"plan_{collection_type}"
+                )
+                logger.warning(f"使用动态创建的 MongoDB 集合: plan_{collection_type}")
+            try:
+                collection_db.insert_many(processed_data)
+                logger.info(
+                    f"采集数据已保存: {manage_ip}, type={collection_type}, "
+                    f"method={collection_method}, count={len(processed_data)}"
+                )
+            except Exception as e:
+                logger.error(
+                    f"保存采集数据到 MongoDB 失败: {manage_ip}, type={collection_type}, {str(e)}",
+                    exc_info=True,
+                )
+                return
+        else:
+            logger.warning(
+                f"采集结果为空或无法保存: {manage_ip}, type={collection_type}, "
+                f"method={collection_method}"
+            )
+
+        # ── 更新子采集任务状态 ────────────────────────────────────────────
+        task_record = {
+            "summary_plan_id": plan.get("summary_plan"),
+            "plan_id": plan.get("id"),
+            "task_id": f"{manage_ip}_{plan.get('id')}_{collection_method}_{int(time.time())}",
+            "device_ip": manage_ip,
+            "device_name": device_info.get("name"),
+            "idc_name": device_info.get("idc__name"),
+            "task_status": "finished",
+            "collection_type": collection_type,
+            "collection_method": collection_method,
+            "vendor": plan.get("summary_plan_vendor"),
+            "device_type": plan.get("summary_plan_device_type"),
+            "execute_time": execute_time,
+            "created_at": datetime.now().isoformat(),
+            "task_errors": [],
+            "log_time": time.time(),
+        }
+        COLLECTION_SUB_PLAN.insert_one(task_record)
 
     except Exception as e:
-        logger.error(f"设备采集任务异常: {host_ip}, 异常: {str(e)}", exc_info=True)
-        return {}
+        logger.error(
+            f"处理并保存采集结果异常: {device_info.get('manage_ip')}, "
+            f"method={collection_method}, {str(e)}",
+            exc_info=True,
+        )
 
 
 # 通用信息采集主调度任务

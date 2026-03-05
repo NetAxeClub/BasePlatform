@@ -62,8 +62,8 @@ class DeviceSubCollectionPlan(models.Model):
     collection_type = models.CharField(max_length=20, default='arp', verbose_name='采集类型')
     description = models.TextField(blank=True, verbose_name='方案描述')
 
-    # 采集方式配置,Netmiko配置
-    netmiko_enabled = models.BooleanField(default=True, verbose_name='启用Netmiko')
+    # 采集方式配置,Netmiko配置（新建时默认关闭，由用户在前端按需开启）
+    netmiko_enabled = models.BooleanField(default=False, verbose_name='启用Netmiko')
     netmiko_method = models.CharField(blank=True, max_length=100, default='', verbose_name='Netmiko方法名称',
                                       help_text='要执行的采集方法名称')
     netmiko_path = models.CharField(blank=True, max_length=150, default='', verbose_name='Netmiko路径')
@@ -77,6 +77,38 @@ class DeviceSubCollectionPlan(models.Model):
     netconf_field_mappings = models.JSONField(blank=True, default=dict, verbose_name='NETCONF字段映射配置')
     netconf_processor_enabled = models.BooleanField(default=False, verbose_name='NETCONF是否启用数据处理')
     netconf_processor = models.TextField(blank=True, null=True, verbose_name='NETCONF数据处理代码')
+
+    # SNMP配置
+    snmp_enabled = models.BooleanField(default=False, verbose_name='启用SNMP')
+    snmp_version = models.CharField(blank=True, max_length=10, default='v2c', verbose_name='SNMP版本', 
+                                    choices=[('v1', 'v1'), ('v2c', 'v2c'), ('v3', 'v3')])
+    snmp_oids = models.JSONField(blank=True, default=list, verbose_name='SNMP OID列表',
+                                  help_text='OID列表，如: ["1.3.6.1.2.1.4.22.1.2", "1.3.6.1.2.1.4.22.1.3"]')
+    snmp_path = models.CharField(blank=True, max_length=150, default='', verbose_name='SNMP路径')
+    snmp_field_mappings = models.JSONField(blank=True, default=dict, verbose_name='SNMP字段映射配置')
+    snmp_processor_enabled = models.BooleanField(default=False, verbose_name='SNMP是否启用数据处理')
+    snmp_processor = models.TextField(blank=True, null=True, verbose_name='SNMP数据处理代码')
+
+    # RESTCONF配置
+    restconf_enabled = models.BooleanField(default=False, verbose_name='启用RESTCONF')
+    restconf_endpoint = models.CharField(blank=True, max_length=500, default='', verbose_name='RESTCONF端点路径')
+    restconf_method = models.CharField(blank=True, max_length=10, default='GET', verbose_name='HTTP方法',
+                                       choices=[('GET', 'GET'), ('POST', 'POST'), ('PUT', 'PUT'), ('DELETE', 'DELETE')])
+    restconf_path = models.CharField(blank=True, max_length=150, default='', verbose_name='RESTCONF路径')
+    restconf_field_mappings = models.JSONField(blank=True, default=dict, verbose_name='RESTCONF字段映射配置')
+    restconf_processor_enabled = models.BooleanField(default=False, verbose_name='RESTCONF是否启用数据处理')
+    restconf_processor = models.TextField(blank=True, null=True, verbose_name='RESTCONF数据处理代码')
+
+    # Telemetry配置
+    telemetry_enabled = models.BooleanField(default=False, verbose_name='启用Telemetry')
+    telemetry_subscription_path = models.CharField(blank=True, max_length=500, default='', verbose_name='Telemetry订阅路径')
+    telemetry_sampling_interval = models.IntegerField(default=10, verbose_name='采样间隔（秒）')
+    telemetry_data_format = models.CharField(blank=True, max_length=20, default='json', verbose_name='数据格式',
+                                              choices=[('gpb', 'GPB'), ('json', 'JSON')])
+    telemetry_path = models.CharField(blank=True, max_length=150, default='', verbose_name='Telemetry路径')
+    telemetry_field_mappings = models.JSONField(blank=True, default=dict, verbose_name='Telemetry字段映射配置')
+    telemetry_processor_enabled = models.BooleanField(default=False, verbose_name='Telemetry是否启用数据处理')
+    telemetry_processor = models.TextField(blank=True, null=True, verbose_name='Telemetry数据处理代码')
 
     # TextFSM配置
     textfsm_template = models.CharField(blank=True, max_length=100, default='', verbose_name='TextFSM模板路径')
@@ -132,9 +164,15 @@ class DeviceSubCollectionPlan(models.Model):
     def _process_data(self, processor_enabled: bool, processor_code: str, data, method: str = 'netmiko'):
         """
         数据处理核心逻辑：
+        当 processor_enabled 为 False 或 processor_code 为空时，不执行自定义处理器，直接返回原始数据，
+        由调用方仅使用字段映射做结构化转换（符合「字段映射」改造约定）。
         1. 优先寻找并执行预定义的处理器方法（推荐方式，支持复杂逻辑与IDE维护）
         2. 如果未找到预定义处理器，则尝试执行数据库中存储的动态代码（兼容旧方案）
         """
+        # 未启用或代码为空时，跳过自定义代码，仅由字段映射处理
+        if not processor_enabled or not (processor_code and str(processor_code).strip()):
+            return data
+
         vendor = self.summary_plan.vendor
         device_type = self.summary_plan.device_type
         collection_type = self.collection_type
@@ -182,6 +220,14 @@ class DeviceSubCollectionPlan(models.Model):
             self.netmiko_field_mappings = {}
         if not self.netconf_field_mappings:
             self.netconf_field_mappings = {}
+        if not self.snmp_field_mappings:
+            self.snmp_field_mappings = {}
+        if not self.restconf_field_mappings:
+            self.restconf_field_mappings = {}
+        if not self.telemetry_field_mappings:
+            self.telemetry_field_mappings = {}
+        if not self.snmp_oids:
+            self.snmp_oids = []
 
         super().save(*args, **kwargs)
 
@@ -226,10 +272,24 @@ class NetconfXMLTemplate(models.Model):
 
 
 class PlansToDevice(models.Model):
+    """方案与设备关联：支持本地采集或南向驱动采集，二选一，默认本地采集。"""
     manage_ip = models.CharField(verbose_name="设备IP", max_length=100, null=False, blank=False)
-    execute_node = models.CharField(verbose_name="执行节点", blank=True, null=True, max_length=50)
     plan = models.ForeignKey("DeviceCollectionPlans", on_delete=models.SET_NULL, null=True, related_name="device_plan",
                              verbose_name="关联方案")
+    # 采集模式：True=本地采集，False=南向驱动采集（此时需填写 execute_node）
+    use_local = models.BooleanField(
+        default=True,
+        verbose_name="使用本地采集",
+        help_text="默认True表示本地采集；设为False时使用南向驱动，由 execute_node 指定执行节点",
+    )
+    # 南向驱动执行节点（当 use_local=False 时使用）
+    execute_node = models.CharField(
+        max_length=200,
+        blank=True,
+        default="",
+        verbose_name="南向驱动执行节点",
+        help_text="仅当 use_local=False 时生效，指定南向驱动节点地址或标识",
+    )
     # 时间戳
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')

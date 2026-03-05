@@ -7,7 +7,7 @@ class PlansToDeviceFilter(django_filters.FilterSet):
 
     class Meta:
         model = PlansToDevice
-        fields = ['manage_ip', 'execute_node']
+        fields = ['manage_ip']
 
 
 class DeviceCollectionPlansFilter(django_filters.FilterSet):

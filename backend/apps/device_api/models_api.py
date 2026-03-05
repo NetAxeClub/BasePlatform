@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 import importlib
+import time
 from datetime import datetime
 
 from apps.device_api.fields_mapping import vendor_mapping, get_vendor_class
@@ -27,6 +28,56 @@ COLLECTION_TYPE_MONGO_MAP = {
     "interface_brief": interface_brief_mongo,
     "aggre_port": aggre_port_mongo,
 }
+
+
+def save_local_collection_result(
+    plan,
+    device,
+    collection_method,
+    method_name,
+    raw_data,
+    processed_data,
+    processed_status,
+    processed_error=None,
+):
+    """将本地执行的采集结果写入 COLLECTION_RESULTS_DB，与南向驱动 webhook 回调写入结构一致，便于统一查询。"""
+    created_on = datetime.now().isoformat()
+    task_id = f"{device.manage_ip}_{plan.id}_{collection_method}_{int(time.time())}"
+    base = {
+        "plan_id": plan.id,
+        "plan_name": plan.name,
+        "device_ip": device.manage_ip,
+        "device_name": getattr(device, "name", ""),
+        "idc_name": device.idc.name if device.idc else "",
+        "device_type": plan.summary_plan.device_type,
+        "vendor": plan.summary_plan.vendor,
+        "collection_method": collection_method,
+        "collection_type": plan.collection_type,
+        "collected_at": created_on,
+        "task_id": task_id,
+        "task_status": "finished",
+        "task_queue": "",
+        "task_errors": [],
+        "status": "success",
+    }
+    doc = {
+        **base,
+        "method_name": method_name,
+        "data": raw_data,
+        "processed_data": processed_data,
+        "processed_status": processed_status,
+        "processed_error": processed_error,
+    }
+    try:
+        COLLECTION_RESULTS_DB.insert_one(doc)
+        logging.info(
+            f"本地采集结果已写入 TestDeviceCollection: {device.manage_ip} {plan.name} {collection_method}"
+        )
+    except Exception as e:
+        logging.error(
+            f"本地采集结果写入 MongoDB 失败: {device.manage_ip} {plan.name} - {e}",
+            exc_info=True,
+        )
 
 
 def _build_base_collection_result(plan, webhook_args, task_info, status):
@@ -167,16 +218,27 @@ def plan_data_to_mongodb(**kwargs):
                 "processed_data": None,
             }
 
-            # 处理原始数据
-            processed_status, processed_error, processed_data = process_raw_data(
+            # 处理原始数据（P1-G：统一使用 resolve_raw_data，废弃 process_raw_data 路径）
+            resolve_status, resolve_error, processed_data = resolve_raw_data(
                 plan, collection_result, collection_method
             )
 
+            # Layer 3：注入设备元数据 hostip/hostname/idc_name，保证 processed_data 与设计一致
+            if resolve_status and isinstance(processed_data, list) and processed_data:
+                meta = {
+                    "hostip": base_result.get("device_ip", ""),
+                    "hostname": base_result.get("device_name", ""),
+                    "idc_name": base_result.get("idc_name", ""),
+                }
+                inject_metadata(processed_data, meta)
+
             collection_result["processed_data"] = processed_data
             collection_result["processed_status"] = (
-                "success" if processed_status else "error"
+                "success" if resolve_status else "error"
             )
-            collection_result["processed_error"] = processed_error
+            collection_result["processed_error"] = (
+                resolve_error if not resolve_status else None
+            )
 
             collection_results.append(collection_result)
 
@@ -378,6 +440,14 @@ def celery_data_mongodb(**kwargs):
                 "message": "没有可保存的采集结果，所有数据处理后都为空",
             }
 
+        # Layer 3：注入设备元数据 hostip/hostname/idc_name，保证入库数据与设计一致
+        meta = {
+            "hostip": base_result.get("device_ip", ""),
+            "hostname": base_result.get("device_name", ""),
+            "idc_name": base_result.get("idc_name", ""),
+        }
+        inject_metadata(collection_results, meta)
+
         try:
             # 根据collection_type选择MongoDB集合，优先使用预定义的实例
             collection_name = f"plan_{collection_type}"
@@ -520,211 +590,231 @@ def update_sub_task_status(new_status, summary_plan_id, plan_id, task_id, error_
 
 
 def process_raw_data(plan, collection_result, collection_method):
-    """数据处理函数，处理原始数据
+    """[DEPRECATED] 使用旧版 processor 代码字段处理原始数据。
 
-    Args:
-        plan: 采集方案对象
-        collection_result: 原始数据
-        collection_method: 采集方法 (netmiko/netconf)
-
-    Returns:
-        tuple: (status, error_message, processed_data)
+    ⚠️ 已废弃：请使用 resolve_raw_data()。
+    此函数仅在 plan_data_to_mongodb（旧版 NetPalm webhook 路径）中保留，
+    计划随该路径一起清理。
     """
     try:
         command_result = collection_result["data"]  # 原始数据
         method = (collection_method or "").lower()
 
-        # 数据处理函数（按采集方式通过分发表调用，异常立即返回）
+        dispatch = {
+            "netmiko": (
+                getattr(plan, "netmiko_processor_enabled", False),
+                getattr(plan, "netmiko_processor", None),
+                getattr(plan, "process_netmiko_data", None),
+            ),
+            "netconf": (
+                getattr(plan, "netconf_processor_enabled", False),
+                getattr(plan, "netconf_processor", None),
+                getattr(plan, "process_netconf_data", None),
+            ),
+        }
+        enabled, code, func = dispatch.get(method, (False, None, None))
+
+        # 未启用或代码为空：直接透传原始数据（运行链路不再执行字段映射）
+        if not enabled or not (code and str(code).strip()):
+            logging.info(f"自定义处理器未启用，透传原始数据: {plan.name}")
+            return True, "", command_result
+
+        # 启用时执行处理器函数
         try:
-            dispatch = {
-                "netmiko": (
-                    getattr(plan, "netmiko_processor_enabled", False),
-                    getattr(plan, "netmiko_processor", None),
-                    getattr(plan, "process_netmiko_data", None),
-                ),
-                "netconf": (
-                    getattr(plan, "netconf_processor_enabled", False),
-                    getattr(plan, "netconf_processor", None),
-                    getattr(plan, "process_netconf_data", None),
-                ),
-            }
-            enabled, code, func = dispatch.get(method, (False, None, None))
-            # 修改：只要 func 可调用就执行，内部会处理映射或 exec 逻辑
             if callable(func):
                 logging.info(f"执行{method}数据处理函数: {plan.name}")
                 processed_data = func(command_result)
                 logging.info(f"数据处理函数执行完成: {plan.name}")
-            else:
-                # 无处理函数
-                logging.info(f"无处理器函数，透传原始数据: {plan.name}")
-                processed_data = command_result  # 修改：透传原始数据应该是 command_result 而不是 []
+                return True, "", processed_data
+            logging.info(f"无处理器函数，透传原始数据: {plan.name}")
+            return True, "", command_result
         except Exception as e:
             logging.error(
                 f"数据处理函数执行失败: {plan.name} - {str(e)}", exc_info=True
             )
             return False, f"{method}_processor_failed: {str(e)}", []
 
-        return True, "", processed_data
-
     except Exception as e:
         logging.error(f"数据处理异常: {plan.name} - {str(e)}", exc_info=True)
         return False, f"exception: {str(e)}", []
 
 
+def _inject_manage_ip(result, manage_ip):
+    """向结果列表中每条记录注入 manage_ip 字段（不覆盖已有值）。"""
+    if not manage_ip or not isinstance(result, list):
+        return result
+    for item in result:
+        if isinstance(item, dict):
+            item.setdefault("manage_ip", manage_ip)
+    return result
+
+
+def inject_metadata(data: list, meta: dict) -> list:
+    """向处理后的数据列表中每条记录注入设备元数据（Layer 3）。
+
+    注入字段：hostip / hostname / idc_name / log_time。
+    当已有值为空（空字符串、None）时用 meta 覆盖，保证与设计一致（processor/tools 可能已写入空串）。
+
+    Args:
+        data: Layer1/Layer2 处理后的 list[dict]
+        meta: 设备元数据字典，支持键：hostip, hostname, idc_name, log_time
+
+    Returns:
+        注入元数据后的 list[dict]
+    """
+    if not meta or not isinstance(data, list):
+        return data
+    log_time = meta.get("log_time") or datetime.now()
+    for item in data:
+        if isinstance(item, dict):
+            if not item.get("hostip"):
+                item["hostip"] = meta.get("hostip", "")
+            if not item.get("hostname"):
+                item["hostname"] = meta.get("hostname", "")
+            if not item.get("idc_name"):
+                item["idc_name"] = meta.get("idc_name", "")
+            item.setdefault("log_time", log_time)
+    return data
+
+
 def resolve_raw_data(plan, collection_result, collection_method):
-    """函数处理+字段映射原始数据
+    """处理原始采集数据，按优先级依次尝试三条路径：
+    1. processors/ 注册处理器（硬编码，协议感知）
+    2. tools/ 类方法（仅 netmiko，最终兜底）
+
+    运行链路不再执行子方案字段映射配置（netmiko_path/netconf_path + *_field_mappings）。
+    NETCONF 采集若无可用处理器，直接返回失败，
+    避免用 netmiko 专用的 tools/ 方法处理嵌套 XML dict 导致静默空结果。
 
     Args:
         plan: 采集方案对象
-        collection_result: 原始数据
+        collection_result: 包含原始数据的结果字典，其中 device_ip 字段用于注入 manage_ip
         collection_method: 采集方法 (netmiko/netconf)
 
     Returns:
-        tuple: (status, error_message, mapping_data)
+        tuple: (status, error_message, processed_data)
     """
     try:
-        # 首先判断结果是否正常， 如果是 netmiko 采集方式，且 data 字段是字符串，说明 Textfsm 模板解析失败
+        # netmiko 采集如果 data 是字符串，说明 TextFSM 解析失败（未匹配到模板或模板与设备输出格式不符）
         if collection_method.lower() == "netmiko" and isinstance(
             collection_result.get("data", ""), str
         ):
-            return False, f"Textfsm 模板解析失败", []
+            raw_preview = (collection_result.get("data") or "")[:500]
+            logging.warning(
+                "[resolve_raw_data] TextFSM 解析失败，返回原始字符串。"
+                "请确认: 1) 环境变量 NET_TEXTFSM 指向含 index 的模板目录(zetmiko/templates); "
+                "2) 采集方案中 textfsm_template 或 index 中设备类型/命令与当前设备一致; "
+                "3) 设备输出格式与模板匹配。原始输出预览: %s",
+                raw_preview.replace("\n", "\\n") if raw_preview else "(空)",
+            )
+            return False, "Textfsm 模板解析失败", []
 
-        copy_data = collection_result.copy()  # 首先进行拷贝数据
-
-        command_result = copy_data["data"]  # 原始数据
-        mapping_data = []  # 映射数据
+        command_result = collection_result["data"]
         method = collection_method.lower()
+        manage_ip = collection_result.get("device_ip", "")
 
-        # 第一步：数据处理函数（根据vendor_alias、collection_method、collection_type调用tools目录下的厂商类方法）
-        try:
-            # 获取厂商别名、采集类型
-            vendor_alias = plan.summary_plan.vendor
-            collection_type = plan.collection_type
+        vendor_alias = plan.summary_plan.vendor
+        device_type = plan.summary_plan.device_type
+        collection_type = plan.collection_type
 
-            # 从vendor_mapping获取模块名和类名（根据vendor_alias和method）
-            module_name, class_name = get_vendor_class(vendor_alias, method)
+        # ── 路径 1：查找已注册的 processors/ 解析器（P0-3）────────────────────
+        from apps.device_api.processors.base import (
+            ProcessorRegistry,
+            normalize_processed_data,
+        )
 
-            if not module_name or not class_name:
-                logging.warning(f"不支持的厂商: {vendor_alias}，跳过数据处理")
-                copy_data["processed_data"] = []
-            else:
-                # 动态导入模块
-                try:
-                    module = importlib.import_module(
-                        f"apps.device_api.tools.{module_name}"
-                    )
-                    plan_class = getattr(module, class_name, None)
-
-                    if not plan_class:
-                        logging.warning(f"未找到类: {class_name}，跳过数据处理")
-                        copy_data["processed_data"] = []
-                    else:
-                        # 构建方法名：get_{collection_type}
-                        method_name = f"get_{collection_type}"
-                        process_method = getattr(plan_class, method_name, None)
-
-                        if process_method and callable(process_method):
-                            logging.info(
-                                f"执行厂商数据处理: {vendor_alias}.{class_name}.{method_name}() - {plan.name}"
-                            )
-                            try:
-                                # 调用工具类的方法处理数据
-                                processed_data = process_method(command_result)
-                                copy_data["processed_data"] = processed_data
-                                logging.info(f"厂商数据处理执行完成: {plan.name}")
-                            except Exception as e:
-                                logging.error(
-                                    f"调用厂商数据处理方法失败: {vendor_alias}.{class_name}.{method_name}() - {str(e)}",
-                                    exc_info=True,
-                                )
-                                return (
-                                    False,
-                                    f"{collection_method}_vendor_process_data_failed: {str(e)}",
-                                    [],
-                                )
-                        else:
-                            logging.warning(
-                                f"未找到处理方法: {class_name}.{method_name}()，跳过数据处理"
-                            )
-                            copy_data["processed_data"] = []
-
-                except ImportError as e:
-                    logging.warning(
-                        f"导入模块失败: apps.device_api.tools.{module_name}, 错误: {str(e)}"
-                    )
-                    copy_data["processed_data"] = []
-
-        except Exception as e:
-            logging.error(
-                f"数据处理函数执行失败: {plan.name} - {str(e)}", exc_info=True
-            )
-            return (
-                False,
-                f"{collection_method}_process_data_function_failed: {str(e)}",
-                [],
-            )
-
-        # 第二步：字段映射，获取字段映射配置
-        field_mappings = None
-        path_config = None
-
-        if method == "netmiko":
-            if plan.netmiko_path and plan.netmiko_field_mappings:
-                field_mappings = plan.netmiko_field_mappings
-                path_config = plan.netmiko_path
-                logging.info(f"使用Netmiko字段映射: {plan.name}")
-        elif method == "netconf":
-            if plan.netconf_path and plan.netconf_field_mappings:
-                field_mappings = plan.netconf_field_mappings
-                path_config = plan.netconf_path
-                logging.info(f"使用NETCONF字段映射: {plan.name}")
-
-        if field_mappings and path_config:
+        processor = ProcessorRegistry.get_processor(
+            vendor=vendor_alias,
+            device_type=device_type,
+            collection_type=collection_type,
+            method=method,
+        )
+        if processor:
             try:
-                mapping_data = apply_field_mappings(
-                    copy_data, field_mappings, path_config
+                # version 类采集需回填 NetworkDevice，向处理器传入 manage_ip
+                if collection_type == "version" and command_result and isinstance(command_result, list):
+                    command_result = list(command_result)
+                    if command_result and isinstance(command_result[0], dict):
+                        command_result[0] = dict(command_result[0], _resolve_device_ip=manage_ip)
+                result = normalize_processed_data(
+                    collection_type, processor(command_result)
                 )
-                if mapping_data:
-                    logging.info(
-                        f"字段映射执行成功: {plan.name} - 映射了 {len(mapping_data)} 条记录"
-                    )
-                else:
-                    logging.warning(f"字段映射未返回数据: {plan.name}")
+                logging.info(
+                    f"[resolve] 使用注册处理器 {vendor_alias}:{device_type}:{collection_type}:{method} - {plan.name}"
+                )
+                return True, "", _inject_manage_ip(result, manage_ip)
+            except NotImplementedError as e:
+                # 处理器已注册但仍是 TODO 时，不直接失败，继续走兜底逻辑。
+                logging.warning(
+                    f"[resolve] 注册处理器未实现，切换兜底路径: {plan.name} - {str(e)}"
+                )
             except Exception as e:
                 logging.error(
-                    f"字段映射执行失败: {plan.name} - {str(e)}", exc_info=True
+                    f"[resolve] 注册处理器执行失败: {plan.name} - {str(e)}",
+                    exc_info=True,
                 )
-                return (
-                    False,
-                    f"{collection_method}_apply_field_mappings_failed(path={path_config}): {str(e)}",
-                    [],
-                )
+                return False, f"processor_failed: {str(e)}", []
 
-        # 3. 根据厂商和类型，调用对应的处理方法
-        try:
-            if method == "netmiko":
-                resolved_data = apply_vendor_processor(plan, mapping_data)
-            else:
-                resolved_data = mapping_data
-        except Exception as e:
-            logging.error(
-                f"厂商处理方法执行失败: {plan.name} - {str(e)}", exc_info=True
+        # ── NETCONF 无处理器：直接失败（避免误走 netmiko tools）────────────────────
+        if method == "netconf":
+            logging.warning(
+                f"[resolve] NETCONF 采集无可用处理器，无法处理原始 XML 数据: "
+                f"{vendor_alias}:{device_type}:{collection_type} - {plan.name}"
             )
             return (
                 False,
-                f"{collection_method}_apply_vendor_processor_failed: {str(e)}",
+                f"netconf_no_processor: {vendor_alias}:{collection_type}",
                 [],
             )
 
-        return True, "", resolved_data
+        # ── 路径 2：tools/ 类方法（仅 netmiko，最终兜底）───────────────────────────
+        try:
+            module_name, class_name = get_vendor_class(vendor_alias, method)
+            if not module_name or not class_name:
+                logging.warning(f"[resolve] 不支持的厂商: {vendor_alias}，跳过数据处理")
+                return True, "", []
+
+            module = importlib.import_module(f"apps.device_api.tools.{module_name}")
+            plan_class = getattr(module, class_name, None)
+            if not plan_class:
+                logging.warning(f"[resolve] 未找到类: {class_name}，跳过数据处理")
+                return True, "", []
+
+            method_func = getattr(plan_class, f"get_{collection_type}", None)
+            if method_func and callable(method_func):
+                result = normalize_processed_data(
+                    collection_type, method_func(command_result)
+                )
+                logging.info(f"[resolve] tools 处理完成: {plan.name}")
+                return True, "", _inject_manage_ip(result, manage_ip)
+            else:
+                logging.warning(
+                    f"[resolve] 未找到处理方法: {class_name}.get_{collection_type}()，跳过数据处理"
+                )
+                return True, "", []
+
+        except ImportError as e:
+            logging.warning(
+                f"[resolve] 导入模块失败: apps.device_api.tools.{module_name}, 错误: {str(e)}"
+            )
+            return True, "", []
+        except Exception as e:
+            logging.error(
+                f"[resolve] tools 数据处理失败: {plan.name} - {str(e)}", exc_info=True
+            )
+            return (
+                False,
+                f"{collection_method}_vendor_process_data_failed: {str(e)}",
+                [],
+            )
 
     except Exception as e:
-        logging.error(f"数据处理异常: {plan.name} - {str(e)}", exc_info=True)
+        logging.error(f"[resolve] 数据处理异常: {plan.name} - {str(e)}", exc_info=True)
         return False, f"resolve_raw_data_exception: {str(e)}", []
 
 
 def apply_field_mappings(data_dict, field_mappings, path_config=None):
-    """应用字段映射 - 支持复杂字段映射配置
+    """[DEPRECATED] 应用字段映射 - 支持复杂字段映射配置
 
     Args:
         data_dict: 原始数据，通常是包含数组的字典，如 {"data": [...]}
@@ -851,14 +941,21 @@ def apply_field_mappings(data_dict, field_mappings, path_config=None):
 
 
 def apply_vendor_processor(plan, processed_data):
-    """根据厂商和采集类型调用对应的处理方法处理数据
+    """按厂商与采集类型做统一预处理（规范化），netmiko 与 netconf 的最终数据都会经此函数。
+
+    用于统一不同厂商、型号、软件版本带来的数据格式差异，例如：
+    - MAC 地址统一写法（大小写、分隔符等）
+    - 接口名统一格式（如 GE1/0/1 -> GigabitEthernet1/0/1）
+    - 其它字段的清洗与归一化
+
+    由 resolve_raw_data 在字段映射之后调用，保证入库前格式一致。
 
     Args:
-        plan: 采集方案对象或字典，包含厂商和采集类型信息
-        processed_data: 已处理的数据列表
+        plan: 采集方案对象或字典，包含 summary_plan.vendor、collection_type
+        processed_data: 字段映射后的数据列表（list of dict）
 
     Returns:
-        处理后的数据列表，如果处理失败则返回原始数据
+        规范化后的数据列表；无对应方法或异常时返回原始 processed_data
     """
     try:
         if not plan or not processed_data:

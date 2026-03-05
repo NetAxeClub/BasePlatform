@@ -19,12 +19,12 @@ from apps.device_api.serializers import (
     CollectionResultDetailSerializer, CollectionFilterSerializer,
     CollectionResultByPlanSerializer, PlansToDeviceSerializer
 )
-from apps.device_api.services import DeviceCollectionService
+from apps.device_api.services_new import DeviceCollectionService
 from apps.device_api import COLLECTION_RESULTS_DB, COLLECTION_PLAN, COLLECTION_SUB_PLAN
 from apps.api.tools.custom_pagination import LargeResultsSetPagination
 from apps.asset.models import NetworkDevice
 from apps.device_api.fields_mapping import field_mapping
-from apps.device_api.services import FieldMappingDriver
+from apps.device_api.services_new import FieldMappingDriver
 from confload.confload import config
 from utils.db.mongo_ops import MongoOps
 
@@ -452,10 +452,11 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
 
     @action(detail=True, methods=['post'])
     def execute_sub_plan(self, request, *args, **kwargs):
-        """执行子采集方案 NETCONF和 NETMIKO"""
+        """执行子采集方案 NETCONF 和 NETMIKO。支持两种方式：南向驱动 / 本机直连。"""
         plan = self.get_object()
         device_ip = request.data.get('device_ip')           # 设备IP
-        south_driver = request.data.get('south_driver')     # 南向驱动
+        south_driver = request.data.get('south_driver')      # 南向驱动（可选）
+        use_local = request.data.get('use_local', False)     # 是否使用本机直连（不走南向驱动）
 
         try:
             # 使用统一的参数验证方法
@@ -466,8 +467,16 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
                     "message": error_msg
                 })
 
-            # 执行双重采集
-            result = DeviceCollectionService.execute_both_collection(plan, device, south_driver)
+            # 不走南向驱动时使用本机直连执行；否则必须提供 south_driver
+            if use_local:
+                result = DeviceCollectionService.execute_both_collection_local(plan, device)
+            else:
+                if not south_driver:
+                    return JsonResponse({
+                        "code": 400,
+                        "message": "南向驱动方式执行时缺少参数: south_driver；若需本机直连执行请传 use_local=true"
+                    })
+                result = DeviceCollectionService.execute_both_collection(plan, device, south_driver)
             
             if result['success']:
                 return JsonResponse({

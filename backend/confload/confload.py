@@ -15,15 +15,15 @@ import nacos
 import logging
 import logging.config
 import yaml
-import getpass
+import os
 import bcrypt
 from pathlib import Path
-
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 log = logging.getLogger(__name__)
 # 缺省配置  示例配置
-DEFAULTS_FILENAME = "../config/defaults.json"
+DEFAULTS_FILENAME = BASE_DIR + "/config/defaults.json"
 # 实际运行配置，会覆盖缺省配置
-CONFIG_FILENAME = "../config/config.json"
+CONFIG_FILENAME = BASE_DIR + "/config/config.json"
 NAMESPACE = "public"
 
 try:
