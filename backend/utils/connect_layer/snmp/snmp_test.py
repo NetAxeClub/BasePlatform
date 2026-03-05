@@ -5,7 +5,7 @@ SNMP协议探测工具
 """
 import logging
 import asyncio
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Any
 
 logger = logging.getLogger(__name__)
 
@@ -361,6 +361,114 @@ def _probe_snmp_v3_async(
 
     except Exception as e:
         logger.exception(f"SNMP v3探测异常: IP={ip}, Username={username}")
+        return False, f"连接异常: {str(e)}"
+
+
+def snmp_get_oid(
+    ip: str,
+    snmp_version: str,
+    snmp_community: str,
+    oid: str,
+    port: int = 161,
+    timeout: int = 5,
+    retries: int = 1,
+    auth_key: Optional[str] = None,
+    priv_key: Optional[str] = None,
+) -> Tuple[bool, Any]:
+    """
+    查询指定 OID 的 SNMP 值
+
+    Args:
+        ip: 目标设备IP地址
+        snmp_version: SNMP版本，支持 'v2c' 或 'v3'
+        snmp_community: SNMP团体字（v2c）或用户名（v3）
+        oid: 要查询的 OID，如 '1.3.6.1.2.1.1.1.0'
+        port: SNMP端口，默认161
+        timeout: 超时时间（秒），默认5秒
+        retries: 重试次数，默认1次
+        auth_key: SNMP v3认证密钥（仅v3需要，可选）
+        priv_key: SNMP v3加密密钥（仅v3需要，可选）
+
+    Returns:
+        Tuple[bool, Any]: (是否成功, 值或错误信息)
+    """
+    if not PYSNMP_AVAILABLE:
+        error_msg = "pysnmp库未安装或导入失败"
+        if _pysnmp_error:
+            error_msg += f": {_pysnmp_error}"
+        return False, error_msg
+
+    if not ip:
+        return False, "IP地址不能为空"
+
+    if not oid:
+        return False, "OID不能为空"
+
+    snmp_version_lower = snmp_version.lower()
+    if snmp_version_lower not in ["v2c", "v3"]:
+        return False, f"不支持的SNMP版本: {snmp_version}"
+
+    if not snmp_community:
+        return False, "SNMP团体字/用户名不能为空"
+
+    return _snmp_get_oid_async(
+        ip, snmp_version_lower, snmp_community, oid, port, timeout, retries,
+        auth_key, priv_key
+    )
+
+
+def _snmp_get_oid_async(
+    ip: str,
+    snmp_version: str,
+    snmp_community: str,
+    oid: str,
+    port: int,
+    timeout: int,
+    retries: int,
+    auth_key: Optional[str],
+    priv_key: Optional[str],
+) -> Tuple[bool, Any]:
+    """使用 pysnmp 7.x 异步 API 查询指定 OID 的值"""
+    try:
+        async def _async_get():
+            dispatcher = SnmpDispatcher()
+            if snmp_version == "v2c":
+                auth_data = CommunityData(snmp_community, mpModel=1)
+            else:
+                auth_data = CommunityData(snmp_community, mpModel=1)
+
+            transport = await UdpTransportTarget.create((ip, port))
+            error_indication, error_status, error_index, var_binds = await get_cmd(
+                dispatcher,
+                auth_data,
+                transport,
+                ObjectType(ObjectIdentity(oid)),
+            )
+            return error_indication, error_status, error_index, var_binds
+
+        error_indication, error_status, error_index, var_binds = asyncio.run(_async_get())
+
+        if error_indication:
+            return False, f"SNMP错误: {error_indication}"
+        if error_status:
+            return False, f"SNMP错误状态: {error_status.prettyPrint()}"
+
+        value = None
+        if var_binds and len(var_binds) > 0:
+            try:
+                obj_type = (
+                    var_binds[0][0] if isinstance(var_binds[0], tuple) else var_binds[0]
+                )
+                if hasattr(obj_type, "__getitem__"):
+                    value_obj = obj_type[1]
+                    value = str(value_obj) if value_obj is not None else None
+            except (IndexError, TypeError, AttributeError) as e:
+                logger.warning(f"提取OID值失败: {e}")
+
+        return True, value
+
+    except Exception as e:
+        logger.exception(f"SNMP GET OID异常: IP={ip}, OID={oid}")
         return False, f"连接异常: {str(e)}"
 
 

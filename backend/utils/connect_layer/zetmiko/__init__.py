@@ -9,7 +9,10 @@ from .hillstone import HillstoneSSH, HillstoneTelnet
 from .fiberhome import FiberHomeSSH
 from .mypower import MypowerOsSSH
 
-os.environ["NTC_TEMPLATES_DIR"] = BASE_DIR + '/utils/connect_layer/zetmiko/templates'
+# 模板目录：netmiko 通过 NET_TEXTFSM 查找 index 与 .textfsm 模板，本地采集 TextFSM 解析依赖此目录
+_zetmiko_templates_dir = os.path.join(BASE_DIR, "utils", "connect_layer", "zetmiko", "templates")
+os.environ["NTC_TEMPLATES_DIR"] = _zetmiko_templates_dir
+os.environ["NET_TEXTFSM"] = _zetmiko_templates_dir
 
 CLASS_MAPPER['hillstone'] = HillstoneSSH
 CLASS_MAPPER['hillstone_telnet'] = HillstoneTelnet
