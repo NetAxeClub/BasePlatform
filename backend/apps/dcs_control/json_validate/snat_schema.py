@@ -98,7 +98,7 @@ post_snat_schema = {
                     # 待校验JSON数组第一个元素是string类型，且可接受的最短长度为5个字符，第二个元素是number类型，且可接受的最小值为10
                     # 剩余的其他元素是string类型，且可接受的最短长度为2。
                     # 至少一个
-                    "miniItems": 1,
+                    "minItems": 1,
                     # 最多5个
                     "maxItems": 10,
                     # 值为true时，所有元素都具有唯一性时，才能通过校验。

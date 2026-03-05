@@ -13,24 +13,27 @@ from apps.dcs_control.json_validate.dnat_schema import post_dnat_schema
 from apps.dcs_control.json_validate.service_schema import service_schema
 from apps.dcs_control.json_validate.sec_policy import sec_policy_schema
 from apps.dcs_control.tasks import bulk_deny_by_address, address_set, config_dnat, config_sec_policy
+from apps.dcs_control.db import (
+    dnat_mongo, snat_mongo, sec_policy_mongo,
+    address_mongo, service_mongo, predefined_mongo, zone_mongo,
+)
+from apps.dcs_control.constants import Vendor
 
 if DEBUG:
     CELERY_QUEUE = 'dev'
 else:
     CELERY_QUEUE = 'config'
 
-dnat_mongo = MongoOps(db='Automation', coll='hillstone_dnat')
-snat_mongo = MongoOps(db='Automation', coll='hillstone_snat')
-sec_policy_mongo = MongoOps(db='Automation', coll='sec_policy')
-
 
 # 一键封堵
 class DenyByAddrObj(APIView):
     def get(self, request):
         get_param = request.GET.dict()
+        if 'vendor' in get_param:
+            get_param['vendor'] = Vendor.normalize(get_param['vendor'])
         # 查询策略包含指定的地址对象的策略匹配次数
         if all(k in get_param for k in ("vendor", "hostip", "address_book")):
-            if get_param['vendor'] in ['hillstone', 'h3c', 'huawei']:
+            if get_param['vendor'] in Vendor.choices():
                 real_ip = AssetIpInfo.objects.select_related('device').filter(
                     name='HA', ipaddr=get_param['hostip'],
                     device__ha_status__in=[0, 1]).values('device__manage_ip').first()
@@ -48,7 +51,7 @@ class DenyByAddrObj(APIView):
                 else:
                     return JsonResponse({'code': 400, 'msg': '未查询到匹配的数据'})
             else:
-                return JsonResponse({'code': 400, 'msg': 'vendor 必须是 hillstone  h3c  huawei 其中一个'})
+                return JsonResponse({'code': 400, 'msg': f'vendor 必须是 {Vendor.choices()} 其中一个'})
 
     def post(self, request):
         post_param = request.data
@@ -78,7 +81,8 @@ class AddressSet(APIView):
 
     def get(self, request):
         get_param = request.GET.dict()
-        # print(get_param)
+        if 'vendor' in get_param:
+            get_param['vendor'] = Vendor.normalize(get_param['vendor'])
         # 获取单个设备地址组信息
         if all(k in get_param for k in ("vendor", "hostip")):
             if get_param['vendor'] == 'H3C':
@@ -102,7 +106,7 @@ class AddressSet(APIView):
                                       'code': 400})
                 return HttpResponse(res, content_type="application/json")
             elif get_param['vendor'] == 'Hillstone':
-                _res = MongoOps(db='Automation', coll='hillstone_address') \
+                _res = address_mongo \
                     .find(query_dict=dict(hostip=get_param['hostip']), fields={'_id': 0})
                 if _res:
                     return JsonResponse({'results': _res, 'count': len(_res), 'code': 200})
@@ -117,6 +121,8 @@ class AddressSet(APIView):
         print(request.user)
         remote_ip = request.META.get("REMOTE_ADDR")
         post_param = request.data
+        if 'vendor' in post_param:
+            post_param['vendor'] = Vendor.normalize(post_param['vendor'])
         # 更新单个设备地址组信息(山石)
         if all(k in post_param for k in ("vendor", "update_device", "hostip")):
             if post_param['vendor'] == 'Hillstone':
@@ -167,7 +173,8 @@ class ServiceSet(APIView):
 
     def get(self, request):
         get_param = request.GET.dict()
-        # print(get_param)
+        if 'vendor' in get_param:
+            get_param['vendor'] = Vendor.normalize(get_param['vendor'])
         # 获取单个设备地址组信息
         if all(k in get_param for k in ("vendor", "hostip")):
             if get_param['vendor'] == 'H3C':
@@ -191,7 +198,7 @@ class ServiceSet(APIView):
                                       'code': 400})
                 return HttpResponse(res, content_type="application/json")
             elif get_param['vendor'] == 'Hillstone':
-                _res = MongoOps(db='Automation', coll='hillstone_service') \
+                _res = service_mongo \
                     .find(query_dict=dict(hostip=get_param['hostip']), fields={'_id': 0})
                 if _res:
                     return JsonResponse({'results': _res, 'count': len(_res), 'code': 200})
@@ -206,6 +213,8 @@ class ServiceSet(APIView):
         print(request.user)
         remote_ip = request.META.get("REMOTE_ADDR")
         post_param = request.data
+        if 'vendor' in post_param:
+            post_param['vendor'] = Vendor.normalize(post_param['vendor'])
         # 更新单个设备服务信息(山石)
         if all(k in post_param for k in ("vendor", "update_device", "hostip")):
             if post_param['vendor'] == 'Hillstone':
@@ -256,6 +265,8 @@ class DestAddTranslate(APIView):
 
     def get(self, request):
         get_param = request.GET.dict()
+        if 'vendor' in get_param:
+            get_param['vendor'] = Vendor.normalize(get_param['vendor'])
         # print(get_param)
         # 获取单个设备DNAT信息
         if all(k in get_param for k in ("vendor", "hostip")):
@@ -290,6 +301,8 @@ class DestAddTranslate(APIView):
     # 表单验证
     def post(self, request):
         post_param = request.data
+        if 'vendor' in post_param:
+            post_param['vendor'] = Vendor.normalize(post_param['vendor'])
         # 更新单个设备DNAT信息
         if all(k in post_param for k in ("vendor", "update_device", "hostip")):
             if post_param['vendor'] == 'Hillstone':
@@ -331,6 +344,8 @@ class SecPolicy(APIView):
         :return:
         """
         get_param = request.GET.dict()
+        if 'vendor' in get_param:
+            get_param['vendor'] = Vendor.normalize(get_param['vendor'])
         print(get_param)
         if all(k in get_param for k in ("page_size", "page")):
             _params = json.loads(get_param["query"])
@@ -368,7 +383,7 @@ class SecPolicy(APIView):
         # if all(k in get_param for k in ("hostip", "sec_policy")):
         # 获取防火墙设备列表，筛选HA状态为独立设备或主设备，类型为防火墙的设备列表。
         if 'get_firewall_sec_policy' in get_param.keys():
-            _res = MongoOps(db='Automation', coll='sec_policy') \
+            _res = sec_policy_mongo \
                 .find(query_dict=dict(hostip=get_param['get_firewall_sec_policy']), fields={'_id': 0})
             if _res:
                 res = json.dumps({'results': _res, 'count': len(_res),
@@ -378,7 +393,7 @@ class SecPolicy(APIView):
                                   'code': 400})
             return HttpResponse(res, content_type="application/json")
         if 'get_firewall_sec_policy_id' in get_param.keys():
-            _res = MongoOps(db='Automation', coll='sec_policy') \
+            _res = sec_policy_mongo \
                 .find(query_dict=dict(hostip=get_param['get_firewall_sec_policy_id']), fields={'_id': 0,
                                                                                                'id': 1,
                                                                                                'name': 1})
@@ -411,7 +426,7 @@ class SecPolicy(APIView):
                                       'code': 400})
                 return HttpResponse(res, content_type="application/json")
             elif get_param['vendor'] == 'Hillstone':
-                _res = MongoOps(db='Automation', coll='hillstone_zone').find(
+                _res = zone_mongo.find(
                     query_dict=dict(hostip=get_param['get_sec_zone'], type='L3'), fields={'_id': 0})
                 if _res:
                     res = json.dumps({'data': _res, 'count': len(_res),
@@ -480,9 +495,9 @@ class SecPolicy(APIView):
                 return HttpResponse(res, content_type="application/json")
             elif get_param['vendor'] == 'Hillstone':
                 service_res = []
-                custom_services = MongoOps(db='Automation', coll='hillstone_service') \
+                custom_services = service_mongo \
                     .find(query_dict=dict(hostip=get_param['get_service_obj']), fields={'_id': 0})
-                predefined_services = MongoOps(db='Automation', coll='hillstone_service_predefined') \
+                predefined_services = predefined_mongo \
                     .find(query_dict=dict(hostip=get_param['get_service_obj']), fields={'_id': 0})
                 custom_services_options = []
                 for x in custom_services:
@@ -555,7 +570,7 @@ class SecPolicy(APIView):
                                       'code': 400})
                 return HttpResponse(res, content_type="application/json")
             elif get_param['vendor'] == 'Hillstone':
-                _res = MongoOps(db='Automation', coll='sec_policy') \
+                _res = sec_policy_mongo \
                     .find(query_dict=dict(hostip=get_param['hostip']), fields={'_id': 0})
                 if _res:
                     return JsonResponse({'results': _res, 'count': len(_res), 'code': 200})
@@ -565,6 +580,8 @@ class SecPolicy(APIView):
 
     def post(self, request):
         post_param = request.data
+        if 'vendor' in post_param:
+            post_param['vendor'] = Vendor.normalize(post_param['vendor'])
         risks_port = [23, 22, 20, 21, 3306, 1521, 6379, 1433, 445, 3389, 5432]
         # print(post_param)
         # 获取设备地址组
@@ -651,7 +668,7 @@ class SecPolicy(APIView):
                     res = json.dumps({'results': [], 'count': 0,
                                       'code': 400})
                 return HttpResponse(res, content_type="application/json")
-            elif post_param['vendor'] == 'hillstone':
+            elif post_param['vendor'] == Vendor.HILLSTONE:
                 result = {
                     'src_addr': [],
                     'dst_addr': [],
@@ -660,7 +677,7 @@ class SecPolicy(APIView):
                 if post_param['src_addr']:
                     for addr in post_param['src_addr']:
                         if 'object' in addr.keys():
-                            src_addr_query = MongoOps(db='Automation', coll='hillstone_address').find(
+                            src_addr_query = address_mongo.find(
                                 query_dict=dict(hostip=post_param['hostip'], name=addr['object']), fields={'_id': 0}
                             )
                             if src_addr_query:
@@ -690,7 +707,7 @@ class SecPolicy(APIView):
                 if post_param['dst_addr']:
                     for addr in post_param['dst_addr']:
                         if 'object' in addr.keys():
-                            src_addr_query = MongoOps(db='Automation', coll='hillstone_address').find(
+                            src_addr_query = address_mongo.find(
                                 query_dict=dict(hostip=post_param['hostip'], name=addr['object']), fields={'_id': 0}
                             )
                             if src_addr_query:
@@ -720,11 +737,11 @@ class SecPolicy(APIView):
                 if post_param['service']:
                     for ser in post_param['service']:
                         if 'object' in ser.keys():
-                            service_query = MongoOps(db='Automation', coll='hillstone_service').find(
+                            service_query = service_mongo.find(
                                 query_dict=dict(hostip=post_param['hostip'], name=ser['object']), fields={'_id': 0}
                             )
                             if not service_query:
-                                service_query = MongoOps(db='Automation', coll='hillstone_service_predefined').find(
+                                service_query = predefined_mongo.find(
                                     query_dict=dict(hostip=post_param['hostip'], name=ser['object']), fields={'_id': 0}
                                 )
                             if service_query:
@@ -868,7 +885,7 @@ class SecPolicy(APIView):
     #             {'src_ip_split': {'$elemMatch': {'start': {'$gte': _ip.value}, 'end': {'$lte': _ip.value}}}},
     #             {'dst_ip_split': {'$elemMatch': {'start': {'$gte': _ip.value}, 'end': {'$lte': _ip.value}}}}
     #         ]}
-    #         _res = MongoOps(db='Automation', coll='sec_policy').find(query_dict=params,
+    #         _res = sec_policy_mongo.find(query_dict=params,
     #                                                                  fileds={'_id': 0, 'src_ip_split': 0,
     #                                                                          'dstc_ip_split': 0})
     #         if _res:

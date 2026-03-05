@@ -102,7 +102,7 @@ post_slb_pool_schema = {
                                     "pattern": "\d+.\d+.\d+.\d+/\d{1,2}"
                                 },
                             ],
-                            "miniItems": 1,
+                            "minItems": 1,
                             "maxItems": 10,
                             "uniqueItems": True
                         },
@@ -141,7 +141,7 @@ post_slb_pool_schema = {
                         }
                     ]
                 },
-            "miniItems": 1,
+            "minItems": 1,
             "maxItems": 5,
             "uniqueItems": True
         },
