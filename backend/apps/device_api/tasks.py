@@ -88,6 +88,7 @@ from apps.device_api.connection_manager import DeviceConnectionManager
 from apps.device_api.models_api import (
     resolve_raw_data,
     inject_metadata,
+    inject_collection_context,
     COLLECTION_TYPE_MONGO_MAP,
 )
 from apps.device_api.tools.collect_device import get_auto_device
@@ -543,13 +544,23 @@ def _process_and_save_result(
         # ── Layer 3：元数据注入 ──────────────────────────────────────────
         meta = {
             "hostip": manage_ip,
-            "hostname": device_info.get("device_name", ""),
-            "idc_name": device_info.get("idc_name", ""),
+            "hostname": device_info.get("name", "") or device_info.get("device_name", ""),
+            "idc_name": device_info.get("idc__name", "") or device_info.get("idc_name", ""),
         }
         inject_metadata(processed_data, meta)
+        collection_type = plan.get("collection_type")
+        inject_collection_context(
+            processed_data,
+            {
+                "summary_plan_id": plan.get("summary_plan"),
+                "plan_id": plan.get("id"),
+                "collection_type": collection_type,
+                "collection_method": collection_method,
+                "execute_time": execute_time,
+            },
+        )
 
         # ── 写入类型专属 MongoDB 集合 ─────────────────────────────────────
-        collection_type = plan.get("collection_type")
         if isinstance(processed_data, list) and processed_data and collection_type:
             collection_db = COLLECTION_TYPE_MONGO_MAP.get(collection_type)
             if not collection_db:

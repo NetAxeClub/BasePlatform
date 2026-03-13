@@ -168,6 +168,8 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
         """执行当前汇总采集方案下所有的子采集方案"""
         summary_plan = self.get_object()
         device_ip = request.data.get('device_ip')
+        south_driver = request.data.get('south_driver')
+        use_local = request.data.get('use_local', False)
 
         try:
             # 验证汇总方案是否启用
@@ -201,6 +203,12 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
                     "message": f"汇总方案 '{summary_plan.name}' 下没有采集方案"
                 })
 
+            if not use_local and not south_driver:
+                return JsonResponse({
+                    "code": 400,
+                    "message": "南向驱动方式执行时缺少参数: south_driver；若需本机直连执行请传 use_local=true"
+                })
+
             # 执行所有采集方案
             results = []
             success_count = 0
@@ -224,8 +232,11 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
                         continue
 
                     # 执行双重采集
-                    collection_result = DeviceCollectionService.execute_both_collection(plan, device)
-                    
+                    if use_local:
+                        collection_result = DeviceCollectionService.execute_both_collection_local(plan, device)
+                    else:
+                        collection_result = DeviceCollectionService.execute_both_collection(plan, device, south_driver)
+
                     if collection_result['success']:
                         result = {
                             'plan_id': plan.id,
@@ -244,7 +255,7 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
                             'message': collection_result['error']
                         }
                         failed_count += 1
-                    
+
                     results.append(result)
 
                 except Exception as e:
@@ -385,7 +396,7 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
                 "data": ""
             })
 
-    def validate_execution_params(self, plan, device_ip, collection_type):
+    def validate_execution_params(self, plan, device_ip, collection_type, use_local=False):
         """验证采集执行参数
         
         Args:
@@ -424,24 +435,50 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
                 return True, "验证通过", device
                 
             elif collection_type == 'both':
-                # 检查是否至少启用了一种采集方式
-                if not plan.netconf_enabled and not plan.netmiko_enabled:
+                enabled_methods = {
+                    'netmiko': bool(plan.netmiko_enabled),
+                    'netconf': bool(plan.netconf_enabled),
+                    'snmp': bool(getattr(plan, 'snmp_enabled', False)),
+                    'restconf': bool(getattr(plan, 'restconf_enabled', False)),
+                    'telemetry': bool(getattr(plan, 'telemetry_enabled', False)),
+                }
+
+                if not any(enabled_methods.values()):
                     return False, "采集方案未启用任何采集方式", None
-                
-                # 检查设备配置 - 只要有一种方式配置正确就可以
-                netconf_available = plan.netconf_enabled and device.netconf_account
-                netmiko_available = plan.netmiko_enabled and device.ssh_account
-                
-                if not netconf_available and not netmiko_available:
-                    # 构建详细的错误信息
-                    error_parts = []
-                    if plan.netconf_enabled and not device.netconf_account:
-                        error_parts.append("未配置NETCONF账户")
-                    if plan.netmiko_enabled and not device.ssh_account:
+
+                available_methods = []
+                error_parts = []
+
+                if enabled_methods['netmiko']:
+                    if device.ssh_account:
+                        available_methods.append('netmiko')
+                    else:
                         error_parts.append("未配置SSH账户")
-                    
+
+                if enabled_methods['netconf']:
+                    if device.netconf_account:
+                        available_methods.append('netconf')
+                    else:
+                        error_parts.append("未配置NETCONF账户")
+
+                if use_local:
+                    if enabled_methods['snmp']:
+                        if getattr(device, 'snmp_community', '') and getattr(device, 'snmp_community', '') != '-':
+                            available_methods.append('snmp')
+                        else:
+                            error_parts.append("未配置SNMP团体字")
+
+                    if enabled_methods['restconf']:
+                        available_methods.append('restconf')
+
+                    if enabled_methods['telemetry']:
+                        available_methods.append('telemetry')
+                elif enabled_methods['snmp'] or enabled_methods['restconf'] or enabled_methods['telemetry']:
+                    error_parts.append("南向驱动验证当前仅支持NETMIKO/NETCONF")
+
+                if not available_methods:
                     return False, f"设备 {device_ip} {', '.join(error_parts)}", None
-                
+
                 return True, "验证通过", device
             else:
                 return False, f"不支持的采集类型: {collection_type}", None
@@ -460,7 +497,9 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
 
         try:
             # 使用统一的参数验证方法
-            is_valid, error_msg, device = self.validate_execution_params(plan, device_ip, 'both')
+            is_valid, error_msg, device = self.validate_execution_params(
+                plan, device_ip, 'both', use_local=use_local
+            )
             if not is_valid:
                 return JsonResponse({
                     "code": 400,
@@ -484,7 +523,10 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
                     "message": result['message'],
                     "data": {
                         "netconf_result": result['netconf_result'],
-                        "netmiko_result": result['netmiko_result']
+                        "netmiko_result": result['netmiko_result'],
+                        "snmp_result": result.get('snmp_result'),
+                        "restconf_result": result.get('restconf_result'),
+                        "telemetry_result": result.get('telemetry_result'),
                     }
                 })
             else:
@@ -493,7 +535,10 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
                     "message": result['error'],
                     "data": {
                         "netconf_result": result.get('netconf_result'),
-                        "netmiko_result": result.get('netmiko_result')
+                        "netmiko_result": result.get('netmiko_result'),
+                        "snmp_result": result.get('snmp_result'),
+                        "restconf_result": result.get('restconf_result'),
+                        "telemetry_result": result.get('telemetry_result'),
                     }
                 })
 
@@ -794,36 +839,84 @@ class CollectionResultViewSet(CustomViewBase):
             device_name = request.GET.get('device_name', '').strip()
             device_ip = request.GET.get('device_ip', '').strip()
             execute_node = request.GET.get('execute_node', '').strip()
+            summary_plan_id = request.GET.get('summary_plan_id', '').strip()
+            sub_plan_id = request.GET.get('sub_plan_id', '').strip()
             page = int(request.GET.get('page', 1))
             page_size = int(request.GET.get('page_size', 10))
-            
-            # 构建MongoDB查询条件
-            query = {}
-            
+
+            conditions = []
+
             # search字段：同时对summary_plan_name、device_ip和device_name进行模糊查询
             if search:
-                query['$or'] = [
-                    {'summary_plan_name': {'$regex': search, '$options': 'i'}},
-                    {'device_ip': {'$regex': search, '$options': 'i'}},
-                    {'device_name': {'$regex': search, '$options': 'i'}}
-                ]
-            
+                conditions.append({
+                    '$or': [
+                        {'summary_plan_name': {'$regex': search, '$options': 'i'}},
+                        {'device_ip': {'$regex': search, '$options': 'i'}},
+                        {'device_name': {'$regex': search, '$options': 'i'}}
+                    ]
+                })
+
             # 其他模糊查询条件
             if idc_name:
-                query['idc_name'] = {'$regex': idc_name, '$options': 'i'}
+                conditions.append({'idc_name': {'$regex': idc_name, '$options': 'i'}})
             if vendor:
-                query['vendor'] = {'$regex': vendor, '$options': 'i'}
-            # 如果提供了search，device_name已经在$or中处理，这里不再单独处理
-            # 如果没提供search但提供了device_name，则单独处理
+                conditions.append({'vendor': {'$regex': vendor, '$options': 'i'}})
             if device_name and not search:
-                query['device_name'] = {'$regex': device_name, '$options': 'i'}
-            # 如果提供了search，device_ip已经在$or中处理，这里不再单独处理
-            # 如果没提供search但提供了device_ip，则单独处理
+                conditions.append({'device_name': {'$regex': device_name, '$options': 'i'}})
             if device_ip and not search:
-                query['device_ip'] = {'$regex': device_ip, '$options': 'i'}
+                conditions.append({'device_ip': {'$regex': device_ip, '$options': 'i'}})
             if execute_node:
-                query['execute_node'] = {'$regex': execute_node, '$options': 'i'}
-            
+                conditions.append({'execute_node': {'$regex': execute_node, '$options': 'i'}})
+            if summary_plan_id:
+                conditions.append({'summary_plan_id': int(summary_plan_id)})
+
+            # 支持按子采集方案筛选主结果列表
+            if sub_plan_id:
+                sub_plan_query = {'plan_id': int(sub_plan_id)}
+                if summary_plan_id:
+                    sub_plan_query['summary_plan_id'] = int(summary_plan_id)
+
+                related_sub_runs = list(COLLECTION_SUB_PLAN.coll.find(
+                    sub_plan_query,
+                    {'_id': 0, 'summary_plan_id': 1, 'device_ip': 1, 'execute_time': 1}
+                ))
+
+                if not related_sub_runs:
+                    return JsonResponse({
+                        'code': 200,
+                        'message': '获取成功',
+                        'data': {
+                            'results': [],
+                            'total': 0
+                        }
+                    })
+
+                matched_runs = []
+                seen_run_keys = set()
+                for item in related_sub_runs:
+                    run_key = (
+                        item.get('summary_plan_id'),
+                        item.get('device_ip'),
+                        item.get('execute_time')
+                    )
+                    if run_key in seen_run_keys:
+                        continue
+                    seen_run_keys.add(run_key)
+                    matched_runs.append({
+                        'summary_plan_id': item.get('summary_plan_id'),
+                        'device_ip': item.get('device_ip'),
+                        'execute_time': item.get('execute_time'),
+                    })
+
+                conditions.append({'$or': matched_runs})
+
+            if not conditions:
+                query = {}
+            elif len(conditions) == 1:
+                query = conditions[0]
+            else:
+                query = {'$and': conditions}
+
             # 计算分页参数
             skip = page_size * (page - 1)
             
@@ -864,16 +957,38 @@ class CollectionResultViewSet(CustomViewBase):
         """根据主采集方案ID和采集类型查询子采集方案详情"""
         try:
             summary_plan_id = request.GET.get('summary_plan_id', '').strip()
+            plan_id = request.GET.get('plan_id', '').strip()
+            device_ip = request.GET.get('device_ip', '').strip()
+            execute_time = request.GET.get('execute_time', '').strip()
             collection_type = request.GET.get('collection_type', 'arp').strip()
             page = int(request.GET.get('page', 1))
             page_size = int(request.GET.get('page_size', 10))
 
             # 查询子采集方案数据
-            query = {
-                'summary_plan_id': int(summary_plan_id),
-                'collection_type': collection_type
-            }
-            sub_plan_data = COLLECTION_SUB_PLAN.coll.find_one(query, {'_id': 0})
+            query = {}
+            if summary_plan_id:
+                query['summary_plan_id'] = int(summary_plan_id)
+            if plan_id:
+                query['plan_id'] = int(plan_id)
+            if collection_type:
+                query['collection_type'] = collection_type
+            if device_ip:
+                query['device_ip'] = device_ip
+            if execute_time:
+                query['execute_time'] = execute_time
+
+            if not query:
+                return JsonResponse({
+                    'code': 400,
+                    'message': '缺少查询条件',
+                    'data': None
+                })
+
+            sub_plan_data = COLLECTION_SUB_PLAN.coll.find_one(
+                query,
+                {'_id': 0},
+                sort=[('log_time', -1), ('execute_time', -1)]
+            )
 
             if not sub_plan_data:
                 return JsonResponse({
@@ -883,16 +998,29 @@ class CollectionResultViewSet(CustomViewBase):
                 })
 
             collection_method = sub_plan_data.get("collection_method")
+            effective_collection_type = sub_plan_data.get('collection_type') or collection_type
 
             # 查询出对应采集类型下的数据
-            collection_name = f"plan_{collection_type}"
+            collection_name = f"plan_{effective_collection_type}"
             collection_db = MongoOps(db='Automation', coll=collection_name)
+            data_query = {
+                'collection_type': effective_collection_type,
+            }
+            if sub_plan_data.get('summary_plan_id') is not None:
+                data_query['summary_plan_id'] = sub_plan_data['summary_plan_id']
+            if sub_plan_data.get('plan_id') is not None:
+                data_query['plan_id'] = sub_plan_data['plan_id']
+            if sub_plan_data.get('device_ip'):
+                data_query['hostip'] = sub_plan_data['device_ip']
+            if sub_plan_data.get('execute_time'):
+                data_query['execute_time'] = sub_plan_data['execute_time']
             # 获取总记录数
-            total = collection_db.coll.count_documents({})
+            total = collection_db.coll.count_documents(data_query)
             # 计算分页参数
             skip = (page - 1) * page_size
             # 使用聚合管道查询，在查询时添加 collection_type 字段
             pipeline = [
+                {'$match': data_query},
                 {'$addFields': {'collection_method': collection_method}},  # 添加 collection_method 字段
                 {'$project': {'_id': 0}},  # 排除 _id 字段
                 {'$skip': skip},  # 跳过记录
@@ -902,8 +1030,8 @@ class CollectionResultViewSet(CustomViewBase):
 
             # 根据 collection_type 获取表头信息
             columns = [{"label": "时间", "value": "log_time"}, {"label": "设备IP", "value": "hostip"}, {"label": "采集方式", "value": "collection_method"}]
-            if collection_type in field_mapping:
-                mapping_fields = field_mapping[collection_type].get('mapping_fields', [])
+            if effective_collection_type in field_mapping:
+                mapping_fields = field_mapping[effective_collection_type].get('mapping_fields', [])
                 for field in mapping_fields:
                     label = field.get('label', '')
                     value = field.get('value', '')

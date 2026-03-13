@@ -206,6 +206,28 @@ class DeviceSubCollectionPlanSerializer(serializers.ModelSerializer):
             "netconf_field_mappings",
             "netconf_processor_enabled",
             "netconf_processor",
+            "snmp_enabled",
+            "snmp_version",
+            "snmp_oids",
+            "snmp_path",
+            "snmp_field_mappings",
+            "snmp_processor_enabled",
+            "snmp_processor",
+            "restconf_enabled",
+            "restconf_endpoint",
+            "restconf_method",
+            "restconf_path",
+            "restconf_field_mappings",
+            "restconf_processor_enabled",
+            "restconf_processor",
+            "telemetry_enabled",
+            "telemetry_subscription_path",
+            "telemetry_sampling_interval",
+            "telemetry_data_format",
+            "telemetry_path",
+            "telemetry_field_mappings",
+            "telemetry_processor_enabled",
+            "telemetry_processor",
             "xml_templates",
             "created_at",
             "updated_at",
@@ -222,6 +244,9 @@ class DeviceSubCollectionPlanSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             "netmiko_processor": {"write_only": True},
             "netconf_processor": {"write_only": True},
+            "snmp_processor": {"write_only": True},
+            "restconf_processor": {"write_only": True},
+            "telemetry_processor": {"write_only": True},
         }
 
     def get_xml_templates(self, obj):
@@ -288,6 +313,28 @@ class DeviceSubCollectionPlanCreateSerializer(serializers.ModelSerializer):
             "netconf_field_mappings",
             "netconf_processor_enabled",
             "netconf_processor",
+            "snmp_enabled",
+            "snmp_version",
+            "snmp_oids",
+            "snmp_path",
+            "snmp_field_mappings",
+            "snmp_processor_enabled",
+            "snmp_processor",
+            "restconf_enabled",
+            "restconf_endpoint",
+            "restconf_method",
+            "restconf_path",
+            "restconf_field_mappings",
+            "restconf_processor_enabled",
+            "restconf_processor",
+            "telemetry_enabled",
+            "telemetry_subscription_path",
+            "telemetry_sampling_interval",
+            "telemetry_data_format",
+            "telemetry_path",
+            "telemetry_field_mappings",
+            "telemetry_processor_enabled",
+            "telemetry_processor",
             "xml_templates",
             "created_at",
             "updated_at",
@@ -306,13 +353,30 @@ class DeviceSubCollectionPlanCreateSerializer(serializers.ModelSerializer):
             "netmiko_processor": {"required": False, "allow_blank": True, "default": ""},
             "netconf_processor_enabled": {"required": False, "default": False},
             "netconf_processor": {"required": False, "allow_blank": True, "default": ""},
+            "snmp_processor_enabled": {"required": False, "default": False},
+            "snmp_processor": {"required": False, "allow_blank": True, "default": ""},
+            "restconf_processor_enabled": {"required": False, "default": False},
+            "restconf_processor": {"required": False, "allow_blank": True, "default": ""},
+            "telemetry_processor_enabled": {"required": False, "default": False},
+            "telemetry_processor": {"required": False, "allow_blank": True, "default": ""},
         }
 
     def validate(self, data):
+        enabled_methods = [
+            key for key in (
+                "netmiko_enabled",
+                "netconf_enabled",
+                "snmp_enabled",
+                "restconf_enabled",
+                "telemetry_enabled",
+            )
+            if data.get(key)
+        ]
+
         # 验证至少选择一种采集方式
-        if not data.get("netconf_enabled") and not data.get("netmiko_enabled"):
+        if not enabled_methods:
             raise serializers.ValidationError(
-                "至少需要启用一种采集方式（NETCONF或Netmiko）"
+                "至少需要启用一种采集方式（NETCONF、Netmiko、SNMP、RESTCONF 或 Telemetry）"
             )
 
         # 验证Netmiko相关配置
@@ -359,6 +423,22 @@ class DeviceSubCollectionPlanCreateSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError(
                         "netconf_field_mappings必须是有效的JSON格式"
                     )
+
+        if data.get("snmp_enabled"):
+            snmp_oids = data.get("snmp_oids", [])
+            if not snmp_oids:
+                raise serializers.ValidationError("启用SNMP时必须提供至少一个OID")
+
+        if data.get("restconf_enabled") and not data.get("restconf_endpoint"):
+            raise serializers.ValidationError("启用RESTCONF时必须提供端点路径")
+
+        if data.get("restconf_enabled"):
+            restconf_method = data.get("restconf_method", "GET")
+            if restconf_method != "GET":
+                raise serializers.ValidationError("当前RESTCONF仅支持GET方法")
+
+        if data.get("telemetry_enabled") and not data.get("telemetry_subscription_path"):
+            raise serializers.ValidationError("启用Telemetry时必须提供订阅路径")
 
         return data
 
@@ -436,6 +516,28 @@ class DeviceSubCollectionPlanUpdateSerializer(serializers.ModelSerializer):
             "netconf_field_mappings",
             "netconf_processor_enabled",
             "netconf_processor",
+            "snmp_enabled",
+            "snmp_version",
+            "snmp_oids",
+            "snmp_path",
+            "snmp_field_mappings",
+            "snmp_processor_enabled",
+            "snmp_processor",
+            "restconf_enabled",
+            "restconf_endpoint",
+            "restconf_method",
+            "restconf_path",
+            "restconf_field_mappings",
+            "restconf_processor_enabled",
+            "restconf_processor",
+            "telemetry_enabled",
+            "telemetry_subscription_path",
+            "telemetry_sampling_interval",
+            "telemetry_data_format",
+            "telemetry_path",
+            "telemetry_field_mappings",
+            "telemetry_processor_enabled",
+            "telemetry_processor",
             "xml_templates",
             "created_at",
             "updated_at",
@@ -446,21 +548,56 @@ class DeviceSubCollectionPlanUpdateSerializer(serializers.ModelSerializer):
             "netmiko_processor": {"required": False, "allow_blank": True},
             "netconf_processor_enabled": {"required": False},
             "netconf_processor": {"required": False, "allow_blank": True},
+            "snmp_processor_enabled": {"required": False},
+            "snmp_processor": {"required": False, "allow_blank": True},
+            "restconf_processor_enabled": {"required": False},
+            "restconf_processor": {"required": False, "allow_blank": True},
+            "telemetry_processor_enabled": {"required": False},
+            "telemetry_processor": {"required": False, "allow_blank": True},
         }
+
+    def _instance_has_xml_templates(self) -> bool:
+        if not self.instance:
+            return False
+        try:
+            templates = getattr(self.instance, "xml_templates", None)
+            if templates is None:
+                return False
+            if hasattr(templates, "exists"):
+                return templates.exists()
+            return bool(templates)
+        except Exception:
+            return False
 
     def validate(self, data):
         # 在更新时，如果字段没有传入，从实例中获取现有值
         if self.instance:
-            netmiko_enabled = data.get("netmiko_enabled", self.instance.netmiko_enabled)
-            netconf_enabled = data.get("netconf_enabled", self.instance.netconf_enabled)
+            enabled_methods = {
+                "netmiko_enabled": data.get("netmiko_enabled", self.instance.netmiko_enabled),
+                "netconf_enabled": data.get("netconf_enabled", self.instance.netconf_enabled),
+                "snmp_enabled": data.get("snmp_enabled", self.instance.snmp_enabled),
+                "restconf_enabled": data.get("restconf_enabled", self.instance.restconf_enabled),
+                "telemetry_enabled": data.get("telemetry_enabled", self.instance.telemetry_enabled),
+            }
         else:
-            netmiko_enabled = data.get("netmiko_enabled", False)
-            netconf_enabled = data.get("netconf_enabled", False)
+            enabled_methods = {
+                "netmiko_enabled": data.get("netmiko_enabled", False),
+                "netconf_enabled": data.get("netconf_enabled", False),
+                "snmp_enabled": data.get("snmp_enabled", False),
+                "restconf_enabled": data.get("restconf_enabled", False),
+                "telemetry_enabled": data.get("telemetry_enabled", False),
+            }
+
+        netmiko_enabled = enabled_methods["netmiko_enabled"]
+        netconf_enabled = enabled_methods["netconf_enabled"]
+        snmp_enabled = enabled_methods["snmp_enabled"]
+        restconf_enabled = enabled_methods["restconf_enabled"]
+        telemetry_enabled = enabled_methods["telemetry_enabled"]
 
         # 验证至少选择一种采集方式
-        if not netconf_enabled and not netmiko_enabled:
+        if not any(enabled_methods.values()):
             raise serializers.ValidationError(
-                "至少需要启用一种采集方式（NETCONF或Netmiko）"
+                "至少需要启用一种采集方式（NETCONF、Netmiko、SNMP、RESTCONF 或 Telemetry）"
             )
 
         # 验证Netmiko相关配置
@@ -478,13 +615,17 @@ class DeviceSubCollectionPlanUpdateSerializer(serializers.ModelSerializer):
 
         # 验证NETCONF相关配置
         if netconf_enabled:
-            # 如果启用NETCONF，必须提供XML模板
-            xml_templates = data.get("xml_templates", [])
-            if not xml_templates:
+            # 如果启用NETCONF，显式传入时必须非空；未传入时允许沿用现有模板
+            xml_templates = data.get("xml_templates", None)
+            if xml_templates is None:
+                has_existing_templates = self._instance_has_xml_templates()
+                if not has_existing_templates:
+                    raise serializers.ValidationError("启用NETCONF时必须提供XML模板")
+            elif not xml_templates:
                 raise serializers.ValidationError("启用NETCONF时必须提供XML模板")
 
             # 验证XML模板数据的完整性
-            for i, template in enumerate(xml_templates):
+            for i, template in enumerate(xml_templates or []):
                 if not template.get("collect_method"):
                     raise serializers.ValidationError(f"XML模板[{i}]必须包含采集方法")
                 if not template.get("xml_template"):
@@ -500,6 +641,33 @@ class DeviceSubCollectionPlanUpdateSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError(
                         "netconf_field_mappings必须是有效的JSON格式"
                     )
+
+        if snmp_enabled:
+            snmp_oids = data.get("snmp_oids", self.instance.snmp_oids if self.instance else [])
+            if not snmp_oids:
+                raise serializers.ValidationError("启用SNMP时必须提供至少一个OID")
+
+        if restconf_enabled:
+            restconf_endpoint = data.get(
+                "restconf_endpoint",
+                self.instance.restconf_endpoint if self.instance else "",
+            )
+            if not restconf_endpoint:
+                raise serializers.ValidationError("启用RESTCONF时必须提供端点路径")
+            restconf_method = data.get(
+                "restconf_method",
+                self.instance.restconf_method if self.instance else "GET",
+            )
+            if restconf_method != "GET":
+                raise serializers.ValidationError("当前RESTCONF仅支持GET方法")
+
+        if telemetry_enabled:
+            telemetry_subscription_path = data.get(
+                "telemetry_subscription_path",
+                self.instance.telemetry_subscription_path if self.instance else "",
+            )
+            if not telemetry_subscription_path:
+                raise serializers.ValidationError("启用Telemetry时必须提供订阅路径")
 
         return data
 

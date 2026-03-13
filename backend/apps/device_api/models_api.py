@@ -447,6 +447,16 @@ def celery_data_mongodb(**kwargs):
             "idc_name": base_result.get("idc_name", ""),
         }
         inject_metadata(collection_results, meta)
+        inject_collection_context(
+            collection_results,
+            {
+                "summary_plan_id": summary_plan_id,
+                "plan_id": plan_id,
+                "collection_type": collection_type,
+                "collection_method": collection_method,
+                "execute_time": execute_time,
+            },
+        )
 
         try:
             # 根据collection_type选择MongoDB集合，优先使用预定义的实例
@@ -674,6 +684,17 @@ def inject_metadata(data: list, meta: dict) -> list:
             if not item.get("idc_name"):
                 item["idc_name"] = meta.get("idc_name", "")
             item.setdefault("log_time", log_time)
+    return data
+
+
+def inject_collection_context(data: list, context: dict) -> list:
+    """向采集结果注入方案和执行批次元数据，便于后续精确查询。"""
+    if not context or not isinstance(data, list):
+        return data
+    for item in data:
+        if isinstance(item, dict):
+            for key, value in context.items():
+                item.setdefault(key, value)
     return data
 
 
