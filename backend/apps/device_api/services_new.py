@@ -394,6 +394,13 @@ class DeviceCollectionService:
             "idc__name": device.idc.name if device.idc else "",
             "vendor__alias": device.vendor.alias if device.vendor else "Huawei",
             "execute_time": datetime.now().isoformat(),
+            "ssh_enable": bool(hasattr(device, "ssh_account") and device.ssh_account),
+            "netconf_enable": bool(hasattr(device, "netconf_account") and device.netconf_account),
+            "snmp_version": getattr(device, "snmp_version", "v2c"),
+            "snmp_community": getattr(device, "snmp_community", ""),
+            "snmp_port": getattr(device, "snmp_port", 161),
+            "restconf_config": {},
+            "telemetry_config": {},
             "ssh": None,
             "netconf": None,
         }
@@ -410,6 +417,53 @@ class DeviceCollectionService:
                 "port": getattr(device.netconf_account, "port", None) or 830,
             }
         return device_info
+
+    @staticmethod
+    def _build_plan_payload_for_local(plan) -> Dict[str, Any]:
+        xml_templates = []
+        if hasattr(plan, "xml_templates"):
+            xml_templates = [
+                {
+                    "collect_method": template.collect_method,
+                    "xml_template": template.xml_template,
+                    "description": template.description or "",
+                }
+                for template in plan.xml_templates.all()
+            ]
+
+        return {
+            "id": plan.id,
+            "summary_plan": plan.summary_plan_id,
+            "summary_plan_name": getattr(plan.summary_plan, "name", ""),
+            "summary_plan_vendor": getattr(plan.summary_plan, "vendor", ""),
+            "summary_plan_device_type": getattr(plan.summary_plan, "device_type", ""),
+            "name": plan.name,
+            "collection_type": plan.collection_type,
+            "netmiko_enabled": plan.netmiko_enabled,
+            "netmiko_method": plan.netmiko_method,
+            "netmiko_path": plan.netmiko_path,
+            "netmiko_field_mappings": plan.netmiko_field_mappings or {},
+            "netconf_enabled": plan.netconf_enabled,
+            "netconf_path": plan.netconf_path,
+            "netconf_field_mappings": plan.netconf_field_mappings or {},
+            "snmp_enabled": plan.snmp_enabled,
+            "snmp_oids": plan.snmp_oids or [],
+            "snmp_path": plan.snmp_path,
+            "snmp_field_mappings": plan.snmp_field_mappings or {},
+            "restconf_enabled": plan.restconf_enabled,
+            "restconf_endpoint": plan.restconf_endpoint,
+            "restconf_method": plan.restconf_method,
+            "restconf_path": plan.restconf_path,
+            "restconf_field_mappings": plan.restconf_field_mappings or {},
+            "telemetry_enabled": plan.telemetry_enabled,
+            "telemetry_subscription_path": plan.telemetry_subscription_path,
+            "telemetry_sampling_interval": plan.telemetry_sampling_interval,
+            "telemetry_data_format": plan.telemetry_data_format,
+            "telemetry_path": plan.telemetry_path,
+            "telemetry_field_mappings": plan.telemetry_field_mappings or {},
+            "textfsm_template": plan.textfsm_template,
+            "xml_templates": xml_templates,
+        }
 
     @staticmethod
     def _update_device_name_from_prompt(conn_mgr, device, device_info: Dict[str, Any]) -> None:
@@ -436,162 +490,44 @@ class DeviceCollectionService:
 
     @staticmethod
     def execute_both_collection_local(plan, device) -> Dict[str, Any]:
-        """使用程序自身连接执行 NETCONF 和 Netmiko 采集（不走南向驱动，不保存结果）"""
+        """使用程序自身连接执行已启用的采集方式（不走南向驱动）。"""
         try:
             logger.info(
-                f"开始执行本地双重采集: 方案={plan.name}, 设备={device.manage_ip}"
+                f"开始执行本地采集: 方案={plan.name}, 设备={device.manage_ip}"
             )
-            netconf_result, netmiko_result = None, None
-            netconf_success, netmiko_success = False, False
+            plan_payload = DeviceCollectionService._build_plan_payload_for_local(plan)
             device_info = DeviceCollectionService._build_device_info_for_local(device)
-
-            with DeviceConnectionManager(device.manage_ip, device_info) as conn_mgr:
-                # Netmiko 采集
-                if plan.netmiko_enabled and device_info.get("ssh"):
-                    try:
-                        DeviceCollectionService._update_device_name_from_prompt(conn_mgr, device, device_info)
-                        command = plan.get_netmiko_method()
-                        if command:
-                            raw = conn_mgr.execute_netmiko_command(
-                                command=command,
-                                use_textfsm=True,
-                                textfsm_template=plan.textfsm_template or None,
-                            )
-                            collection_result = (
-                                raw
-                                if isinstance(raw, dict) and "data" in raw
-                                else {"data": raw, "device_ip": device.manage_ip}
-                            )
-                            status, err_msg, mapping_data = resolve_raw_data(
-                                plan, collection_result, "netmiko"
-                            )
-                            if status and isinstance(mapping_data, list) and mapping_data:
-                                meta = {
-                                    "hostip": device.manage_ip or "",
-                                    "hostname": getattr(device, "name", "") or "",
-                                    "idc_name": device.idc.name if (getattr(device, "idc", None) and device.idc) else "",
-                                }
-                                inject_metadata(mapping_data, meta)
-                            netmiko_result = (
-                                {"success": True, "data": mapping_data}
-                                if status
-                                else {"success": False, "error": err_msg}
-                            )
-                            if status:
-                                netmiko_success = True
-                            save_local_collection_result(
-                                plan, device, "netmiko",
-                                method_name=command or "netmiko",
-                                raw_data=raw,
-                                processed_data=mapping_data if status else None,
-                                processed_status="success" if status else "error",
-                                processed_error=None if status else err_msg,
-                            )
-                        else:
-                            netmiko_result = {"success": False, "error": "未配置 Netmiko 命令"}
-                            save_local_collection_result(
-                                plan, device, "netmiko", method_name="netmiko",
-                                raw_data=None, processed_data=None,
-                                processed_status="error", processed_error="未配置 Netmiko 命令",
-                            )
-                    except Exception as e:
-                        logger.exception(f"本地 Netmiko 采集异常: {device.manage_ip}")
-                        netmiko_result = {"success": False, "error": str(e)}
-                        save_local_collection_result(
-                            plan, device, "netmiko",
-                            method_name=plan.get_netmiko_method() or "netmiko",
-                            raw_data=None, processed_data=None,
-                            processed_status="error", processed_error=str(e),
-                        )
-
-                # NETCONF 采集
-                if plan.netconf_enabled and device_info.get("netconf"):
-                    try:
-                        xml_tpl = plan.xml_templates.first()
-                        if not xml_tpl:
-                            netconf_result = {
-                                "success": False,
-                                "error": "采集方案未配置 NETCONF XML 模板",
-                            }
-                            save_local_collection_result(
-                                plan, device, "netconf", method_name="netconf",
-                                raw_data=None, processed_data=None,
-                                processed_status="error",
-                                processed_error="采集方案未配置 NETCONF XML 模板",
-                            )
-                        else:
-                            xml_template = (xml_tpl.xml_template or "").strip()
-                            collect_method = getattr(xml_tpl, "collect_method", "get") or "get"
-                            xml_template = _strip_netconf_filter_wrapper(xml_template)
-                            if collect_method == "get_config":
-                                raw = conn_mgr.execute_netconf_get_config(xml_template)
-                            else:
-                                raw = conn_mgr.execute_netconf_get(xml_template)
-                            collection_result = (
-                                raw
-                                if isinstance(raw, dict) and "data" in raw
-                                else {"data": raw, "device_ip": device.manage_ip}
-                            )
-                            status, err_msg, mapping_data = resolve_raw_data(
-                                plan, collection_result, "netconf"
-                            )
-                            if status and isinstance(mapping_data, list) and mapping_data:
-                                meta = {
-                                    "hostip": device.manage_ip or "",
-                                    "hostname": getattr(device, "name", "") or "",
-                                    "idc_name": device.idc.name if (getattr(device, "idc", None) and device.idc) else "",
-                                }
-                                inject_metadata(mapping_data, meta)
-                            netconf_result = (
-                                {"success": True, "data": mapping_data}
-                                if status
-                                else {"success": False, "error": err_msg}
-                            )
-                            if status:
-                                netconf_success = True
-                            save_local_collection_result(
-                                plan, device, "netconf", method_name="netconf",
-                                raw_data=raw,
-                                processed_data=mapping_data if status else None,
-                                processed_status="success" if status else "error",
-                                processed_error=None if status else err_msg,
-                            )
-                    except Exception as e:
-                        logger.exception(f"本地 NETCONF 采集异常: {device.manage_ip}")
-                        netconf_result = {"success": False, "error": str(e)}
-                        save_local_collection_result(
-                            plan, device, "netconf", method_name="netconf",
-                            raw_data=None, processed_data=None,
-                            processed_status="error", processed_error=str(e),
-                        )
-
-            if not netconf_success and not netmiko_success:
-                return {
-                    "success": False,
-                    "netconf_result": netconf_result,
-                    "netmiko_result": netmiko_result,
-                    "error": "所有可用的采集方式均失败",
-                }
-            messages = []
-            if netmiko_success:
-                messages.append("Netmiko 采集成功")
-            if netconf_success:
-                messages.append("NETCONF 采集成功")
-            return {
-                "success": True,
-                "netconf_result": netconf_result,
-                "netmiko_result": netmiko_result,
-                "message": "; ".join(messages),
+            result = DeviceCollectionService.collect_with_connection_manager(plan_payload, device_info)
+            method_results = result.get("results", {})
+            response = {
+                "success": result.get("success", False),
+                "netconf_result": method_results.get("netconf"),
+                "netmiko_result": method_results.get("netmiko"),
+                "snmp_result": method_results.get("snmp"),
+                "restconf_result": method_results.get("restconf"),
+                "telemetry_result": method_results.get("telemetry"),
             }
+
+            if result.get("success"):
+                response["message"] = "; ".join(
+                    [f"{method.upper()} 采集成功" for method in result.get("success_methods", [])]
+                )
+            else:
+                response["error"] = result.get("error", "所有可用的采集方式均失败")
+
+            return response
         except Exception as e:
             logger.error(
-                f"本地双重采集异常: 方案={plan.name}, 设备={getattr(device, 'manage_ip', '')}, {e}",
+                f"本地采集异常: 方案={plan.name}, 设备={getattr(device, 'manage_ip', '')}, {e}",
                 exc_info=True,
             )
             return {
                 "success": False,
                 "netconf_result": None,
                 "netmiko_result": None,
+                "snmp_result": None,
+                "restconf_result": None,
+                "telemetry_result": None,
                 "error": str(e),
             }
 
