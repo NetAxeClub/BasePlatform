@@ -16,6 +16,16 @@ from apps.device_api import (
     ip_interface_mongo,
     interface_brief_mongo,
     aggre_port_mongo,
+    fan_status_mongo,
+    power_status_mongo,
+    temperature_status_mongo,
+    clock_status_mongo,
+    route_table_mongo,
+    bgp_neighbors_mongo,
+    bgp_summary_mongo,
+    ospf_neighbors_mongo,
+    ospf_interfaces_mongo,
+    isis_neighbors_mongo,
 )
 from utils.db.mongo_ops import MongoOps
 
@@ -27,6 +37,16 @@ COLLECTION_TYPE_MONGO_MAP = {
     "ip_interface": ip_interface_mongo,
     "interface_brief": interface_brief_mongo,
     "aggre_port": aggre_port_mongo,
+    "fan_status": fan_status_mongo,
+    "power_status": power_status_mongo,
+    "temperature_status": temperature_status_mongo,
+    "clock_status": clock_status_mongo,
+    "route_table": route_table_mongo,
+    "bgp_neighbors": bgp_neighbors_mongo,
+    "bgp_summary": bgp_summary_mongo,
+    "ospf_neighbors": ospf_neighbors_mongo,
+    "ospf_interfaces": ospf_interfaces_mongo,
+    "isis_neighbors": isis_neighbors_mongo,
 }
 
 

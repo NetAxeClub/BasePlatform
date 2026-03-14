@@ -14,10 +14,18 @@ from apps.dcs_control.json_validate.service_schema import service_schema
 from apps.dcs_control.json_validate.sec_policy import sec_policy_schema
 from apps.dcs_control.tasks import bulk_deny_by_address, address_set, config_dnat, config_sec_policy
 from apps.dcs_control.db import (
-    dnat_mongo, snat_mongo, sec_policy_mongo,
+    hillstone_dnat_mongo, snat_mongo, sec_policy_mongo, dnat_mongo,
     address_mongo, service_mongo, predefined_mongo, zone_mongo,
 )
 from apps.dcs_control.constants import Vendor
+from apps.dcs_control.models import FirewallPolicyAuditRecord
+from apps.dcs_control.serializers import FirewallPolicyAuditRecordSerializer
+from apps.dcs_control.policy_audit import (
+    build_sec_policy_audit_payload,
+    extract_sec_policy_audit_summary,
+    extract_sec_policy_findings,
+    get_vendor_aliases,
+)
 
 if DEBUG:
     CELERY_QUEUE = 'dev'
@@ -267,6 +275,63 @@ class DestAddTranslate(APIView):
         get_param = request.GET.dict()
         if 'vendor' in get_param:
             get_param['vendor'] = Vendor.normalize(get_param['vendor'])
+        dnat_range_filters = ('global_ip', 'global_port', 'local_ip', 'local_port')
+        if get_param.get('hostip') and (
+            any(get_param.get(key) for key in dnat_range_filters) or 'vendor' not in get_param
+        ):
+            try:
+                query = {'hostip': get_param['hostip']}
+
+                if get_param.get('global_ip'):
+                    global_ip_int = IPAddress(get_param['global_ip']).value
+                    query['global_ip'] = {
+                        '$elemMatch': {
+                            'start_int': {'$lte': global_ip_int},
+                            'end_int': {'$gte': global_ip_int},
+                        }
+                    }
+
+                if get_param.get('local_ip'):
+                    local_ip_int = IPAddress(get_param['local_ip']).value
+                    query['local_ip'] = {
+                        '$elemMatch': {
+                            'start_int': {'$lte': local_ip_int},
+                            'end_int': {'$gte': local_ip_int},
+                        }
+                    }
+
+                if get_param.get('global_port'):
+                    global_port = int(get_param['global_port'])
+                    query['global_port'] = {
+                        '$elemMatch': {
+                            'start': {'$lte': global_port},
+                            'end': {'$gte': global_port},
+                        }
+                    }
+
+                if get_param.get('local_port'):
+                    local_port = int(get_param['local_port'])
+                    query['local_port'] = {
+                        '$elemMatch': {
+                            'start': {'$lte': local_port},
+                            'end': {'$gte': local_port},
+                        }
+                    }
+
+                _res = dnat_mongo.find(query_dict=query, fields={'_id': 0})
+                return JsonResponse({
+                    'results': _res,
+                    'count': len(_res),
+                    'code': 200,
+                    'msg': 'success',
+                })
+            except Exception as e:
+                return JsonResponse({
+                    'results': [],
+                    'count': 0,
+                    'code': 400,
+                    'msg': f'参数错误: {str(e)}',
+                })
         # print(get_param)
         # 获取单个设备DNAT信息
         if all(k in get_param for k in ("vendor", "hostip")):
@@ -289,7 +354,7 @@ class DestAddTranslate(APIView):
                     return JsonResponse({'results': _res, 'count': len(_res),
                                          'code': 400})
             elif get_param['vendor'] == 'Hillstone':
-                _res = dnat_mongo.find(query_dict=dict(hostip=get_param['hostip']), fileds={'_id': 0})
+                _res = hillstone_dnat_mongo.find(query_dict=dict(hostip=get_param['hostip']), fileds={'_id': 0})
                 if _res:
                     return JsonResponse({'results': _res, 'count': len(_res),
                                          'code': 200})
@@ -796,6 +861,138 @@ class SecPolicy(APIView):
                 return JsonResponse(msg, safe=False)
             return JsonResponse(dict(code=400, message='操作不被允许', data=[]))
         return JsonResponse({'code': 400}, content_type="application/json")
+
+
+class SecPolicyAudit(APIView):
+    permission_classes = ()
+    authentication_classes = ()
+
+    def get(self, request):
+        get_param = request.GET.dict()
+        hostip = get_param.get("hostip", "")
+        vendor = get_param.get("vendor", "")
+        if vendor:
+            vendor = Vendor.normalize(vendor)
+
+        if not hostip:
+            return JsonResponse(
+                {"code": 400, "message": "缺少必要参数: hostip", "data": None}
+            )
+
+        policies = sec_policy_mongo.find(
+            query_dict=dict(hostip=hostip),
+            fields={"_id": 0},
+        )
+        if vendor:
+            vendor_aliases = get_vendor_aliases(vendor)
+            policies = [
+                item for item in policies
+                if str(item.get("vendor", "")) in vendor_aliases
+            ]
+
+        payload = build_sec_policy_audit_payload(
+            policies=policies,
+            hostip=hostip,
+            vendor=vendor,
+        )
+        return JsonResponse(
+            {
+                "code": 200,
+                "message": "获取统一安全策略审计结果成功",
+                "data": payload,
+            }
+        )
+
+
+class SecPolicyAuditRecordView(APIView):
+    permission_classes = ()
+    authentication_classes = ()
+
+    def get(self, request):
+        get_param = request.GET.dict()
+        queryset = FirewallPolicyAuditRecord.objects.all().order_by("-created_at")
+
+        if get_param.get("device_ip"):
+            queryset = queryset.filter(device_ip=get_param["device_ip"])
+        if get_param.get("vendor"):
+            queryset = queryset.filter(vendor=Vendor.normalize(get_param["vendor"]))
+        if get_param.get("status"):
+            queryset = queryset.filter(status=get_param["status"])
+        if get_param.get("audit_type"):
+            queryset = queryset.filter(audit_type=get_param["audit_type"])
+
+        limit = int(get_param.get("limit", 20))
+        serializer = FirewallPolicyAuditRecordSerializer(queryset[:limit], many=True)
+        return JsonResponse(
+            {
+                "code": 200,
+                "message": "获取防火墙审计记录成功",
+                "data": serializer.data,
+                "count": len(serializer.data),
+            }
+        )
+
+    def post(self, request):
+        post_param = request.data.copy()
+        device_ip = post_param.get("device_ip") or post_param.get("hostip")
+        vendor = post_param.get("vendor", "")
+        if vendor:
+            vendor = Vendor.normalize(vendor)
+
+        if not device_ip:
+            return JsonResponse(
+                {"code": 400, "message": "缺少必要参数: device_ip/hostip", "data": None}
+            )
+
+        audit_payload = post_param.get("audit_payload")
+        if not audit_payload:
+            policies = sec_policy_mongo.find(
+                query_dict=dict(hostip=device_ip),
+                fields={"_id": 0},
+            )
+            if vendor:
+                vendor_aliases = get_vendor_aliases(vendor)
+                policies = [
+                    item for item in policies
+                    if str(item.get("vendor", "")) in vendor_aliases
+                ]
+            audit_payload = build_sec_policy_audit_payload(
+                policies=policies,
+                hostip=device_ip,
+                vendor=vendor,
+            )
+
+        summary = post_param.get("summary") or extract_sec_policy_audit_summary(audit_payload)
+        findings = post_param.get("findings") or extract_sec_policy_findings(audit_payload)
+        status = post_param.get("status", FirewallPolicyAuditRecord.Status.SUCCESS)
+        operator = post_param.get("operator") or getattr(getattr(request, "user", None), "username", "") or ""
+
+        record_data = {
+            "audit_type": post_param.get(
+                "audit_type", FirewallPolicyAuditRecord.AuditType.SECURITY_POLICY
+            ),
+            "vendor": vendor or audit_payload.get("vendor", ""),
+            "device_ip": device_ip,
+            "operator": operator,
+            "source": post_param.get("source", "NetClaw-CN"),
+            "status": status,
+            "summary": summary,
+            "findings": findings,
+            "audit_payload": audit_payload,
+            "auto_flow_id": post_param.get("auto_flow_id"),
+            "task_id": post_param.get("task_id", ""),
+        }
+        serializer = FirewallPolicyAuditRecordSerializer(data=record_data)
+        serializer.is_valid(raise_exception=True)
+        record = serializer.save()
+
+        return JsonResponse(
+            {
+                "code": 201,
+                "message": "写入防火墙审计记录成功",
+                "data": FirewallPolicyAuditRecordSerializer(record).data,
+            }
+        )
     #     # 更新单个设备策略
     #     if all(k in post_param for k in ("vendor", "update_device")):
     #         if post_param['vendor'] == 'H3C':

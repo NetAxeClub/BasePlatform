@@ -164,6 +164,31 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
             })
 
     @action(detail=True, methods=['post'])
+    def sync_collect_plans(self, request, *args, **kwargs):
+        """为历史父方案补齐缺失的默认子采集方案。"""
+        try:
+            summary_plan = self.get_object()
+            sync_result = DeviceCollectionService.ensure_default_sub_plans(summary_plan)
+            summary_plan.refresh_from_db()
+            serializer = DeviceCollectionPlansDetailSerializer(summary_plan)
+
+            return JsonResponse({
+                'code': 200,
+                'message': '同步成功',
+                'data': {
+                    'summary_plan': serializer.data,
+                    **sync_result,
+                }
+            })
+        except Exception as e:
+            logger.error(f"同步采集方案失败: {str(e)}", exc_info=True)
+            return JsonResponse({
+                'code': 500,
+                'message': f'同步失败: {str(e)}',
+                'data': None
+            })
+
+    @action(detail=True, methods=['post'])
     def execute_all_collections(self, request, *args, **kwargs):
         """执行当前汇总采集方案下所有的子采集方案"""
         summary_plan = self.get_object()
@@ -729,6 +754,19 @@ class CollectionResultViewSet(CustomViewBase):
     serializer_class = None
     pagination_class = None
 
+    @staticmethod
+    def _pick_latest_record(records):
+        if not records:
+            return None
+        return sorted(
+            records,
+            key=lambda item: (
+                str(item.get('execute_time', '') or ''),
+                float(item.get('log_time', 0) or 0),
+            ),
+            reverse=True,
+        )[0]
+
     @action(detail=False, methods=['get'])
     def overview(self, request):
         """根据厂商统计4个指标：
@@ -814,6 +852,150 @@ class CollectionResultViewSet(CustomViewBase):
                 'code': 500,
                 'message': f"获取失败: {str(e)}",
                 'results': None
+            })
+
+    @action(detail=False, methods=['get'])
+    def device_traceability(self, request):
+        """按设备维度展示采集方案绑定、最新执行批次与子采集状态。"""
+        try:
+            manage_ip = request.GET.get('manage_ip', '').strip()
+            if not manage_ip:
+                return JsonResponse({
+                    'code': 400,
+                    'message': '缺少必要参数: manage_ip',
+                    'data': None,
+                })
+
+            plan_relations = list(
+                PlansToDevice.objects.select_related('plan').filter(manage_ip=manage_ip)
+            )
+
+            results = []
+            for relation in plan_relations:
+                summary_plan = relation.plan
+                if not summary_plan:
+                    continue
+
+                expected_sub_plans = list(summary_plan.collect_plans.all())
+                parent_records = list(
+                    COLLECTION_PLAN.coll.find(
+                        {'summary_plan_id': summary_plan.id, 'device_ip': manage_ip},
+                        {'_id': 0},
+                    )
+                )
+                latest_parent = self._pick_latest_record(parent_records)
+
+                latest_execute_time = latest_parent.get('execute_time') if latest_parent else None
+                latest_sub_runs = []
+                if latest_execute_time:
+                    latest_sub_runs = list(
+                        COLLECTION_SUB_PLAN.coll.find(
+                            {
+                                'summary_plan_id': summary_plan.id,
+                                'device_ip': manage_ip,
+                                'execute_time': latest_execute_time,
+                            },
+                            {'_id': 0},
+                        )
+                    )
+
+                latest_sub_runs_map = {}
+                for run in latest_sub_runs:
+                    plan_id = run.get('plan_id')
+                    if plan_id is None:
+                        continue
+                    existing = latest_sub_runs_map.get(plan_id)
+                    if not existing or (
+                        float(run.get('log_time', 0) or 0) > float(existing.get('log_time', 0) or 0)
+                    ):
+                        latest_sub_runs_map[plan_id] = run
+
+                sub_plan_items = []
+                successful_count = 0
+                failed_count = 0
+                for sub_plan in expected_sub_plans:
+                    latest_run = latest_sub_runs_map.get(sub_plan.id)
+                    latest_status = latest_run.get('task_status') if latest_run else 'pending'
+                    if latest_status in {'finished', 'success'}:
+                        successful_count += 1
+                    elif latest_run:
+                        failed_count += 1
+
+                    enabled_methods = []
+                    if getattr(sub_plan, 'netmiko_enabled', False):
+                        enabled_methods.append('netmiko')
+                    if getattr(sub_plan, 'netconf_enabled', False):
+                        enabled_methods.append('netconf')
+                    if getattr(sub_plan, 'snmp_enabled', False):
+                        enabled_methods.append('snmp')
+                    if getattr(sub_plan, 'restconf_enabled', False):
+                        enabled_methods.append('restconf')
+                    if getattr(sub_plan, 'telemetry_enabled', False):
+                        enabled_methods.append('telemetry')
+
+                    collection_type = getattr(sub_plan, 'collection_type', '')
+                    sub_plan_items.append({
+                        'plan_id': sub_plan.id,
+                        'plan_name': sub_plan.name,
+                        'collection_type': collection_type,
+                        'collection_label': field_mapping.get(collection_type, {}).get('label', collection_type),
+                        'description': getattr(sub_plan, 'description', ''),
+                        'enabled_methods': enabled_methods,
+                        'latest_run': {
+                            'task_status': latest_status,
+                            'collection_method': latest_run.get('collection_method') if latest_run else '',
+                            'execute_time': latest_run.get('execute_time') if latest_run else latest_execute_time,
+                            'task_errors': latest_run.get('task_errors', []) if latest_run else [],
+                            'detail_query': {
+                                'summary_plan_id': summary_plan.id,
+                                'plan_id': sub_plan.id,
+                                'device_ip': manage_ip,
+                                'execute_time': latest_run.get('execute_time') if latest_run else latest_execute_time,
+                                'collection_type': collection_type,
+                            } if latest_run or latest_execute_time else None,
+                        },
+                    })
+
+                results.append({
+                    'relation_id': relation.id,
+                    'manage_ip': relation.manage_ip,
+                    'use_local': relation.use_local,
+                    'execute_node': relation.execute_node,
+                    'summary_plan': {
+                        'id': summary_plan.id,
+                        'name': summary_plan.name,
+                        'vendor': summary_plan.vendor,
+                        'device_type': summary_plan.device_type,
+                        'is_active': summary_plan.is_active,
+                    },
+                    'latest_execution': {
+                        'task_status': latest_parent.get('task_status') if latest_parent else 'never_run',
+                        'device_name': latest_parent.get('device_name', '') if latest_parent else '',
+                        'idc_name': latest_parent.get('idc_name', '') if latest_parent else '',
+                        'execute_time': latest_execute_time,
+                        'sub_plans_count': latest_parent.get('sub_plans_count', len(expected_sub_plans)) if latest_parent else len(expected_sub_plans),
+                        'successful_sub_plans': successful_count,
+                        'failed_sub_plans': failed_count,
+                    },
+                    'sub_plans': sub_plan_items,
+                })
+
+            return JsonResponse({
+                'code': 200,
+                'message': '获取成功',
+                'data': {
+                    'manage_ip': manage_ip,
+                    'count': len(results),
+                    'results': results,
+                }
+            })
+
+        except Exception as e:
+            logger.error(f"查询设备采集链路概览失败: {str(e)}", exc_info=True)
+            return JsonResponse({
+                'code': 500,
+                'message': f'查询失败: {str(e)}',
+                'data': None,
             })
 
     @action(detail=False, methods=['get'])

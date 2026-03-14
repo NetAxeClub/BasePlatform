@@ -386,6 +386,8 @@ POST 操作（封堵、地址对象变更、DNAT 变更、安全策略变更）�
 
 ### GET — 查询设备 DNAT 规则列表
 
+场景一：按厂商实时查询设备 DNAT 规则。
+
 **请求参数（Query String）**
 
 | 参数 | 类型 | 必填 | 说明 |
@@ -402,6 +404,99 @@ POST 操作（封堵、地址对象变更、DNAT 变更、安全策略变更）�
     { "name": "dnat_web", "hostip": "192.168.1.1", "from": "any", "to": "203.x.x.1", "trans_to": "10.0.0.10" }
   ],
   "count": 1
+}
+```
+
+---
+
+### GET — 查询全局 DNAT 标准化表
+
+场景二：基于标准化后的 `DNAT` Mongo 集合做精确/范围混合查询。
+
+说明：
+
+- 该查询直接使用后端统一数据表 `dnat_mongo`
+- `hostip` 为精确匹配防火墙管理 IP
+- `global_ip` / `local_ip` 会先转换为十进制，再判断是否落在 `start_int ~ end_int` 区间
+- `global_port` / `local_port` 会判断是否落在 `start ~ end` 区间
+- 如果同时传了 `vendor` 和 `hostip`，但又带了任一范围筛选字段，后端优先走本标准化查询分支
+
+**请求参数（Query String）**
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `hostip` | string | 是 | 防火墙管理 IP，精确匹配 |
+| `global_ip` | string | 否 | 公网 IP，按 `global_ip.start_int ~ end_int` 范围匹配 |
+| `global_port` | integer | 否 | 公网端口，按 `global_port.start ~ end` 范围匹配 |
+| `local_ip` | string | 否 | 内网 IP，按 `local_ip.start_int ~ end_int` 范围匹配 |
+| `local_port` | integer | 否 | 内网端口，按 `local_port.start ~ end` 范围匹配 |
+| `vendor` | string | 否 | 可传，但该分支不依赖 `vendor` 做主查询条件 |
+
+**请求示例**
+
+```http
+GET /api/dcs_control/dnat/?hostip=172.16.75.1&global_ip=36.7.172.66&global_port=12183&local_ip=172.16.81.43&local_port=12181
+```
+
+**成功响应**
+
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "count": 1,
+  "results": [
+    {
+      "id": "683_172.16.75.1",
+      "rule_id": "683",
+      "hostip": "172.16.75.1",
+      "global_ip": [
+        {
+          "start": "36.7.172.66",
+          "end": "36.7.172.66",
+          "start_int": 604482626,
+          "end_int": 604482626,
+          "result": "36.7.172.66"
+        }
+      ],
+      "global_port": [
+        {
+          "start": 12183,
+          "end": 12183,
+          "protocol": "tcp",
+          "result": "12183"
+        }
+      ],
+      "local_ip": [
+        {
+          "start": "172.16.81.43",
+          "end": "172.16.81.43",
+          "start_int": 2886750507,
+          "end_int": 2886750507,
+          "result": "172.16.81.43"
+        }
+      ],
+      "local_port": [
+        {
+          "start": 12181,
+          "end": 12181,
+          "protocol": "tcp",
+          "result": "12181"
+        }
+      ]
+    }
+  ]
+}
+```
+
+**失败响应**
+
+```json
+{
+  "code": 400,
+  "msg": "参数错误: failed to detect a valid IP address from 'bad-ip'",
+  "count": 0,
+  "results": []
 }
 ```
 

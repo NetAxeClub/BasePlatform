@@ -186,6 +186,7 @@ class Tasks(object):
     SERVICE_SET = '服务对象'
     DENY = '一键封堵'
     AUTO_SWITCH = '一键切换'
+    INSPECTION = '巡检'
 
     CHOICES = (
         (DNAT, DNAT),
@@ -197,6 +198,7 @@ class Tasks(object):
         (ADDRESS_SET, ADDRESS_SET),
         (SERVICE_SET, SERVICE_SET),
         (AUTO_SWITCH, AUTO_SWITCH),
+        (INSPECTION, INSPECTION),
     )
 
 
@@ -225,10 +227,12 @@ class AutoTasks(object):
 class InventoryTasks(object):
     CONNECTED = '网络打通'
     DENY = '一键封堵'
+    INSPECTION = '巡检'
 
     CHOICES = (
         (DENY, DENY),
         (CONNECTED, CONNECTED),
+        (INSPECTION, INSPECTION),
     )
 
 

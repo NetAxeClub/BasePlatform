@@ -1,0 +1,164 @@
+{
+  "rule_tree": {
+    "root": "管理面硬化基线",
+    "children": [
+      "管理面-SSH",
+      "管理面-Telnet",
+      "管理面-VTY协议",
+      "管理面-AAA",
+      "管理面-SNMP",
+      "管理面-HTTP",
+      "管理面-Banner",
+      "管理面-Timeout"
+    ]
+  },
+  "compliance": [
+    {
+      "vendor": "H3C",
+      "rule": "管理面-SSH",
+      "pattern": "match-compliance",
+      "regex": "^\\s*ssh server enable\\b",
+      "intent": "要求设备启用 SSH 管理面，避免仅依赖明文远程登录方式。"
+    },
+    {
+      "vendor": "H3C",
+      "rule": "管理面-Telnet",
+      "pattern": "match-compliance",
+      "regex": "^\\s*undo telnet server enable\\b",
+      "intent": "要求显式关闭 Telnet 服务，降低明文口令暴露风险。"
+    },
+    {
+      "vendor": "H3C",
+      "rule": "管理面-VTY协议",
+      "pattern": "match-compliance",
+      "regex": "^\\s*protocol inbound ssh\\b",
+      "intent": "要求 VTY 入站协议仅允许 SSH，避免混用 Telnet。"
+    },
+    {
+      "vendor": "H3C",
+      "rule": "管理面-AAA",
+      "pattern": "match-compliance",
+      "regex": "^\\s*authentication-mode scheme\\b",
+      "intent": "要求远程管理认证接入 AAA 策略，而不是仅依赖简单认证模式。"
+    },
+    {
+      "vendor": "H3C",
+      "rule": "管理面-AAA",
+      "pattern": "match-compliance",
+      "regex": "^\\s*(radius scheme|hwtacacs scheme|ldap scheme)\\b",
+      "intent": "要求至少存在一类集中认证后端定义，便于接入 RADIUS、TACACS 或 LDAP。"
+    },
+    {
+      "vendor": "H3C",
+      "rule": "管理面-AAA",
+      "pattern": "match-compliance",
+      "regex": "^\\s*local-user\\s+\\S+",
+      "intent": "要求具备本地管理兜底用户，避免集中认证故障时完全失去登录能力。"
+    },
+    {
+      "vendor": "H3C",
+      "rule": "管理面-SNMP",
+      "pattern": "match-compliance",
+      "regex": "^\\s*snmp-agent sys-info version\\s+v3\\b",
+      "intent": "要求 SNMP 管理面至少启用 v3，避免低版本弱认证方式。"
+    },
+    {
+      "vendor": "H3C",
+      "rule": "管理面-HTTP",
+      "pattern": "mismatch-compliance",
+      "regex": "^\\s*ip https enable\\b|^\\s*web management enable\\b",
+      "intent": "默认要求关闭 Web 管理面，减少额外暴露的管理入口。"
+    },
+    {
+      "vendor": "H3C",
+      "rule": "管理面-Banner",
+      "pattern": "match-compliance",
+      "regex": "^\\s*header login\\b",
+      "intent": "要求配置登录 Banner，满足管理提示与合规告警要求。"
+    },
+    {
+      "vendor": "H3C",
+      "rule": "管理面-Timeout",
+      "pattern": "match-compliance",
+      "regex": "^\\s*idle-timeout\\s+[1-9]\\d*(\\s+\\d+)?\\b",
+      "intent": "要求远程管理会话配置空闲超时，避免长期悬挂登录会话。"
+    },
+    {
+      "vendor": "HUAWEI",
+      "rule": "管理面-SSH",
+      "pattern": "match-compliance",
+      "regex": "^\\s*stelnet server enable\\b",
+      "intent": "要求设备启用 STelnet/SSH 管理面，避免仅依赖明文远程登录方式。"
+    },
+    {
+      "vendor": "HUAWEI",
+      "rule": "管理面-Telnet",
+      "pattern": "match-compliance",
+      "regex": "^\\s*(telnet(?: ipv6)? server disable|undo telnet(?: ipv6)? server enable)\\b",
+      "intent": "要求显式关闭 Telnet 服务，降低明文口令暴露风险。"
+    },
+    {
+      "vendor": "HUAWEI",
+      "rule": "管理面-VTY协议",
+      "pattern": "match-compliance",
+      "regex": "^\\s*protocol inbound ssh\\b",
+      "intent": "要求 VTY 入站协议仅允许 SSH，避免混用 Telnet。"
+    },
+    {
+      "vendor": "HUAWEI",
+      "rule": "管理面-AAA",
+      "pattern": "match-compliance",
+      "regex": "^\\s*authentication-mode aaa\\b",
+      "intent": "要求远程管理认证接入 AAA 策略，而不是仅依赖本地口令。"
+    },
+    {
+      "vendor": "HUAWEI",
+      "rule": "管理面-AAA",
+      "pattern": "match-compliance",
+      "regex": "^\\s*(radius-server|radius-server template|hwtacacs-server|tacacs-server|ldap-server)\\b",
+      "intent": "要求至少存在一类集中认证后端定义，便于接入 RADIUS、TACACS 或 LDAP。"
+    },
+    {
+      "vendor": "HUAWEI",
+      "rule": "管理面-AAA",
+      "pattern": "match-compliance",
+      "regex": "^\\s*local-user\\s+\\S+\\s+service-type\\s+.*\\b(ssh|terminal)\\b",
+      "intent": "要求具备本地管理兜底用户，避免集中认证故障时完全失去登录能力。"
+    },
+    {
+      "vendor": "HUAWEI",
+      "rule": "管理面-SNMP",
+      "pattern": "match-compliance",
+      "regex": "snmp-agent.*\\bv3\\b",
+      "intent": "要求 SNMP 管理面至少启用 v3，避免低版本弱认证方式。"
+    },
+    {
+      "vendor": "HUAWEI",
+      "rule": "管理面-HTTP",
+      "pattern": "mismatch-compliance",
+      "regex": "^\\s*http server enable\\b",
+      "intent": "默认要求关闭明文 HTTP 管理面，减少额外暴露的管理入口。"
+    },
+    {
+      "vendor": "HUAWEI",
+      "rule": "管理面-HTTP",
+      "pattern": "mismatch-compliance",
+      "regex": "^\\s*(http secure-server enable|https server enable)\\b",
+      "intent": "默认要求关闭 HTTPS 管理面，减少额外暴露的 Web 管理入口。"
+    },
+    {
+      "vendor": "HUAWEI",
+      "rule": "管理面-Banner",
+      "pattern": "match-compliance",
+      "regex": "^\\s*header login\\b",
+      "intent": "要求配置登录 Banner，满足管理提示与合规告警要求。"
+    },
+    {
+      "vendor": "HUAWEI",
+      "rule": "管理面-Timeout",
+      "pattern": "match-compliance",
+      "regex": "^\\s*idle-timeout\\s+[1-9]\\d*(\\s+\\d+)?\\b",
+      "intent": "要求远程管理会话配置空闲超时，避免长期悬挂登录会话。"
+    }
+  ]
+}

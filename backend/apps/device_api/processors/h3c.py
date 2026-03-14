@@ -120,6 +120,42 @@ def _build_ifindex_map(top):
     return ifindex_map
 
 
+def _as_list(value):
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    return [value]
+
+
+def _h3c_protocol_name(protocol: dict) -> str:
+    protocol_id = str(protocol.get('ProtocolID', ''))
+    sub_protocol_id = str(protocol.get('SubProtocolID', ''))
+    mapping = {
+        ('1', ''): 'direct',
+        ('2', ''): 'static',
+        ('8', ''): 'rip',
+        ('16', ''): 'ospf',
+        ('32', ''): 'isis',
+        ('64', ''): 'bgp',
+    }
+    return mapping.get((protocol_id, sub_protocol_id), protocol_id or sub_protocol_id or 'unknown')
+
+
+def _index_by(items, key_name):
+    result = {}
+    for item in _as_list(items):
+        key = item.get(key_name)
+        if key:
+            result[str(key)] = item
+    return result
+
+
+def _is_established(state: str) -> bool:
+    text = str(state or '').strip().lower()
+    return text in {'established', 'estab', 'up'} or 'established' in text
+
+
 @register_processor(vendor='H3C', device_type='', collection_type='interface_brief', method='netconf')
 def process_interface_brief_netconf(data):
     """H3C 交换机二层接口处理 (NETCONF)"""
@@ -156,10 +192,6 @@ def process_interface_brief_netconf(data):
 @register_processor(vendor='H3C', device_type='', collection_type='arp', method='netconf')
 def process_arp_netconf(data):
     """H3C 交换机 ARP 表处理 (NETCONF)
-
-    TODO: 解析 data['top']['ARP']['ARPTable']['ARPEntry']
-          注意：单条记录时 ncclient 返回 dict 而非 list，需做 isinstance 兼容处理
-          输出字段：ipaddress, macaddress, vlan, interface, type, aging, vpninstance
     """
     top = data['top']
     ifindex_map = _build_ifindex_map(top)
@@ -258,6 +290,277 @@ def process_mac_evpn_netconf(data):
         ))
 
     return mac_datas
+
+
+@register_processor(vendor='H3C', device_type='', collection_type='route_table', method='netconf')
+def process_route_table_netconf(data):
+    """H3C 路由表处理 (NETCONF)
+
+    解析 `Route.Ipv4Routes.RouteEntry` 结果，输出归一化路由记录。
+    当前优先处理 IPv4 路由表。
+    """
+    top = data.get('top', {})
+    route_entries = (
+        top.get('Route', {})
+        .get('Ipv4Routes', {})
+        .get('RouteEntry', [])
+    )
+    ifindex_map = _build_ifindex_map(top)
+
+    results = []
+    for entry in _as_list(route_entries):
+        ipv4 = entry.get('Ipv4', {}) or {}
+        addr = ipv4.get('Ipv4Address', '')
+        prefix_len = ipv4.get('Ipv4PrefixLength', '')
+        prefix = f"{addr}/{prefix_len}" if addr and prefix_len != '' else addr
+        protocol = entry.get('Protocol', {}) or {}
+        if_index = str(entry.get('IfIndex', ''))
+
+        results.append(
+            dict(
+                prefix=prefix,
+                next_hop=entry.get('Nexthop', ''),
+                interface=ifindex_map.get(if_index, if_index),
+                protocol=_h3c_protocol_name(protocol),
+                protocol_id=protocol.get('ProtocolID', ''),
+                sub_protocol_id=protocol.get('SubProtocolID', ''),
+                process_id=entry.get('ProcessID', ''),
+                preference=entry.get('Preference', ''),
+                metric=entry.get('Metric', ''),
+                vrf=entry.get('VRF', ''),
+                topology=entry.get('Topology', ''),
+                neighbor=entry.get('Neighbor', ''),
+                age=entry.get('Age', ''),
+                origin_as=(entry.get('ASNumber', {}) or {}).get('OriginAS', ''),
+                last_as=(entry.get('ASNumber', {}) or {}).get('LastAS', ''),
+            )
+        )
+
+    return results
+
+
+@register_processor(vendor='H3C', device_type='', collection_type='bgp_neighbors', method='netconf')
+def process_bgp_neighbors_netconf(data):
+    """H3C BGP 邻居处理 (NETCONF)
+
+    优先解析 `BGP.Sessions.Session` 的运行状态，并尝试用
+    `BGP.CfgSessions.CfgSession` 补充邻居组、连接接口等配置侧信息。
+    """
+    top = data.get('top', {})
+    bgp = top.get('BGP', {}) or {}
+    sessions = _as_list((bgp.get('Sessions', {}) or {}).get('Session'))
+    cfg_sessions = _index_by((bgp.get('CfgSessions', {}) or {}).get('CfgSession'), 'IpAddress')
+
+    results = []
+    for session in sessions:
+        peer_ip = session.get('IpAddress', '')
+        cfg = cfg_sessions.get(str(peer_ip), {})
+        results.append(
+            dict(
+                peer_ip=peer_ip,
+                address_family=session.get('AF', ''),
+                vrf=session.get('VRF', ''),
+                remote_as=session.get('ASNumber', '') or cfg.get('ASNumber', ''),
+                state=session.get('State', ''),
+                peer_group=cfg.get('GroupName', ''),
+                remote_router_id='',
+                peer_type='',
+                connect_interface=cfg.get('ConnectInterface', ''),
+                update_interval=cfg.get('UpdateInterval', ''),
+                ebgp_max_hop=cfg.get('EbgpMaxHop', ''),
+            )
+        )
+
+    return results
+
+
+@register_processor(vendor='H3C', device_type='', collection_type='bgp_summary', method='netconf')
+def process_bgp_summary_netconf(data):
+    """H3C BGP 汇总处理 (NETCONF)
+
+    基于 `Sessions.Session` 按 `VRF + AF` 聚合 BGP 邻居状态。
+    """
+    top = data.get('top', {})
+    bgp = top.get('BGP', {}) or {}
+    sessions = _as_list((bgp.get('Sessions', {}) or {}).get('Session'))
+
+    grouped = {}
+    for session in sessions:
+        af = session.get('AF', '')
+        vrf = session.get('VRF', '')
+        key = (vrf, af)
+        state = session.get('State', '')
+        item = grouped.setdefault(
+            key,
+            {
+                'address_family': af,
+                'vrf': vrf,
+                'total_peers': 0,
+                'established_peers': 0,
+                'non_established_peers': 0,
+                'states': {},
+            },
+        )
+        item['total_peers'] += 1
+        if _is_established(state):
+            item['established_peers'] += 1
+        else:
+            item['non_established_peers'] += 1
+        item['states'][state] = item['states'].get(state, 0) + 1
+
+    results = []
+    for item in grouped.values():
+        dominant_state = ''
+        if item['states']:
+            dominant_state = sorted(item['states'].items(), key=lambda kv: kv[1], reverse=True)[0][0]
+        results.append(
+            dict(
+                address_family=item['address_family'],
+                vrf=item['vrf'],
+                total_peers=item['total_peers'],
+                established_peers=item['established_peers'],
+                non_established_peers=item['non_established_peers'],
+                dominant_state=dominant_state,
+            )
+        )
+
+    return results
+
+
+@register_processor(vendor='H3C', device_type='', collection_type='ospf_neighbors', method='netmiko')
+def process_ospf_neighbors_netmiko(data):
+    """H3C OSPF 邻居处理 (Netmiko/TextFSM)"""
+    results = []
+    for item in data:
+        results.append(
+            dict(
+                area=item.get('area', ''),
+                local_interface=item.get('interface', ''),
+                neighbor_router_id=item.get('router_id', ''),
+                neighbor_ip=item.get('address', ''),
+                state=item.get('state', ''),
+                priority=item.get('priority', ''),
+                dead_time=item.get('dead_time', ''),
+            )
+        )
+    return results
+
+
+@register_processor(vendor='H3C', device_type='', collection_type='ospf_interfaces', method='netmiko')
+def process_ospf_interfaces_netmiko(data):
+    """H3C OSPF 接口处理 (Netmiko/TextFSM)"""
+    results = []
+    for item in data:
+        results.append(
+            dict(
+                area=item.get('area', ''),
+                local_interface=item.get('interface', ''),
+                interface_ip=item.get('interface_ip', ''),
+                network_type=item.get('network_type', ''),
+                state=item.get('state', ''),
+                cost=item.get('cost', ''),
+                priority=item.get('priority', ''),
+                dr=item.get('dr', ''),
+                bdr=item.get('bdr', ''),
+                hello_interval=item.get('hello_interval', ''),
+                dead_interval=item.get('dead_interval', ''),
+            )
+        )
+    return results
+
+
+@register_processor(vendor='H3C', device_type='', collection_type='isis_neighbors', method='netmiko')
+def process_isis_neighbors_netmiko(data):
+    """H3C ISIS 邻居处理 (Netmiko/TextFSM)"""
+    results = []
+    for item in data:
+        peer_ip_raw = item.get('peer_ip', '')
+        peer_ip = str(peer_ip_raw).split()[0] if peer_ip_raw else ''
+        results.append(
+            dict(
+                system_id=item.get('system_id', ''),
+                local_interface=item.get('local_interface', ''),
+                circuit_id=item.get('circuit_id', ''),
+                state=item.get('state', ''),
+                hold_time=item.get('hold_time', ''),
+                neighbor_type=item.get('neighbor_type', ''),
+                priority=item.get('priority', ''),
+                area=item.get('area', ''),
+                peer_ip=peer_ip,
+                uptime=item.get('uptime', ''),
+            )
+        )
+    return results
+
+
+@register_processor(vendor='H3C', device_type='', collection_type='fan_status', method='netmiko')
+def process_fan_status_netmiko(data):
+    """H3C 风扇状态处理 (Netmiko/TextFSM)"""
+    results = []
+    for item in data:
+        fan_id = item.get('FanID', '') or item.get('fan_id', '')
+        results.append(
+            dict(
+                chassis='',
+                slot=item.get('Slot', '') or item.get('slot', ''),
+                fan_id=fan_id,
+                fan_name=f"Fan{fan_id}" if fan_id else '',
+                present='',
+                register_state='',
+                status=item.get('State', '') or item.get('state', ''),
+                speed='',
+                mode='',
+                airflow_direction=item.get('AirflowDirection', '') or item.get('airflowdirection', ''),
+                prefer_airflow_direction=item.get('PreferAirflowDirection', '') or item.get('preferairflowdirection', ''),
+            )
+        )
+    return results
+
+
+@register_processor(vendor='H3C', device_type='', collection_type='power_status', method='netmiko')
+def process_power_status_netmiko(data):
+    """H3C 电源状态处理 (Netmiko/TextFSM)"""
+    results = []
+    for item in data:
+        power_id = item.get('PowerID', '') or item.get('power_id', '')
+        results.append(
+            dict(
+                chassis='',
+                slot=item.get('Slot', '') or item.get('slot', ''),
+                power_id=power_id,
+                power_name=f"Power{power_id}" if power_id else '',
+                present='',
+                status=item.get('State', '') or item.get('state', ''),
+                mode=item.get('Mode', '') or item.get('mode', ''),
+                current=item.get('Current', '') or item.get('current', ''),
+                voltage=item.get('Voltage', '') or item.get('voltage', ''),
+                output_power=item.get('Power', '') or item.get('power', ''),
+            )
+        )
+    return results
+
+
+@register_processor(vendor='H3C', device_type='', collection_type='clock_status', method='netmiko')
+def process_clock_status_netmiko(data):
+    """H3C 时钟状态处理 (Netmiko/TextFSM)"""
+    results = []
+    for item in data:
+        month = str(item.get('MONTH', '') or item.get('month', '')).zfill(2)
+        day = str(item.get('DAY', '') or item.get('day', '')).zfill(2)
+        year = str(item.get('YEAR', '') or item.get('year', ''))
+        device_time = item.get('TIME', '') or item.get('time', '')
+        device_date = f"{year}-{month}-{day}" if year and month and day else ''
+        device_datetime = f"{device_date} {device_time}" if device_date and device_time else ''
+        results.append(
+            dict(
+                device_time=device_time,
+                timezone=item.get('TIMEZONE', '') or item.get('timezone', ''),
+                weekday=item.get('DAYWEEK', '') or item.get('dayweek', ''),
+                device_date=device_date,
+                device_datetime=device_datetime,
+            )
+        )
+    return results
 
 
 # ────────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 from urllib.parse import quote
 from io import BytesIO
+from uuid import uuid4
 from django.http import JsonResponse, HttpResponse
 from rest_framework.response import Response
 from django.apps import apps
@@ -13,14 +14,17 @@ from django_filters.rest_framework import DjangoFilterBackend
 import django_filters
 from django.db.models import Count
 from rest_framework import filters
+from rest_framework.decorators import action
 from rest_framework.views import APIView
+from django.utils import timezone
 from apps.api.tools.custom_pagination import LargeResultsSetPagination
 from apps.automation.models import (CollectionPlan, CollectionRule,
-                                    CollectionMatchRule, AutoFlow, AutomationInventory, AutoVars)
+                                    CollectionMatchRule, AutoFlow, AutomationInventory, AutoVars, Tasks, Method, State)
 from apps.asset.serializers import NetworkDeviceSerializer
 from apps.automation.serializers import (
     CollectionPlanSerializer, CollectionRuleSerializer, CollectionMatchRuleSerializer,
     AutoFlowSerializer, AutomationInventorySerializer, AutoVarsSerializer)
+from apps.automation.inspection import inspection_payload, inspection_scope, inspection_type
 from apps.api.tools.custom_viewset_base import CustomViewBase
 from django.db.models import CharField, ForeignKey, GenericIPAddressField
 from apps.automation.tasks import DiagnoseProc
@@ -80,6 +84,160 @@ class AutoFlowViewSet(CustomViewBase):
     # filterset_class = NetFileVTEPFilter
     filter_fields = '__all__'
     ordering_fields = ('-id',)
+
+    @staticmethod
+    def _parse_datetime(value):
+        if not value:
+            return None
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+            try:
+                dt = datetime.strptime(value, fmt)
+                if fmt == "%Y-%m-%d":
+                    dt = datetime(dt.year, dt.month, dt.day, 0, 0, 0)
+                return timezone.make_aware(dt) if timezone.is_naive(dt) else dt
+            except ValueError:
+                continue
+        return None
+
+    @action(detail=False, methods=['get'])
+    def inspection_results(self, request):
+        queryset = self.get_queryset().filter(task=Tasks.INSPECTION)
+        query_params = request.query_params
+
+        db_filters = {
+            "commit_user": query_params.get("commit_user"),
+            "device": query_params.get("device"),
+            "origin": query_params.get("origin"),
+            "state": query_params.get("state"),
+            "task_id": query_params.get("task_id"),
+        }
+        for field_name, value in db_filters.items():
+            if value not in (None, ""):
+                queryset = queryset.filter(**{field_name: value})
+
+        if query_params.get("code") not in (None, ""):
+            queryset = queryset.filter(code=query_params.get("code"))
+
+        start_time = self._parse_datetime(query_params.get("start_time"))
+        if start_time:
+            queryset = queryset.filter(commit_time__gte=start_time)
+        end_time = self._parse_datetime(query_params.get("end_time"))
+        if end_time:
+            queryset = queryset.filter(commit_time__lte=end_time)
+
+        limit = int(query_params.get("limit", 100))
+        flows = list(queryset.order_by("-commit_time")[:limit])
+
+        scope_filter = query_params.get("inspection_scope", "").lower()
+        type_filter = query_params.get("inspection_type", "")
+        keyword = query_params.get("keyword", "").lower()
+
+        filtered = []
+        for flow in flows:
+            flow_scope = inspection_scope(flow)
+            flow_type = inspection_type(flow)
+            if scope_filter and flow_scope != scope_filter:
+                continue
+            if type_filter and flow_type != type_filter:
+                continue
+            if keyword:
+                haystack = " ".join(
+                    [
+                        str(getattr(flow, "task_id", "")),
+                        str(getattr(flow, "commit_user", "")),
+                        str(getattr(flow, "device", "")),
+                        str(getattr(flow, "task_result", "")),
+                        str(getattr(flow, "kwargs", "")),
+                    ]
+                ).lower()
+                if keyword not in haystack:
+                    continue
+            filtered.append(flow)
+
+        serializer = self.get_serializer(filtered, many=True)
+        return JsonResponse(
+            {
+                "code": 200,
+                "msg": "success",
+                "data": serializer.data,
+                "count": len(serializer.data),
+            }
+        )
+
+    @action(detail=True, methods=['get'])
+    def inspection_detail(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.task != Tasks.INSPECTION:
+            return JsonResponse(
+                {"code": 400, "msg": "当前记录不是巡检结果", "data": None}
+            )
+
+        serializer = self.get_serializer(instance)
+        return JsonResponse(
+            {
+                "code": 200,
+                "msg": "success",
+                "data": serializer.data,
+            }
+        )
+
+    @action(detail=False, methods=['post'])
+    def write_inspection_result(self, request):
+        payload = request.data
+        device = payload.get("device") or payload.get("device_ip")
+        commit_user = (
+            payload.get("commit_user")
+            or getattr(getattr(request, "user", None), "username", "")
+            or "system"
+        )
+        method = payload.get("method") or Method.RESTAPI
+        state = payload.get("state") or State.FINISH
+        code = payload.get("code")
+        if code in (None, ""):
+            code = 9008 if state == State.FINISH else 9006 if state == State.PUBLISHED else 9005 if state == State.FAILED else 9000
+
+        kwargs_payload = payload.get("kwargs", {}) or {}
+        inspection_meta = {
+            "inspection_scope": payload.get("inspection_scope") or kwargs_payload.get("inspection_scope") or ("device" if device else "fleet"),
+            "inspection_type": payload.get("inspection_type") or kwargs_payload.get("inspection_type") or "generic",
+            "summary": payload.get("summary", {}),
+        }
+        kwargs_payload.update(inspection_meta)
+
+        task_result = payload.get("task_result", {})
+        ttp = payload.get("ttp", {})
+        commands = payload.get("commands", [])
+        back_off_commands = payload.get("back_off_commands", [])
+
+        flow = AutoFlow.objects.create(
+            task_id=payload.get("task_id") or f"inspection-{uuid4().hex[:12]}",
+            origin=payload.get("origin", "NetClaw-CN"),
+            task_result=json.dumps(task_result, ensure_ascii=False) if isinstance(task_result, (dict, list)) else str(task_result or ""),
+            order_code=payload.get("order_code"),
+            device=device,
+            device_id=payload.get("device_id"),
+            commit_user=commit_user,
+            commit_time=timezone.now(),
+            task=Tasks.INSPECTION,
+            method=method,
+            class_method=payload.get("class_method", "inspection_result"),
+            remote_ip=str(request.META.get("REMOTE_ADDR", "")),
+            kwargs=json.dumps(kwargs_payload, ensure_ascii=False),
+            ttp=json.dumps(ttp, ensure_ascii=False) if isinstance(ttp, (dict, list)) else str(ttp or "{}"),
+            commands=json.dumps(commands, ensure_ascii=False) if isinstance(commands, list) else str(commands or "[]"),
+            back_off_commands=json.dumps(back_off_commands, ensure_ascii=False) if isinstance(back_off_commands, list) else str(back_off_commands or "[]"),
+            state=state,
+            code=code,
+        )
+
+        serializer = self.get_serializer(flow)
+        return JsonResponse(
+            {
+                "code": 201,
+                "msg": "success",
+                "data": serializer.data,
+            }
+        )
 
 
 class CollectionPlanViewSet(CustomViewBase):

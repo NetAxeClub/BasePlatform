@@ -4,6 +4,7 @@ from rest_framework import serializers
 import json
 from apps.automation.models import (CollectionPlan, CollectionRule, CollectionMatchRule,
                                     AutoFlow, AutomationInventory, AutoVars)
+from apps.automation.inspection import inspection_payload, inspection_scope, inspection_summary, inspection_type
 
 # 采集方案序列化
 class CollectionPlanSerializer(serializers.ModelSerializer):
@@ -77,10 +78,59 @@ class CollectionRuleSerializer(serializers.ModelSerializer):
 # 自动化工作流
 class AutoFlowSerializer(serializers.ModelSerializer):
     commit_time = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', read_only=True)
+    inspection_scope = serializers.SerializerMethodField()
+    inspection_type = serializers.SerializerMethodField()
+    inspection_summary = serializers.SerializerMethodField()
+    inspection_payload = serializers.SerializerMethodField()
 
     class Meta:
         model = AutoFlow
-        fields = '__all__'
+        fields = (
+            'id',
+            'task_id',
+            'origin',
+            'task_result',
+            'order_code',
+            'device',
+            'device_id',
+            'commit_user',
+            'commit_time',
+            'task',
+            'method',
+            'class_method',
+            'remote_ip',
+            'event',
+            'kwargs',
+            'ttp',
+            'commands',
+            'back_off_commands',
+            'state',
+            'code',
+            'inspection_scope',
+            'inspection_type',
+            'inspection_summary',
+            'inspection_payload',
+        )
+
+    def get_inspection_scope(self, obj):
+        if getattr(obj, "task", "") != "巡检":
+            return ""
+        return inspection_scope(obj)
+
+    def get_inspection_type(self, obj):
+        if getattr(obj, "task", "") != "巡检":
+            return ""
+        return inspection_type(obj)
+
+    def get_inspection_summary(self, obj):
+        if getattr(obj, "task", "") != "巡检":
+            return {}
+        return inspection_summary(obj)
+
+    def get_inspection_payload(self, obj):
+        if getattr(obj, "task", "") != "巡检":
+            return {}
+        return inspection_payload(obj)
 
 
 class AutomationInventoryField(serializers.StringRelatedField):
