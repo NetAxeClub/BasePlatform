@@ -10,7 +10,8 @@ import time
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from apps.asset.models import NetworkDevice
-from apps.device_api.models import NetconfXMLTemplate
+from apps.device_api.fields_mapping import DEFAULT_COLLECTION_TYPES
+from apps.device_api.models import DeviceSubCollectionPlan, NetconfXMLTemplate
 from apps.device_api import COLLECTION_RESULTS_DB, COLLECTION_PLAN, COLLECTION_SUB_PLAN
 from apps.device_api.connection_manager import DeviceConnectionManager
 from apps.device_api.models_api import resolve_raw_data, save_local_collection_result, inject_metadata
@@ -20,6 +21,56 @@ logger = logging.getLogger(__name__)
 
 class DeviceCollectionService:
     """设备采集服务类（新版本）"""
+
+    @staticmethod
+    def _build_sub_plan_name(summary_plan_name: str, collection_type: str) -> str:
+        """为默认子方案生成全局唯一且长度受控的名称。"""
+        name_max_len = DeviceSubCollectionPlan._meta.get_field("name").max_length or 50
+        suffix = f"-{collection_type}"
+        max_parent_len = max(1, name_max_len - len(suffix))
+        parent_part = summary_plan_name[:max_parent_len]
+        candidate = f"{parent_part}{suffix}"
+
+        if not DeviceSubCollectionPlan.objects.filter(name=candidate).exists():
+            return candidate
+
+        for index in range(1, 1000):
+            reserve = len(f"-{index}")
+            truncated_parent = parent_part[: max(1, max_parent_len - reserve)]
+            candidate = f"{truncated_parent}-{index}{suffix}"[:name_max_len]
+            if not DeviceSubCollectionPlan.objects.filter(name=candidate).exists():
+                return candidate
+
+        raise ValueError(f"无法为 collection_type={collection_type} 生成唯一子方案名称")
+
+    @staticmethod
+    def ensure_default_sub_plans(summary_plan) -> Dict[str, Any]:
+        """为父方案补齐默认 collection_type 对应的子方案。"""
+        existing_types = set(
+            summary_plan.collect_plans.values_list("collection_type", flat=True)
+        )
+        created_types = []
+
+        for collection_type in DEFAULT_COLLECTION_TYPES:
+            if collection_type in existing_types:
+                continue
+
+            DeviceSubCollectionPlan.objects.create(
+                summary_plan=summary_plan,
+                name=DeviceCollectionService._build_sub_plan_name(
+                    summary_plan.name, collection_type
+                ),
+                collection_type=collection_type,
+                description="",
+            )
+            existing_types.add(collection_type)
+            created_types.append(collection_type)
+
+        return {
+            "created_count": len(created_types),
+            "created_types": created_types,
+            "total_types": len(DEFAULT_COLLECTION_TYPES),
+        }
 
     @staticmethod
     def get_xml_templates_by_plan(plan_id: int) -> List[NetconfXMLTemplate]:

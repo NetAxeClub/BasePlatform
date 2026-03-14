@@ -10,7 +10,7 @@ from apps.device_api.models import (
     NetconfXMLTemplate,
     PlansToDevice,
 )
-from apps.device_api.fields_mapping import DEFAULT_COLLECTION_TYPES
+from apps.device_api.services_new import DeviceCollectionService
 
 
 class DeviceCollectionPlansSerializer(serializers.ModelSerializer):
@@ -82,26 +82,7 @@ class DeviceCollectionPlansCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         with transaction.atomic():
             summary_plan = DeviceCollectionPlans.objects.create(**validated_data)
-            # 自动创建所有采集类型的空白子方案（仅名称和采集类型确定）
-            name_max_len = 50  # DeviceSubCollectionPlan.name 最大长度
-            for collection_type in DEFAULT_COLLECTION_TYPES:
-                suffix = f"-{collection_type}"
-                max_parent_len = name_max_len - len(suffix)
-                parent_part = summary_plan.name[:max_parent_len] if len(summary_plan.name) > max_parent_len else summary_plan.name
-                sub_name = f"{parent_part}{suffix}"
-                if DeviceSubCollectionPlan.objects.filter(name=sub_name).exists():
-                    for i in range(1, 100):
-                        # 预留 "-99" 的宽度，保证总长不超 name_max_len
-                        candidate = f"{parent_part[:max_parent_len - len(str(i)) - 1]}-{i}{suffix}"[:name_max_len]
-                        if not DeviceSubCollectionPlan.objects.filter(name=candidate).exists():
-                            sub_name = candidate
-                            break
-                DeviceSubCollectionPlan.objects.create(
-                    summary_plan=summary_plan,
-                    name=sub_name,
-                    collection_type=collection_type,
-                    description="",
-                )
+            DeviceCollectionService.ensure_default_sub_plans(summary_plan)
             return summary_plan
 
 

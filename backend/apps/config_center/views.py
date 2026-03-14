@@ -13,6 +13,7 @@ from django.http import JsonResponse, StreamingHttpResponse
 from django.core.files.storage import default_storage
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
+from rest_framework.decorators import action
 from rest_framework.views import APIView
 from ttp import ttp
 from netaxe.settings import BASE_DIR
@@ -23,9 +24,65 @@ from apps.config_center.config_parse.config_parse import ConfigTree, FSMTree
 from apps.config_center.git_tools.git_proc import ConfigGit
 from utils.db.mongo_ops import MongoNetOps
 from .serializers import *
-from .models import ConfigComplianceResult
+from .models import ConfigCompliance, ConfigComplianceResult
 
 _ConfigGit = ConfigGit()
+
+
+def build_security_baseline_payload(compliances, root_rule_name):
+    """将基线规则按 vendor / 子规则聚合，便于上层直接消费。"""
+    vendors = {}
+    total_items = 0
+
+    for compliance in compliances:
+        total_items += 1
+        vendor_bucket = vendors.setdefault(
+            compliance.vendor,
+            {"vendor": compliance.vendor, "rule_count": 0, "rules": {}},
+        )
+        rule_name = compliance.rule.name if getattr(compliance, "rule", None) else ""
+        parent_name = (
+            compliance.rule.parent.name
+            if getattr(compliance, "rule", None) and getattr(compliance.rule, "parent", None)
+            else root_rule_name
+        )
+        rule_bucket = vendor_bucket["rules"].setdefault(
+            rule_name,
+            {
+                "rule_name": rule_name,
+                "rule_id": getattr(compliance, "rule_id", None) or getattr(getattr(compliance, "rule", None), "id", None),
+                "parent_rule": parent_name,
+                "items": [],
+            },
+        )
+        rule_bucket["items"].append(
+            {
+                "id": getattr(compliance, "id", None),
+                "vendor": compliance.vendor,
+                "pattern": compliance.pattern,
+                "regex": compliance.regex,
+                "intent": getattr(compliance, "intent", ""),
+            }
+        )
+
+    vendor_items = []
+    for vendor_name in sorted(vendors.keys()):
+        vendor_bucket = vendors[vendor_name]
+        rules = []
+        for rule_name in sorted(vendor_bucket["rules"].keys()):
+            rule_bucket = vendor_bucket["rules"][rule_name]
+            rule_bucket["item_count"] = len(rule_bucket["items"])
+            rules.append(rule_bucket)
+        vendor_bucket["rules"] = rules
+        vendor_bucket["rule_count"] = len(rules)
+        vendor_items.append(vendor_bucket)
+
+    return {
+        "root_rule": root_rule_name,
+        "vendor_count": len(vendor_items),
+        "total_items": total_items,
+        "vendors": vendor_items,
+    }
 
 
 class ConfigComplianceResultFilter(django_filters.FilterSet):
@@ -61,6 +118,110 @@ def inverse_mask(cidr: str) -> str:
 def format_cidr(cidr: str) -> str:
     net = IPNetwork(cidr.strip())
     return str(net.cidr)
+
+
+def _truthy(value) -> bool:
+    return str(value).strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+def summarize_compliance_results(results):
+    total = len(results)
+    compliant = 0
+    non_compliant = 0
+    unknown = 0
+    for item in results:
+        status = str(getattr(item, 'compliance', '') or '').strip()
+        if status == '合规':
+            compliant += 1
+        elif status == '不合规':
+            non_compliant += 1
+        else:
+            unknown += 1
+    return {
+        'total': total,
+        'compliant': compliant,
+        'non_compliant': non_compliant,
+        'unknown': unknown,
+    }
+
+
+def build_backup_snapshot_payload(backup, compliance_results, commits=None, preview_content=None):
+    commits = commits or []
+    latest_commit = commits[0] if commits else None
+    data = {
+        'config_backup_id': backup.id,
+        'manage_ip': backup.manage_ip,
+        'device_name': backup.name,
+        'vendor': backup.vendor,
+        'model_name': backup.model_name,
+        'idc_name': backup.idc_name,
+        'config_type': backup.config_type,
+        'backup_time': backup.last_time.strftime('%Y-%m-%d %H:%M:%S') if backup.last_time else '',
+        'config_status': backup.config_status,
+        'file_path': backup.file_path,
+        'detail': backup.detail or '',
+        'git_commit_count': len(commits),
+        'latest_commit': latest_commit,
+        'compliance_summary': summarize_compliance_results(compliance_results),
+        'compliance_results': [
+            {
+                'id': item.id,
+                'rule_id': item.rule_id,
+                'rule': item.rule,
+                'compliance': item.compliance,
+                'backup_time': item.backup_time.strftime('%Y-%m-%d %H:%M:%S') if item.backup_time else '',
+                'config_backup_id': item.config_backup_id,
+                'config_file_path': item.config_file_path,
+                'rule_regex': item.rule_regex,
+            }
+            for item in compliance_results
+        ],
+    }
+    if preview_content is not None:
+        data['preview_content'] = preview_content
+    return data
+
+
+def build_backup_timeline_payload(backups, compliance_results_by_backup, commits_by_path):
+    items = []
+    for backup in backups:
+        compliance_results = compliance_results_by_backup.get(backup.id, [])
+        commits = commits_by_path.get(backup.file_path, [])
+        items.append({
+            'config_backup_id': backup.id,
+            'manage_ip': backup.manage_ip,
+            'device_name': backup.name,
+            'vendor': backup.vendor,
+            'config_type': backup.config_type,
+            'backup_time': backup.last_time.strftime('%Y-%m-%d %H:%M:%S') if backup.last_time else '',
+            'config_status': backup.config_status,
+            'file_path': backup.file_path,
+            'git_commit_count': len(commits),
+            'latest_commit': commits[0] if commits else None,
+            'compliance_summary': summarize_compliance_results(compliance_results),
+        })
+    return items
+
+
+def build_backup_compare_payload(backup, from_commit, to_commit, diff_result):
+    old_str = diff_result.get('old_str', '') or ''
+    new_str = diff_result.get('new_str', '') or ''
+    return {
+        'config_backup_id': backup.id,
+        'manage_ip': backup.manage_ip,
+        'device_name': backup.name,
+        'vendor': backup.vendor,
+        'config_type': backup.config_type,
+        'file_path': backup.file_path,
+        'from_commit': from_commit,
+        'to_commit': to_commit,
+        'old_content': old_str,
+        'new_content': new_str,
+        'old_line_count': len(old_str.splitlines()) if old_str else 0,
+        'new_line_count': len(new_str.splitlines()) if new_str else 0,
+        'added_lines': diff_result.get('added_lines'),
+        'deleted_lines': diff_result.get('deleted_lines'),
+    }
 
 
 def jinja_render(data, template):
@@ -153,6 +314,106 @@ class ConfigBackupViewSet(CustomViewBase):
     def filter_by_date_range(self, start_dt, end_dt):
         return self.queryset.filter(last_time__range=(start_dt, end_dt))
 
+    @action(detail=False, methods=['get'])
+    def latest_snapshot(self, request):
+        manage_ip = request.query_params.get('manage_ip')
+        config_type = request.query_params.get('config_type', 'running')
+        include_preview = _truthy(request.query_params.get('include_preview'))
+        preview_lines = int(request.query_params.get('preview_lines', 50))
+        if not manage_ip:
+            return JsonResponse({'code': 400, 'message': '缺少必要参数: manage_ip', 'data': None})
+
+        backup = (
+            ConfigBackup.objects.filter(manage_ip=manage_ip, config_type=config_type)
+            .order_by('-last_time')
+            .first()
+        )
+        if not backup:
+            return JsonResponse({'code': 404, 'message': '未找到配置备份记录', 'data': None})
+
+        compliance_results = list(
+            ConfigComplianceResult.objects.filter(config_backup_id=backup.id).order_by('rule')
+        )
+        commits = _ConfigGit.get_file_all_change_commmit(backup.file_path) if backup.file_path else []
+        preview_content = None
+        if include_preview and backup.file_path and default_storage.exists(backup.file_path):
+            file_content = default_storage.open(backup.file_path).read().decode('utf-8')
+            preview_content = '\n'.join(file_content.splitlines()[:preview_lines])
+
+        data = build_backup_snapshot_payload(
+            backup=backup,
+            compliance_results=compliance_results,
+            commits=commits,
+            preview_content=preview_content,
+        )
+        return JsonResponse({'code': 200, 'message': '获取最新配置快照成功', 'data': data})
+
+    @action(detail=False, methods=['get'])
+    def history_timeline(self, request):
+        manage_ip = request.query_params.get('manage_ip')
+        config_type = request.query_params.get('config_type')
+        limit = int(request.query_params.get('limit', 20))
+        if not manage_ip:
+            return JsonResponse({'code': 400, 'message': '缺少必要参数: manage_ip', 'data': None})
+
+        queryset = ConfigBackup.objects.filter(manage_ip=manage_ip).order_by('-last_time')
+        if config_type:
+            queryset = queryset.filter(config_type=config_type)
+        backups = list(queryset[:limit])
+        backup_ids = [item.id for item in backups]
+
+        compliance_results_by_backup = {}
+        if backup_ids:
+            for item in ConfigComplianceResult.objects.filter(config_backup_id__in=backup_ids).order_by('rule'):
+                compliance_results_by_backup.setdefault(item.config_backup_id, []).append(item)
+
+        commits_by_path = {}
+        for backup in backups:
+            if backup.file_path and backup.file_path not in commits_by_path:
+                commits_by_path[backup.file_path] = _ConfigGit.get_file_all_change_commmit(backup.file_path)
+
+        data = {
+            'manage_ip': manage_ip,
+            'config_type': config_type or 'all',
+            'count': len(backups),
+            'items': build_backup_timeline_payload(backups, compliance_results_by_backup, commits_by_path),
+        }
+        return JsonResponse({'code': 200, 'message': '获取配置时间线成功', 'data': data})
+
+    @action(detail=False, methods=['get'])
+    def version_compare(self, request):
+        config_backup_id = request.query_params.get('config_backup_id')
+        if not config_backup_id:
+            return JsonResponse({'code': 400, 'message': '缺少必要参数: config_backup_id', 'data': None})
+
+        backup = ConfigBackup.objects.filter(id=config_backup_id).first()
+        if not backup:
+            return JsonResponse({'code': 404, 'message': '未找到配置备份记录', 'data': None})
+        if not backup.file_path:
+            return JsonResponse({'code': 400, 'message': '当前备份记录缺少 file_path', 'data': None})
+
+        commits = _ConfigGit.get_file_all_change_commmit(backup.file_path)
+        from_commit = request.query_params.get('from_commit')
+        to_commit = request.query_params.get('to_commit')
+        if not (from_commit and to_commit):
+            if len(commits) < 2:
+                return JsonResponse({'code': 404, 'message': '该配置文件缺少足够的历史提交用于对比', 'data': None})
+            to_commit = commits[0]['value']
+            from_commit = commits[1]['value']
+
+        diff_result = _ConfigGit.get_commit_by_file_new(
+            file=backup.file_path,
+            from_commit=from_commit,
+            to_commit=to_commit,
+        )
+        data = build_backup_compare_payload(
+            backup=backup,
+            from_commit=from_commit,
+            to_commit=to_commit,
+            diff_result=diff_result,
+        )
+        return JsonResponse({'code': 200, 'message': '获取配置版本对比成功', 'data': data})
+
 
 class ConfigComplianceRuleViewSet(CustomViewBase):
     # queryset = ConfigComplianceRule.objects.filter(parent__isnull=True).order_by('-id')
@@ -196,6 +457,27 @@ class ConfigComplianceViewSet(CustomViewBase):
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filter_fields = '__all__'
     search_fields = ('vendor',)
+
+    @action(detail=False, methods=['get'])
+    def security_baselines(self, request):
+        """按规则树和厂商聚合返回安全基线规则库。"""
+        root_rule_name = request.query_params.get("root_rule", "管理面硬化基线")
+        vendor = request.query_params.get("vendor")
+
+        queryset = ConfigCompliance.objects.select_related("rule", "rule__parent").filter(
+            rule__parent__name=root_rule_name
+        )
+        if vendor:
+            queryset = queryset.filter(vendor=vendor)
+
+        payload = build_security_baseline_payload(list(queryset), root_rule_name)
+        return JsonResponse(
+            {
+                "code": 200,
+                "message": "获取安全基线规则成功",
+                "data": payload,
+            }
+        )
 
 
 class ConfigComplianceResultViewSet(CustomViewBase):

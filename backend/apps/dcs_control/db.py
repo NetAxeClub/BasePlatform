@@ -18,8 +18,9 @@ servgroup_mongo = MongoOps(db='Automation', coll='hillstone_servgroup')
 predefined_mongo = MongoOps(db='Automation', coll='hillstone_service_predefined')
 
 # ── DNAT / SNAT ─────────────────────────────────────────────────────────
-dnat_mongo = MongoOps(db='Automation', coll='hillstone_dnat')
+hillstone_dnat_mongo = MongoOps(db='Automation', coll='hillstone_dnat')
 snat_mongo = MongoOps(db='Automation', coll='hillstone_snat')
+dnat_mongo = MongoOps(db='Automation', coll='DNAT')
 
 # ── 安全策略 ────────────────────────────────────────────────────────────
 sec_policy_mongo = MongoOps(db='Automation', coll='sec_policy')

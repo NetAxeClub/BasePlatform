@@ -6,6 +6,14 @@ from django.core.cache import cache
 from apps.asset.models import NetworkDevice, Model
 
 
+def _as_list(value):
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    return [value]
+
+
 def _lookup_neighbor_ip(neighborsysname: str) -> str:
     """通过设备名查询 CMDB 管理 IP，先查 cache，再查 DB。"""
     if not neighborsysname:
@@ -22,6 +30,19 @@ def _lookup_neighbor_ip(neighborsysname: str) -> str:
         return row["manage_ip"] if row else ""
     except Exception:
         return ""
+
+
+def _safe_list(value):
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    return [value]
+
+
+def _is_established(state: str) -> bool:
+    text = str(state or "").strip().lower()
+    return text in {"established", "estab", "up"} or "established" in text
 
 
 # ────────────────────────────────────────────────────────────
@@ -239,6 +260,299 @@ def process_aggre_port_netmiko(data):
                 memberports=memberports,
                 status=i.get("status", "") or i.get("portstatus", ""),
                 mode=i.get("mode", ""),
+            )
+        )
+    return result
+
+
+@register_processor(
+    vendor="Huawei", device_type="", collection_type="fan_status", method="netmiko"
+)
+def process_fan_status_netmiko(data):
+    """Huawei 风扇状态处理 (Netmiko/TextFSM)"""
+    result = []
+    for item in data:
+        fan_id = item.get("FanID", "") or item.get("fan_id", "")
+        result.append(
+            dict(
+                chassis=item.get("Chassis", "") or item.get("chassis", ""),
+                slot=item.get("Slot", "") or item.get("slot", ""),
+                fan_id=fan_id,
+                fan_name=item.get("FanNUM", "") or item.get("fan_num", "") or f"FAN{fan_id}",
+                present=item.get("Present", "") or item.get("present", ""),
+                register_state=item.get("Register", "") or item.get("register", ""),
+                status=item.get("Present", "") or item.get("present", ""),
+                speed=item.get("Speed", "") or item.get("speed", ""),
+                mode=item.get("Mode", "") or item.get("mode", ""),
+                airflow_direction="",
+                prefer_airflow_direction="",
+            )
+        )
+    return result
+
+
+@register_processor(
+    vendor="Huawei", device_type="", collection_type="power_status", method="netmiko"
+)
+def process_power_status_netmiko(data):
+    """Huawei 电源状态处理 (Netmiko/TextFSM)"""
+    result = []
+    for item in data:
+        result.append(
+            dict(
+                chassis=item.get("Chassis", "") or item.get("chassis", ""),
+                slot=item.get("Slot", "") or item.get("slot", ""),
+                power_id=item.get("PowerNo", "") or item.get("power_no", ""),
+                power_name=item.get("PowerNo", "") or item.get("power_no", ""),
+                present=item.get("Present", "") or item.get("present", ""),
+                status=item.get("State", "") or item.get("state", ""),
+                mode=item.get("Mode", "") or item.get("mode", ""),
+                current=item.get("Current", "") or item.get("current", ""),
+                voltage=item.get("Voltage", "") or item.get("voltage", ""),
+                output_power=item.get("RealPwr", "") or item.get("real_pwr", ""),
+            )
+        )
+    return result
+
+
+@register_processor(
+    vendor="Huawei", device_type="", collection_type="temperature_status", method="netmiko"
+)
+def process_temperature_status_netmiko(data):
+    """Huawei 温度状态处理 (Netmiko/TextFSM)"""
+    result = []
+    for item in data:
+        result.append(
+            dict(
+                chassis="",
+                slot=item.get("SLOTID", "") or item.get("slotid", ""),
+                sensor=item.get("PCB", "") or item.get("pcb", ""),
+                status=item.get("STATUS", "") or item.get("status", ""),
+                temperature=item.get("TEMPERATURE", "") or item.get("temperature", ""),
+            )
+        )
+    return result
+
+
+@register_processor(
+    vendor="Huawei", device_type="", collection_type="route_table", method="netconf"
+)
+def process_route_table_netconf(data):
+    """Huawei 路由表处理 (NETCONF)
+
+    当前优先解析 IETF routing 视图下的静态 IPv4 路由。
+    若设备仅返回静态路由，也照常输出为 route_table 的一部分。
+    """
+    routing = data.get("routing", {}) or {}
+    instances = _as_list(routing.get("routing-instance"))
+    result = []
+
+    for instance in instances:
+        instance_name = instance.get("name", "")
+        protocols = instance.get("routing-protocols", {}) or {}
+        routing_protocols = _as_list(protocols.get("routing-protocol"))
+        for protocol in routing_protocols:
+            static_routes = protocol.get("static-routes", {}) or {}
+            ipv4_container = static_routes.get("v4ur:ipv4", {}) or {}
+            routes = _as_list(ipv4_container.get("v4ur:route"))
+            for route in routes:
+                next_hop = (
+                    (route.get("v4ur:next-hop", {}) or {}).get("v4ur:next-hop-address", "")
+                )
+                result.append(
+                    dict(
+                        prefix=route.get("v4ur:destination-prefix", ""),
+                        next_hop=next_hop,
+                        interface="",
+                        protocol="static",
+                        protocol_id="static",
+                        sub_protocol_id="",
+                        process_id="",
+                        preference=route.get("hw-v4sr:preference", ""),
+                        metric="0",
+                        vrf="" if instance_name == "_public_" else instance_name,
+                        topology="",
+                        neighbor="",
+                        age="",
+                        origin_as="",
+                        last_as="",
+                    )
+                )
+
+    return result
+
+
+@register_processor(
+    vendor="Huawei", device_type="", collection_type="bgp_neighbors", method="netconf"
+)
+def process_bgp_neighbors_netconf(data):
+    """Huawei BGP 邻居处理 (NETCONF)
+
+    解析 `bgp.bgpcomm.bgpVrfs.bgpVrf.bgpVrfAFs.bgpVrfAF.peerAFs.peerAF`
+    的运行状态信息。
+    """
+    bgp = data.get("bgp", {}) or {}
+    bgpcomm = bgp.get("bgpcomm", {}) or {}
+    vrfs = _safe_list((bgpcomm.get("bgpVrfs", {}) or {}).get("bgpVrf"))
+
+    result = []
+    for vrf in vrfs:
+        vrf_name = vrf.get("vrfName", "")
+        afs = _safe_list((vrf.get("bgpVrfAFs", {}) or {}).get("bgpVrfAF"))
+        for af in afs:
+            af_type = af.get("afType", "")
+            peers = _safe_list((af.get("peerAFs", {}) or {}).get("peerAF"))
+            for peer in peers:
+                peer_info = peer.get("peerInfo", {}) or {}
+                result.append(
+                    dict(
+                        peer_ip=peer.get("remoteAddress", ""),
+                        address_family=af_type,
+                        vrf="" if vrf_name == "_public_" else vrf_name,
+                        remote_as="",
+                        state=peer_info.get("bgpCurState", ""),
+                        peer_group="",
+                        remote_router_id=peer_info.get("remoteRouterId", ""),
+                        peer_type=peer_info.get("peerType", ""),
+                        connect_interface="",
+                        update_interval="",
+                        ebgp_max_hop="",
+                    )
+                )
+
+    return result
+
+
+@register_processor(
+    vendor="Huawei", device_type="", collection_type="bgp_summary", method="netconf"
+)
+def process_bgp_summary_netconf(data):
+    """Huawei BGP 汇总处理 (NETCONF)
+
+    基于 `bgpVrfAF.peerAFs.peerAF` 按 `vrf + afType` 聚合邻居状态。
+    """
+    bgp = data.get("bgp", {}) or {}
+    bgpcomm = bgp.get("bgpcomm", {}) or {}
+    vrfs = _safe_list((bgpcomm.get("bgpVrfs", {}) or {}).get("bgpVrf"))
+
+    grouped = {}
+    for vrf in vrfs:
+        vrf_name = "" if vrf.get("vrfName", "") == "_public_" else vrf.get("vrfName", "")
+        afs = _safe_list((vrf.get("bgpVrfAFs", {}) or {}).get("bgpVrfAF"))
+        for af in afs:
+            af_type = af.get("afType", "")
+            key = (vrf_name, af_type)
+            item = grouped.setdefault(
+                key,
+                {
+                    "address_family": af_type,
+                    "vrf": vrf_name,
+                    "total_peers": 0,
+                    "established_peers": 0,
+                    "non_established_peers": 0,
+                    "states": {},
+                },
+            )
+            peers = _safe_list((af.get("peerAFs", {}) or {}).get("peerAF"))
+            for peer in peers:
+                peer_info = peer.get("peerInfo", {}) or {}
+                state = peer_info.get("bgpCurState", "")
+                item["total_peers"] += 1
+                if _is_established(state):
+                    item["established_peers"] += 1
+                else:
+                    item["non_established_peers"] += 1
+                item["states"][state] = item["states"].get(state, 0) + 1
+
+    result = []
+    for item in grouped.values():
+        dominant_state = ""
+        if item["states"]:
+            dominant_state = sorted(item["states"].items(), key=lambda kv: kv[1], reverse=True)[0][0]
+        result.append(
+            dict(
+                address_family=item["address_family"],
+                vrf=item["vrf"],
+                total_peers=item["total_peers"],
+                established_peers=item["established_peers"],
+                non_established_peers=item["non_established_peers"],
+                dominant_state=dominant_state,
+            )
+        )
+
+    return result
+
+
+@register_processor(
+    vendor="Huawei", device_type="", collection_type="ospf_neighbors", method="netmiko"
+)
+def process_ospf_neighbors_netmiko(data):
+    """Huawei OSPF 邻居处理 (Netmiko/TextFSM)
+
+    当前基于 `display ospf peer brief` 的简表输出。
+    """
+    result = []
+    for item in data:
+        result.append(
+            dict(
+                area=item.get("area_id", ""),
+                local_interface=item.get("interface", ""),
+                neighbor_router_id=item.get("neighbor_id", ""),
+                neighbor_ip=item.get("neighbor_ip", ""),
+                state=item.get("state", ""),
+                priority=item.get("priority", ""),
+                dead_time=item.get("dead_time", ""),
+            )
+        )
+    return result
+
+
+@register_processor(
+    vendor="Huawei", device_type="", collection_type="ospf_interfaces", method="netmiko"
+)
+def process_ospf_interfaces_netmiko(data):
+    """Huawei OSPF 接口处理 (Netmiko/TextFSM)"""
+    result = []
+    for item in data:
+        result.append(
+            dict(
+                area=item.get("area", ""),
+                local_interface=item.get("interface", ""),
+                interface_ip=item.get("interface_ip", ""),
+                network_type=item.get("network_type", ""),
+                state=item.get("state", ""),
+                cost=item.get("cost", ""),
+                priority=item.get("priority", ""),
+                dr=item.get("dr", ""),
+                bdr=item.get("bdr", ""),
+                hello_interval=item.get("hello_interval", ""),
+                dead_interval=item.get("dead_interval", ""),
+            )
+        )
+    return result
+
+
+@register_processor(
+    vendor="Huawei", device_type="", collection_type="isis_neighbors", method="netmiko"
+)
+def process_isis_neighbors_netmiko(data):
+    """Huawei ISIS 邻居处理 (Netmiko/TextFSM)"""
+    result = []
+    for item in data:
+        peer_ip_raw = item.get("peer_ip", "")
+        peer_ip = str(peer_ip_raw).split()[0] if peer_ip_raw else ""
+        result.append(
+            dict(
+                system_id=item.get("system_id", ""),
+                local_interface=item.get("local_interface", ""),
+                circuit_id=item.get("circuit_id", ""),
+                state=item.get("state", ""),
+                hold_time=item.get("hold_time", ""),
+                neighbor_type=item.get("neighbor_type", ""),
+                priority=item.get("priority", ""),
+                area=item.get("area", ""),
+                peer_ip=peer_ip,
+                uptime=item.get("uptime", ""),
             )
         )
     return result

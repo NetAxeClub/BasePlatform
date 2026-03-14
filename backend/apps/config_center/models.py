@@ -44,6 +44,7 @@ class ConfigCompliance(models.Model):
     # category = models.CharField(verbose_name='类型', choices=CATEGORY_CHOICES, max_length=50, default='交换机')
     pattern = models.CharField(verbose_name='模式', choices=MATCH_CHOICES, max_length=50, default='match-compliance')
     regex = models.TextField(verbose_name='表达式', null=False, default='', blank=False)
+    intent = models.TextField(verbose_name='设计意图', null=False, default='', blank=True)
     # is_repair = models.BooleanField(verbose_name="是否修正", null=False, default=False, blank=False)
     # repair_cmds = models.TextField(verbose_name='修复命令', null=True, default='', blank=True)
     datetime = models.DateTimeField(auto_now=True, verbose_name='创建日期')

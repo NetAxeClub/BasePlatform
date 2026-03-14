@@ -85,6 +85,157 @@ AGGRE_PORT_MAPPING = [
     {"label": "模型: mode", "value": "mode"},
 ]
 
+FAN_STATUS_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "机框: chassis", "value": "chassis"},
+    {"label": "槽位: slot", "value": "slot"},
+    {"label": "风扇ID: fan_id", "value": "fan_id"},
+    {"label": "风扇名称: fan_name", "value": "fan_name"},
+    {"label": "在位状态: present", "value": "present"},
+    {"label": "注册状态: register_state", "value": "register_state"},
+    {"label": "状态: status", "value": "status"},
+    {"label": "转速: speed", "value": "speed"},
+    {"label": "模式: mode", "value": "mode"},
+    {"label": "风向: airflow_direction", "value": "airflow_direction"},
+    {"label": "期望风向: prefer_airflow_direction", "value": "prefer_airflow_direction"},
+]
+
+POWER_STATUS_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "机框: chassis", "value": "chassis"},
+    {"label": "槽位: slot", "value": "slot"},
+    {"label": "电源ID: power_id", "value": "power_id"},
+    {"label": "电源名称: power_name", "value": "power_name"},
+    {"label": "在位状态: present", "value": "present"},
+    {"label": "状态: status", "value": "status"},
+    {"label": "模式: mode", "value": "mode"},
+    {"label": "电流: current", "value": "current"},
+    {"label": "电压: voltage", "value": "voltage"},
+    {"label": "输出功率: output_power", "value": "output_power"},
+]
+
+TEMPERATURE_STATUS_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "机框: chassis", "value": "chassis"},
+    {"label": "槽位: slot", "value": "slot"},
+    {"label": "传感器: sensor", "value": "sensor"},
+    {"label": "状态: status", "value": "status"},
+    {"label": "温度: temperature", "value": "temperature"},
+]
+
+CLOCK_STATUS_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "设备时间: device_time", "value": "device_time"},
+    {"label": "时区: timezone", "value": "timezone"},
+    {"label": "星期: weekday", "value": "weekday"},
+    {"label": "日期: device_date", "value": "device_date"},
+    {"label": "日期时间: device_datetime", "value": "device_datetime"},
+]
+
+ROUTE_TABLE_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "前缀: prefix", "value": "prefix"},
+    {"label": "下一跳: next_hop", "value": "next_hop"},
+    {"label": "接口: interface", "value": "interface"},
+    {"label": "协议: protocol", "value": "protocol"},
+    {"label": "协议ID: protocol_id", "value": "protocol_id"},
+    {"label": "子协议ID: sub_protocol_id", "value": "sub_protocol_id"},
+    {"label": "进程ID: process_id", "value": "process_id"},
+    {"label": "优先级: preference", "value": "preference"},
+    {"label": "度量值: metric", "value": "metric"},
+    {"label": "VRF: vrf", "value": "vrf"},
+    {"label": "拓扑: topology", "value": "topology"},
+    {"label": "邻居: neighbor", "value": "neighbor"},
+    {"label": "路由年龄: age", "value": "age"},
+    {"label": "Origin AS: origin_as", "value": "origin_as"},
+    {"label": "Last AS: last_as", "value": "last_as"},
+]
+
+BGP_NEIGHBORS_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "邻居IP: peer_ip", "value": "peer_ip"},
+    {"label": "地址族: address_family", "value": "address_family"},
+    {"label": "VRF: vrf", "value": "vrf"},
+    {"label": "远端AS: remote_as", "value": "remote_as"},
+    {"label": "状态: state", "value": "state"},
+    {"label": "邻居组: peer_group", "value": "peer_group"},
+    {"label": "对端Router ID: remote_router_id", "value": "remote_router_id"},
+    {"label": "对等体类型: peer_type", "value": "peer_type"},
+    {"label": "本地接口: connect_interface", "value": "connect_interface"},
+    {"label": "更新源间隔: update_interval", "value": "update_interval"},
+    {"label": "EBGP MaxHop: ebgp_max_hop", "value": "ebgp_max_hop"},
+]
+
+BGP_SUMMARY_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "地址族: address_family", "value": "address_family"},
+    {"label": "VRF: vrf", "value": "vrf"},
+    {"label": "总邻居数: total_peers", "value": "total_peers"},
+    {"label": "已建立邻居数: established_peers", "value": "established_peers"},
+    {"label": "未建立邻居数: non_established_peers", "value": "non_established_peers"},
+    {"label": "主状态: dominant_state", "value": "dominant_state"},
+]
+
+OSPF_NEIGHBORS_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "区域: area", "value": "area"},
+    {"label": "本地接口: local_interface", "value": "local_interface"},
+    {"label": "邻居Router ID: neighbor_router_id", "value": "neighbor_router_id"},
+    {"label": "邻居地址: neighbor_ip", "value": "neighbor_ip"},
+    {"label": "状态: state", "value": "state"},
+    {"label": "优先级: priority", "value": "priority"},
+    {"label": "Dead Time: dead_time", "value": "dead_time"},
+]
+
+OSPF_INTERFACES_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "区域: area", "value": "area"},
+    {"label": "本地接口: local_interface", "value": "local_interface"},
+    {"label": "接口地址: interface_ip", "value": "interface_ip"},
+    {"label": "网络类型: network_type", "value": "network_type"},
+    {"label": "状态: state", "value": "state"},
+    {"label": "Cost: cost", "value": "cost"},
+    {"label": "优先级: priority", "value": "priority"},
+    {"label": "DR: dr", "value": "dr"},
+    {"label": "BDR: bdr", "value": "bdr"},
+    {"label": "Hello间隔: hello_interval", "value": "hello_interval"},
+    {"label": "Dead间隔: dead_interval", "value": "dead_interval"},
+]
+
+ISIS_NEIGHBORS_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "邻居System ID: system_id", "value": "system_id"},
+    {"label": "本地接口: local_interface", "value": "local_interface"},
+    {"label": "Circuit ID: circuit_id", "value": "circuit_id"},
+    {"label": "状态: state", "value": "state"},
+    {"label": "Hold Time: hold_time", "value": "hold_time"},
+    {"label": "邻居类型: neighbor_type", "value": "neighbor_type"},
+    {"label": "优先级: priority", "value": "priority"},
+    {"label": "区域地址: area", "value": "area"},
+    {"label": "邻居地址: peer_ip", "value": "peer_ip"},
+    {"label": "Up时间: uptime", "value": "uptime"},
+]
+
 field_mapping = {
     "version": {
         "label": "VERSION",
@@ -139,6 +290,66 @@ field_mapping = {
         "value": "aggre_port",
         "icon": "aggregation-port",
         "mapping_fields": AGGRE_PORT_MAPPING,
+    },
+    "fan_status": {
+        "label": "风扇状态",
+        "value": "fan_status",
+        "icon": "fan-status",
+        "mapping_fields": FAN_STATUS_MAPPING,
+    },
+    "power_status": {
+        "label": "电源状态",
+        "value": "power_status",
+        "icon": "power-status",
+        "mapping_fields": POWER_STATUS_MAPPING,
+    },
+    "temperature_status": {
+        "label": "温度状态",
+        "value": "temperature_status",
+        "icon": "temperature-status",
+        "mapping_fields": TEMPERATURE_STATUS_MAPPING,
+    },
+    "clock_status": {
+        "label": "时钟状态",
+        "value": "clock_status",
+        "icon": "clock-status",
+        "mapping_fields": CLOCK_STATUS_MAPPING,
+    },
+    "route_table": {
+        "label": "路由表",
+        "value": "route_table",
+        "icon": "route-table",
+        "mapping_fields": ROUTE_TABLE_MAPPING,
+    },
+    "bgp_neighbors": {
+        "label": "BGP邻居",
+        "value": "bgp_neighbors",
+        "icon": "bgp-neighbors",
+        "mapping_fields": BGP_NEIGHBORS_MAPPING,
+    },
+    "bgp_summary": {
+        "label": "BGP汇总",
+        "value": "bgp_summary",
+        "icon": "bgp-summary",
+        "mapping_fields": BGP_SUMMARY_MAPPING,
+    },
+    "ospf_neighbors": {
+        "label": "OSPF邻居",
+        "value": "ospf_neighbors",
+        "icon": "ospf-neighbors",
+        "mapping_fields": OSPF_NEIGHBORS_MAPPING,
+    },
+    "ospf_interfaces": {
+        "label": "OSPF接口",
+        "value": "ospf_interfaces",
+        "icon": "ospf-interfaces",
+        "mapping_fields": OSPF_INTERFACES_MAPPING,
+    },
+    "isis_neighbors": {
+        "label": "ISIS邻居",
+        "value": "isis_neighbors",
+        "icon": "isis-neighbors",
+        "mapping_fields": ISIS_NEIGHBORS_MAPPING,
     },
 }
 

@@ -89,6 +89,43 @@ docker-compose logs -f
 - `docs/<topic>`
 - `chore/<topic>`
 
+## Git 暂存与引用完整性约束
+
+这部分是仓库级强制约束，用于避免出现“代码还在引用新模块，但新模块文件被 stash / checkout / restore 收走”的半完成状态。
+
+本仓库已发生过一次真实问题：
+
+- `backend/apps/dcs_control/views.py` 中新增了对 `serializers.py`、`policy_audit.py` 等文件的引用。
+- 后续执行 `git stash` 时，未跟踪的新文件被收进 stash，而部分已跟踪改动仍留在工作区。
+- 结果变成“引用存在、被引用文件不存在”，最终触发 `ModuleNotFoundError`。
+
+根因总结：
+
+- 新增 import 的已跟踪文件，与新增的未跟踪配套文件没有作为一个原子变更集一起管理。
+- 使用 `git stash -u` 后，没有立即检查工作区是否真的干净。
+- 在 stash 出现异常或部分成功后，没有先修复工作区一致性，就继续后续操作。
+
+强制性约束：
+
+- 只要某个已跟踪文件新增了对新模块、新迁移、新文档或新路由文件的引用，这些文件必须视为一个“配套变更集”，不能拆开 stash、restore、checkout、提交或回滚。
+- 严禁让已跟踪代码处于“引用未跟踪文件”的中间状态超过当前操作步骤；如果必须中断，优先临时提交或单独分支保存，不优先依赖 stash。
+- 执行 `git stash`、`git checkout`、`git restore`、`git cherry-pick`、手工恢复文件后，必须立即执行 `git status --short`，确认不存在“已跟踪引用文件仍在，但配套新文件消失”的情况。
+- 对包含 Python import 链、Django `urls.py`、`views.py`、`serializers.py`、`models.py` 变更的任务，stash 或恢复后必须做一次导入级冒烟验证。
+- 如果 `git stash` 或索引操作返回异常、锁文件错误、部分成功结果，必须先处理一致性问题，再继续开发，不允许带病继续推进。
+
+推荐操作顺序：
+
+1. 先用 `git status --short` 识别本次变更中的“配套变更集”。
+2. 如果存在“已跟踪文件 + 新增未跟踪文件”的组合，优先：
+   - 临时提交到本地分支，或
+   - 明确使用 `git stash -u`
+3. stash 后立刻再次执行 `git status --short`。
+4. 对涉及 Django 导入链的改动，至少执行以下之一：
+   - `python -m py_compile <files>`
+   - `python manage.py shell -c "import apps.xxx.views"`
+   - `python manage.py test <targeted_tests>`
+5. 若发现工作区进入半状态，第一优先级是恢复缺失文件或回到一致状态，不先写新代码。
+
 ## 编码与实现约定
 
 - 遵循 PEP 8，使用 4 空格缩进，单行长度控制在 120 字符内。

@@ -100,3 +100,56 @@ class DnatRecord(models.Model):
 
     def __str__(self):
         return f"{self.rule_name} ({self.public_ip} → {self.private_ip})"
+
+
+class FirewallPolicyAuditRecord(models.Model):
+    """防火墙策略审计结果留痕记录。"""
+
+    class AuditType(models.TextChoices):
+        SECURITY_POLICY = 'sec_policy', '安全策略审计'
+
+    class Status(models.TextChoices):
+        SUCCESS = 'success', '成功'
+        PARTIAL = 'partial', '部分成功'
+        FAILED = 'failed', '失败'
+
+    audit_type = models.CharField(
+        max_length=32,
+        choices=AuditType.choices,
+        default=AuditType.SECURITY_POLICY,
+        verbose_name='审计类型',
+    )
+    vendor = models.CharField(max_length=20, verbose_name='厂商')
+    device_ip = models.GenericIPAddressField(
+        protocol='both', unpack_ipv4=True, verbose_name='设备管理IP'
+    )
+    operator = models.CharField(max_length=64, blank=True, default='', verbose_name='操作人')
+    source = models.CharField(max_length=64, blank=True, default='NetClaw-CN', verbose_name='来源系统')
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.SUCCESS,
+        verbose_name='执行状态',
+    )
+    summary = models.JSONField(verbose_name='摘要信息', default=dict)
+    findings = models.JSONField(verbose_name='风险发现', default=list)
+    audit_payload = models.JSONField(verbose_name='完整审计载荷', default=dict)
+    auto_flow_id = models.IntegerField(null=True, blank=True, verbose_name='关联 AutoFlow ID')
+    task_id = models.CharField(max_length=128, blank=True, default='', verbose_name='关联任务ID')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
+
+    class Meta:
+        db_table = 'dcs_firewall_policy_audit_record'
+        verbose_name = '防火墙审计记录'
+        verbose_name_plural = verbose_name
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['device_ip', 'created_at'], name='idx_fw_audit_device_time'),
+            models.Index(fields=['vendor', 'created_at'], name='idx_fw_audit_vendor_time'),
+            models.Index(fields=['status'], name='idx_fw_audit_status'),
+            models.Index(fields=['auto_flow_id'], name='idx_fw_audit_flow'),
+        ]
+
+    def __str__(self):
+        return f"{self.vendor}-{self.device_ip}-{self.audit_type}"
