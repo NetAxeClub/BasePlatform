@@ -35,7 +35,9 @@ from apps.device_api.serializers import (
     DeviceSubCollectionPlanSerializer,
     DeviceSubCollectionPlanUpdateSerializer,
 )
+from apps.device_api.management.commands.sync_legacy_plan_bindings import Command as SyncLegacyPlanBindingsCommand
 from apps.device_api.tasks import _process_and_save_result
+from apps.device_api.tools.collect_device import get_auto_device
 from apps.device_api.views import CollectionResultViewSet, DeviceCollectionPlansViewSet
 
 
@@ -347,6 +349,148 @@ class DeviceApiSerializerTests(SimpleTestCase):
 
         self.assertFalse(serializer.is_valid())
         self.assertIn("当前RESTCONF仅支持GET方法", str(serializer.errors))
+
+
+class DeviceApiCollectDeviceTests(SimpleTestCase):
+    @patch("apps.device_api.tools.collect_device.DeviceSubCollectionPlanSerializer")
+    @patch("apps.device_api.tools.collect_device.DeviceSubCollectionPlan.objects")
+    @patch("apps.device_api.tools.collect_device.AssetAccount.objects")
+    @patch("apps.device_api.tools.collect_device.PlansToDevice.objects")
+    @patch("apps.device_api.tools.collect_device.NetworkDevice.objects")
+    def test_get_auto_device_uses_plans_to_device_as_binding_source(
+        self,
+        mock_device_objects,
+        mock_relation_objects,
+        mock_account_objects,
+        mock_sub_plan_objects,
+        mock_sub_plan_serializer,
+    ):
+        device_row = {
+            "id": 1,
+            "serial_num": "SER-1",
+            "manage_ip": "10.0.0.1",
+            "name": "switch-a",
+            "soft_version": "v1",
+            "vendor__name": "Huawei",
+            "vendor__alias": "Huawei",
+            "category__name": "switch",
+            "model__name": "CE8850",
+            "ssh_enable": "account",
+            "ssh_account": 101,
+            "netconf_enable": "account",
+            "netconf_account": 102,
+            "patch_version": "p1",
+            "status": 0,
+            "idc__name": "IDC-A",
+            "auto_enable": True,
+            "ha_status": 0,
+            "chassis": 1,
+            "slot": 1,
+        }
+        mock_device_objects.filter.return_value.select_related.return_value.values.return_value = [device_row]
+
+        relation_one = SimpleNamespace(manage_ip="10.0.0.1", plan_id=201, use_local=True, execute_node="", plan=SimpleNamespace(id=201))
+        relation_two = SimpleNamespace(manage_ip="10.0.0.1", plan_id=202, use_local=False, execute_node="10.0.0.9", plan=SimpleNamespace(id=202))
+        mock_relation_objects.select_related.return_value.filter.return_value = [relation_one, relation_two]
+
+        mock_account_objects.filter.return_value.values.return_value = [
+            {"id": 101, "name": "ssh", "username": "u1", "password": "gAAAA", "protocol": "ssh", "port": 22},
+            {"id": 102, "name": "netconf", "username": "u2", "password": "gBBBB", "protocol": "netconf", "port": 830},
+        ]
+        mock_sub_plan_objects.filter.return_value.select_related.return_value.order_by.return_value = [SimpleNamespace(id=11), SimpleNamespace(id=12)]
+        mock_sub_plan_serializer.return_value.data = [
+            {"summary_plan": 201, "id": 11, "collection_type": "arp"},
+            {"summary_plan": 202, "id": 12, "collection_type": "mac"},
+        ]
+
+        with patch("apps.device_api.tools.collect_device.CryptPwd.decrypt_pwd", side_effect=lambda value: f"decoded-{value}"):
+            result = get_auto_device(manage_ip="10.0.0.1", plan_id=201, use_local=False)
+
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]["manage_ip"], "10.0.0.1")
+        self.assertEqual(result[0]["plan_id"], 201)
+        self.assertEqual(result[0]["sub_plans"], [{"summary_plan": 201, "id": 11, "collection_type": "arp"}])
+        self.assertTrue(result[0]["use_local"])
+        self.assertEqual(result[1]["plan_id"], 202)
+        self.assertEqual(result[1]["execute_node"], "10.0.0.9")
+        self.assertEqual(result[1]["sub_plans"], [{"summary_plan": 202, "id": 12, "collection_type": "mac"}])
+
+        network_filter_kwargs = mock_device_objects.filter.call_args.kwargs
+        self.assertNotIn("plan_id", network_filter_kwargs)
+        self.assertNotIn("use_local", network_filter_kwargs)
+
+        relation_filter_kwargs = mock_relation_objects.select_related.return_value.filter.call_args.kwargs
+        self.assertEqual(relation_filter_kwargs["manage_ip__in"], ["10.0.0.1"])
+        self.assertEqual(relation_filter_kwargs["plan_id"], 201)
+        self.assertFalse(relation_filter_kwargs["use_local"])
+
+    @patch("apps.device_api.tools.collect_device.PlansToDevice.objects")
+    @patch("apps.device_api.tools.collect_device.NetworkDevice.objects")
+    def test_get_auto_device_skips_devices_without_plan_binding(
+        self,
+        mock_device_objects,
+        mock_relation_objects,
+    ):
+        device_row = {
+            "id": 1,
+            "serial_num": "SER-1",
+            "manage_ip": "10.0.0.1",
+            "name": "switch-a",
+            "soft_version": "v1",
+            "vendor__name": "Huawei",
+            "vendor__alias": "Huawei",
+            "category__name": "switch",
+            "model__name": "CE8850",
+            "ssh_enable": "0",
+            "ssh_account": None,
+            "netconf_enable": "0",
+            "netconf_account": None,
+            "patch_version": "p1",
+            "status": 0,
+            "idc__name": "IDC-A",
+            "auto_enable": True,
+            "ha_status": 0,
+            "chassis": 1,
+            "slot": 1,
+        }
+        mock_device_objects.filter.return_value.select_related.return_value.values.return_value = [device_row]
+        mock_relation_objects.select_related.return_value.filter.return_value = []
+
+        result = get_auto_device(manage_ip="10.0.0.1")
+
+        self.assertEqual(result, [])
+
+
+class DeviceApiBridgeCommandTests(SimpleTestCase):
+    @patch("apps.device_api.management.commands.sync_legacy_plan_bindings.PlansToDevice.objects")
+    @patch("apps.device_api.management.commands.sync_legacy_plan_bindings.DeviceCollectionPlans.objects")
+    @patch("apps.device_api.management.commands.sync_legacy_plan_bindings.NetworkDevice.objects")
+    def test_sync_legacy_plan_bindings_creates_bridge_relation(
+        self,
+        mock_network_device_objects,
+        mock_device_plan_objects,
+        mock_relation_objects,
+    ):
+        legacy_plan = SimpleNamespace(id=9, name="legacy-switch-plan")
+        device = SimpleNamespace(
+            manage_ip="10.0.0.1",
+            plan=legacy_plan,
+            vendor=SimpleNamespace(alias="Huawei"),
+            category=SimpleNamespace(name="switch"),
+        )
+        mock_network_device_objects.filter.return_value.select_related.return_value = [device]
+        mock_device_plan_objects.filter.return_value.first.return_value = SimpleNamespace(id=101)
+        mock_relation_objects.filter.return_value.exists.return_value = False
+
+        command = SyncLegacyPlanBindingsCommand()
+        command.handle(dry_run=False, manage_ip=None)
+
+        mock_relation_objects.create.assert_called_once_with(
+            manage_ip="10.0.0.1",
+            plan=mock_device_plan_objects.filter.return_value.first.return_value,
+            use_local=True,
+            execute_node="",
+        )
 
 
 class DeviceApiTaskTests(SimpleTestCase):
