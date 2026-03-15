@@ -398,6 +398,8 @@ NetAxe平台提供RESTful API接口，基于Django REST Framework实现。所有
   "vendor": "H3C",
   "device_type": "switch",
   "description": "H3C 现代交换机默认模板方案",
+  "enabled_collection_types": ["arp", "mac", "lldp", "interface_brief"],
+  "collection_method": "both",
   "profile_code": "H3C-modern-netconf",
   "plan_kind": "template",
   "version": 1,
@@ -405,6 +407,9 @@ NetAxe平台提供RESTful API接口，基于Django REST Framework实现。所有
   "is_active": true
 }
 ```
+
+- `enabled_collection_types` 为空数组或不传时，表示使用后端默认的全部采集类型。
+- `collection_method` 支持 `netmiko`、`netconf`、`both`，保存父方案时会自动同步到对应子方案的 `netmiko_enabled` / `netconf_enabled`。
 
 ### 6.2 子采集方案管理
 
@@ -428,6 +433,44 @@ NetAxe平台提供RESTful API接口，基于Django REST Framework实现。所有
   "netconf_enabled": false
 }
 ```
+
+#### 获取方案级字段映射
+- **URL**: `/base_platform/device_api/collection-plans/{id}/field-mappings/`
+- **方法**: GET
+
+#### 更新方案级字段映射
+- **URL**: `/base_platform/device_api/collection-plans/{id}/field-mappings/`
+- **方法**: PATCH
+- **请求参数**:
+```json
+{
+  "arp": {
+    "netmiko_path": "data.items[*]",
+    "netmiko_field_mappings": {
+      "ipaddress": "ip",
+      "macaddress": "mac"
+    },
+    "netconf_path": "top.ARP.ArpTable.ArpEntry",
+    "netconf_field_mappings": {
+      "ipaddress": "Ipv4Address"
+    }
+  }
+}
+```
+
+#### 方案级一键验证
+- **URL**: `/base_platform/device_api/collection-plans/{id}/validate/`
+- **方法**: POST
+- **请求参数**:
+```json
+{
+  "device_ip": "10.0.0.1",
+  "use_local": true
+}
+```
+
+- 南向驱动方式需额外传 `south_driver`；本机直连方式可传 `use_local=true`。
+- 返回结果按 `collection_type` 分组，单个类型下保留对应子方案的执行状态与协议返回结果。
 
 ### 6.3 采集结果管理
 

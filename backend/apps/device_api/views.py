@@ -237,6 +237,40 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
     ordering = ['-created_at']
     pagination_class = LargeResultsSetPagination
 
+    @staticmethod
+    def _plan_has_enabled_method(plan):
+        return any(
+            bool(getattr(plan, field_name, False))
+            for field_name in (
+                'netmiko_enabled',
+                'netconf_enabled',
+                'snmp_enabled',
+                'restconf_enabled',
+                'telemetry_enabled',
+            )
+        )
+
+    @staticmethod
+    def _build_plan_execution_payload(plan, status, message, collection_result=None):
+        payload = {
+            'plan_id': plan.id,
+            'plan_name': plan.name,
+            'collection_type': getattr(plan, 'collection_type', ''),
+            'status': status,
+            'message': message,
+        }
+        if collection_result is not None:
+            payload.update(
+                {
+                    'netconf_result': collection_result.get('netconf_result'),
+                    'netmiko_result': collection_result.get('netmiko_result'),
+                    'snmp_result': collection_result.get('snmp_result'),
+                    'restconf_result': collection_result.get('restconf_result'),
+                    'telemetry_result': collection_result.get('telemetry_result'),
+                }
+            )
+        return payload
+
     def get_serializer_class(self):
         """根据操作类型返回不同的序列化器"""
         if self.action == 'create':
@@ -343,10 +377,10 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
 
     @action(detail=True, methods=['post'])
     def sync_collect_plans(self, request, *args, **kwargs):
-        """为历史父方案补齐缺失的默认子采集方案。"""
+        """按父方案配置补齐并同步默认子采集方案。"""
         try:
             summary_plan = self.get_object()
-            sync_result = DeviceCollectionService.ensure_default_sub_plans(summary_plan)
+            sync_result = DeviceCollectionService.sync_summary_plan_sub_plans(summary_plan)
             profile_code = getattr(summary_plan, "profile_code", "")
             if profile_code:
                 profile = PlatformProfile.objects.filter(code=profile_code).first()
@@ -369,6 +403,177 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
                 'code': 500,
                 'message': f'同步失败: {str(e)}',
                 'data': None
+            })
+
+    @action(detail=True, methods=['get', 'patch'], url_path='field-mappings')
+    def field_mappings(self, request, *args, **kwargs):
+        """按 collection_type 聚合父方案字段映射，并支持批量回写。"""
+        try:
+            summary_plan = self.get_object()
+            if request.method.lower() == 'get':
+                data = DeviceCollectionService.get_summary_plan_field_mappings(summary_plan)
+                return JsonResponse({
+                    'code': 200,
+                    'message': '获取成功',
+                    'data': data,
+                })
+
+            data = DeviceCollectionService.update_summary_plan_field_mappings(
+                summary_plan,
+                request.data,
+            )
+            return JsonResponse({
+                'code': 200,
+                'message': '更新成功',
+                'data': data,
+            })
+        except ValueError as e:
+            return JsonResponse({
+                'code': 400,
+                'message': str(e),
+                'data': None,
+            })
+        except Exception as e:
+            logger.error(f"父方案字段映射聚合操作失败: {str(e)}", exc_info=True)
+            return JsonResponse({
+                'code': 500,
+                'message': f'操作失败: {str(e)}',
+                'data': None,
+            })
+
+    @action(detail=True, methods=['post'], url_path='validate')
+    def validate_plan(self, request, *args, **kwargs):
+        """按父方案聚合执行所有启用子方案的验证，并按 collection_type 分组返回结果。"""
+        summary_plan = self.get_object()
+        device_ip = (request.data.get('device_ip') or '').strip()
+        south_driver = request.data.get('south_driver')
+        use_local = request.data.get('use_local', False)
+
+        try:
+            if not summary_plan.is_active:
+                return JsonResponse({
+                    'code': 400,
+                    'message': f"汇总方案 '{summary_plan.name}' 已被禁用",
+                    'data': None,
+                })
+
+            if not device_ip:
+                return JsonResponse({
+                    'code': 400,
+                    'message': '缺少必要参数: device_ip',
+                    'data': None,
+                })
+
+            enabled_plans = [
+                plan for plan in summary_plan.collect_plans.all()
+                if self._plan_has_enabled_method(plan)
+            ]
+            if not enabled_plans:
+                return JsonResponse({
+                    'code': 400,
+                    'message': f"汇总方案 '{summary_plan.name}' 下没有启用的采集方案",
+                    'data': None,
+                })
+
+            if not use_local and not south_driver:
+                return JsonResponse({
+                    'code': 400,
+                    'message': '南向驱动方式执行时缺少参数: south_driver；若需本机直连执行请传 use_local=true',
+                    'data': None,
+                })
+
+            results = []
+            success_count = 0
+            failed_count = 0
+            skipped_count = 0
+
+            for plan in enabled_plans:
+                try:
+                    is_valid, error_msg, device = DeviceSubCollectionPlanViewSet.validate_execution_params(
+                        plan, device_ip, 'both', use_local=use_local
+                    )
+                    if not is_valid:
+                        results.append(
+                            self._build_plan_execution_payload(plan, 'skipped', error_msg)
+                        )
+                        skipped_count += 1
+                        continue
+
+                    if use_local:
+                        execution_result = DeviceCollectionService.execute_both_collection_local(plan, device)
+                    else:
+                        execution_result = DeviceCollectionService.execute_both_collection(
+                            plan, device, south_driver
+                        )
+
+                    if execution_result.get('success'):
+                        results.append(
+                            self._build_plan_execution_payload(
+                                plan,
+                                'success',
+                                execution_result.get('message', '验证成功'),
+                                execution_result,
+                            )
+                        )
+                        success_count += 1
+                    else:
+                        results.append(
+                            self._build_plan_execution_payload(
+                                plan,
+                                'failed',
+                                execution_result.get('error', '验证失败'),
+                                execution_result,
+                            )
+                        )
+                        failed_count += 1
+                except Exception as e:
+                    logger.error(f"父方案一键验证失败: 方案={plan.name}, 设备={device_ip}, 错误={str(e)}", exc_info=True)
+                    results.append(
+                        self._build_plan_execution_payload(plan, 'failed', f'执行异常: {str(e)}')
+                    )
+                    failed_count += 1
+
+            grouped_results = {}
+            for result in results:
+                grouped_results.setdefault(result['collection_type'], []).append(result)
+
+            total_plans = len(enabled_plans)
+            if success_count == total_plans:
+                message = f"所有采集方案验证成功 ({success_count}/{total_plans})"
+            elif success_count > 0:
+                message = (
+                    f"部分采集方案验证成功 ({success_count}/{total_plans})，"
+                    f"失败 {failed_count}，跳过 {skipped_count}"
+                )
+            elif skipped_count == total_plans:
+                message = f"所有采集方案均未通过前置校验 ({skipped_count}/{total_plans})"
+            else:
+                message = f"所有采集方案验证失败 ({failed_count}/{total_plans})"
+
+            result_code = 200 if success_count > 0 else 500
+            if skipped_count == total_plans:
+                result_code = 400
+
+            return JsonResponse({
+                'code': result_code,
+                'message': message,
+                'data': {
+                    'summary_plan_id': summary_plan.id,
+                    'summary_plan_name': summary_plan.name,
+                    'device_ip': device_ip,
+                    'total_plans': total_plans,
+                    'success_count': success_count,
+                    'failed_count': failed_count,
+                    'skipped_count': skipped_count,
+                    'results': grouped_results,
+                },
+            })
+        except Exception as e:
+            logger.error(f"父方案一键验证失败: 方案={summary_plan.name}, 设备={device_ip}, 错误={str(e)}", exc_info=True)
+            return JsonResponse({
+                'code': 500,
+                'message': f'验证失败: {str(e)}',
+                'data': None,
             })
 
     @action(detail=True, methods=['post'])
@@ -620,7 +825,8 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
                 "data": ""
             })
 
-    def validate_execution_params(self, plan, device_ip, collection_type, use_local=False):
+    @staticmethod
+    def validate_execution_params(plan, device_ip, collection_type, use_local=False):
         """验证采集执行参数
         
         Args:

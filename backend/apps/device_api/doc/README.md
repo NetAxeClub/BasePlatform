@@ -1,6 +1,6 @@
 # device_api 模块文档
 
-**更新时间：2026-03-10**
+**更新时间：2026-03-16**
 
 ## 📋 模块概述
 
@@ -13,6 +13,11 @@
 ---
 
 ## 📚 文档索引
+
+### 最新归档
+
+- [工作区开发归档（2026-03-16）](../../../../doc/20-device_api开发归档-2026-03-16.md)
+  - 记录当前工作区未提交进度、已完成能力、验证结果和下次恢复建议
 
 ### 核心文档（建议优先阅读）
 
@@ -69,17 +74,16 @@
 
 ### 🚧 进行中（Phase 2）
 - [x] H3C Netmiko 处理器全量补齐（arp/mac/lldp/ip_interface/interface_brief/aggre_port）
-- [x] H3C NETCONF 处理器：mac_evpn 已实现
-- [ ] H3C NETCONF 处理器：arp/mac/ip_interface/lldp/aggre_port 待补齐
+- [x] H3C NETCONF 处理器：arp/mac/ip_interface/lldp/aggre_port/mac_evpn 已实现
 - [x] Huawei Netmiko 处理器全量补齐
-- [ ] Huawei NETCONF 处理器待实现
+- [x] Huawei NETCONF 处理器：arp/mac/ip_interface/lldp/aggre_port 已实现
 - [ ] 改造 `tools/` 为 Layer 2 规范化器（职责收窄）
 
 ### 📅 待启动（Phase 3 - UX 简化）
-- [ ] 父方案模型增加 `enabled_collection_types` 和 `collection_method` 字段
-- [ ] 父方案保存时自动同步子方案
-- [ ] 新增方案级字段映射聚合接口
-- [ ] 新增方案级一键验证接口
+- [x] 父方案模型增加 `enabled_collection_types` 和 `collection_method` 字段
+- [x] 父方案保存时自动同步子方案（含 `sync_collect_plans`）
+- [x] 新增方案级字段映射聚合接口
+- [x] 新增方案级一键验证接口
 
 ### 🔮 长期规划（Phase 4）
 - [ ] 建立单元测试（预处理管道、字段映射、连接管理）

@@ -71,9 +71,17 @@ class DeviceCollectionPlans(models.Model):
     """采集汇总方案"""
     PLAN_KIND_TEMPLATE = "template"
     PLAN_KIND_RUNTIME = "runtime"
+    COLLECTION_METHOD_NETMIKO = "netmiko"
+    COLLECTION_METHOD_NETCONF = "netconf"
+    COLLECTION_METHOD_BOTH = "both"
     PLAN_KIND_CHOICES = [
         (PLAN_KIND_TEMPLATE, "模板方案"),
         (PLAN_KIND_RUNTIME, "运行时方案"),
+    ]
+    COLLECTION_METHOD_CHOICES = [
+        (COLLECTION_METHOD_NETMIKO, "仅 Netmiko"),
+        (COLLECTION_METHOD_NETCONF, "仅 NETCONF"),
+        (COLLECTION_METHOD_BOTH, "Netmiko + NETCONF"),
     ]
 
     VENDOR_CHOICES = [
@@ -110,6 +118,13 @@ class DeviceCollectionPlans(models.Model):
     generated_by_system = models.BooleanField(default=False, verbose_name="是否系统生成")
     version = models.PositiveIntegerField(default=1, verbose_name="方案版本")
     is_default = models.BooleanField(default=False, verbose_name="是否默认方案")
+    enabled_collection_types = models.JSONField(blank=True, default=list, verbose_name="启用的采集类型")
+    collection_method = models.CharField(
+        max_length=16,
+        choices=COLLECTION_METHOD_CHOICES,
+        default=COLLECTION_METHOD_NETMIKO,
+        verbose_name="方案级采集方式",
+    )
     is_active = models.BooleanField(default=True, verbose_name='是否启用')
 
     # 时间戳

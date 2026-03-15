@@ -14,14 +14,23 @@ from apps.device_api.fields_mapping import (
 from apps.device_api.models import DeviceCollectionPlans, DeviceDiscoveryState, DeviceSubCollectionPlan
 from apps.device_api.models_api import COLLECTION_TYPE_MONGO_MAP
 from apps.device_api.processors.h3c import (
+    process_aggre_port_netconf as process_h3c_aggre_port_netconf,
     process_bgp_summary_netconf as process_h3c_bgp_summary_netconf,
     process_clock_status_netmiko as process_h3c_clock_status_netmiko,
     process_fan_status_netmiko as process_h3c_fan_status_netmiko,
+    process_ip_interface_netconf as process_h3c_ip_interface_netconf,
+    process_lldp_netconf as process_h3c_lldp_netconf,
+    process_mac_netconf as process_h3c_mac_netconf,
     process_power_status_netmiko as process_h3c_power_status_netmiko,
     process_route_table_netconf as process_h3c_route_table_netconf,
 )
 from apps.device_api.processors.huawei import (
+    process_aggre_port_netconf as process_huawei_aggre_port_netconf,
+    process_arp_netconf as process_huawei_arp_netconf,
+    process_ip_interface_netconf as process_huawei_ip_interface_netconf,
     process_isis_neighbors_netmiko as process_huawei_isis_neighbors_netmiko,
+    process_lldp_netconf as process_huawei_lldp_netconf,
+    process_mac_netconf as process_huawei_mac_netconf,
     process_power_status_netmiko as process_huawei_power_status_netmiko,
     process_route_table_netconf as process_huawei_route_table_netconf,
     process_temperature_status_netmiko as process_huawei_temperature_status_netmiko,
@@ -32,6 +41,7 @@ from apps.device_api.processors.ruijie import (
 )
 from apps.device_api.services_new import DeviceCollectionService
 from apps.device_api.serializers import (
+    DeviceCollectionPlansCreateSerializer,
     DeviceSubCollectionPlanCreateSerializer,
     DeviceSubCollectionPlanSerializer,
     DeviceSubCollectionPlanUpdateSerializer,
@@ -98,6 +108,108 @@ class DeviceApiViewTests(SimpleTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(payload["code"], 200)
         mock_execute_both_collection.assert_called_once_with(plan, mock_get_device.return_value, "10.0.0.10")
+
+    @patch("apps.device_api.views.DeviceCollectionService.execute_both_collection_local")
+    @patch("apps.device_api.views.DeviceSubCollectionPlanViewSet.validate_execution_params")
+    @patch.object(DeviceCollectionPlansViewSet, "get_object")
+    def test_validate_plan_groups_results_by_collection_type(
+        self,
+        mock_get_object,
+        mock_validate_params,
+        mock_execute_local,
+    ):
+        arp_plan = SimpleNamespace(
+            id=11,
+            name="summary-plan-arp",
+            collection_type="arp",
+            netmiko_enabled=True,
+            netconf_enabled=False,
+            snmp_enabled=False,
+            restconf_enabled=False,
+            telemetry_enabled=False,
+        )
+        mac_plan = SimpleNamespace(
+            id=12,
+            name="summary-plan-mac",
+            collection_type="mac",
+            netmiko_enabled=True,
+            netconf_enabled=False,
+            snmp_enabled=False,
+            restconf_enabled=False,
+            telemetry_enabled=False,
+        )
+        summary_plan = SimpleNamespace(
+            id=1,
+            name="summary-plan",
+            is_active=True,
+            collect_plans=SimpleNamespace(all=lambda: [arp_plan, mac_plan]),
+        )
+        mock_get_object.return_value = summary_plan
+        device = SimpleNamespace(manage_ip="10.0.0.1")
+        mock_validate_params.side_effect = [
+            (True, "验证通过", device),
+            (False, "设备 10.0.0.1 未配置SSH账号", None),
+        ]
+        mock_execute_local.return_value = {
+            "success": True,
+            "message": "NETMIKO 采集成功",
+            "netconf_result": None,
+            "netmiko_result": {"success": True},
+            "snmp_result": None,
+            "restconf_result": None,
+            "telemetry_result": None,
+        }
+
+        request = self.factory.post(
+            "/base_platform/device_api/collection-plans/1/validate/",
+            {"device_ip": "10.0.0.1", "use_local": True},
+            format="json",
+        )
+        response = DeviceCollectionPlansViewSet.as_view({"post": "validate_plan"})(request, pk="1")
+        payload = json.loads(response.content)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["code"], 200)
+        self.assertEqual(payload["data"]["success_count"], 1)
+        self.assertEqual(payload["data"]["skipped_count"], 1)
+        self.assertEqual(payload["data"]["results"]["arp"][0]["status"], "success")
+        self.assertEqual(payload["data"]["results"]["mac"][0]["status"], "skipped")
+        mock_execute_local.assert_called_once_with(arp_plan, device)
+
+    @patch.object(DeviceCollectionPlansViewSet, "get_object")
+    def test_validate_plan_requires_south_driver_when_not_local(self, mock_get_object):
+        summary_plan = SimpleNamespace(
+            id=1,
+            name="summary-plan",
+            is_active=True,
+            collect_plans=SimpleNamespace(
+                all=lambda: [
+                    SimpleNamespace(
+                        id=11,
+                        name="summary-plan-arp",
+                        collection_type="arp",
+                        netmiko_enabled=True,
+                        netconf_enabled=False,
+                        snmp_enabled=False,
+                        restconf_enabled=False,
+                        telemetry_enabled=False,
+                    )
+                ]
+            ),
+        )
+        mock_get_object.return_value = summary_plan
+
+        request = self.factory.post(
+            "/base_platform/device_api/collection-plans/1/validate/",
+            {"device_ip": "10.0.0.1"},
+            format="json",
+        )
+        response = DeviceCollectionPlansViewSet.as_view({"post": "validate_plan"})(request, pk="1")
+        payload = json.loads(response.content)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["code"], 400)
+        self.assertIn("south_driver", payload["message"])
 
     @patch("apps.device_api.views.MongoOps")
     @patch("apps.device_api.views.COLLECTION_SUB_PLAN")
@@ -226,7 +338,7 @@ class DeviceApiViewTests(SimpleTestCase):
         self.assertIn("manage_ip", payload["message"])
 
     @patch("apps.device_api.views.DeviceCollectionPlansDetailSerializer")
-    @patch("apps.device_api.views.DeviceCollectionService.ensure_default_sub_plans")
+    @patch("apps.device_api.views.DeviceCollectionService.sync_summary_plan_sub_plans")
     @patch.object(DeviceCollectionPlansViewSet, "get_object")
     def test_sync_collect_plans_returns_sync_summary(
         self,
@@ -257,6 +369,113 @@ class DeviceApiViewTests(SimpleTestCase):
         self.assertEqual(payload["data"]["created_types"], ["route_table", "bgp_neighbors"])
         mock_sync.assert_called_once_with(summary_plan)
         summary_plan.refresh_from_db.assert_called_once()
+
+    @patch.object(DeviceCollectionPlansViewSet, "get_object")
+    def test_collection_plan_field_mappings_returns_grouped_payload(self, mock_get_object):
+        arp_plan = SimpleNamespace(
+            id=11,
+            name="summary-plan-arp",
+            collection_type="arp",
+            netmiko_path="data.arp",
+            netmiko_field_mappings={"ipaddress": "ip"},
+            netconf_path="top.arp",
+            netconf_field_mappings={"ipaddress": "Ipv4Address"},
+            snmp_path="",
+            snmp_field_mappings={},
+            restconf_path="",
+            restconf_field_mappings={},
+            telemetry_path="",
+            telemetry_field_mappings={},
+        )
+        mac_plan = SimpleNamespace(
+            id=12,
+            name="summary-plan-mac",
+            collection_type="mac",
+            netmiko_path="",
+            netmiko_field_mappings={},
+            netconf_path="",
+            netconf_field_mappings={},
+            snmp_path="",
+            snmp_field_mappings={},
+            restconf_path="",
+            restconf_field_mappings={},
+            telemetry_path="",
+            telemetry_field_mappings={},
+        )
+        summary_plan = SimpleNamespace(
+            enabled_collection_types=["arp"],
+            collect_plans=SimpleNamespace(all=lambda: [arp_plan, mac_plan]),
+        )
+        mock_get_object.return_value = summary_plan
+
+        request = self.factory.get("/base_platform/device_api/collection-plans/1/field-mappings/")
+        response = DeviceCollectionPlansViewSet.as_view({"get": "field_mappings"})(request, pk="1")
+        payload = json.loads(response.content)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["code"], 200)
+        self.assertEqual(payload["data"]["arp"]["netmiko_path"], "data.arp")
+        self.assertTrue(payload["data"]["arp"]["enabled"])
+        self.assertFalse(payload["data"]["mac"]["enabled"])
+        self.assertIn("ipaddress", payload["data"]["arp"]["output_fields"])
+
+    @patch("apps.device_api.views.DeviceCollectionService.sync_summary_plan_sub_plans")
+    @patch.object(DeviceCollectionPlansViewSet, "get_object")
+    def test_collection_plan_field_mappings_patch_updates_sub_plan_fields(
+        self,
+        mock_get_object,
+        mock_sync,
+    ):
+        arp_plan = SimpleNamespace(
+            id=11,
+            name="summary-plan-arp",
+            collection_type="arp",
+            netmiko_path="old.path",
+            netmiko_field_mappings={"old": "value"},
+            netconf_path="",
+            netconf_field_mappings={},
+            snmp_path="",
+            snmp_field_mappings={},
+            restconf_path="",
+            restconf_field_mappings={},
+            telemetry_path="",
+            telemetry_field_mappings={},
+            save=Mock(),
+        )
+        summary_plan = SimpleNamespace(
+            enabled_collection_types=["arp"],
+            collection_method="both",
+            collect_plans=SimpleNamespace(all=lambda: [arp_plan]),
+        )
+        mock_get_object.return_value = summary_plan
+        mock_sync.return_value = {
+            "created_count": 0,
+            "created_types": [],
+            "updated_count": 0,
+            "updated_types": [],
+            "disabled_count": 0,
+            "disabled_types": [],
+        }
+
+        request = self.factory.patch(
+            "/base_platform/device_api/collection-plans/1/field-mappings/",
+            {
+                "arp": {
+                    "netmiko_path": "data.items[*]",
+                    "netmiko_field_mappings": {"ipaddress": "ip"},
+                }
+            },
+            format="json",
+        )
+        response = DeviceCollectionPlansViewSet.as_view({"patch": "field_mappings"})(request, pk="1")
+        payload = json.loads(response.content)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["code"], 200)
+        self.assertEqual(arp_plan.netmiko_path, "data.items[*]")
+        self.assertEqual(arp_plan.netmiko_field_mappings, {"ipaddress": "ip"})
+        arp_plan.save.assert_called_once()
+        self.assertEqual(payload["data"]["arp"]["netmiko_path"], "data.items[*]")
 
     @patch("apps.device_api.views.PlatformProfileService.auto_bind_devices")
     @patch("apps.device_api.views.NetworkDevice.objects")
@@ -379,6 +598,64 @@ class DeviceApiViewTests(SimpleTestCase):
 
 
 class DeviceApiSerializerTests(SimpleTestCase):
+    def test_plan_create_serializer_rejects_unknown_enabled_collection_type(self):
+        serializer = DeviceCollectionPlansCreateSerializer(
+            data={
+                "name": "summary-plan",
+                "vendor": "Huawei",
+                "device_type": "switch",
+                "enabled_collection_types": ["arp", "not-supported"],
+                "collection_method": "both",
+                "is_active": True,
+            }
+        )
+        serializer.fields["name"].validators = []
+
+        with patch("apps.device_api.serializers.DeviceCollectionPlans.objects.filter") as mock_filter:
+            mock_filter.return_value.exists.return_value = False
+            self.assertFalse(serializer.is_valid())
+
+        self.assertIn("enabled_collection_types", serializer.errors)
+
+    @patch("apps.device_api.serializers.transaction.atomic")
+    @patch("apps.device_api.serializers.DeviceCollectionService.sync_summary_plan_sub_plans")
+    @patch("apps.device_api.serializers.DeviceCollectionPlans.objects")
+    def test_plan_create_serializer_calls_parent_sync_service(
+        self,
+        mock_plan_objects,
+        mock_sync_sub_plans,
+        mock_atomic,
+    ):
+        serializer = DeviceCollectionPlansCreateSerializer(
+            data={
+                "name": "summary-plan",
+                "vendor": "Huawei",
+                "device_type": "switch",
+                "enabled_collection_types": ["arp", "mac"],
+                "collection_method": "both",
+                "is_active": True,
+            }
+        )
+        serializer.fields["name"].validators = []
+        mock_plan_objects.filter.return_value.exists.return_value = False
+        mock_atomic.return_value.__enter__.return_value = None
+        mock_atomic.return_value.__exit__.return_value = False
+        created_plan = SimpleNamespace(
+            id=1,
+            name="summary-plan",
+            vendor="Huawei",
+            device_type="switch",
+            enabled_collection_types=["arp", "mac"],
+            collection_method="both",
+            profile_code="",
+        )
+        mock_plan_objects.create.return_value = created_plan
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        serializer.save()
+
+        mock_sync_sub_plans.assert_called_once_with(created_plan)
+
     def test_sub_plan_serializer_exposes_extended_protocol_fields(self):
         summary_plan = DeviceCollectionPlans(name="summary", vendor="Huawei", device_type="switch")
         sub_plan = DeviceSubCollectionPlan(
@@ -792,6 +1069,127 @@ class DeviceApiProtocolExtensionTests(SimpleTestCase):
         self.assertEqual(result[0]["origin_as"], "65001")
         self.assertEqual(result[0]["last_as"], "65002")
 
+    def test_h3c_mac_netconf_processor_maps_ifindex_and_status(self):
+        result = process_h3c_mac_netconf(
+            {
+                "top": {
+                    "Ifmgr": {
+                        "Interfaces": {
+                            "Interface": [{"IfIndex": "101", "Name": "GigabitEthernet1/0/1"}]
+                        }
+                    },
+                    "L2FDB": {
+                        "UnicastTables": {
+                            "UnicastTable": [
+                                {
+                                    "MacAddress": "aa-bb-cc-dd-ee-ff",
+                                    "VLANID": "100",
+                                    "IfIndex": "101",
+                                    "Status": "2",
+                                }
+                            ]
+                        }
+                    },
+                }
+            }
+        )
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["macaddress"], "aabb-ccdd-eeff")
+        self.assertEqual(result[0]["vlan"], "100")
+        self.assertEqual(result[0]["interface"], "GigabitEthernet1/0/1")
+        self.assertEqual(result[0]["type"], "Learned")
+
+    def test_h3c_ip_interface_netconf_processor_builds_location(self):
+        result = process_h3c_ip_interface_netconf(
+            {
+                "top": {
+                    "Ipv4AddressTable": {
+                        "Ipv4Address": [
+                            {
+                                "Name": "Vlan-interface100",
+                                "Ipv4Address": "10.10.10.1",
+                                "Ipv4Mask": "255.255.255.0",
+                                "type": "Primary",
+                                "MTU": "1500",
+                            }
+                        ]
+                    }
+                }
+            }
+        )
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["interface"], "Vlan-interface100")
+        self.assertEqual(result[0]["ipaddress"], "10.10.10.1")
+        self.assertEqual(result[0]["ipmask"], "255.255.255.0")
+        self.assertEqual(result[0]["ip_type"], "Primary")
+        self.assertEqual(result[0]["mtu"], "1500")
+        self.assertEqual(result[0]["location"][0]["start"], 168430080)
+        self.assertEqual(result[0]["location"][0]["end"], 168430335)
+
+    @patch("apps.device_api.processors.h3c._lookup_neighbor_ip", return_value="192.0.2.10")
+    def test_h3c_lldp_netconf_processor_enriches_neighbor_ip(self, mock_lookup_neighbor_ip):
+        result = process_h3c_lldp_netconf(
+            {
+                "top": {
+                    "Lldp": {
+                        "Neighbors": {
+                            "Neighbor": [
+                                {
+                                    "LocalPort": "GE1/0/1",
+                                    "ChassisId": "0011-2233-4455",
+                                    "PortId": "GE0/0/1",
+                                    "SystemName": "core-sw-1",
+                                    "Address": "192.0.2.10",
+                                    "SubType": "ipv4",
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        )
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["local_interface"], "GigabitEthernet1/0/1")
+        self.assertEqual(result[0]["neighbor_port"], "GE0/0/1")
+        self.assertEqual(result[0]["neighborsysname"], "core-sw-1")
+        self.assertEqual(result[0]["neighbor_ip"], "192.0.2.10")
+        mock_lookup_neighbor_ip.assert_called_once_with("core-sw-1")
+
+    def test_h3c_aggre_port_netconf_processor_maps_members_and_mode(self):
+        result = process_h3c_aggre_port_netconf(
+            {
+                "top": {
+                    "LAGG": {
+                        "Groups": {
+                            "Group": [
+                                {
+                                    "GroupId": "47",
+                                    "Name": "Bridge-Aggregation47",
+                                    "LinkMode": "Dynamic",
+                                    "Memberlist": [
+                                        {"Name": "GE1/0/1", "SelectedStatus": "Selected."},
+                                        {"Name": "GE1/0/2", "SelectedStatus": "Selected."},
+                                    ],
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        )
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["aggregroup"], "Bridge-Aggregation47")
+        self.assertEqual(
+            result[0]["memberports"],
+            ["GigabitEthernet1/0/1", "GigabitEthernet1/0/2"],
+        )
+        self.assertEqual(result[0]["status"], "Selected.,Selected.")
+        self.assertEqual(result[0]["mode"], "Dynamic")
+
     def test_huawei_route_table_netconf_processor_extracts_static_routes(self):
         result = process_huawei_route_table_netconf(
             {
@@ -830,6 +1228,153 @@ class DeviceApiProtocolExtensionTests(SimpleTestCase):
         self.assertEqual(result[0]["protocol"], "static")
         self.assertEqual(result[0]["preference"], "60")
         self.assertEqual(result[0]["vrf"], "")
+
+    def test_huawei_arp_netconf_processor_maps_fields(self):
+        result = process_huawei_arp_netconf(
+            {
+                "arpTable": {
+                    "arpEntry": [
+                        {
+                            "ipAddr": "172.16.49.11",
+                            "macAddr": "6c92-bf3b-d721",
+                            "expireTime": "12",
+                            "styleType": "DynamicArp",
+                            "ifName": "Eth-Trunk416",
+                            "peVid": "549",
+                            "vrfName": "_public_",
+                        }
+                    ]
+                }
+            }
+        )
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["ipaddress"], "172.16.49.11")
+        self.assertEqual(result[0]["macaddress"], "6c92-bf3b-d721")
+        self.assertEqual(result[0]["vlan"], "549")
+        self.assertEqual(result[0]["interface"], "Eth-Trunk416")
+        self.assertEqual(result[0]["type"], "DynamicArp")
+
+    def test_huawei_mac_netconf_processor_maps_vlan_and_interface(self):
+        result = process_huawei_mac_netconf(
+            {
+                "macTable": {
+                    "item": [
+                        {
+                            "slotId": "0",
+                            "vlanId": "654",
+                            "macAddress": "d4ae-52a7-b954",
+                            "macType": "dynamic",
+                            "outIfName": "Eth-Trunk227",
+                        }
+                    ]
+                }
+            }
+        )
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["macaddress"], "d4ae-52a7-b954")
+        self.assertEqual(result[0]["vlan"], "654")
+        self.assertEqual(result[0]["interface"], "Eth-Trunk227")
+        self.assertEqual(result[0]["type"], "dynamic")
+
+    def test_huawei_ip_interface_netconf_processor_extracts_ipv4_oper(self):
+        result = process_huawei_ip_interface_netconf(
+            {
+                "interfaces": {
+                    "interface": [
+                        {
+                            "ifName": "Vlanif100",
+                            "ifDynamicInfo": {
+                                "ifLinkStatus": "up",
+                                "ifV4State": "up",
+                                "ifOpertMTU": "1500",
+                            },
+                            "ipv4Oper": {
+                                "ipv4Addrs": {
+                                    "ipv4Addr": {
+                                        "ifIpAddr": "10.0.0.1",
+                                        "subnetMask": "255.255.255.0",
+                                        "addrType": "primary",
+                                    }
+                                }
+                            },
+                        }
+                    ]
+                }
+            }
+        )
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["interface"], "Vlanif100")
+        self.assertEqual(result[0]["line_status"], "up")
+        self.assertEqual(result[0]["protocol_status"], "up")
+        self.assertEqual(result[0]["ipaddress"], "10.0.0.1")
+        self.assertEqual(result[0]["ipmask"], "255.255.255.0")
+        self.assertEqual(result[0]["location"][0]["start"], 167772160)
+        self.assertEqual(result[0]["location"][0]["end"], 167772415)
+
+    @patch("apps.device_api.processors.huawei._lookup_neighbor_ip", return_value="192.0.2.11")
+    def test_huawei_lldp_netconf_processor_enriches_neighbor_ip(self, mock_lookup_neighbor_ip):
+        result = process_huawei_lldp_netconf(
+            {
+                "lldpIfs": {
+                    "lldpIf": [
+                        {
+                            "ifName": "GE1/0/1",
+                            "lldpNeighbors": {
+                                "lldpNeighbor": {
+                                    "chassisId": "0011-2233-4455",
+                                    "portId": "GE0/0/1",
+                                    "portDescription": "uplink",
+                                    "systemName": "agg-sw-1",
+                                    "managementAddresss": {
+                                        "managementAddress": {
+                                            "manAddr": "192.0.2.11",
+                                            "manAddrSubtype": "ipv4",
+                                        }
+                                    },
+                                }
+                            },
+                        }
+                    ]
+                }
+            }
+        )
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["local_interface"], "GigabitEthernet1/0/1")
+        self.assertEqual(result[0]["neighbor_port"], "GE0/0/1")
+        self.assertEqual(result[0]["management_ip"], "192.0.2.11")
+        self.assertEqual(result[0]["neighbor_ip"], "192.0.2.11")
+        mock_lookup_neighbor_ip.assert_called_once_with("agg-sw-1")
+
+    def test_huawei_aggre_port_netconf_processor_maps_members(self):
+        result = process_huawei_aggre_port_netconf(
+            {
+                "trunks": {
+                    "trunk": [
+                        {
+                            "ifName": "Eth-Trunk10",
+                            "TrunkMemberIfs": {
+                                "TrunkMemberIf": [
+                                    {"memberIfName": "GE1/0/1", "memberIfState": "up"},
+                                    {"memberIfName": "GE1/0/2", "memberIfState": "up"},
+                                ]
+                            },
+                        }
+                    ]
+                }
+            }
+        )
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["aggregroup"], "Eth-Trunk10")
+        self.assertEqual(
+            result[0]["memberports"],
+            ["GigabitEthernet1/0/1", "GigabitEthernet1/0/2"],
+        )
+        self.assertEqual(result[0]["status"], "up,up")
 
     def test_h3c_bgp_summary_netconf_processor_aggregates_neighbor_states(self):
         result = process_h3c_bgp_summary_netconf(
@@ -1152,6 +1697,78 @@ class DeviceCollectionServiceSyncTests(SimpleTestCase):
         self.assertIn("bgp_neighbors", sync_result["created_types"])
         created_types = {item["collection_type"] for item in created_records}
         self.assertEqual(created_types, set(DEFAULT_COLLECTION_TYPES) - {"arp"})
+
+    @patch("apps.device_api.services_new.DeviceSubCollectionPlan.objects")
+    def test_sync_summary_plan_sub_plans_updates_method_and_disables_unselected_types(
+        self,
+        mock_objects,
+    ):
+        existing_names = {"sync-summary-route_table"}
+        created_records = []
+
+        def filter_side_effect(**kwargs):
+            name = kwargs.get("name")
+            return SimpleNamespace(exists=lambda: name in existing_names)
+
+        def create_side_effect(**kwargs):
+            record = SimpleNamespace(
+                netmiko_enabled=False,
+                netconf_enabled=False,
+                snmp_enabled=False,
+                restconf_enabled=False,
+                telemetry_enabled=False,
+                save=Mock(),
+                **kwargs,
+            )
+            created_records.append(record)
+            existing_names.add(kwargs["name"])
+            return record
+
+        mock_objects.filter.side_effect = filter_side_effect
+        mock_objects.create.side_effect = create_side_effect
+
+        selected_plan = SimpleNamespace(
+            collection_type="arp",
+            netmiko_enabled=False,
+            netconf_enabled=False,
+            snmp_enabled=False,
+            restconf_enabled=False,
+            telemetry_enabled=False,
+            save=Mock(),
+        )
+        disabled_plan = SimpleNamespace(
+            collection_type="route_table",
+            netmiko_enabled=True,
+            netconf_enabled=True,
+            snmp_enabled=True,
+            restconf_enabled=False,
+            telemetry_enabled=False,
+            save=Mock(),
+        )
+
+        summary_plan = SimpleNamespace(
+            name="sync-summary",
+            enabled_collection_types=["arp"],
+            collection_method="both",
+            collect_plans=SimpleNamespace(all=lambda: [selected_plan, disabled_plan]),
+        )
+
+        sync_result = DeviceCollectionService.sync_summary_plan_sub_plans(summary_plan)
+
+        self.assertTrue(selected_plan.netmiko_enabled)
+        self.assertTrue(selected_plan.netconf_enabled)
+        selected_plan.save.assert_called_once()
+
+        self.assertFalse(disabled_plan.netmiko_enabled)
+        self.assertFalse(disabled_plan.netconf_enabled)
+        self.assertFalse(disabled_plan.snmp_enabled)
+        disabled_plan.save.assert_called_once()
+
+        self.assertIn("arp", sync_result["updated_types"])
+        self.assertIn("route_table", sync_result["disabled_types"])
+        self.assertEqual(sync_result["collection_method"], "both")
+        created_types = {item.collection_type for item in created_records}
+        self.assertIn("mac", created_types)
 
 
 class DeviceApiArchitectureGuardTests(SimpleTestCase):

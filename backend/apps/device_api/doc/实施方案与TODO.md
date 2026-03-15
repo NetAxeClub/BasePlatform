@@ -250,12 +250,12 @@ mode          string   聚合模式（dynamic / static）
 
 - [x] **[P1-C] 补充 H3C NETCONF 全量解析器（processors/h3c.py）**
   - 为以下类型补充 `method='netconf'` 的处理器：
-    - [ ] `arp`：解析 `data.top.ARP.ARPTable.ARPEntry`，单条时 ncclient 返回 dict 需特殊处理
-    - [ ] `mac`：解析 MAC 地址表 XML 结构
+    - [x] `arp`：解析 `data.top.ARP.ARPTable.ARPEntry`，单条时 ncclient 返回 dict 需特殊处理
+    - [x] `mac`：解析 MAC 地址表 XML 结构
     - [x] `mac_evpn`：解析 `L2VPN.LocalMACs.MAC`，通过 `Ifmgr` 映射 IfIndex→接口名，MAC 格式转换 aa-bb-cc-dd-ee-ff → aabb-ccdd-eeff
-    - [ ] `ip_interface`：解析三层接口，含 IP/掩码提取，调用 `IPNetwork` 计算 location
-    - [ ] `lldp`：解析 LLDP 邻居，保留 CMDB 查询 neighbor_ip 逻辑
-    - [ ] `aggre_port`：解析聚合端口，成员端口列表处理
+    - [x] `ip_interface`：解析三层接口，含 IP/掩码提取，调用 `IPNetwork` 计算 location
+    - [x] `lldp`：解析 LLDP 邻居，保留 CMDB 查询 neighbor_ip 逻辑
+    - [x] `aggre_port`：解析聚合端口，成员端口列表处理
   - `interface_brief` 已有 ✅，无需重复
   - 补充 Netmiko 处理器（整合自 `tools/h3c.py`）：
     - [x] `arp/netmiko`：TextFSM list → 标准 dict，接口名规范化
@@ -268,7 +268,7 @@ mode          string   聚合模式（dynamic / static）
 - [x] **[P1-D] 补充 Huawei NETCONF 全量解析器（processors/huawei.py）**
   - 新建 `processors/huawei.py`，已实现 Netmiko 处理器，NETCONF 处理器为 TODO 存根：
     - [x] `arp/netmiko`、`mac/netmiko`、`lldp/netmiko`、`ip_interface/netmiko`、`interface_brief/netmiko`、`aggre_port/netmiko`
-    - [ ] `arp/netconf`、`mac/netconf`、`ip_interface/netconf`、`lldp/netconf`、`aggre_port/netconf`（待实现）
+    - [x] `arp/netconf`、`mac/netconf`、`ip_interface/netconf`、`lldp/netconf`、`aggre_port/netconf`
 
 - [ ] **[P1-E] 改造 `tools/` 为 Layer 2 规范化器（职责收窄）**
   - 备注：H3C/Huawei 的 Netmiko 处理逻辑已整合进 processors/；tools/ 目前作为其他厂商（Cisco/Ruijie等）的兜底降级。
@@ -299,14 +299,14 @@ mode          string   聚合模式（dynamic / static）
 
 > 目标：落地《采集方案简化与优化方案》，减少用户操作层级。
 
-- [ ] **[P2-A] 父方案模型增加 `enabled_collection_types` 和 `collection_method` 字段**
+- [x] **[P2-A] 父方案模型增加 `enabled_collection_types` 和 `collection_method` 字段**
   - 文件：`backend/apps/device_api/models.py`
   - 新增字段：
     - `enabled_collection_types`（JSONField，默认 `[]` 表示全部启用）
     - `collection_method`（CharField，choices: `netmiko` / `netconf` / `both`，默认 `netmiko`）
   - 生成并执行 migration
 
-- [ ] **[P2-B] 父方案保存时自动同步子方案**
+- [x] **[P2-B] 父方案保存时自动同步子方案**
   - 文件：`backend/apps/device_api/views.py` 或 `serializers.py`
   - 逻辑：在 `DeviceCollectionPlans` 的 `create` / `update` 时，根据 `enabled_collection_types` 对比 `DEFAULT_COLLECTION_TYPES`，自动：
     - 创建缺失的子方案（`collection_type` 由系统填写）
@@ -314,14 +314,14 @@ mode          string   聚合模式（dynamic / static）
     - 按 `collection_method` 更新各子方案的 `netmiko_enabled` / `netconf_enabled`
   - 验收：前端只提交父方案，子方案列表自动与父方案配置保持一致
 
-- [ ] **[P2-C] 新增方案级字段映射聚合接口**
+- [x] **[P2-C] 新增方案级字段映射聚合接口**
   - 文件：`backend/apps/device_api/views.py`
   - 接口：`GET /device_api/collection-plans/{id}/field-mappings/`
   - 返回格式：`{ "arp": {"netmiko_path": ..., "netmiko_field_mappings": {...}, "netconf_path": ..., ...}, "mac": {...}, ... }`
   - 由后端从各子方案按 `collection_type` 聚合
   - 对应 PATCH 接口：接收同结构，回写到各子方案
 
-- [ ] **[P2-D] 新增方案级一键验证接口**
+- [x] **[P2-D] 新增方案级一键验证接口**
   - 文件：`backend/apps/device_api/views.py`
   - 接口：`POST /device_api/collection-plans/{id}/validate/`，入参 `{"device_ip": "x.x.x.x"}`
   - 后端遍历该方案下所有启用子方案，使用 `DeviceConnectionManager` 一次性执行，返回按 `collection_type` 分组的结果

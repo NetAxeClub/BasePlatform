@@ -6,6 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
 from apps.asset.models import NetworkDevice
+from apps.device_api.fields_mapping import DEFAULT_COLLECTION_TYPES
 from apps.device_api.models import (
     DeviceCollectionMatchRule,
     DeviceCollectionRule,
@@ -18,6 +19,31 @@ from apps.device_api.models import (
 )
 from apps.device_api.platform_profiles import PlatformProfileService
 from apps.device_api.services_new import DeviceCollectionService
+
+
+def _normalize_enabled_collection_types(value):
+    if value in (None, ""):
+        return []
+    if not isinstance(value, list):
+        raise serializers.ValidationError("enabled_collection_types 必须为数组")
+
+    normalized_types = []
+    invalid_types = []
+    for collection_type in value:
+        type_name = str(collection_type).strip()
+        if not type_name:
+            continue
+        if type_name not in DEFAULT_COLLECTION_TYPES:
+            invalid_types.append(type_name)
+            continue
+        if type_name not in normalized_types:
+            normalized_types.append(type_name)
+
+    if invalid_types:
+        raise serializers.ValidationError(
+            f"enabled_collection_types 包含未支持的采集类型: {', '.join(invalid_types)}"
+        )
+    return normalized_types
 
 
 class DeviceCollectionPlansSerializer(serializers.ModelSerializer):
@@ -41,6 +67,8 @@ class DeviceCollectionPlansSerializer(serializers.ModelSerializer):
             "generated_by_system",
             "version",
             "is_default",
+            "enabled_collection_types",
+            "collection_method",
             "is_active",
             "collect_plans_count",
             "collect_plans",
@@ -86,6 +114,8 @@ class DeviceCollectionPlansCreateSerializer(serializers.ModelSerializer):
             "generated_by_system",
             "version",
             "is_default",
+            "enabled_collection_types",
+            "collection_method",
             "is_active",
             "created_at",
             "updated_at",
@@ -103,12 +133,15 @@ class DeviceCollectionPlansCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("采集汇总方案名称已存在")
         return value
 
+    def validate_enabled_collection_types(self, value):
+        return _normalize_enabled_collection_types(value)
+
     def create(self, validated_data):
         with transaction.atomic():
             validated_data.setdefault("plan_kind", DeviceCollectionPlans.PLAN_KIND_RUNTIME)
             validated_data.setdefault("version", 1)
             summary_plan = DeviceCollectionPlans.objects.create(**validated_data)
-            DeviceCollectionService.ensure_default_sub_plans(summary_plan)
+            DeviceCollectionService.sync_summary_plan_sub_plans(summary_plan)
             if summary_plan.profile_code:
                 profile = PlatformProfile.objects.filter(code=summary_plan.profile_code).first()
                 if profile:
@@ -135,6 +168,8 @@ class DeviceCollectionPlansUpdateSerializer(serializers.ModelSerializer):
             "generated_by_system",
             "version",
             "is_default",
+            "enabled_collection_types",
+            "collection_method",
             "is_active",
             "created_at",
             "updated_at",
@@ -151,6 +186,15 @@ class DeviceCollectionPlansUpdateSerializer(serializers.ModelSerializer):
         ):
             raise serializers.ValidationError("采集汇总方案名称已存在")
         return value
+
+    def validate_enabled_collection_types(self, value):
+        return _normalize_enabled_collection_types(value)
+
+    def update(self, instance, validated_data):
+        with transaction.atomic():
+            summary_plan = super().update(instance, validated_data)
+            DeviceCollectionService.sync_summary_plan_sub_plans(summary_plan)
+            return summary_plan
 
 
 class DeviceCollectionPlansDetailSerializer(serializers.ModelSerializer):
@@ -177,6 +221,8 @@ class DeviceCollectionPlansDetailSerializer(serializers.ModelSerializer):
             "generated_by_system",
             "version",
             "is_default",
+            "enabled_collection_types",
+            "collection_method",
             "is_active",
             "collect_plans",
             "created_at",

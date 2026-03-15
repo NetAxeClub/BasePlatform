@@ -19,6 +19,7 @@
 - [device_api阶段性总结-2026-03-13](./13-device_api阶段性总结-2026-03-13.md) - device_api 模块阶段性功能、更新与后续待办总结
 - [NetClaw-CN适配功能开发任务](./14-NetClaw-CN适配功能开发任务.md) - BasePlatform 为适配 NetClaw-CN 需要推进的功能开发任务清单
 - [config_center配置快照标准接口](./15-config_center配置快照标准接口.md) - 配置快照、历史时间线与版本对比接口说明
+- [device_api开发归档-2026-03-16](./20-device_api开发归档-2026-03-16.md) - device_api 当前工作区进度归档、验证记录与下次恢复建议
 
 ## 快速开始
 

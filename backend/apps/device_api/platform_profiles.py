@@ -590,6 +590,8 @@ class PlatformProfileService:
                 "generated_by_system": True,
                 "version": 1,
                 "is_default": True,
+                "enabled_collection_types": profile.supported_collection_types or [],
+                "collection_method": DeviceCollectionPlans.COLLECTION_METHOD_NETMIKO,
             },
         )
 
@@ -606,6 +608,13 @@ class PlatformProfileService:
         if not plan.is_default:
             plan.is_default = True
             updated_fields.append("is_default")
+        expected_enabled_types = profile.supported_collection_types or []
+        if plan.enabled_collection_types != expected_enabled_types:
+            plan.enabled_collection_types = expected_enabled_types
+            updated_fields.append("enabled_collection_types")
+        if plan.collection_method != DeviceCollectionPlans.COLLECTION_METHOD_NETMIKO:
+            plan.collection_method = DeviceCollectionPlans.COLLECTION_METHOD_NETMIKO
+            updated_fields.append("collection_method")
         if updated_fields:
             plan.save(update_fields=updated_fields + ["updated_at"])
 
@@ -623,6 +632,12 @@ class PlatformProfileService:
         cls, plan: DeviceCollectionPlans, profile: PlatformProfile
     ) -> None:
         identity_command = DEVICE_IDENTITY_NETMIKO_COMMANDS.get(profile.vendor_alias, "")
+        enabled_collection_types = set(DeviceCollectionService.get_enabled_collection_types(plan))
+        plan_method = getattr(plan, "collection_method", DeviceCollectionPlans.COLLECTION_METHOD_NETMIKO)
+        plan_allows_netmiko = plan_method in {
+            DeviceCollectionPlans.COLLECTION_METHOD_NETMIKO,
+            DeviceCollectionPlans.COLLECTION_METHOD_BOTH,
+        }
         for sub_plan in plan.collect_plans.all():
             preferred = (profile.preferred_methods or {}).get(sub_plan.collection_type, [])
             supported = sub_plan.collection_type in (profile.supported_collection_types or [])
@@ -658,6 +673,8 @@ class PlatformProfileService:
                 and "netmiko" in (profile.fallback_methods or {}).get(sub_plan.collection_type, [])
             ):
                 desired_netmiko_enabled = bool(command)
+            if sub_plan.collection_type not in enabled_collection_types or not plan_allows_netmiko:
+                desired_netmiko_enabled = False
 
             if sub_plan.netmiko_enabled != desired_netmiko_enabled:
                 sub_plan.netmiko_enabled = desired_netmiko_enabled
