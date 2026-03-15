@@ -1,7 +1,7 @@
 import json
 from netaddr import IPNetwork
 from django.core.cache import cache
-from apps.automation.tools.base_connection import InterfaceFormat
+from apps.device_api.common import InterfaceFormat
 from apps.asset.models import NetworkDevice
 
 

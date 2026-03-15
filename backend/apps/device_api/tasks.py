@@ -92,9 +92,11 @@ from apps.device_api.models_api import (
     COLLECTION_TYPE_MONGO_MAP,
 )
 from apps.device_api.tools.collect_device import get_auto_device
-from apps.automation.cache_utils import cache_network_data
+from apps.device_api.platform_profiles import DeviceFactService
+from apps.device_api.cache_utils import cache_network_data
 from apps.device_api import COLLECTION_SUB_PLAN
 from apps.device_api import arp_mongo, mac_mongo, lldp_mongo, aggre_port_mongo
+from apps.network_analysis.tasks import refresh_network_analysis_for_batch
 from utils.db.mongo_ops import MongoOps, MongoNetOps
 
 logger = logging.getLogger("device_api")
@@ -539,6 +541,7 @@ def _process_and_save_result(
             logger.error(
                 f"数据处理失败: {manage_ip}, method={collection_method}, error={resolve_error}"
             )
+            DeviceFactService.mark_discovery_failure(device_info, resolve_error)
             return
 
         # ── Layer 3：元数据注入 ──────────────────────────────────────────
@@ -588,6 +591,12 @@ def _process_and_save_result(
                 f"method={collection_method}"
             )
 
+        DeviceFactService.update_from_processed_data(
+            collection_type=collection_type,
+            device_info=device_info,
+            processed_data=processed_data,
+        )
+
         # ── 更新子采集任务状态 ────────────────────────────────────────────
         task_record = {
             "summary_plan_id": plan.get("summary_plan"),
@@ -614,6 +623,7 @@ def _process_and_save_result(
             f"method={collection_method}, {str(e)}",
             exc_info=True,
         )
+        DeviceFactService.mark_discovery_failure(device_info, str(e))
 
 
 # 通用信息采集主调度任务
@@ -642,6 +652,8 @@ def plan_collect_device_main(**kwargs):
 
     # 参数初始化
     net_tower_tasks = []  # 采集任务id集合
+    total_expected_subtasks = sum(len(host.get("sub_plans", [])) for host in hosts)
+    batch_execute_time = hosts[0].get("execute_time") if hosts else ""
 
     # 清空历史采集数据
     try:
@@ -665,6 +677,19 @@ def plan_collect_device_main(**kwargs):
     logger.info(
         f"批量下发任务完成, 总设备数: {len(hosts)}, 有效任务: {len(net_tower_tasks)}, 耗时: {total_time:.2f}分钟"
     )
+
+    if batch_execute_time:
+        refresh_network_analysis_for_batch.apply_async(
+            kwargs={
+                "execute_time": batch_execute_time,
+                "expected_devices": len(hosts),
+                "expected_subtasks": total_expected_subtasks,
+                "triggered_by": "device_api-plan_collect_device_main",
+            },
+            queue="config",
+            retry=True,
+            countdown=30,
+        )
 
     return {
         "total": len(hosts),

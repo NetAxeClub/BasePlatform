@@ -1,5 +1,8 @@
 # device_api 替代 automation 架构审视与迁移计划
 
+> 本文档的实施边界需同时遵守 [17-网络自动化新架构开发规范](./17-网络自动化新架构开发规范.md)。
+> legacy 表与新模型的字段关系参见 [18-legacy字段到新架构字段映射](./18-legacy字段到新架构字段映射.md)。
+
 ## 1. 结论
 
 结论分两层：
@@ -124,14 +127,19 @@ plan = models.ForeignKey("automation.CollectionPlan", ...)
 3. `config_center` / `dcs_control` / `topology`
    - 各领域治理和查询
 
-4. `automation`
+4. `network_analysis`
+   - 接口利用率分析
+   - 地址终极定位
+   - 分析型快照和重建任务
+
+5. `automation`
    - 自动化编排
    - 审批流
    - AutoFlow 留痕
    - 非采集类任务
    - 旧采集入口兼容
 
-5. `NetClaw-CN`
+6. `NetClaw-CN`
    - 只消费稳定接口，不依赖内部旧模型
 
 ### 4.2 必须新增的平台能力画像层
@@ -174,6 +182,37 @@ plan = models.ForeignKey("automation.CollectionPlan", ...)
 ---
 
 ## 5. 迁移路线
+
+### 2026-03-15 已落地基础阶段
+
+当前仓库已落地的基础能力：
+
+1. `device_api` 新增 `PlatformProfile` 画像注册表，并内置 Huawei/H3C/Ruijie/Hillstone/Cisco/ZTE/Maipu/Mellanox/Centec 首版画像。
+2. `DeviceCollectionPlans` 已扩展 `profile_code`、`plan_kind`、`generated_by_system`、`version`、`is_default`，可承载默认模板方案。
+3. `PlansToDevice` 已扩展为以 `device_serial_num + plan` 为唯一绑定键，新增 `profile_code`、`binding_source`、`is_active`、`last_bound_at`。
+4. `NetworkDevice` 已新增 `platform_profile_code`、`last_discovered_at`、`last_discovery_status`、`last_discovery_error`，用于自动发现闭环。
+5. `device_api.tools.collect_device.get_auto_device()` 已切换为只从 `PlansToDevice` 读取绑定关系，不再依赖 `NetworkDevice.plan_id` 参与调度。
+6. 已新增稳定接口：
+   - `/base_platform/device_api/platform-profiles/`
+   - `/base_platform/device_api/plans-to-device/auto_bind/`
+   - `/base_platform/device_api/devices/{serial_num}/facts/`
+   - `/base_platform/device_api/devices/{serial_num}/capabilities/`
+   - `/base_platform/device_api/collection-results/latest/`
+   - `/base_platform/workflow_center/executions/`
+   - `/base_platform/workflow_center/inventories/`
+   - `/base_platform/workflow_center/host-vars/`
+   - 同时保留 `/base_platform/device_api/v1/*`、`/base_platform/workflow_center/v1/*` 版本化别名，供 NetClaw-CN 稳定接入。
+7. `workflow_center` 已建立独立实体模型、序列化层、巡检辅助层、诊断服务层和稳定路由，工作流侧运行链路不再依赖 `automation` 代码。
+8. `device_api` 已建立独立的采集规则实体模型与稳定接口，`automation` 旧规则与旧采集方案后台入口已冻结为只读 legacy 状态。
+9. `network_analysis` 已建立独立接口利用率与地址定位分析模块，分析任务开始转向以 `device_api` 标准化结果为输入。
+10. `int_utilization` 现有查询入口已开始切换为读取 `network_analysis` 新快照，`interface_used` / `tracking_main` 的替代工作进入实施阶段。
+
+当前仍未完成的部分：
+
+- 默认子方案的协议模板仍是首版骨架，尚未覆盖所有厂商/产品线的 NETCONF XML、RESTCONF path 和 CLI 命令模板。
+- `automation/api/collection_rule*` 与 `collection_match_rule*` 仍处于 legacy 状态，尚未迁到新的稳定模型。
+- `workflow_center` / `device_api` 的 legacy 数据导入命令已建立，但仍需在生产前完成首轮数据导入演练与校验。
+- 全量厂商切流、并跑比对、NetClaw-CN v1 接口版本化仍在后续阶段。
 
 ### Phase 0：定义双轨过渡基线
 

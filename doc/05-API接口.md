@@ -358,6 +358,30 @@ NetAxe平台提供RESTful API接口，基于Django REST Framework实现。所有
 
 ## 6. 设备API管理接口（新版）
 
+> 以下接口为新架构主入口，面向 `device_api` / `workflow_center` 能力中心。
+> `automation` 仅作为 legacy 兼容入口，不再作为新功能的文档主入口。
+
+### 6.0 平台画像与规则管理
+
+#### 获取平台画像列表
+- **URL**: `/base_platform/device_api/platform-profiles/`
+- **方法**: GET
+
+#### 获取采集规则列表
+- **URL**: `/base_platform/device_api/collection-rules/`
+- **方法**: GET
+
+#### 获取采集规则匹配项列表
+- **URL**: `/base_platform/device_api/collection-match-rules/`
+- **方法**: GET
+
+#### 获取规则工具元数据
+- **URL**: `/base_platform/device_api/collection-rule-tools/`
+- **方法**: GET
+- **查询参数**:
+  - `get_cmdb_field=1`
+  - `get_pulgin_list=1`
+
 ### 6.1 父采集方案管理
 
 #### 获取方案列表
@@ -370,10 +394,14 @@ NetAxe平台提供RESTful API接口，基于Django REST Framework实现。所有
 - **请求参数**:
 ```json
 {
-  "name": "H3C交换机完整采集",
+  "name": "default-h3c-modern-switch",
   "vendor": "H3C",
-  "device_type": "交换机",
-  "description": "采集H3C交换机的完整信息",
+  "device_type": "switch",
+  "description": "H3C 现代交换机默认模板方案",
+  "profile_code": "H3C-modern-netconf",
+  "plan_kind": "template",
+  "version": 1,
+  "is_default": true,
   "is_active": true
 }
 ```
@@ -390,23 +418,20 @@ NetAxe平台提供RESTful API接口，基于Django REST Framework实现。所有
 - **请求参数**:
 ```json
 {
-  "parent_plan": 1,
-  "name": "ARP表采集",
-  "netmiko_config": {
-    "commands": ["display arp"],
-    "parser": "textfsm"
-  },
-  "netconf_config": null,
-  "fields_mapping": {
-    "ip": "ip_address",
-    "mac": "mac_address"
-  }
+  "summary_plan_id": 1,
+  "name": "default-h3c-modern-switch-arp",
+  "collection_type": "arp",
+  "description": "profile=H3C-modern-netconf; supported=True; preferred=netconf,netmiko",
+  "netmiko_enabled": true,
+  "netmiko_method": "display arp",
+  "textfsm_template": "hp_comware_display_arp.textfsm",
+  "netconf_enabled": false
 }
 ```
 
 ### 6.3 采集结果管理
 
-#### 获取采集结果
+#### 获取采集结果列表
 - **URL**: `/base_platform/device_api/collection-results/`
 - **方法**: GET
 - **查询参数**:
@@ -414,6 +439,14 @@ NetAxe平台提供RESTful API接口，基于Django REST Framework实现。所有
   - `plan_id`: 方案ID
   - `start_date`: 开始日期
   - `end_date`: 结束日期
+
+#### 获取设备最新标准化结果
+- **URL**: `/base_platform/device_api/collection-results/latest/`
+- **方法**: GET
+- **查询参数**:
+  - `serial_num`: 设备序列号
+  - `manage_ip`: 设备管理IP
+  - `collection_type`: 采集类型，可选
 
 ### 6.4 方案设备关联
 
@@ -423,12 +456,180 @@ NetAxe平台提供RESTful API接口，基于Django REST Framework实现。所有
 - **请求参数**:
 ```json
 {
-  "plan_id": 1,
-  "device_ids": [1, 2, 3]
+  "plan": 1,
+  "device_serial_num": "SER-001",
+  "manage_ip": "10.0.0.1",
+  "profile_code": "Huawei-CE",
+  "binding_source": "manual",
+  "use_local": true,
+  "execute_node": ""
 }
 ```
 
+#### 自动绑定设备到默认方案
+- **URL**: `/base_platform/device_api/plans-to-device/auto_bind/`
+- **方法**: POST
+- **请求参数**:
+```json
+{
+  "manage_ip": "10.0.0.1"
+}
+```
+
+#### 获取设备事实
+- **URL**: `/base_platform/device_api/devices/{serial_num}/facts/`
+- **方法**: GET
+
+#### 获取设备能力画像与绑定关系
+- **URL**: `/base_platform/device_api/devices/{serial_num}/capabilities/`
+- **方法**: GET
+
+### 6.5 工作流中心接口
+
+#### 获取工作流执行列表
+- **URL**: `/base_platform/workflow_center/executions/`
+- **方法**: GET
+
+#### 写入巡检结果
+- **URL**: `/base_platform/workflow_center/executions/write_inspection_result/`
+- **方法**: POST
+
+#### 获取工作流库存列表
+- **URL**: `/base_platform/workflow_center/inventories/`
+- **方法**: GET
+
+#### 创建工作流库存
+- **URL**: `/base_platform/workflow_center/inventories/`
+- **方法**: POST
+- **请求参数**:
+```json
+{
+  "name": "core-switch-inventory",
+  "variables": "{\"site\": \"dc1\"}",
+  "description": "核心交换机库存",
+  "task": "巡检",
+  "hosts": [
+    {"id": 1},
+    {"id": 2}
+  ]
+}
+```
+
+#### 获取工作流主机变量列表
+- **URL**: `/base_platform/workflow_center/host-vars/`
+- **方法**: GET
+
+#### 创建工作流主机变量
+- **URL**: `/base_platform/workflow_center/host-vars/`
+- **方法**: POST
+- **请求参数**:
+```json
+{
+  "name": "border-fw-01",
+  "host": "10.0.0.10",
+  "variables": "{\"region\": \"cn-east\"}",
+  "object_name": "firewall",
+  "description": "边界防火墙",
+  "task": "安全策略"
+}
+```
+
+#### 版本化别名
+- **URL 前缀**:
+  - `/base_platform/device_api/v1/`
+  - `/base_platform/workflow_center/v1/`
+- **说明**:
+  - 与当前主接口行为一致，用于外部系统稳定接入。
+
+## 6.6 网络分析中心接口
+
+#### 获取分析运行记录
+- **URL**: `/base_platform/network_analysis/analysis-runs/`
+- **方法**: GET
+
+#### 统一重建分析结果
+- **URL**: `/base_platform/network_analysis/analysis-runs/rebuild_all/`
+- **方法**: POST
+- **请求参数**:
+```json
+{
+  "manage_ip": "10.0.0.1",
+  "ip_address": "10.1.1.1",
+  "triggered_by": "api"
+}
+```
+
+#### 获取接口利用率快照
+- **URL**: `/base_platform/network_analysis/interface-utilization/`
+- **方法**: GET
+- **查询参数**:
+  - `manage_ip`
+  - `device_serial_num`
+  - `component_scope`
+
+#### 重建接口利用率快照
+- **URL**: `/base_platform/network_analysis/interface-utilization/rebuild/`
+- **方法**: POST
+- **请求参数**:
+```json
+{
+  "manage_ip": "10.0.0.1"
+}
+```
+
+#### 获取接口利用率总览
+- **URL**: `/base_platform/network_analysis/interface-utilization/overview/`
+- **方法**: GET
+
+#### 获取接口利用率质量指标
+- **URL**: `/base_platform/network_analysis/interface-utilization/quality/`
+- **方法**: GET
+
+#### 获取地址定位快照
+- **URL**: `/base_platform/network_analysis/address-traces/`
+- **方法**: GET
+- **查询参数**:
+  - `ip_address`
+  - `manage_ip`
+  - `trace_status`
+
+#### 重建地址定位快照
+- **URL**: `/base_platform/network_analysis/address-traces/rebuild/`
+- **方法**: POST
+- **请求参数**:
+```json
+{
+  "ip_address": "10.1.1.1"
+}
+```
+
+#### 获取地址定位总览
+- **URL**: `/base_platform/network_analysis/address-traces/overview/`
+- **方法**: GET
+
+#### 获取地址定位质量指标
+- **URL**: `/base_platform/network_analysis/address-traces/quality/`
+- **方法**: GET
+
 ## 7. 系统管理接口
+
+## 6.7 兼容查询接口
+
+### 6.7.1 接口利用率兼容入口
+
+#### 获取接口利用率列表
+- **URL**: `/base_platform/int_utilization/interfaceused/`
+- **方法**: GET
+- **说明**:
+  - 该接口为兼容入口，当前底层已切换为 `network_analysis.InterfaceUtilizationSnapshot`
+  - 返回结构尽量保持 legacy 兼容，但真实数据来源为新分析快照
+
+#### 获取设备接口视图
+- **URL**: `/base_platform/int_utilization/interface/`
+- **方法**: GET
+- **说明**:
+  - 当前底层已切换为 `plan_interface_brief` / `plan_ip_interface`
+  - 不再依赖 legacy `layer2interface` / `layer3interface` 作为主来源
 
 ### 7.1 菜单管理
 

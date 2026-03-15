@@ -4,12 +4,17 @@ import importlib
 import time
 from datetime import datetime
 
-from apps.device_api.fields_mapping import vendor_mapping, get_vendor_class
+from apps.device_api.fields_mapping import (
+    COLLECTION_TYPE_ALIASES,
+    vendor_mapping,
+    get_vendor_class,
+)
 from apps.device_api.models import DeviceSubCollectionPlan
 from apps.device_api import (
     COLLECTION_RESULTS_DB,
     COLLECTION_SUB_PLAN,
     COLLECTION_PLAN,
+    device_identity_mongo,
     arp_mongo,
     mac_mongo,
     lldp_mongo,
@@ -19,6 +24,12 @@ from apps.device_api import (
     fan_status_mongo,
     power_status_mongo,
     temperature_status_mongo,
+    cpu_status_mongo,
+    memory_status_mongo,
+    board_status_mongo,
+    transceiver_status_mongo,
+    storage_status_mongo,
+    environment_status_mongo,
     clock_status_mongo,
     route_table_mongo,
     bgp_neighbors_mongo,
@@ -31,6 +42,7 @@ from utils.db.mongo_ops import MongoOps
 
 # collection_type 到 MongoDB 实例的映射
 COLLECTION_TYPE_MONGO_MAP = {
+    "device_identity": device_identity_mongo,
     "arp": arp_mongo,
     "mac": mac_mongo,
     "lldp": lldp_mongo,
@@ -40,6 +52,12 @@ COLLECTION_TYPE_MONGO_MAP = {
     "fan_status": fan_status_mongo,
     "power_status": power_status_mongo,
     "temperature_status": temperature_status_mongo,
+    "cpu_status": cpu_status_mongo,
+    "memory_status": memory_status_mongo,
+    "board_status": board_status_mongo,
+    "transceiver_status": transceiver_status_mongo,
+    "storage_status": storage_status_mongo,
+    "environment_status": environment_status_mongo,
     "clock_status": clock_status_mongo,
     "route_table": route_table_mongo,
     "bgp_neighbors": bgp_neighbors_mongo,
@@ -757,6 +775,9 @@ def resolve_raw_data(plan, collection_result, collection_method):
         vendor_alias = plan.summary_plan.vendor
         device_type = plan.summary_plan.device_type
         collection_type = plan.collection_type
+        resolved_collection_type = COLLECTION_TYPE_ALIASES.get(
+            collection_type, collection_type
+        )
 
         # ── 路径 1：查找已注册的 processors/ 解析器（P0-3）────────────────────
         from apps.device_api.processors.base import (
@@ -767,13 +788,13 @@ def resolve_raw_data(plan, collection_result, collection_method):
         processor = ProcessorRegistry.get_processor(
             vendor=vendor_alias,
             device_type=device_type,
-            collection_type=collection_type,
+            collection_type=resolved_collection_type,
             method=method,
         )
         if processor:
             try:
                 # version 类采集需回填 NetworkDevice，向处理器传入 manage_ip
-                if collection_type == "version" and command_result and isinstance(command_result, list):
+                if resolved_collection_type == "version" and command_result and isinstance(command_result, list):
                     command_result = list(command_result)
                     if command_result and isinstance(command_result[0], dict):
                         command_result[0] = dict(command_result[0], _resolve_device_ip=manage_ip)
@@ -781,7 +802,7 @@ def resolve_raw_data(plan, collection_result, collection_method):
                     collection_type, processor(command_result)
                 )
                 logging.info(
-                    f"[resolve] 使用注册处理器 {vendor_alias}:{device_type}:{collection_type}:{method} - {plan.name}"
+                    f"[resolve] 使用注册处理器 {vendor_alias}:{device_type}:{resolved_collection_type}:{method} - {plan.name}"
                 )
                 return True, "", _inject_manage_ip(result, manage_ip)
             except NotImplementedError as e:
@@ -800,11 +821,11 @@ def resolve_raw_data(plan, collection_result, collection_method):
         if method == "netconf":
             logging.warning(
                 f"[resolve] NETCONF 采集无可用处理器，无法处理原始 XML 数据: "
-                f"{vendor_alias}:{device_type}:{collection_type} - {plan.name}"
+                f"{vendor_alias}:{device_type}:{resolved_collection_type} - {plan.name}"
             )
             return (
                 False,
-                f"netconf_no_processor: {vendor_alias}:{collection_type}",
+                f"netconf_no_processor: {vendor_alias}:{resolved_collection_type}",
                 [],
             )
 
@@ -821,7 +842,7 @@ def resolve_raw_data(plan, collection_result, collection_method):
                 logging.warning(f"[resolve] 未找到类: {class_name}，跳过数据处理")
                 return True, "", []
 
-            method_func = getattr(plan_class, f"get_{collection_type}", None)
+            method_func = getattr(plan_class, f"get_{resolved_collection_type}", None)
             if method_func and callable(method_func):
                 result = normalize_processed_data(
                     collection_type, method_func(command_result)
@@ -830,7 +851,7 @@ def resolve_raw_data(plan, collection_result, collection_method):
                 return True, "", _inject_manage_ip(result, manage_ip)
             else:
                 logging.warning(
-                    f"[resolve] 未找到处理方法: {class_name}.get_{collection_type}()，跳过数据处理"
+                    f"[resolve] 未找到处理方法: {class_name}.get_{resolved_collection_type}()，跳过数据处理"
                 )
                 return True, "", []
 

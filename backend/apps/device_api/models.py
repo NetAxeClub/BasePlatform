@@ -1,13 +1,81 @@
 import json
 import logging
+import xml.etree.ElementTree as ET
 from django.db import models
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
 from .processors import get_processor
 
 logger = logging.getLogger(__name__)
 
 
+class PlatformProfile(models.Model):
+    """设备平台画像，用于按厂商/产品线/版本选择默认方案与采集能力。"""
+
+    code = models.CharField(max_length=64, unique=True, verbose_name="画像编码")
+    vendor_alias = models.CharField(max_length=30, verbose_name="厂商别名")
+    category = models.CharField(max_length=30, blank=True, default="", verbose_name="设备类型")
+    series_patterns = models.JSONField(blank=True, default=list, verbose_name="型号匹配规则")
+    os_family = models.CharField(max_length=64, blank=True, default="", verbose_name="操作系统族")
+    version_patterns = models.JSONField(blank=True, default=list, verbose_name="版本匹配规则")
+    preferred_methods = models.JSONField(blank=True, default=dict, verbose_name="优先采集协议")
+    fallback_methods = models.JSONField(blank=True, default=dict, verbose_name="回退采集协议")
+    supported_collection_types = models.JSONField(
+        blank=True, default=list, verbose_name="支持的采集类型"
+    )
+    default_plan_name = models.CharField(max_length=100, blank=True, default="", verbose_name="默认方案名")
+    is_active = models.BooleanField(default=True, verbose_name="是否启用")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="创建时间")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新时间")
+
+    class Meta:
+        verbose_name = "平台画像"
+        verbose_name_plural = "平台画像"
+        db_table = "device_api_platform_profile"
+        ordering = ["code"]
+        indexes = [
+            models.Index(fields=["vendor_alias", "category"]),
+            models.Index(fields=["is_active"]),
+        ]
+
+    def __str__(self):
+        return self.code
+
+
+class DeviceDiscoveryState(models.Model):
+    """设备发现运行态，不放入 asset 主表，避免污染资产事实模型。"""
+
+    device_serial_num = models.CharField(max_length=200, unique=True, verbose_name="设备序列号")
+    manage_ip = models.GenericIPAddressField(verbose_name="管理IP", null=True, blank=True)
+    profile_code = models.CharField(max_length=64, blank=True, default="", verbose_name="画像编码")
+    last_discovered_at = models.DateTimeField(null=True, blank=True, verbose_name="最近发现时间")
+    last_discovery_status = models.CharField(max_length=20, blank=True, default="pending", verbose_name="最近发现状态")
+    last_discovery_error = models.TextField(blank=True, default="", verbose_name="最近发现错误")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="创建时间")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新时间")
+
+    class Meta:
+        verbose_name = "设备发现状态"
+        verbose_name_plural = "设备发现状态"
+        db_table = "device_api_device_discovery_state"
+        indexes = [
+            models.Index(fields=["manage_ip"]),
+            models.Index(fields=["profile_code", "last_discovery_status"]),
+        ]
+
+    def __str__(self):
+        return self.device_serial_num
+
+
 class DeviceCollectionPlans(models.Model):
     """采集汇总方案"""
+    PLAN_KIND_TEMPLATE = "template"
+    PLAN_KIND_RUNTIME = "runtime"
+    PLAN_KIND_CHOICES = [
+        (PLAN_KIND_TEMPLATE, "模板方案"),
+        (PLAN_KIND_RUNTIME, "运行时方案"),
+    ]
+
     VENDOR_CHOICES = [
         ('H3C', '华三'),
         ('Huawei', '华为'),
@@ -32,6 +100,16 @@ class DeviceCollectionPlans(models.Model):
     vendor = models.CharField(max_length=30, choices=VENDOR_CHOICES, verbose_name='厂商')
     device_type = models.CharField(max_length=30, verbose_name='设备类型')
     description = models.TextField(blank=True, null=True, verbose_name='描述')
+    profile_code = models.CharField(max_length=64, blank=True, default="", verbose_name="画像编码")
+    plan_kind = models.CharField(
+        max_length=16,
+        choices=PLAN_KIND_CHOICES,
+        default=PLAN_KIND_RUNTIME,
+        verbose_name="方案类型",
+    )
+    generated_by_system = models.BooleanField(default=False, verbose_name="是否系统生成")
+    version = models.PositiveIntegerField(default=1, verbose_name="方案版本")
+    is_default = models.BooleanField(default=False, verbose_name="是否默认方案")
     is_active = models.BooleanField(default=True, verbose_name='是否启用')
 
     # 时间戳
@@ -43,6 +121,10 @@ class DeviceCollectionPlans(models.Model):
         verbose_name_plural = '父采集方案'
         db_table = 'device_api_collection_plans'
         ordering = ['name', 'created_at']
+        indexes = [
+            models.Index(fields=["profile_code", "device_type"]),
+            models.Index(fields=["vendor", "is_default"]),
+        ]
 
     def __str__(self):
         return f"{self.name} ({self.get_vendor_display()})"
@@ -273,9 +355,32 @@ class NetconfXMLTemplate(models.Model):
 
 class PlansToDevice(models.Model):
     """方案与设备关联：支持本地采集或南向驱动采集，二选一，默认本地采集。"""
+    BINDING_SOURCE_AUTO = "auto"
+    BINDING_SOURCE_MANUAL = "manual"
+    BINDING_SOURCE_LEGACY = "legacy_bridge"
+    BINDING_SOURCE_CHOICES = [
+        (BINDING_SOURCE_AUTO, "自动绑定"),
+        (BINDING_SOURCE_MANUAL, "手工绑定"),
+        (BINDING_SOURCE_LEGACY, "旧链路桥接"),
+    ]
+
+    device_serial_num = models.CharField(
+        verbose_name="设备序列号",
+        max_length=200,
+        blank=True,
+        default="",
+    )
     manage_ip = models.CharField(verbose_name="设备IP", max_length=100, null=False, blank=False)
     plan = models.ForeignKey("DeviceCollectionPlans", on_delete=models.SET_NULL, null=True, related_name="device_plan",
                              verbose_name="关联方案")
+    profile_code = models.CharField(max_length=64, blank=True, default="", verbose_name="画像编码")
+    binding_source = models.CharField(
+        max_length=20,
+        choices=BINDING_SOURCE_CHOICES,
+        default=BINDING_SOURCE_MANUAL,
+        verbose_name="绑定来源",
+    )
+    is_active = models.BooleanField(default=True, verbose_name="是否启用")
     # 采集模式：True=本地采集，False=南向驱动采集（此时需填写 execute_node）
     use_local = models.BooleanField(
         default=True,
@@ -291,6 +396,7 @@ class PlansToDevice(models.Model):
         help_text="仅当 use_local=False 时生效，指定南向驱动节点地址或标识",
     )
     # 时间戳
+    last_bound_at = models.DateTimeField(null=True, blank=True, verbose_name="最近绑定时间")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
 
@@ -299,7 +405,121 @@ class PlansToDevice(models.Model):
         verbose_name_plural = '采集方案关系表'
         db_table = 'device_api_plan2device'
         ordering = ['manage_ip', 'created_at']
-        # unique_together = (("name", "vendor"),)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["device_serial_num", "plan"],
+                name="uniq_device_api_plan_binding",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["device_serial_num", "is_active"]),
+            models.Index(fields=["manage_ip", "profile_code"]),
+        ]
 
     def __str__(self):
-        return f"{self.manage_ip} ({self.plan.name})"
+        plan_name = self.plan.name if self.plan else ""
+        return f"{self.device_serial_num or self.manage_ip} ({plan_name})"
+
+
+class DeviceCollectionRule(models.Model):
+    MODULE_CHOICES = (
+        ('BASE', '基础平台'),
+        ('SouthDriver', '南向驱动'),
+    )
+    METHOD_CHOICES = (
+        ('NETCONF', 'NETCONF'),
+        ('CLI', 'CLI'),
+        ('REST_API', 'REST_API'),
+    )
+    id = models.BigAutoField(primary_key=True)
+    name = models.CharField(verbose_name='规则名', max_length=100, default='', null=True, blank=True)
+    operation = models.CharField(verbose_name='运算符', max_length=50, default='', null=True, blank=True)
+    module = models.CharField(verbose_name='执行模块', choices=MODULE_CHOICES, max_length=50, default='BASE')
+    method = models.CharField(verbose_name='执行方法', choices=METHOD_CHOICES, max_length=50, default='CLI')
+    execute = models.TextField(blank=True, default='', verbose_name='执行内容')
+    plugin = models.CharField(verbose_name="解析插件标识", max_length=50, null=False, blank=False, default='')
+    legacy_rule_id = models.IntegerField(null=True, blank=True, db_index=True, verbose_name="legacy规则ID")
+
+    @staticmethod
+    def is_valid_xml(xml_string):
+        try:
+            ET.fromstring(xml_string)
+            return True
+        except ET.ParseError:
+            return False
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        if self.method == 'CLI':
+            if not isinstance(self.execute, str):
+                raise ValueError("命令校验失败，CLI校验内容不是标准命令行.")
+        elif self.method == 'NETCONF':
+            if not self.is_valid_xml(self.execute):
+                raise ValueError("命令校验失败，NETCONF校验内容不符合XML规范.")
+        elif self.method == 'REST_API':
+            if not isinstance(json.loads(self.execute), dict):
+                raise ValueError("命令校验失败，REST_API校验内容不是dict类型.")
+        super(DeviceCollectionRule, self).save(
+            force_insert=force_insert,
+            force_update=force_update,
+            using=using,
+            update_fields=update_fields,
+        )
+
+    class Meta:
+        verbose_name = "采集规则"
+        verbose_name_plural = "采集规则"
+        db_table = "device_api_collection_rule"
+        indexes = [models.Index(fields=["id"])]
+
+
+class DeviceCollectionMatchRule(models.Model):
+    OPER_CHOICES = (
+        ('__exact', '精确匹配'),
+        ('__iexact', '不区分大小写的精确匹配'),
+        ('__contains', '包含指定值'),
+        ('__icontains', '不区分大小写包含指定值'),
+        ('__startswith', '以指定值开头'),
+        ('__endswith', '以指定值结尾'),
+        ('__istartswith', '不区分大小写以指定值开头'),
+        ('__iendswith', '不区分大小写以指定值结尾'),
+    )
+    id = models.BigAutoField(primary_key=True)
+    name = models.CharField(verbose_name='规则名', max_length=10, blank=True)
+    fields = models.CharField(verbose_name='匹配字段', max_length=50, default='', blank=True, null=True)
+    operator = models.CharField(verbose_name='操作符', choices=OPER_CHOICES, max_length=50, null=True, default='__exact', blank=True)
+    value = models.CharField(verbose_name='匹配值', max_length=50, default='', blank=True, null=True)
+    legacy_match_rule_id = models.IntegerField(null=True, blank=True, db_index=True, verbose_name="legacy匹配规则ID")
+    rule = models.ForeignKey(
+        "device_api.DeviceCollectionRule",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='match_rule',
+    )
+
+    def __str__(self):
+        operator_name = dict(self.OPER_CHOICES).get(self.operator, '')
+        return "{}-{}-{}-{}".format(self.name, self.fields, operator_name, self.value)
+
+    class Meta:
+        verbose_name = "采集规则匹配项"
+        verbose_name_plural = "采集规则匹配项"
+        db_table = "device_api_collection_match_rule"
+        indexes = [models.Index(fields=["id"])]
+        unique_together = (("rule", "name"),)
+
+
+@receiver(pre_save, sender=DeviceCollectionMatchRule)
+def auto_device_match_rule_name(sender, instance, **kwargs):
+    if not instance.name:
+        last_instance = (
+            sender.objects.select_related('rule')
+            .filter(rule=instance.rule)
+            .order_by('-id')
+            .first()
+        )
+        if last_instance:
+            last_id = ord(last_instance.name)
+            instance.name = chr(last_id + 1)
+        else:
+            instance.name = 'A'

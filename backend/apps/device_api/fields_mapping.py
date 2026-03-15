@@ -8,9 +8,78 @@ LIST_VALUE_FIELDS = {"memberports", "location"}
 
 
 DEV_MAPPING = [
+    {"label": "设备序列号: serial_num", "value": "serial_num"},
+    {"label": "厂商别名: vendor_alias", "value": "vendor_alias"},
     {"label": "设备型号: model_name", "value": "model_name"},
     {"label": "软件版本: soft_version", "value": "soft_version"},
     {"label": "补丁版本: patch_version", "value": "patch_version"},
+]
+
+CPU_STATUS_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "槽位: slot", "value": "slot"},
+    {"label": "CPU名称: cpu_name", "value": "cpu_name"},
+    {"label": "CPU利用率: cpu_usage", "value": "cpu_usage"},
+    {"label": "采样窗口: sample_window", "value": "sample_window"},
+    {"label": "状态: status", "value": "status"},
+]
+
+MEMORY_STATUS_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "槽位: slot", "value": "slot"},
+    {"label": "内存池: memory_name", "value": "memory_name"},
+    {"label": "已使用内存: used_memory", "value": "used_memory"},
+    {"label": "总内存: total_memory", "value": "total_memory"},
+    {"label": "使用率: memory_usage", "value": "memory_usage"},
+    {"label": "状态: status", "value": "status"},
+]
+
+BOARD_STATUS_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "槽位: slot", "value": "slot"},
+    {"label": "板卡名称: board_name", "value": "board_name"},
+    {"label": "板卡型号: board_model", "value": "board_model"},
+    {"label": "序列号: serial_num", "value": "serial_num"},
+    {"label": "状态: status", "value": "status"},
+]
+
+TRANSCEIVER_STATUS_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "接口: interface", "value": "interface"},
+    {"label": "光模块型号: transceiver_model", "value": "transceiver_model"},
+    {"label": "序列号: serial_num", "value": "serial_num"},
+    {"label": "厂商: vendor_name", "value": "vendor_name"},
+    {"label": "状态: status", "value": "status"},
+]
+
+STORAGE_STATUS_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "存储名称: storage_name", "value": "storage_name"},
+    {"label": "已使用空间: used_space", "value": "used_space"},
+    {"label": "总空间: total_space", "value": "total_space"},
+    {"label": "使用率: storage_usage", "value": "storage_usage"},
+    {"label": "状态: status", "value": "status"},
+]
+
+ENVIRONMENT_STATUS_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "指标类型: metric_type", "value": "metric_type"},
+    {"label": "指标名称: metric_name", "value": "metric_name"},
+    {"label": "指标值: metric_value", "value": "metric_value"},
+    {"label": "单位: unit", "value": "unit"},
+    {"label": "状态: status", "value": "status"},
 ]
 
 ARP_MAPPING = [
@@ -237,6 +306,12 @@ ISIS_NEIGHBORS_MAPPING = [
 ]
 
 field_mapping = {
+    "device_identity": {
+        "label": "DEVICE IDENTITY",
+        "value": "device_identity",
+        "icon": "identity",
+        "mapping_fields": DEV_MAPPING,
+    },
     "version": {
         "label": "VERSION",
         "value": "version",
@@ -309,6 +384,42 @@ field_mapping = {
         "icon": "temperature-status",
         "mapping_fields": TEMPERATURE_STATUS_MAPPING,
     },
+    "cpu_status": {
+        "label": "CPU状态",
+        "value": "cpu_status",
+        "icon": "cpu-status",
+        "mapping_fields": CPU_STATUS_MAPPING,
+    },
+    "memory_status": {
+        "label": "内存状态",
+        "value": "memory_status",
+        "icon": "memory-status",
+        "mapping_fields": MEMORY_STATUS_MAPPING,
+    },
+    "board_status": {
+        "label": "板卡状态",
+        "value": "board_status",
+        "icon": "board-status",
+        "mapping_fields": BOARD_STATUS_MAPPING,
+    },
+    "transceiver_status": {
+        "label": "光模块状态",
+        "value": "transceiver_status",
+        "icon": "transceiver-status",
+        "mapping_fields": TRANSCEIVER_STATUS_MAPPING,
+    },
+    "storage_status": {
+        "label": "存储状态",
+        "value": "storage_status",
+        "icon": "storage-status",
+        "mapping_fields": STORAGE_STATUS_MAPPING,
+    },
+    "environment_status": {
+        "label": "环境状态",
+        "value": "environment_status",
+        "icon": "environment-status",
+        "mapping_fields": ENVIRONMENT_STATUS_MAPPING,
+    },
     "clock_status": {
         "label": "时钟状态",
         "value": "clock_status",
@@ -353,8 +464,15 @@ field_mapping = {
     },
 }
 
-# 所有采集类型列表，用于创建空白方案时自动生成各类型的子方案
-DEFAULT_COLLECTION_TYPES = list(field_mapping.keys())
+COLLECTION_TYPE_ALIASES = {
+    "device_identity": "version",
+}
+
+# 所有采集类型列表，用于创建空白方案时自动生成各类型的子方案。
+# version 仅作为 device_identity 的兼容别名保留，不参与默认子方案自动生成。
+DEFAULT_COLLECTION_TYPES = [
+    key for key in field_mapping.keys() if key != "version"
+]
 
 
 def get_collection_output_fields(collection_type):

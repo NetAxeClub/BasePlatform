@@ -1,5 +1,5 @@
 from netaddr import IPNetwork
-from apps.automation.tools.base_connection import InterfaceFormat
+from apps.device_api.common import InterfaceFormat
 
 
 class MaipuPlan:

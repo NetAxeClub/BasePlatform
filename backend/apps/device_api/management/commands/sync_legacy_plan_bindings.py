@@ -1,8 +1,7 @@
 from django.core.management.base import BaseCommand
-from django.db import transaction
-
 from apps.asset.models import NetworkDevice
 from apps.device_api.models import DeviceCollectionPlans, PlansToDevice
+from apps.device_api.platform_profiles import PlatformProfileService
 
 
 class Command(BaseCommand):
@@ -12,7 +11,6 @@ class Command(BaseCommand):
         parser.add_argument("--dry-run", action="store_true", help="仅预览，不写入数据库")
         parser.add_argument("--manage-ip", dest="manage_ip", help="仅同步指定设备")
 
-    @transaction.atomic
     def handle(self, *args, **options):
         dry_run = options.get("dry_run", False)
         manage_ip = options.get("manage_ip")
@@ -59,11 +57,17 @@ class Command(BaseCommand):
                 continue
 
             if not dry_run:
+                profile = PlatformProfileService.match_profile_for_device(device)
                 PlansToDevice.objects.create(
+                    device_serial_num=device.serial_num,
                     manage_ip=device.manage_ip,
                     plan=summary_plan,
+                    profile_code=profile.code if profile else "",
+                    binding_source=PlansToDevice.BINDING_SOURCE_LEGACY,
+                    is_active=True,
                     use_local=True,
                     execute_node="",
+                    last_bound_at=None,
                 )
             created_count += 1
 

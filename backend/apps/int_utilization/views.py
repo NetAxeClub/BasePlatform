@@ -1,46 +1,42 @@
 import json
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 import django_filters
 from django.http import JsonResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.views import APIView
-from rest_framework import viewsets, permissions, filters, pagination
-from .models import InterfaceUsed
+from rest_framework import filters
 from .serializers import InterfaceUsedNewSerializer
 from apps.api.tools.custom_viewset_base import CustomViewBase
 from apps.api.tools.custom_pagination import LargeResultsSetPagination
+from apps.network_analysis.models import InterfaceUtilizationSnapshot
 from utils.db.mongo_ops import MongoOps
-show_ip_mongo = MongoOps(db='Automation', coll='layer3interface')
-interface_mongo = MongoOps(db='Automation', coll='layer2interface')
+show_ip_mongo = MongoOps(db='Automation', coll='plan_ip_interface')
+interface_mongo = MongoOps(db='Automation', coll='plan_interface_brief')
 
 
 class InterfaceUsedFilter(django_filters.FilterSet):
-    log_time = django_filters.CharFilter(lookup_expr='icontains')
-    host = django_filters.CharFilter(lookup_expr='icontains')
-    host_ip = django_filters.CharFilter(lookup_expr='icontains')
+    log_time = django_filters.CharFilter(field_name="snapshot_time", lookup_expr='icontains')
+    host = django_filters.CharFilter(field_name="device_name", lookup_expr='icontains')
+    host_ip = django_filters.CharFilter(field_name="manage_ip", lookup_expr='icontains')
 
     class Meta:
-        model = InterfaceUsed
-        fields = '__all__'
+        model = InterfaceUtilizationSnapshot
+        fields = ['manage_ip', 'device_name', 'device_serial_num', 'component_scope']
 
 
 class InterfaceUsedNewViewSet(CustomViewBase):
     """
     接口利用率--处理  GET POST , 处理 /api/post/<pk>/ GET PUT PATCH DELETE
     """
-    queryset = InterfaceUsed.objects.all().order_by('-log_time')
-    # queryset = InterfaceUsedNewSerializer.setup_eager_loading(queryset)
+    http_method_names = ["get", "head", "options"]
+    queryset = InterfaceUtilizationSnapshot.objects.all().order_by('-snapshot_time')
     serializer_class = InterfaceUsedNewSerializer
-    # permission_classes = ()
-    # authentication_classes = ()
     pagination_class = LargeResultsSetPagination
-    # 配置搜索功能
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
-    # 如果要允许对某些字段进行过滤，可以使用filter_fields属性。
-    # filterset_class = InterfaceUsedFilter
-    search_fields = ('host_ip', 'host')
-    filter_fields = ('host_ip', 'host')
-    ordering_fields = ('log_time', 'id')
+    filterset_class = InterfaceUsedFilter
+    search_fields = ('manage_ip', 'device_name', 'component_name', 'device_serial_num')
+    filter_fields = ('manage_ip', 'device_name')
+    ordering_fields = ('snapshot_time', 'utilization_percent', 'manage_ip')
 
     def get_queryset(self):
         # 获取查询参数
@@ -82,7 +78,7 @@ class InterfaceUsedNewViewSet(CustomViewBase):
         return self.queryset
 
     def filter_by_date_range(self, start_dt, end_dt):
-        return self.queryset.filter(log_time__range=(start_dt, end_dt))
+        return self.queryset.filter(snapshot_time__range=(start_dt, end_dt))
 
 class InterfaceView(APIView):
     def get(self, request):
