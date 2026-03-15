@@ -10,8 +10,12 @@ import time
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from apps.asset.models import NetworkDevice
-from apps.device_api.fields_mapping import DEFAULT_COLLECTION_TYPES
-from apps.device_api.models import DeviceSubCollectionPlan, NetconfXMLTemplate
+from apps.device_api.fields_mapping import DEFAULT_COLLECTION_TYPES, get_collection_output_fields
+from apps.device_api.models import (
+    DeviceCollectionPlans,
+    DeviceSubCollectionPlan,
+    NetconfXMLTemplate,
+)
 from apps.device_api import COLLECTION_RESULTS_DB, COLLECTION_PLAN, COLLECTION_SUB_PLAN
 from apps.device_api.connection_manager import DeviceConnectionManager
 from apps.device_api.models_api import resolve_raw_data, save_local_collection_result, inject_metadata
@@ -21,6 +25,37 @@ logger = logging.getLogger(__name__)
 
 class DeviceCollectionService:
     """设备采集服务类（新版本）"""
+    FIELD_MAPPING_PROTOCOLS = ("netmiko", "netconf", "snmp", "restconf", "telemetry")
+
+    @staticmethod
+    def get_enabled_collection_types(summary_plan) -> List[str]:
+        """返回父方案当前启用的采集类型；空配置视为全部启用。"""
+        configured_types = getattr(summary_plan, "enabled_collection_types", None) or []
+        if not configured_types:
+            return list(DEFAULT_COLLECTION_TYPES)
+
+        normalized_types = []
+        for collection_type in configured_types:
+            type_name = str(collection_type).strip()
+            if not type_name or type_name in normalized_types:
+                continue
+            normalized_types.append(type_name)
+        return normalized_types
+
+    @staticmethod
+    def _resolve_collection_method_flags(collection_method: str) -> Dict[str, bool]:
+        method = (collection_method or DeviceCollectionPlans.COLLECTION_METHOD_NETMIKO).lower()
+        return {
+            "collection_method": method,
+            "netmiko_enabled": method in {
+                DeviceCollectionPlans.COLLECTION_METHOD_NETMIKO,
+                DeviceCollectionPlans.COLLECTION_METHOD_BOTH,
+            },
+            "netconf_enabled": method in {
+                DeviceCollectionPlans.COLLECTION_METHOD_NETCONF,
+                DeviceCollectionPlans.COLLECTION_METHOD_BOTH,
+            },
+        }
 
     @staticmethod
     def _build_sub_plan_name(summary_plan_name: str, collection_type: str) -> str:
@@ -71,6 +106,165 @@ class DeviceCollectionService:
             "created_types": created_types,
             "total_types": len(DEFAULT_COLLECTION_TYPES),
         }
+
+    @staticmethod
+    def sync_summary_plan_sub_plans(summary_plan) -> Dict[str, Any]:
+        """按父方案的启用类型与采集方式同步子方案。"""
+        enabled_types = DeviceCollectionService.get_enabled_collection_types(summary_plan)
+        enabled_type_set = set(enabled_types)
+        method_flags = DeviceCollectionService._resolve_collection_method_flags(
+            getattr(summary_plan, "collection_method", DeviceCollectionPlans.COLLECTION_METHOD_NETMIKO)
+        )
+
+        existing_sub_plans = list(summary_plan.collect_plans.all())
+        existing_by_type = {}
+        for sub_plan in existing_sub_plans:
+            existing_by_type.setdefault(sub_plan.collection_type, sub_plan)
+
+        created_types = []
+        updated_types = []
+        disabled_types = []
+
+        for collection_type in DEFAULT_COLLECTION_TYPES:
+            sub_plan = existing_by_type.get(collection_type)
+            if sub_plan is None:
+                sub_plan = DeviceSubCollectionPlan.objects.create(
+                    summary_plan=summary_plan,
+                    name=DeviceCollectionService._build_sub_plan_name(
+                        summary_plan.name, collection_type
+                    ),
+                    collection_type=collection_type,
+                    description="",
+                )
+                existing_by_type[collection_type] = sub_plan
+                created_types.append(collection_type)
+
+            update_fields = []
+            if collection_type in enabled_type_set:
+                desired_netmiko_enabled = method_flags["netmiko_enabled"]
+                desired_netconf_enabled = method_flags["netconf_enabled"]
+
+                if sub_plan.netmiko_enabled != desired_netmiko_enabled:
+                    sub_plan.netmiko_enabled = desired_netmiko_enabled
+                    update_fields.append("netmiko_enabled")
+                if sub_plan.netconf_enabled != desired_netconf_enabled:
+                    sub_plan.netconf_enabled = desired_netconf_enabled
+                    update_fields.append("netconf_enabled")
+                if update_fields:
+                    updated_types.append(collection_type)
+            else:
+                for field_name in (
+                    "netmiko_enabled",
+                    "netconf_enabled",
+                    "snmp_enabled",
+                    "restconf_enabled",
+                    "telemetry_enabled",
+                ):
+                    if getattr(sub_plan, field_name, False):
+                        setattr(sub_plan, field_name, False)
+                        update_fields.append(field_name)
+                if update_fields:
+                    disabled_types.append(collection_type)
+
+            if update_fields:
+                sub_plan.save(update_fields=update_fields + ["updated_at"])
+
+        return {
+            "created_count": len(created_types),
+            "created_types": created_types,
+            "updated_count": len(updated_types),
+            "updated_types": updated_types,
+            "disabled_count": len(disabled_types),
+            "disabled_types": disabled_types,
+            "enabled_collection_types": enabled_types,
+            "collection_method": method_flags["collection_method"],
+            "total_types": len(DEFAULT_COLLECTION_TYPES),
+        }
+
+    @staticmethod
+    def _serialize_sub_plan_field_mapping(sub_plan, enabled_type_set) -> Dict[str, Any]:
+        payload = {
+            "sub_plan_id": getattr(sub_plan, "id", None),
+            "sub_plan_name": getattr(sub_plan, "name", ""),
+            "collection_type": sub_plan.collection_type,
+            "enabled": sub_plan.collection_type in enabled_type_set,
+            "output_fields": get_collection_output_fields(sub_plan.collection_type),
+        }
+
+        for protocol in DeviceCollectionService.FIELD_MAPPING_PROTOCOLS:
+            payload[f"{protocol}_path"] = getattr(sub_plan, f"{protocol}_path", "") or ""
+            payload[f"{protocol}_field_mappings"] = (
+                getattr(sub_plan, f"{protocol}_field_mappings", {}) or {}
+            )
+        return payload
+
+    @staticmethod
+    def get_summary_plan_field_mappings(summary_plan) -> Dict[str, Any]:
+        """按 collection_type 聚合父方案下的字段映射配置。"""
+        enabled_type_set = set(DeviceCollectionService.get_enabled_collection_types(summary_plan))
+        sub_plans = list(summary_plan.collect_plans.all())
+        sub_plan_by_type = {sub_plan.collection_type: sub_plan for sub_plan in sub_plans}
+
+        ordered_types = []
+        for collection_type in DEFAULT_COLLECTION_TYPES:
+            if collection_type in sub_plan_by_type:
+                ordered_types.append(collection_type)
+        for collection_type in sub_plan_by_type.keys():
+            if collection_type not in ordered_types:
+                ordered_types.append(collection_type)
+
+        return {
+            collection_type: DeviceCollectionService._serialize_sub_plan_field_mapping(
+                sub_plan_by_type[collection_type], enabled_type_set
+            )
+            for collection_type in ordered_types
+        }
+
+    @staticmethod
+    def update_summary_plan_field_mappings(summary_plan, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """按 collection_type 回写父方案下各子方案的路径与字段映射。"""
+        if not isinstance(payload, dict):
+            raise ValueError("请求体必须为以 collection_type 为 key 的对象")
+
+        DeviceCollectionService.sync_summary_plan_sub_plans(summary_plan)
+        sub_plan_by_type = {
+            sub_plan.collection_type: sub_plan for sub_plan in summary_plan.collect_plans.all()
+        }
+
+        for collection_type, config in payload.items():
+            if collection_type not in sub_plan_by_type:
+                raise ValueError(f"未找到采集类型: {collection_type}")
+            if not isinstance(config, dict):
+                raise ValueError(f"{collection_type} 的配置必须为对象")
+
+            sub_plan = sub_plan_by_type[collection_type]
+            update_fields = []
+            for protocol in DeviceCollectionService.FIELD_MAPPING_PROTOCOLS:
+                path_key = f"{protocol}_path"
+                mappings_key = f"{protocol}_field_mappings"
+
+                if path_key in config:
+                    path_value = config.get(path_key) or ""
+                    if not isinstance(path_value, str):
+                        raise ValueError(f"{collection_type}.{path_key} 必须为字符串")
+                    if getattr(sub_plan, path_key) != path_value:
+                        setattr(sub_plan, path_key, path_value)
+                        update_fields.append(path_key)
+
+                if mappings_key in config:
+                    mappings_value = config.get(mappings_key)
+                    if mappings_value is None:
+                        mappings_value = {}
+                    if not isinstance(mappings_value, dict):
+                        raise ValueError(f"{collection_type}.{mappings_key} 必须为对象")
+                    if getattr(sub_plan, mappings_key) != mappings_value:
+                        setattr(sub_plan, mappings_key, mappings_value)
+                        update_fields.append(mappings_key)
+
+            if update_fields:
+                sub_plan.save(update_fields=update_fields + ["updated_at"])
+
+        return DeviceCollectionService.get_summary_plan_field_mappings(summary_plan)
 
     @staticmethod
     def get_xml_templates_by_plan(plan_id: int) -> List[NetconfXMLTemplate]:

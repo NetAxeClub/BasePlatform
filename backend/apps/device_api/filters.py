@@ -24,7 +24,7 @@ class DeviceCollectionPlansFilter(django_filters.FilterSet):
 
     class Meta:
         model = DeviceCollectionPlans
-        fields = ['name', 'vendor', 'device_type', 'profile_code', 'plan_kind', 'is_default', 'is_active']
+        fields = ['name', 'vendor', 'device_type', 'profile_code', 'plan_kind', 'collection_method', 'is_default', 'is_active']
 
 
 class DeviceSubCollectionPlanFilter(django_filters.FilterSet):

@@ -1,5 +1,5 @@
 import json
-from netaddr import IPNetwork
+from netaddr import IPAddress, IPNetwork
 from .base import register_processor
 from apps.device_api.common import InterfaceFormat
 from django.core.cache import cache
@@ -38,6 +38,49 @@ def _safe_list(value):
     if isinstance(value, list):
         return value
     return [value]
+
+
+def _find_records(value, required_keys):
+    records = []
+    if isinstance(value, dict):
+        if required_keys.issubset(set(value.keys())):
+            records.append(value)
+        for child in value.values():
+            records.extend(_find_records(child, required_keys))
+    elif isinstance(value, list):
+        for item in value:
+            records.extend(_find_records(item, required_keys))
+    return records
+
+
+def _normalize_huawei_interface(interface: str) -> str:
+    if not interface:
+        return ""
+    if "." in interface:
+        interface = interface.split(".")[0]
+    return InterfaceFormat.huawei_interface_format(interface)
+
+
+def _normalize_huawei_mac(mac_address: str) -> str:
+    return (mac_address or "").lower()
+
+
+def _build_ipv4_location(ip_address: str, ip_mask: str):
+    if not ip_address or ip_address == "0.0.0.0":
+        return None
+    if ip_mask:
+        network = IPNetwork(f"{ip_address}/{ip_mask}")
+        return dict(
+            ipaddress=network.ip.format(),
+            ipmask=network.netmask.format(),
+            location=[dict(start=network.first, end=network.last)],
+        )
+    host = IPAddress(ip_address)
+    return dict(
+        ipaddress=host.format(),
+        ipmask="255.255.255.255",
+        location=[dict(start=host.value, end=host.value)],
+    )
 
 
 def _is_established(state: str) -> bool:
@@ -569,10 +612,23 @@ def process_isis_neighbors_netmiko(data):
 def process_arp_netconf(data):
     """Huawei ARP 表处理 (NETCONF)
 
-    TODO: 解析 Huawei yang 模型的 ARP XML 结构
-          输出字段：ipaddress, macaddress, vlan, interface, type, aging, vpninstance
+    优先兼容旧 Huawei NETCONF `arp_list` 结构。
     """
-    raise NotImplementedError("Huawei NETCONF ARP 处理器待实现")
+    entries = _find_records(data, {"ipAddr", "ifName"})
+    results = []
+    for entry in entries:
+        results.append(
+            dict(
+                ipaddress=entry.get("ipAddr", ""),
+                macaddress=_normalize_huawei_mac(entry.get("macAddr", "")),
+                vlan=entry.get("peVid", ""),
+                interface=_normalize_huawei_interface(entry.get("ifName", "")),
+                type=entry.get("styleType", ""),
+                aging=entry.get("expireTime", ""),
+                vpninstance=entry.get("vrfName", ""),
+            )
+        )
+    return results
 
 
 @register_processor(
@@ -581,10 +637,22 @@ def process_arp_netconf(data):
 def process_mac_netconf(data):
     """Huawei MAC 地址表处理 (NETCONF)
 
-    TODO: 解析 Huawei yang 模型的 MAC XML 结构
-          输出字段：macaddress（统一格式）, vlan, interface, type
+    兼容 `mac_table` 和 `mac_bd` 两类旧 Huawei NETCONF 结构。
     """
-    raise NotImplementedError("Huawei NETCONF MAC 地址表处理器待实现")
+    entries = _find_records(data, {"macAddress"})
+    results = []
+    for entry in entries:
+        if not any(entry.get(key) for key in ("vlanId", "bdId", "outIfName", "macType")):
+            continue
+        results.append(
+            dict(
+                macaddress=_normalize_huawei_mac(entry.get("macAddress", "")),
+                vlan=entry.get("vlanId", "") or entry.get("bdId", "") or "-",
+                interface=_normalize_huawei_interface(entry.get("outIfName", "")),
+                type=entry.get("macType", ""),
+            )
+        )
+    return results
 
 
 @register_processor(
@@ -593,10 +661,65 @@ def process_mac_netconf(data):
 def process_ip_interface_netconf(data):
     """Huawei 三层接口处理 (NETCONF)
 
-    TODO: 解析 Huawei yang 模型的三层接口 XML 结构，含 IP/掩码提取
-          输出字段：interface, line_status, protocol_status, ipaddress, ipmask, ip_type, mtu, location
+    兼容 `intf_ipv4v6` 和 USG `ip:ipv4` 两类旧 Huawei NETCONF 结构。
     """
-    raise NotImplementedError("Huawei NETCONF 三层接口处理器待实现")
+    interface_entries = _find_records(data, {"ifName"})
+    interface_entries.extend(_find_records(data, {"name", "ip:ipv4"}))
+
+    results = []
+    for entry in interface_entries:
+        interface_name = entry.get("ifName", "") or entry.get("name", "")
+        line_status = ((entry.get("ifDynamicInfo", {}) or {}).get("ifLinkStatus", ""))
+        protocol_status = ((entry.get("ifDynamicInfo", {}) or {}).get("ifV4State", ""))
+        mtu = ((entry.get("ifDynamicInfo", {}) or {}).get("ifOpertMTU", ""))
+
+        ipv4_entries = []
+        ipv4_oper = entry.get("ipv4Oper", {}) or {}
+        ipv4_addrs = (ipv4_oper.get("ipv4Addrs", {}) or {}).get("ipv4Addr")
+        for addr in _as_list(ipv4_addrs):
+            if not isinstance(addr, dict):
+                continue
+            ipv4_entries.append(
+                dict(
+                    ip=addr.get("ifIpAddr", ""),
+                    mask=addr.get("subnetMask", ""),
+                    ip_type=addr.get("addrType", ""),
+                )
+            )
+
+        if not ipv4_entries and entry.get("ip:ipv4"):
+            address = ((entry.get("ip:ipv4", {}) or {}).get("ip:address", {}))
+            for addr in _as_list(address):
+                if not isinstance(addr, dict):
+                    continue
+                ipv4_entries.append(
+                    dict(
+                        ip=addr.get("ip:ip", ""),
+                        mask=addr.get("ip:netmask", ""),
+                        ip_type="ipv4",
+                    )
+                )
+
+        for ipv4_entry in ipv4_entries:
+            location_payload = _build_ipv4_location(
+                ipv4_entry.get("ip", ""),
+                ipv4_entry.get("mask", ""),
+            )
+            if not location_payload:
+                continue
+            results.append(
+                dict(
+                    interface=_normalize_huawei_interface(interface_name),
+                    line_status=line_status,
+                    protocol_status=protocol_status,
+                    ipaddress=location_payload["ipaddress"],
+                    ipmask=location_payload["ipmask"],
+                    ip_type=ipv4_entry.get("ip_type", ""),
+                    mtu=mtu,
+                    location=location_payload["location"],
+                )
+            )
+    return results
 
 
 @register_processor(
@@ -605,11 +728,44 @@ def process_ip_interface_netconf(data):
 def process_lldp_netconf(data):
     """Huawei LLDP 邻居表处理 (NETCONF)
 
-    TODO: 解析 Huawei yang 模型的 LLDP XML 结构，保留 CMDB 查询 neighbor_ip 逻辑
-          输出字段：local_interface, chassis_id, neighbor_port, portdescription,
-                   neighborsysname, management_ip, management_type, neighbor_ip
+    优先兼容旧 Huawei NETCONF `lldp` 结构。
     """
-    raise NotImplementedError("Huawei NETCONF LLDP 邻居处理器待实现")
+    entries = _find_records(data, {"ifName"})
+    results = []
+    for entry in entries:
+        neighbors = entry.get("lldpNeighbors", {})
+        neighbor = (neighbors or {}).get("lldpNeighbor")
+        if not isinstance(neighbor, dict):
+            continue
+        if neighbor.get("portIdSubtype") == "macAddress":
+            continue
+
+        management_ip = ""
+        management_type = ""
+        management_addresses = ((neighbor.get("managementAddresss", {}) or {}).get("managementAddress"))
+        for address in _as_list(management_addresses):
+            if not isinstance(address, dict):
+                continue
+            if address.get("manAddrSubtype") == "ipv4" or not management_ip:
+                management_ip = address.get("manAddr", "")
+                management_type = address.get("manAddrSubtype", "")
+                if management_type == "ipv4":
+                    break
+
+        neighborsysname = neighbor.get("systemName", "")
+        results.append(
+            dict(
+                local_interface=_normalize_huawei_interface(entry.get("ifName", "")),
+                chassis_id=neighbor.get("chassisId", ""),
+                neighbor_port=neighbor.get("portId", ""),
+                portdescription=neighbor.get("portDescription", ""),
+                neighborsysname=neighborsysname,
+                management_ip=management_ip,
+                management_type=management_type,
+                neighbor_ip=_lookup_neighbor_ip(neighborsysname),
+            )
+        )
+    return results
 
 
 @register_processor(
@@ -618,7 +774,36 @@ def process_lldp_netconf(data):
 def process_aggre_port_netconf(data):
     """Huawei 聚合端口处理 (NETCONF)
 
-    TODO: 解析 Huawei yang 模型的聚合端口 XML 结构
-          输出字段：aggregroup, memberports（list）, status, mode
+    兼容旧 Huawei NETCONF `trunk_lacp` / `aggregation` 结构。
     """
-    raise NotImplementedError("Huawei NETCONF 聚合端口处理器待实现")
+    entries = _find_records(data, {"ifName"})
+    results = []
+    for entry in entries:
+        if not (
+            str(entry.get("ifName", "")).startswith("Eth-Trunk")
+            or entry.get("TrunkMemberIfs") is not None
+        ):
+            continue
+
+        memberports = []
+        memberstatus = []
+        trunk_members = ((entry.get("TrunkMemberIfs", {}) or {}).get("TrunkMemberIf"))
+        for member in _as_list(trunk_members):
+            if not isinstance(member, dict):
+                continue
+            member_name = member.get("memberIfName", "")
+            if member_name:
+                memberports.append(_normalize_huawei_interface(member_name))
+            state = member.get("memberIfState", "")
+            if state:
+                memberstatus.append(state)
+
+        results.append(
+            dict(
+                aggregroup=entry.get("ifName", ""),
+                memberports=memberports,
+                status=",".join(memberstatus),
+                mode=entry.get("workMode", "") or entry.get("mode", ""),
+            )
+        )
+    return results

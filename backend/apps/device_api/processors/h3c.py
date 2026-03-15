@@ -128,6 +128,44 @@ def _as_list(value):
     return [value]
 
 
+def _find_records(value, required_keys):
+    """递归查找包含 required_keys 的 dict 记录。"""
+    records = []
+    if isinstance(value, dict):
+        if required_keys.issubset(set(value.keys())):
+            records.append(value)
+        for child in value.values():
+            records.extend(_find_records(child, required_keys))
+    elif isinstance(value, list):
+        for item in value:
+            records.extend(_find_records(item, required_keys))
+    return records
+
+
+def _normalize_h3c_interface(name: str) -> str:
+    if not name:
+        return ""
+    return InterfaceFormat.h3c_interface_format(name)
+
+
+def _build_ipv4_location(ip_address: str, ip_mask: str):
+    if not ip_address or ip_address == "0.0.0.0":
+        return None
+    if ip_mask:
+        network = IPNetwork(f"{ip_address}/{ip_mask}")
+        return dict(
+            ipaddress=network.ip.format(),
+            ipmask=network.netmask.format(),
+            location=[dict(start=network.first, end=network.last)],
+        )
+    host = IPAddress(ip_address)
+    return dict(
+        ipaddress=host.format(),
+        ipmask="255.255.255.255",
+        location=[dict(start=host.value, end=host.value)],
+    )
+
+
 def _h3c_protocol_name(protocol: dict) -> str:
     protocol_id = str(protocol.get('ProtocolID', ''))
     sub_protocol_id = str(protocol.get('SubProtocolID', ''))
@@ -219,46 +257,142 @@ def process_arp_netconf(data):
 def process_mac_netconf(data):
     """H3C 交换机 MAC 地址表处理 (NETCONF)
 
-    TODO: 解析 H3C MAC 地址表 XML 结构
-          输出字段：macaddress（aabb-ccdd-eeff 格式）, vlan, interface, type
+    优先兼容旧 H3C NETCONF `mac_unicasttable` 结构，并允许通过 IfIndex 回填接口名。
     """
-    # TODO: 实现 H3C NETCONF MAC 地址表解析
-    raise NotImplementedError("H3C NETCONF MAC 地址表处理器待实现")
+    top = data.get('top', {}) if isinstance(data, dict) else {}
+    ifindex_map = _build_ifindex_map(top)
+    status_map = {
+        '0': 'Other',
+        '1': 'Security',
+        '2': 'Learned',
+        '3': 'Static',
+        '4': 'Blackhole',
+    }
+
+    entries = _find_records(data, {'MacAddress'})
+    mac_datas = []
+    for entry in entries:
+        if not any(
+            entry.get(key)
+            for key in ('PortName', 'VLANID', 'VlanID', 'Status')
+        ):
+            continue
+        interface_name = (
+            entry.get('PortName')
+            or ifindex_map.get(str(entry.get('IfIndex', '')))
+            or entry.get('Name')
+            or ""
+        )
+        if not interface_name:
+            continue
+        status = str(entry.get('Status', ''))
+        mac_datas.append(
+            dict(
+                macaddress=_normalize_mac(entry.get('MacAddress', '')),
+                vlan=entry.get('VLANID', '') or entry.get('VlanID', ''),
+                interface=_normalize_h3c_interface(interface_name),
+                type=status_map.get(status, entry.get('Type', '') or status),
+            )
+        )
+    return mac_datas
 
 
 @register_processor(vendor='H3C', device_type='', collection_type='ip_interface', method='netconf')
 def process_ip_interface_netconf(data):
     """H3C 交换机三层接口处理 (NETCONF)
 
-    TODO: 解析三层接口信息，含 IP/掩码提取，调用 IPNetwork 计算 location 字段
-          输出字段：interface, line_status, protocol_status, ipaddress, ipmask,
-                   ip_type, mtu, location
+    优先兼容旧 H3C NETCONF `ipv4address` 结构。
     """
-    # TODO: 实现 H3C NETCONF 三层接口解析
-    raise NotImplementedError("H3C NETCONF 三层接口处理器待实现")
+    entries = _find_records(data, {'Name', 'Ipv4Address'})
+    results = []
+    for entry in entries:
+        location_payload = _build_ipv4_location(
+            entry.get('Ipv4Address', ''),
+            entry.get('Ipv4Mask', ''),
+        )
+        if not location_payload:
+            continue
+        results.append(
+            dict(
+                interface=_normalize_h3c_interface(entry.get('Name', '')),
+                line_status=entry.get('LineStatus', '') or entry.get('line_status', ''),
+                protocol_status=entry.get('ProtocolStatus', '') or entry.get('protocol_status', ''),
+                ipaddress=location_payload['ipaddress'],
+                ipmask=location_payload['ipmask'],
+                ip_type=entry.get('type', '') or entry.get('IpType', ''),
+                mtu=entry.get('MTU', '') or entry.get('mtu', ''),
+                location=location_payload['location'],
+            )
+        )
+    return results
 
 
 @register_processor(vendor='H3C', device_type='', collection_type='lldp', method='netconf')
 def process_lldp_netconf(data):
     """H3C 交换机 LLDP 邻居表处理 (NETCONF)
 
-    TODO: 解析 LLDP 邻居信息，保留通过 CMDB 查询补充 neighbor_ip 的逻辑
-          输出字段：local_interface, chassis_id, neighbor_port, portdescription,
-                   neighborsysname, management_ip, management_type, neighbor_ip
+    优先兼容旧 H3C NETCONF `lldp` 结构。
     """
-    # TODO: 实现 H3C NETCONF LLDP 邻居解析
-    raise NotImplementedError("H3C NETCONF LLDP 邻居处理器待实现")
+    entries = _find_records(data, {'LocalPort', 'PortId', 'SystemName'})
+    results = []
+    for entry in entries:
+        neighborsysname = entry.get('SystemName', '')
+        results.append(
+            dict(
+                local_interface=_normalize_h3c_interface(entry.get('LocalPort', '')),
+                chassis_id=entry.get('ChassisId', ''),
+                neighbor_port=entry.get('PortId', ''),
+                portdescription=entry.get('PortDescription', ''),
+                neighborsysname=neighborsysname,
+                management_ip=entry.get('Address', '') or entry.get('ManagementIp', ''),
+                management_type=entry.get('SubType', '') or entry.get('ManagementType', ''),
+                neighbor_ip=_lookup_neighbor_ip(neighborsysname),
+            )
+        )
+    return results
 
 
 @register_processor(vendor='H3C', device_type='', collection_type='aggre_port', method='netconf')
 def process_aggre_port_netconf(data):
     """H3C 交换机聚合端口处理 (NETCONF)
 
-    TODO: 解析聚合端口及其成员端口列表
-          输出字段：aggregroup, memberports（list，接口名已规范化）, status, mode
+    优先兼容旧 H3C NETCONF `lagg_list` 结构。
     """
-    # TODO: 实现 H3C NETCONF 聚合端口解析
-    raise NotImplementedError("H3C NETCONF 聚合端口处理器待实现")
+    entries = []
+    for record in _find_records(data, {'Name'}):
+        name = str(record.get('Name', ''))
+        attr = str(record.get('attr', '') or '')
+        if (
+            record.get('GroupId')
+            or record.get('Memberlist') is not None
+            or 'aggregation' in attr.lower()
+            or name.startswith('Bridge-Aggregation')
+            or name.startswith('Route-Aggregation')
+        ):
+            entries.append(record)
+
+    results = []
+    for entry in entries:
+        member_items = _as_list(entry.get('Memberlist'))
+        memberports = []
+        member_statuses = []
+        for member in member_items:
+            member_name = member.get('Name', '')
+            if member_name:
+                memberports.append(_normalize_h3c_interface(member_name))
+            selected_status = member.get('SelectedStatus')
+            if selected_status:
+                member_statuses.append(selected_status)
+
+        results.append(
+            dict(
+                aggregroup=entry.get('Name', ''),
+                memberports=memberports,
+                status=','.join(member_statuses),
+                mode=entry.get('LinkMode', '') or entry.get('Mode', ''),
+            )
+        )
+    return results
 
 
 @register_processor(vendor='H3C', device_type='', collection_type='mac_evpn', method='netconf')
