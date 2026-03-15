@@ -220,6 +220,9 @@ class NetworkDeviceSerializer(serializers.ModelSerializer):
     class Meta:
         model = NetworkDevice
         fields = '__all__'
+        read_only_fields = [
+            'plan',
+        ]
 
     def __init__(self, *args, **kwargs):
         # 接收 fields 参数

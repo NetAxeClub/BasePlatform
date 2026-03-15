@@ -1,34 +1,141 @@
 import logging
 from datetime import timedelta
 from bson import ObjectId
+from django.apps import apps
 from django.http import JsonResponse
+from django.db.models import CharField, ForeignKey, GenericIPAddressField
 from django.utils import timezone
 from rest_framework.decorators import action
+from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.response import Response
 from apps.api.tools.custom_viewset_base import CustomViewBase
-from apps.device_api.filters import DeviceCollectionPlansFilter, DeviceSubCollectionPlanFilter, PlansToDeviceFilter
-from apps.device_api.models import DeviceCollectionPlans, DeviceSubCollectionPlan, NetconfXMLTemplate, PlansToDevice
+from apps.device_api.filters import (
+    DeviceCollectionMatchRuleFilter,
+    DeviceCollectionRuleFilter,
+    DeviceCollectionPlansFilter,
+    DeviceSubCollectionPlanFilter,
+    PlansToDeviceFilter,
+    PlatformProfileFilter,
+)
+from apps.device_api.models import (
+    DeviceCollectionMatchRule,
+    DeviceCollectionRule,
+    DeviceCollectionPlans,
+    DeviceDiscoveryState,
+    DeviceSubCollectionPlan,
+    NetconfXMLTemplate,
+    PlansToDevice,
+    PlatformProfile,
+)
 from apps.device_api.models_api import plan_data_to_mongodb, celery_data_mongodb
 from apps.device_api.serializers import (
+    DeviceCollectionMatchRuleSerializer,
+    DeviceCollectionRuleSerializer,
     DeviceCollectionPlansSerializer, DeviceCollectionPlansCreateSerializer,
     DeviceCollectionPlansUpdateSerializer, DeviceCollectionPlansDetailSerializer,
     DeviceSubCollectionPlanSerializer, DeviceSubCollectionPlanCreateSerializer,
     DeviceSubCollectionPlanUpdateSerializer,
     NetconfXMLTemplateSerializer, NetconfXMLTemplateListSerializer,
     CollectionResultDetailSerializer, CollectionFilterSerializer,
-    CollectionResultByPlanSerializer, PlansToDeviceSerializer
+    CollectionResultByPlanSerializer, PlansToDeviceSerializer,
+    PlatformProfileSerializer, DeviceFactsSerializer, DeviceCapabilitiesSerializer,
+    DeviceDiscoveryStateSerializer,
 )
+from apps.device_api.platform_profiles import PlatformProfileService
 from apps.device_api.services_new import DeviceCollectionService
 from apps.device_api import COLLECTION_RESULTS_DB, COLLECTION_PLAN, COLLECTION_SUB_PLAN
 from apps.api.tools.custom_pagination import LargeResultsSetPagination
 from apps.asset.models import NetworkDevice
-from apps.device_api.fields_mapping import field_mapping
+from apps.device_api.fields_mapping import DEFAULT_COLLECTION_TYPES, field_mapping
 from apps.device_api.services_new import FieldMappingDriver
 from confload.confload import config
 from utils.db.mongo_ops import MongoOps
 
 logger = logging.getLogger(__name__)
+
+
+class PlatformProfileViewSet(CustomViewBase):
+    queryset = PlatformProfile.objects.all()
+    serializer_class = PlatformProfileSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_class = PlatformProfileFilter
+    search_fields = ['code', 'vendor_alias', 'category', 'os_family']
+    ordering_fields = ['code', 'vendor_alias', 'category', 'updated_at']
+    ordering = ['code']
+    pagination_class = LargeResultsSetPagination
+
+    def get_queryset(self):
+        PlatformProfileService.ensure_builtin_profiles()
+        return super().get_queryset()
+
+
+class DeviceCollectionMatchRuleViewSet(CustomViewBase):
+    queryset = DeviceCollectionMatchRule.objects.all().order_by("-id")
+    serializer_class = DeviceCollectionMatchRuleSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_class = DeviceCollectionMatchRuleFilter
+    search_fields = ["name", "fields", "value"]
+    ordering_fields = ["id", "name"]
+    ordering = ["-id"]
+    pagination_class = LargeResultsSetPagination
+
+    def get_queryset(self):
+        return DeviceCollectionMatchRuleSerializer.setup_eager_loading(super().get_queryset())
+
+
+class DeviceCollectionRuleViewSet(CustomViewBase):
+    queryset = DeviceCollectionRule.objects.all().order_by("-id")
+    serializer_class = DeviceCollectionRuleSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_class = DeviceCollectionRuleFilter
+    search_fields = ["name", "module", "method", "plugin"]
+    ordering_fields = ["id", "name", "module", "method"]
+    ordering = ["-id"]
+    pagination_class = LargeResultsSetPagination
+
+    def get_queryset(self):
+        return DeviceCollectionRuleSerializer.setup_eager_loading(super().get_queryset())
+
+
+class DeviceCollectionRuleToolView(APIView):
+    permission_classes = ()
+    authentication_classes = ()
+
+    def get(self, request):
+        get_param = request.GET.dict()
+        if "get_cmdb_field" in get_param:
+            model = apps.get_model(app_label="asset", model_name="NetworkDevice")
+            fields = model._meta.get_fields()
+            field_res = []
+            for field in fields:
+                if isinstance(field, ForeignKey):
+                    related_model = field.related_model
+                    for related_field in related_model._meta.get_fields():
+                        if isinstance(related_field, CharField):
+                            field_res.append(
+                                {
+                                    "label": f"{field.verbose_name}-{related_field.verbose_name}",
+                                    "value": f"{field.name}__{related_field.name}",
+                                }
+                            )
+                if isinstance(field, CharField) or isinstance(field, GenericIPAddressField):
+                    field_res.append(
+                        {
+                            "label": getattr(field, "verbose_name", field.name),
+                            "value": field.name,
+                        }
+                    )
+            return JsonResponse({"code": 200, "msg": "success", "data": field_res})
+        if "get_pulgin_list" in get_param:
+            from driver import auto_driver_map
+
+            return JsonResponse({"code": 200, "msg": "success", "data": auto_driver_map})
+        return JsonResponse({"code": 400, "msg": "未匹配动作"})
+
+    def post(self, request):
+        return JsonResponse({"code": 400, "msg": "未匹配动作"})
 
 
 class PlansToDeviceViewSet(CustomViewBase):
@@ -37,15 +144,86 @@ class PlansToDeviceViewSet(CustomViewBase):
     serializer_class = PlansToDeviceSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = PlansToDeviceFilter
-    search_fields = ['manage_ip', 'execute_node']
-    ordering_fields = ['manage_ip', 'created_at', 'updated_at']
+    search_fields = ['manage_ip', 'device_serial_num', 'execute_node', 'profile_code']
+    ordering_fields = ['manage_ip', 'device_serial_num', 'created_at', 'updated_at']
     ordering = ['-created_at']
     pagination_class = LargeResultsSetPagination
 
     def get_queryset(self):
         """获取查询集"""
 
-        return self.queryset
+        return self.queryset.select_related("plan")
+
+    @action(detail=False, methods=['post'])
+    def auto_bind(self, request, *args, **kwargs):
+        queryset = NetworkDevice.objects.filter(status=0, auto_enable=True).select_related(
+            "vendor", "category", "model"
+        )
+        manage_ip = (request.data.get("manage_ip") or "").strip()
+        serial_num = (request.data.get("serial_num") or "").strip()
+        vendor_alias = (request.data.get("vendor_alias") or "").strip()
+        profile_code = (request.data.get("profile_code") or "").strip()
+
+        if manage_ip:
+            queryset = queryset.filter(manage_ip=manage_ip)
+        if serial_num:
+            queryset = queryset.filter(serial_num=serial_num)
+        if vendor_alias:
+            queryset = queryset.filter(vendor__alias=vendor_alias)
+        if profile_code:
+            serial_nums = list(
+                DeviceDiscoveryState.objects.filter(profile_code=profile_code)
+                .values_list("device_serial_num", flat=True)
+            )
+            queryset = queryset.filter(serial_num__in=serial_nums)
+
+        result = PlatformProfileService.auto_bind_devices(list(queryset))
+        return JsonResponse({
+            'code': 200,
+            'message': '自动绑定完成',
+            'data': result,
+        })
+
+
+class DeviceFactsAPIView(APIView):
+    def get(self, request, serial_num):
+        device = (
+            NetworkDevice.objects.select_related("vendor", "category", "model", "plan")
+            .filter(serial_num=serial_num)
+            .first()
+        )
+        if not device:
+            return JsonResponse({'code': 404, 'message': '设备不存在', 'data': None})
+        serializer = DeviceFactsSerializer(device)
+        discovery_state = DeviceDiscoveryState.objects.filter(device_serial_num=serial_num).first()
+        discovery_payload = (
+            DeviceDiscoveryStateSerializer(discovery_state).data if discovery_state else {}
+        )
+        return JsonResponse(
+            {
+                'code': 200,
+                'message': '获取成功',
+                'data': {
+                    **serializer.data,
+                    **discovery_payload,
+                },
+            }
+        )
+
+
+class DeviceCapabilitiesAPIView(APIView):
+    def get(self, request, serial_num):
+        device = (
+            NetworkDevice.objects.select_related("vendor", "category", "model")
+            .filter(serial_num=serial_num)
+            .first()
+        )
+        if not device:
+            return JsonResponse({'code': 404, 'message': '设备不存在', 'data': None})
+        data = PlatformProfileService.build_capabilities(device)
+        serializer = DeviceCapabilitiesSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        return JsonResponse({'code': 200, 'message': '获取成功', 'data': serializer.validated_data})
 
 
 class DeviceCollectionPlansViewSet(CustomViewBase):
@@ -169,6 +347,11 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
         try:
             summary_plan = self.get_object()
             sync_result = DeviceCollectionService.ensure_default_sub_plans(summary_plan)
+            profile_code = getattr(summary_plan, "profile_code", "")
+            if profile_code:
+                profile = PlatformProfile.objects.filter(code=profile_code).first()
+                if profile:
+                    PlatformProfileService.apply_profile_defaults(summary_plan, profile)
             summary_plan.refresh_from_db()
             serializer = DeviceCollectionPlansDetailSerializer(summary_plan)
 
@@ -323,6 +506,22 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
                 "code": 500,
                 "message": f"执行失败: {str(e)}"
             })
+
+
+class LegacyCollectionPlanViewSet(DeviceCollectionPlansViewSet):
+    """automation.collection_plan 兼容入口，仅保留只读访问。"""
+
+    def create(self, request, *args, **kwargs):
+        return JsonResponse({"code": 405, "message": "legacy 接口只读，请改用 /device_api/collection-plans/", "data": None})
+
+    def update(self, request, *args, **kwargs):
+        return JsonResponse({"code": 405, "message": "legacy 接口只读，请改用 /device_api/collection-plans/", "data": None})
+
+    def partial_update(self, request, *args, **kwargs):
+        return JsonResponse({"code": 405, "message": "legacy 接口只读，请改用 /device_api/collection-plans/", "data": None})
+
+    def destroy(self, request, *args, **kwargs):
+        return JsonResponse({"code": 405, "message": "legacy 接口只读，请改用 /device_api/collection-plans/", "data": None})
 
 
 class DeviceSubCollectionPlanViewSet(CustomViewBase):
@@ -768,6 +967,54 @@ class CollectionResultViewSet(CustomViewBase):
         )[0]
 
     @action(detail=False, methods=['get'])
+    def latest(self, request):
+        serial_num = request.GET.get('serial_num', '').strip()
+        manage_ip = request.GET.get('manage_ip', '').strip()
+        collection_type = request.GET.get('collection_type', '').strip()
+
+        device = None
+        if serial_num:
+            device = NetworkDevice.objects.filter(serial_num=serial_num).first()
+            if device and not manage_ip:
+                manage_ip = device.manage_ip
+        elif manage_ip:
+            device = NetworkDevice.objects.filter(manage_ip=manage_ip).first()
+            if device and not serial_num:
+                serial_num = device.serial_num
+
+        if not manage_ip:
+            return JsonResponse({
+                'code': 400,
+                'message': '缺少必要参数: serial_num 或 manage_ip',
+                'data': None,
+            })
+
+        types = [collection_type] if collection_type else DEFAULT_COLLECTION_TYPES
+        latest_results = []
+        for current_type in types:
+            collection_db = MongoOps(db='Automation', coll=f'plan_{current_type}')
+            records = list(
+                collection_db.coll.find({'hostip': manage_ip}, {'_id': 0})
+                .sort('execute_time', -1)
+                .limit(1)
+            )
+            if records:
+                latest_results.append({
+                    'collection_type': current_type,
+                    'record': records[0],
+                })
+
+        return JsonResponse({
+            'code': 200,
+            'message': '获取成功',
+            'data': {
+                'serial_num': serial_num,
+                'manage_ip': manage_ip,
+                'results': latest_results,
+            },
+        })
+
+    @action(detail=False, methods=['get'])
     def overview(self, request):
         """根据厂商统计4个指标：
           1. 覆盖率：参与自动化任务的网络设备数 / 网络设备总数 * 100
@@ -793,9 +1040,20 @@ class CollectionResultViewSet(CustomViewBase):
             # 2. 采集方案数：启用的采集方案数
             plan_count = DeviceCollectionPlans.objects.filter(**plan_filters).count()
 
-            # 3. 参与自动化任务的网络设备数：关联了采集方案且启用自动化的设备数
-            participated_filters = {**device_filters, 'auto_enable': True, 'plan__isnull': False}
-            participated_devices = NetworkDevice.objects.filter(**participated_filters).count()
+            # 3. 参与采集任务的网络设备数：由 PlansToDevice 绑定关系决定
+            participated_manage_ips = list(
+                NetworkDevice.objects.filter(**device_filters, auto_enable=True)
+                .values_list('manage_ip', flat=True)
+            )
+            participated_devices = (
+                PlansToDevice.objects.filter(
+                    is_active=True,
+                    manage_ip__in=participated_manage_ips,
+                )
+                .values('manage_ip')
+                .distinct()
+                .count()
+            )
 
             # 4. 覆盖率计算：参与自动化任务的设备数 / 总设备数 * 100
             coverage_rate = round((participated_devices / total_devices * 100), 2) if total_devices > 0 else 0.0
@@ -867,7 +1125,7 @@ class CollectionResultViewSet(CustomViewBase):
                 })
 
             plan_relations = list(
-                PlansToDevice.objects.select_related('plan').filter(manage_ip=manage_ip)
+                PlansToDevice.objects.select_related('plan').filter(manage_ip=manage_ip, is_active=True)
             )
 
             results = []

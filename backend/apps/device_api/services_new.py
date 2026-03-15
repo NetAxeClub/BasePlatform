@@ -643,7 +643,7 @@ class DeviceCollectionService:
     def _execute_netmiko_south(plan, device, south_driver, south_driver_runner, config):
         """南向驱动 Netmiko 采集（内部方法）"""
         try:
-            from apps.automation.tools.base_connection import device_type_map
+            from apps.device_api.common import device_type_map
             command = plan.get_netmiko_method()
             account = device.ssh_account
             vendor_alias = device.vendor.alias if device.vendor else "Huawei"

@@ -1,6 +1,13 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from apps.device_api.models import DeviceCollectionPlans, DeviceSubCollectionPlan, NetconfXMLTemplate
+from apps.device_api.models import (
+    DeviceCollectionMatchRule,
+    DeviceCollectionPlans,
+    DeviceCollectionRule,
+    DeviceSubCollectionPlan,
+    NetconfXMLTemplate,
+    PlatformProfile,
+)
 
 
 @admin.register(DeviceCollectionPlans)
@@ -149,4 +156,24 @@ class NetconfXMLTemplateAdmin(admin.ModelAdmin):
         return '-'
     collection_plan_info.short_description = '采集方案信息'
 
+
+@admin.register(PlatformProfile)
+class PlatformProfileAdmin(admin.ModelAdmin):
+    list_display = ["code", "vendor_alias", "category", "os_family", "is_active", "updated_at"]
+    list_filter = ["vendor_alias", "category", "is_active"]
+    search_fields = ["code", "vendor_alias", "category", "os_family"]
+
+
+@admin.register(DeviceCollectionRule)
+class DeviceCollectionRuleAdmin(admin.ModelAdmin):
+    list_display = ["id", "name", "module", "method", "plugin"]
+    search_fields = ["name", "module", "method", "plugin"]
+    list_filter = ["module", "method"]
+
+
+@admin.register(DeviceCollectionMatchRule)
+class DeviceCollectionMatchRuleAdmin(admin.ModelAdmin):
+    list_display = ["id", "name", "fields", "operator", "value", "rule"]
+    search_fields = ["name", "fields", "value"]
+    list_filter = ["operator"]
 

@@ -3,13 +3,20 @@ import logging
 import pytz
 from datetime import datetime
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers
+from apps.asset.models import NetworkDevice
 from apps.device_api.models import (
+    DeviceCollectionMatchRule,
+    DeviceCollectionRule,
     DeviceCollectionPlans,
+    DeviceDiscoveryState,
     DeviceSubCollectionPlan,
     NetconfXMLTemplate,
     PlansToDevice,
+    PlatformProfile,
 )
+from apps.device_api.platform_profiles import PlatformProfileService
 from apps.device_api.services_new import DeviceCollectionService
 
 
@@ -29,6 +36,11 @@ class DeviceCollectionPlansSerializer(serializers.ModelSerializer):
             "vendor_display",
             "device_type",
             "description",
+            "profile_code",
+            "plan_kind",
+            "generated_by_system",
+            "version",
+            "is_default",
             "is_active",
             "collect_plans_count",
             "collect_plans",
@@ -39,6 +51,7 @@ class DeviceCollectionPlansSerializer(serializers.ModelSerializer):
             "id",
             "vendor_display",
             "collect_plans_count",
+            "generated_by_system",
             "created_at",
             "updated_at",
         ]
@@ -68,11 +81,22 @@ class DeviceCollectionPlansCreateSerializer(serializers.ModelSerializer):
             "vendor_display",
             "device_type",
             "description",
+            "profile_code",
+            "plan_kind",
+            "generated_by_system",
+            "version",
+            "is_default",
             "is_active",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "vendor_display", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "vendor_display",
+            "generated_by_system",
+            "created_at",
+            "updated_at",
+        ]
 
     def validate_name(self, value):
         if DeviceCollectionPlans.objects.filter(name=value).exists():
@@ -81,8 +105,14 @@ class DeviceCollectionPlansCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         with transaction.atomic():
+            validated_data.setdefault("plan_kind", DeviceCollectionPlans.PLAN_KIND_RUNTIME)
+            validated_data.setdefault("version", 1)
             summary_plan = DeviceCollectionPlans.objects.create(**validated_data)
             DeviceCollectionService.ensure_default_sub_plans(summary_plan)
+            if summary_plan.profile_code:
+                profile = PlatformProfile.objects.filter(code=summary_plan.profile_code).first()
+                if profile:
+                    PlatformProfileService.apply_profile_defaults(summary_plan, profile)
             return summary_plan
 
 
@@ -100,11 +130,16 @@ class DeviceCollectionPlansUpdateSerializer(serializers.ModelSerializer):
             "vendor_display",
             "device_type",
             "description",
+            "profile_code",
+            "plan_kind",
+            "generated_by_system",
+            "version",
+            "is_default",
             "is_active",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "vendor_display", "created_at", "updated_at"]
+        read_only_fields = ["id", "vendor_display", "generated_by_system", "created_at", "updated_at"]
 
     def validate_name(self, value):
         instance = self.instance
@@ -137,12 +172,50 @@ class DeviceCollectionPlansDetailSerializer(serializers.ModelSerializer):
             "vendor_display",
             "device_type",
             "description",
+            "profile_code",
+            "plan_kind",
+            "generated_by_system",
+            "version",
+            "is_default",
             "is_active",
             "collect_plans",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "vendor_display", "created_at", "updated_at"]
+        read_only_fields = ["id", "vendor_display", "generated_by_system", "created_at", "updated_at"]
+
+
+class PlatformProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PlatformProfile
+        fields = "__all__"
+        read_only_fields = ["created_at", "updated_at"]
+
+
+class DeviceCollectionMatchRuleSerializer(serializers.ModelSerializer):
+    operator_name = serializers.CharField(source="get_operator_display", read_only=True)
+
+    @staticmethod
+    def setup_eager_loading(queryset):
+        return queryset.select_related("rule")
+
+    class Meta:
+        model = DeviceCollectionMatchRule
+        fields = "__all__"
+        read_only_fields = ["legacy_match_rule_id"]
+
+
+class DeviceCollectionRuleSerializer(serializers.ModelSerializer):
+    match_rule = DeviceCollectionMatchRuleSerializer(many=True, read_only=True)
+
+    @staticmethod
+    def setup_eager_loading(queryset):
+        return queryset.prefetch_related("match_rule")
+
+    class Meta:
+        model = DeviceCollectionRule
+        fields = "__all__"
+        read_only_fields = ["legacy_rule_id"]
 
 
 class DeviceSubCollectionPlanSerializer(serializers.ModelSerializer):
@@ -814,6 +887,8 @@ class NetconfXMLTemplateSerializer(serializers.ModelSerializer):
 class PlansToDeviceSerializer(serializers.ModelSerializer):
     """采集方案和设备关联序列化"""
 
+    plan_name = serializers.CharField(source="plan.name", read_only=True)
+
     class Meta:
         model = PlansToDevice
         fields = "__all__"
@@ -825,15 +900,81 @@ class PlansToDeviceSerializer(serializers.ModelSerializer):
         """
         manage_ip = validated_data.get("manage_ip")
         plan = validated_data.get("plan")
+        device_serial_num = validated_data.get("device_serial_num", "")
+        profile_code = validated_data.get("profile_code", "")
+
+        device = None
+        if manage_ip:
+            device = NetworkDevice.objects.filter(manage_ip=manage_ip).first()
+        if device:
+            if not device_serial_num:
+                validated_data["device_serial_num"] = device.serial_num
+                device_serial_num = device.serial_num
+            if not profile_code:
+                discovery_state = DeviceDiscoveryState.objects.filter(
+                    device_serial_num=device.serial_num
+                ).first()
+                validated_data["profile_code"] = (
+                    getattr(discovery_state, "profile_code", "")
+                    or validated_data.get("profile_code", "")
+                )
+            validated_data.setdefault("last_bound_at", timezone.now())
 
         # 幂等创建：如果已存在则直接返回，不抛错
-        # 注意：validated_data['plan'] 在DRF里通常是 FK 对象（不是 plan_id）
-        qs = PlansToDevice.objects.filter(manage_ip=manage_ip, plan=plan).order_by("id")
+        qs = PlansToDevice.objects.filter(
+            device_serial_num=device_serial_num,
+            plan=plan,
+        ).order_by("id")
         existed = qs.first()
         if existed:
             return existed
 
         return PlansToDevice.objects.create(**validated_data)
+
+
+class DeviceFactsSerializer(serializers.ModelSerializer):
+    vendor_name = serializers.CharField(source="vendor.name", read_only=True)
+    vendor_alias = serializers.CharField(source="vendor.alias", read_only=True)
+    category_name = serializers.CharField(source="category.name", read_only=True)
+    model_name = serializers.CharField(source="model.name", read_only=True)
+    legacy_plan_name = serializers.CharField(source="plan.name", read_only=True)
+
+    class Meta:
+        model = NetworkDevice
+        fields = [
+            "id",
+            "serial_num",
+            "manage_ip",
+            "name",
+            "vendor_name",
+            "vendor_alias",
+            "category_name",
+            "model_name",
+            "soft_version",
+            "patch_version",
+            "legacy_plan_name",
+        ]
+
+
+class DeviceDiscoveryStateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DeviceDiscoveryState
+        fields = [
+            "profile_code",
+            "last_discovered_at",
+            "last_discovery_status",
+            "last_discovery_error",
+        ]
+
+
+class DeviceCapabilitiesSerializer(serializers.Serializer):
+    serial_num = serializers.CharField()
+    manage_ip = serializers.CharField()
+    profile_code = serializers.CharField()
+    supported_collection_types = serializers.ListField(child=serializers.CharField())
+    preferred_methods = serializers.DictField()
+    fallback_methods = serializers.DictField()
+    bindings = serializers.ListField(child=serializers.DictField())
 
 
 class NetconfXMLTemplateListSerializer(serializers.ModelSerializer):

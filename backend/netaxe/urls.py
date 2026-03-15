@@ -64,10 +64,12 @@ urlpatterns = [
     path(r'base_platform/automation/', include('apps.automation.urls'), name="automation"),
     path(r'base_platform/config_center/', include('apps.config_center.urls'), name="config_center"),
     path(r'base_platform/int_utilization/', include('apps.int_utilization.urls'), name="int_utilization"),
+    path(r'base_platform/network_analysis/', include('apps.network_analysis.urls'), name="network_analysis"),
     path(r'base_platform/topology/', include('apps.topology.urls'), name="topology"),
     path(r'base_platform/system/', include('apps.system.urls'), name="system"),
     path(r'base_platform/dcs_manage/', include('apps.dcs_control.urls'), name="dcs_control"),
     path(r'base_platform/device_api/', include('apps.device_api.urls'), name="device_api"),     # 新增
+    path(r'base_platform/workflow_center/', include('apps.workflow_center.urls'), name="workflow_center"),
 ]
 
 if 'apps.support' in discovered_apps:

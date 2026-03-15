@@ -1,16 +1,17 @@
 import json
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 from django.test import SimpleTestCase
 from rest_framework.test import APIRequestFactory
 
+from apps.asset.models import Category, Model, NetworkDevice, Vendor
 from apps.device_api.fields_mapping import (
     DEFAULT_COLLECTION_TYPES,
     get_collection_output_fields,
 )
-from apps.device_api.models import DeviceCollectionPlans, DeviceSubCollectionPlan
+from apps.device_api.models import DeviceCollectionPlans, DeviceDiscoveryState, DeviceSubCollectionPlan
 from apps.device_api.models_api import COLLECTION_TYPE_MONGO_MAP
 from apps.device_api.processors.h3c import (
     process_bgp_summary_netconf as process_h3c_bgp_summary_netconf,
@@ -36,9 +37,20 @@ from apps.device_api.serializers import (
     DeviceSubCollectionPlanUpdateSerializer,
 )
 from apps.device_api.management.commands.sync_legacy_plan_bindings import Command as SyncLegacyPlanBindingsCommand
+from apps.device_api.platform_profiles import PlatformProfileService
 from apps.device_api.tasks import _process_and_save_result
 from apps.device_api.tools.collect_device import get_auto_device
-from apps.device_api.views import CollectionResultViewSet, DeviceCollectionPlansViewSet
+from apps.device_api.management.commands.import_legacy_collection_rules import (
+    Command as ImportLegacyCollectionRulesCommand,
+)
+from apps.device_api.views import (
+    CollectionResultViewSet,
+    DeviceCollectionRuleToolView,
+    DeviceCollectionPlansViewSet,
+    DeviceFactsAPIView,
+    DeviceCapabilitiesAPIView,
+    PlansToDeviceViewSet,
+)
 
 
 class FakeQuerySet(list):
@@ -246,6 +258,125 @@ class DeviceApiViewTests(SimpleTestCase):
         mock_sync.assert_called_once_with(summary_plan)
         summary_plan.refresh_from_db.assert_called_once()
 
+    @patch("apps.device_api.views.PlatformProfileService.auto_bind_devices")
+    @patch("apps.device_api.views.NetworkDevice.objects")
+    def test_plans_to_device_auto_bind_endpoint(self, mock_device_objects, mock_auto_bind):
+        mock_queryset = Mock()
+        filtered_devices = [SimpleNamespace(serial_num="SER-1", manage_ip="10.0.0.1")]
+        mock_device_objects.filter.return_value.select_related.return_value = mock_queryset
+        mock_queryset.filter.return_value = filtered_devices
+        mock_auto_bind.return_value = {"created": 1, "updated": 0, "skipped": 0, "results": []}
+
+        request = self.factory.post(
+            "/base_platform/device_api/plans-to-device/auto_bind/",
+            {"manage_ip": "10.0.0.1"},
+            format="json",
+        )
+        response = PlansToDeviceViewSet.as_view({"post": "auto_bind"})(request)
+        payload = json.loads(response.content)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["code"], 200)
+        mock_auto_bind.assert_called_once_with(filtered_devices)
+
+    def test_collection_rule_tool_returns_cmdb_fields(self):
+        request = self.factory.get(
+            "/base_platform/device_api/collection-rule-tools/",
+            {"get_cmdb_field": "1"},
+        )
+        response = DeviceCollectionRuleToolView.as_view()(request)
+        payload = json.loads(response.content)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["code"], 200)
+        values = {item["value"] for item in payload["data"]}
+        self.assertIn("manage_ip", values)
+
+    @patch("apps.device_api.views.MongoOps")
+    @patch("apps.device_api.views.NetworkDevice.objects")
+    def test_collection_results_latest_returns_grouped_records(self, mock_device_objects, mock_mongo_ops):
+        mock_device_objects.filter.return_value.first.return_value = SimpleNamespace(
+            serial_num="SER-1",
+            manage_ip="10.0.0.1",
+        )
+        collection_db = Mock()
+        collection_db.coll.find.return_value.sort.return_value.limit.return_value = [
+            {"hostip": "10.0.0.1", "execute_time": "2026-03-15 10:00:00"}
+        ]
+        mock_mongo_ops.return_value = collection_db
+
+        request = self.factory.get(
+            "/base_platform/device_api/collection-results/latest/",
+            {"serial_num": "SER-1", "collection_type": "arp"},
+        )
+        response = CollectionResultViewSet.as_view({"get": "latest"})(request)
+        payload = json.loads(response.content)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["code"], 200)
+        self.assertEqual(payload["data"]["manage_ip"], "10.0.0.1")
+        self.assertEqual(payload["data"]["results"][0]["collection_type"], "arp")
+
+    @patch("apps.device_api.views.DeviceDiscoveryState.objects")
+    @patch("apps.device_api.views.NetworkDevice.objects")
+    def test_device_facts_api_returns_discovered_fields(self, mock_device_objects, mock_state_objects):
+        vendor = Vendor(name="Huawei", alias="Huawei")
+        category = Category(name="switch")
+        model = Model(name="CE8850", vendor=vendor)
+        device = NetworkDevice(
+            serial_num="SER-1",
+            manage_ip="10.0.0.1",
+            name="sw-a",
+            vendor=vendor,
+            category=category,
+            model=model,
+            soft_version="V200",
+            patch_version="SP1",
+        )
+        mock_device_objects.select_related.return_value.filter.return_value.first.return_value = device
+        mock_state_objects.filter.return_value.first.return_value = DeviceDiscoveryState(
+            device_serial_num="SER-1",
+            profile_code="Huawei-CE",
+            last_discovery_status="success",
+            last_discovery_error="",
+        )
+
+        request = self.factory.get("/base_platform/device_api/devices/SER-1/facts/")
+        response = DeviceFactsAPIView.as_view()(request, serial_num="SER-1")
+        payload = json.loads(response.content)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["data"]["profile_code"], "Huawei-CE")
+        self.assertEqual(payload["data"]["vendor_alias"], "Huawei")
+
+    @patch("apps.device_api.views.PlatformProfileService.build_capabilities")
+    @patch("apps.device_api.views.NetworkDevice.objects")
+    def test_device_capabilities_api_returns_profile_payload(
+        self,
+        mock_device_objects,
+        mock_build_capabilities,
+    ):
+        mock_device_objects.select_related.return_value.filter.return_value.first.return_value = SimpleNamespace(
+            serial_num="SER-1",
+            manage_ip="10.0.0.1",
+        )
+        mock_build_capabilities.return_value = {
+            "serial_num": "SER-1",
+            "manage_ip": "10.0.0.1",
+            "profile_code": "Huawei-CE",
+            "supported_collection_types": ["device_identity", "arp"],
+            "preferred_methods": {"arp": ["netconf", "netmiko"]},
+            "fallback_methods": {"arp": ["netmiko"]},
+            "bindings": [],
+        }
+
+        request = self.factory.get("/base_platform/device_api/devices/SER-1/capabilities/")
+        response = DeviceCapabilitiesAPIView.as_view()(request, serial_num="SER-1")
+        payload = json.loads(response.content)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["data"]["profile_code"], "Huawei-CE")
+
 
 class DeviceApiSerializerTests(SimpleTestCase):
     def test_sub_plan_serializer_exposes_extended_protocol_fields(self):
@@ -421,6 +552,8 @@ class DeviceApiCollectDeviceTests(SimpleTestCase):
 
         relation_filter_kwargs = mock_relation_objects.select_related.return_value.filter.call_args.kwargs
         self.assertEqual(relation_filter_kwargs["manage_ip__in"], ["10.0.0.1"])
+        self.assertEqual(relation_filter_kwargs["device_serial_num__in"], ["SER-1"])
+        self.assertTrue(relation_filter_kwargs["is_active"])
         self.assertEqual(relation_filter_kwargs["plan_id"], 201)
         self.assertFalse(relation_filter_kwargs["use_local"])
 
@@ -465,20 +598,25 @@ class DeviceApiBridgeCommandTests(SimpleTestCase):
     @patch("apps.device_api.management.commands.sync_legacy_plan_bindings.PlansToDevice.objects")
     @patch("apps.device_api.management.commands.sync_legacy_plan_bindings.DeviceCollectionPlans.objects")
     @patch("apps.device_api.management.commands.sync_legacy_plan_bindings.NetworkDevice.objects")
+    @patch("apps.device_api.management.commands.sync_legacy_plan_bindings.PlatformProfileService.match_profile_for_device")
     def test_sync_legacy_plan_bindings_creates_bridge_relation(
         self,
+        mock_match_profile,
         mock_network_device_objects,
         mock_device_plan_objects,
         mock_relation_objects,
     ):
+        mock_match_profile.return_value = SimpleNamespace(code="Huawei-CE")
         legacy_plan = SimpleNamespace(id=9, name="legacy-switch-plan")
         device = SimpleNamespace(
+            serial_num="SER-1",
             manage_ip="10.0.0.1",
             plan=legacy_plan,
             vendor=SimpleNamespace(alias="Huawei"),
             category=SimpleNamespace(name="switch"),
         )
-        mock_network_device_objects.filter.return_value.select_related.return_value = [device]
+        mock_queryset = mock_network_device_objects.filter.return_value.select_related.return_value
+        mock_queryset.iterator.return_value = [device]
         mock_device_plan_objects.filter.return_value.first.return_value = SimpleNamespace(id=101)
         mock_relation_objects.filter.return_value.exists.return_value = False
 
@@ -486,10 +624,15 @@ class DeviceApiBridgeCommandTests(SimpleTestCase):
         command.handle(dry_run=False, manage_ip=None)
 
         mock_relation_objects.create.assert_called_once_with(
+            device_serial_num="SER-1",
             manage_ip="10.0.0.1",
             plan=mock_device_plan_objects.filter.return_value.first.return_value,
+            profile_code="Huawei-CE",
+            binding_source="legacy_bridge",
+            is_active=True,
             use_local=True,
             execute_node="",
+            last_bound_at=None,
         )
 
 
@@ -534,6 +677,46 @@ class DeviceApiTaskTests(SimpleTestCase):
         self.assertEqual(inserted_docs[0]["collection_method"], "netmiko")
         self.assertEqual(inserted_docs[0]["execute_time"], "2026-03-12T11:00:00")
         mock_insert_sub_task.assert_called_once()
+
+    @patch("apps.device_api.tasks.refresh_network_analysis_for_batch.apply_async")
+    @patch("apps.device_api.tasks.plan_collect_device.apply_async")
+    @patch("apps.device_api.tasks.clear_his_collect_res")
+    @patch("apps.device_api.tasks.MainIn.cmdb_to_mongo")
+    @patch("apps.device_api.tasks.datas_to_cache")
+    @patch("apps.device_api.tasks.get_auto_device")
+    def test_plan_collect_device_main_schedules_network_analysis_followup(
+        self,
+        mock_get_auto_device,
+        mock_datas_to_cache,
+        mock_cmdb_to_mongo,
+        mock_clear_his_collect_res,
+        mock_plan_collect_apply_async,
+        mock_analysis_apply_async,
+    ):
+        mock_get_auto_device.return_value = [
+            {
+                "manage_ip": "10.0.0.1",
+                "execute_time": "2026-03-15 10:00:00",
+                "sub_plans": [{"id": 1}, {"id": 2}],
+            },
+            {
+                "manage_ip": "10.0.0.2",
+                "execute_time": "2026-03-15 10:00:00",
+                "sub_plans": [{"id": 3}],
+            },
+        ]
+        mock_plan_collect_apply_async.return_value = SimpleNamespace(id="task-1")
+
+        from apps.device_api.tasks import plan_collect_device_main
+
+        result = plan_collect_device_main()
+
+        self.assertEqual(result["total"], 2)
+        mock_analysis_apply_async.assert_called_once()
+        kwargs = mock_analysis_apply_async.call_args.kwargs["kwargs"]
+        self.assertEqual(kwargs["execute_time"], "2026-03-15 10:00:00")
+        self.assertEqual(kwargs["expected_devices"], 2)
+        self.assertEqual(kwargs["expected_subtasks"], 3)
 
 
 class DeviceApiProtocolExtensionTests(SimpleTestCase):
@@ -886,6 +1069,55 @@ class DeviceApiHealthExtensionTests(SimpleTestCase):
         self.assertEqual(result[0]["device_date"], "2026-03-14")
         self.assertEqual(result[0]["device_datetime"], "2026-03-14 12:34:56")
 
+    def test_apply_profile_defaults_populates_h3c_cli_templates(self):
+        sub_plan = SimpleNamespace(
+            collection_type="arp",
+            description="",
+            netmiko_method="",
+            textfsm_template="",
+            netmiko_enabled=False,
+            save=Mock(),
+        )
+        plan = SimpleNamespace(collect_plans=SimpleNamespace(all=lambda: [sub_plan]))
+        profile = SimpleNamespace(
+            code="H3C-legacy-cli",
+            vendor_alias="H3C",
+            preferred_methods={"arp": ["netmiko"]},
+            fallback_methods={},
+            supported_collection_types=["arp"],
+        )
+
+        PlatformProfileService.apply_profile_defaults(plan, profile)
+
+        self.assertEqual(sub_plan.netmiko_method, "display arp")
+        self.assertEqual(sub_plan.textfsm_template, "hp_comware_display_arp.textfsm")
+        self.assertTrue(sub_plan.netmiko_enabled)
+        sub_plan.save.assert_called_once()
+
+    def test_apply_profile_defaults_uses_huawei_cli_fallback(self):
+        sub_plan = SimpleNamespace(
+            collection_type="arp",
+            description="",
+            netmiko_method="",
+            textfsm_template="",
+            netmiko_enabled=False,
+            save=Mock(),
+        )
+        plan = SimpleNamespace(collect_plans=SimpleNamespace(all=lambda: [sub_plan]))
+        profile = SimpleNamespace(
+            code="Huawei-CE",
+            vendor_alias="Huawei",
+            preferred_methods={"arp": ["netconf", "netmiko"]},
+            fallback_methods={"arp": ["netmiko"]},
+            supported_collection_types=["arp"],
+        )
+
+        PlatformProfileService.apply_profile_defaults(plan, profile)
+
+        self.assertEqual(sub_plan.netmiko_method, "display arp")
+        self.assertEqual(sub_plan.textfsm_template, "huawei_vrp_display_arp.textfsm")
+        self.assertTrue(sub_plan.netmiko_enabled)
+
 
 class DeviceCollectionServiceSyncTests(SimpleTestCase):
     @patch("apps.device_api.services_new.DeviceSubCollectionPlan.objects")
@@ -920,3 +1152,41 @@ class DeviceCollectionServiceSyncTests(SimpleTestCase):
         self.assertIn("bgp_neighbors", sync_result["created_types"])
         created_types = {item["collection_type"] for item in created_records}
         self.assertEqual(created_types, set(DEFAULT_COLLECTION_TYPES) - {"arp"})
+
+
+class DeviceApiArchitectureGuardTests(SimpleTestCase):
+    def test_runtime_modules_do_not_import_automation(self):
+        runtime_paths = []
+        root = Path("/Users/lijiamin/PycharmProjects/BasePlatform/backend/apps/device_api")
+        for path in root.rglob("*.py"):
+            relative = path.relative_to(root)
+            if "tests.py" in path.name:
+                continue
+            if relative.parts and relative.parts[0] == "migrations":
+                continue
+            source = path.read_text()
+            self.assertNotIn("from apps.automation", source, f"forbidden legacy import in {path}")
+            self.assertNotIn("import apps.automation", source, f"forbidden legacy import in {path}")
+
+
+class DeviceApiRuleImportCommandTests(SimpleTestCase):
+    @patch("apps.device_api.management.commands.import_legacy_collection_rules.DeviceCollectionMatchRule.objects")
+    @patch("apps.device_api.management.commands.import_legacy_collection_rules.DeviceCollectionRule.objects")
+    def test_import_legacy_collection_rules_reads_raw_tables(
+        self,
+        mock_rule_objects,
+        mock_match_rule_objects,
+    ):
+        mock_rule_objects.update_or_create.return_value = (SimpleNamespace(id=10), False)
+        mock_match_rule_objects.update_or_create.return_value = (SimpleNamespace(id=11), True)
+        rules = [
+            [{"id": 1, "name": "rule-a", "operation": "and", "module": "BASE", "method": "CLI", "execute": "show version", "plugin": "textfsm"}],
+        ]
+        match_rules = [{"id": 2, "name": "A", "fields": "vendor__alias", "operator": "__exact", "value": "Huawei", "rule_id": 1}]
+
+        stats = ImportLegacyCollectionRulesCommand._import_rows(rules[0], match_rules)
+
+        mock_rule_objects.update_or_create.assert_called_once()
+        mock_match_rule_objects.update_or_create.assert_called_once()
+        self.assertEqual(stats["rules"]["updated"], 1)
+        self.assertEqual(stats["match_rules"]["created"], 1)

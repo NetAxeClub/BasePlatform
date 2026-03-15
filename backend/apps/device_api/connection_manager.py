@@ -24,7 +24,7 @@ from utils.connect_layer.NETCONF.netconf_connect import (
     CiscoNetconfConnect,
 )
 from utils.connect_layer.snmp.snmp_test import probe_snmp, snmp_get_oid
-from apps.automation.tools.base_connection import device_type_map
+from apps.device_api.common import device_type_map
 
 logger = logging.getLogger(__name__)
 
