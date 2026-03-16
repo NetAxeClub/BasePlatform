@@ -1,0 +1,13 @@
+Value AREA (\S+)
+Value INTERFACE (\S+)
+Value ROUTER_ID (\S+)
+Value ADDRESS (\S+)
+Value STATE (\S+)
+Value PRIORITY (\S+)
+Value DEAD_TIME (\S+)
+
+Start
+  ^\s*Area\s+Interface\s+Router\s+ID\s+Address\s+State\s+Pri\s+Dead-Time\s*$$ -> Start
+  ^\s*-+\s*$$ -> Start
+  ^\s*$$ -> Start
+  ^\s*${AREA}\s+${INTERFACE}\s+${ROUTER_ID}\s+${ADDRESS}\s+${STATE}\s+${PRIORITY}\s+${DEAD_TIME}\s*$$ -> Record

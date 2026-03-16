@@ -1,0 +1,17 @@
+Value AREA (\S+)
+Value INTERFACE (\S+)
+Value INTERFACE_IP (\S+)
+Value NETWORK_TYPE (\S+)
+Value STATE (\S+)
+Value COST (\S+)
+Value PRIORITY (\S+)
+Value DR (\S+)
+Value BDR (\S+)
+Value HELLO_INTERVAL (\S+)
+Value DEAD_INTERVAL (\S+)
+
+Start
+  ^\s*Area\s+Interface\s+IP\s+Address\s+Type\s+State\s+Cost\s+Pri\s+DR\s+BDR\s+Hello/Dead\s*$$ -> Start
+  ^\s*-+\s*$$ -> Start
+  ^\s*$$ -> Start
+  ^\s*${AREA}\s+${INTERFACE}\s+${INTERFACE_IP}\s+${NETWORK_TYPE}\s+${STATE}\s+${COST}\s+${PRIORITY}\s+${DR}\s+${BDR}\s+${HELLO_INTERVAL}\s+${DEAD_INTERVAL}\s*$$ -> Record

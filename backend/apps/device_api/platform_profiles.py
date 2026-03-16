@@ -1,4 +1,5 @@
 import re
+from pathlib import Path
 from typing import Dict, List, Optional
 
 from django.utils import timezone
@@ -12,6 +13,31 @@ from apps.device_api.models import (
     PlansToDevice,
 )
 from apps.device_api.services_new import DeviceCollectionService
+
+
+TEMPLATE_BASE_DIR = (
+    Path(__file__).resolve().parents[2] / "utils" / "connect_layer" / "zetmiko" / "templates"
+)
+PLACEHOLDER_TEMPLATE_MARKERS = (
+    "Placeholder template for P1.5 baseline",
+)
+DEVICE_CATEGORY_ALIASES = {
+    "switch": "switch",
+    "交换机": "switch",
+    "tap交换机": "switch",
+    "firewall": "firewall",
+    "防火墙": "firewall",
+    "router": "router",
+    "路由器": "router",
+}
+
+
+def _supported_types(*collection_types: str) -> List[str]:
+    ordered = []
+    for collection_type in DEFAULT_COLLECTION_TYPES:
+        if collection_type in collection_types and collection_type not in ordered:
+            ordered.append(collection_type)
+    return ordered
 
 
 BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
@@ -37,7 +63,22 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
             "interface_brief": ["netmiko"],
             "ip_interface": ["netmiko"],
         },
-        "supported_collection_types": DEFAULT_COLLECTION_TYPES,
+        "supported_collection_types": _supported_types(
+            "device_identity",
+            "arp",
+            "mac",
+            "lldp",
+            "interface_brief",
+            "ip_interface",
+            "aggre_port",
+            "fan_status",
+            "power_status",
+            "temperature_status",
+            "ospf_neighbors",
+            "ospf_interfaces",
+            "isis_neighbors",
+            "board_status",
+        ),
         "default_plan_name": "default-huawei-s-switch",
     },
     {
@@ -68,8 +109,56 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
             "bgp_neighbors": ["netmiko"],
             "bgp_summary": ["netmiko"],
         },
-        "supported_collection_types": DEFAULT_COLLECTION_TYPES,
+        "supported_collection_types": _supported_types(
+            "device_identity",
+            "arp",
+            "mac",
+            "lldp",
+            "interface_brief",
+            "ip_interface",
+            "aggre_port",
+            "fan_status",
+            "power_status",
+            "temperature_status",
+            "ospf_neighbors",
+            "ospf_interfaces",
+            "isis_neighbors",
+            "board_status",
+            "route_table",
+            "bgp_neighbors",
+            "bgp_summary",
+        ),
         "default_plan_name": "default-huawei-ce-switch",
+    },
+    {
+        "code": "Huawei-router-cli",
+        "vendor_alias": "Huawei",
+        "category": "router",
+        "series_patterns": [r"^AR\d+", r"^NE\d+", r"路由"],
+        "os_family": "VRP",
+        "version_patterns": [r".*"],
+        "preferred_methods": {
+            "device_identity": ["netmiko"],
+            "arp": ["netmiko"],
+            "lldp": ["netmiko"],
+            "interface_brief": ["netmiko"],
+            "ip_interface": ["netmiko"],
+            "ospf_neighbors": ["netmiko"],
+            "ospf_interfaces": ["netmiko"],
+            "isis_neighbors": ["netmiko"],
+        },
+        "fallback_methods": {},
+        "supported_collection_types": _supported_types(
+            "device_identity",
+            "arp",
+            "lldp",
+            "interface_brief",
+            "ip_interface",
+            "ospf_neighbors",
+            "ospf_interfaces",
+            "isis_neighbors",
+        ),
+        "default_plan_name": "default-huawei-router",
     },
     {
         "code": "Huawei-USG",
@@ -87,7 +176,12 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
         "fallback_methods": {
             "arp": ["netmiko"],
         },
-        "supported_collection_types": DEFAULT_COLLECTION_TYPES,
+        "supported_collection_types": _supported_types(
+            "device_identity",
+            "arp",
+            "mac",
+            "lldp",
+        ),
         "default_plan_name": "default-huawei-usg-firewall",
     },
     {
@@ -110,7 +204,11 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
             "interface_brief": ["netmiko"],
             "ip_interface": ["netmiko"],
         },
-        "supported_collection_types": DEFAULT_COLLECTION_TYPES,
+        "supported_collection_types": _supported_types(
+            "device_identity",
+            "interface_brief",
+            "ip_interface",
+        ),
         "default_plan_name": "default-huawei-yunshan-switch",
     },
     {
@@ -129,7 +227,22 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
             "ip_interface": ["netmiko"],
         },
         "fallback_methods": {},
-        "supported_collection_types": DEFAULT_COLLECTION_TYPES,
+        "supported_collection_types": _supported_types(
+            "device_identity",
+            "arp",
+            "mac",
+            "lldp",
+            "interface_brief",
+            "ip_interface",
+            "aggre_port",
+            "fan_status",
+            "power_status",
+            "clock_status",
+            "ospf_neighbors",
+            "ospf_interfaces",
+            "isis_neighbors",
+            "board_status",
+        ),
         "default_plan_name": "default-h3c-legacy-switch",
     },
     {
@@ -160,8 +273,70 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
             "bgp_neighbors": ["netmiko"],
             "bgp_summary": ["netmiko"],
         },
-        "supported_collection_types": DEFAULT_COLLECTION_TYPES,
+        "supported_collection_types": _supported_types(
+            "device_identity",
+            "arp",
+            "mac",
+            "lldp",
+            "interface_brief",
+            "ip_interface",
+            "aggre_port",
+            "fan_status",
+            "power_status",
+            "clock_status",
+            "ospf_neighbors",
+            "ospf_interfaces",
+            "isis_neighbors",
+            "board_status",
+            "route_table",
+            "bgp_neighbors",
+            "bgp_summary",
+        ),
         "default_plan_name": "default-h3c-modern-switch",
+    },
+    {
+        "code": "H3C-router-cli",
+        "vendor_alias": "H3C",
+        "category": "router",
+        "series_patterns": [r"^SR\d+", r"路由"],
+        "os_family": "Comware",
+        "version_patterns": [r".*"],
+        "preferred_methods": {
+            "device_identity": ["netmiko"],
+            "arp": ["netmiko"],
+            "interface_brief": ["netmiko"],
+            "ip_interface": ["netmiko"],
+        },
+        "fallback_methods": {},
+        "supported_collection_types": _supported_types(
+            "device_identity",
+            "arp",
+            "interface_brief",
+            "ip_interface",
+        ),
+        "default_plan_name": "default-h3c-router",
+    },
+    {
+        "code": "H3C-firewall-cli",
+        "vendor_alias": "H3C",
+        "category": "firewall",
+        "series_patterns": [r"SecPath", r"^F\d+"],
+        "os_family": "SecPath",
+        "version_patterns": [r".*"],
+        "preferred_methods": {
+            "device_identity": ["netmiko"],
+            "arp": ["netmiko"],
+            "interface_brief": ["netmiko"],
+            "ip_interface": ["netmiko"],
+        },
+        "fallback_methods": {},
+        "supported_collection_types": _supported_types(
+            "device_identity",
+            "arp",
+            "interface_brief",
+            "ip_interface",
+        ),
+        "default_plan_name": "default-h3c-firewall",
     },
     {
         "code": "Ruijie-switch",
@@ -178,7 +353,14 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
             "power_status": ["netmiko"],
         },
         "fallback_methods": {},
-        "supported_collection_types": DEFAULT_COLLECTION_TYPES,
+        "supported_collection_types": _supported_types(
+            "device_identity",
+            "arp",
+            "mac",
+            "fan_status",
+            "power_status",
+            "interface_brief",
+        ),
         "default_plan_name": "default-ruijie-switch",
     },
     {
@@ -194,7 +376,11 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
             "session": ["netmiko"],
         },
         "fallback_methods": {},
-        "supported_collection_types": DEFAULT_COLLECTION_TYPES,
+        "supported_collection_types": _supported_types(
+            "device_identity",
+            "arp",
+            "session",
+        ),
         "default_plan_name": "default-hillstone-firewall",
     },
     {
@@ -210,7 +396,11 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
             "mac": ["netmiko"],
         },
         "fallback_methods": {},
-        "supported_collection_types": DEFAULT_COLLECTION_TYPES,
+        "supported_collection_types": _supported_types(
+            "device_identity",
+            "arp",
+            "mac",
+        ),
         "default_plan_name": "default-cisco-switch",
     },
     {
@@ -226,7 +416,11 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
             "mac": ["netmiko"],
         },
         "fallback_methods": {},
-        "supported_collection_types": DEFAULT_COLLECTION_TYPES,
+        "supported_collection_types": _supported_types(
+            "device_identity",
+            "arp",
+            "lldp",
+        ),
         "default_plan_name": "default-zte-switch",
     },
     {
@@ -242,7 +436,13 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
             "mac": ["netmiko"],
         },
         "fallback_methods": {},
-        "supported_collection_types": DEFAULT_COLLECTION_TYPES,
+        "supported_collection_types": _supported_types(
+            "arp",
+            "mac",
+            "interface_brief",
+            "aggre_port",
+            "lldp",
+        ),
         "default_plan_name": "default-maipu-switch",
     },
     {
@@ -258,7 +458,12 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
             "mac": ["netmiko"],
         },
         "fallback_methods": {},
-        "supported_collection_types": DEFAULT_COLLECTION_TYPES,
+        "supported_collection_types": _supported_types(
+            "mac",
+            "aggre_port",
+            "fan_status",
+            "power_status",
+        ),
         "default_plan_name": "default-mellanox-switch",
     },
     {
@@ -274,7 +479,10 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
             "mac": ["netmiko"],
         },
         "fallback_methods": {},
-        "supported_collection_types": DEFAULT_COLLECTION_TYPES,
+        "supported_collection_types": _supported_types(
+            "arp",
+            "ip_interface",
+        ),
         "default_plan_name": "default-centec-switch",
     },
 ]
@@ -408,6 +616,31 @@ PROFILE_NETMIKO_SUB_PLAN_DEFAULTS: Dict[str, Dict[str, Dict[str, str]]] = {
         "lldp": {"command": "display lldp neighbor", "template": "huawei_usg_display_lldp_neighbor.textfsm"},
         "mac": {"command": "display mac-address", "template": "huawei_usg_display_mac-address.textfsm"},
     },
+    "Huawei-router-cli": {
+        "device_identity": {"command": "display version", "template": "huawei_vrp_display_version.textfsm"},
+        "arp": {"command": "display arp", "template": "huawei_vrp_display_arp.textfsm"},
+        "lldp": {"command": "display lldp neighbor", "template": "huawei_vrp_display_lldp_neighbor.textfsm"},
+        "interface_brief": {
+            "command": "display interface brief",
+            "template": "huawei_vrp_display_interface_brief.textfsm",
+        },
+        "ip_interface": {
+            "command": "display ip interface brief",
+            "template": "huawei_vrp_display_ip_interface_brief.textfsm",
+        },
+        "ospf_neighbors": {
+            "command": "display ospf peer brief",
+            "template": "huawei_vrp_display_ospf_peer_brief.textfsm",
+        },
+        "ospf_interfaces": {
+            "command": "display ospf interface",
+            "template": "huawei_vrp_display_ospf_interface.textfsm",
+        },
+        "isis_neighbors": {
+            "command": "display isis peer verbose",
+            "template": "huawei_vrp_display_isis_peer_verbose.textfsm",
+        },
+    },
     "Huawei-YunShan": {
         "device_identity": {"command": "display version", "template": "huawei_vrp_display_version.textfsm"},
         "interface_brief": {"command": "display interface brief", "template": "huawei_vrp_display_interface_brief.textfsm"},
@@ -457,13 +690,25 @@ PROFILE_NETMIKO_SUB_PLAN_DEFAULTS: Dict[str, Dict[str, Dict[str, str]]] = {
         "isis_neighbors": {"command": "display isis peer verbose", "template": "hp_comware_display_isis_peer_verbose.textfsm"},
         "board_status": {"command": "display device manuinfo", "template": "hp_comware_display_device_manuinfo.textfsm"},
     },
+    "H3C-router-cli": {
+        "device_identity": {"command": "display version", "template": "hp_comware_display_version.textfsm"},
+        "arp": {"command": "display arp", "template": "hp_comware_display_arp.textfsm"},
+        "interface_brief": {"command": "display interface brief", "template": "hp_comware_display_interface_brief.textfsm"},
+        "ip_interface": {"command": "display ip interface", "template": "hp_comware_display_ip_interface.textfsm"},
+    },
+    "H3C-firewall-cli": {
+        "device_identity": {"command": "display version", "template": "hp_comware_display_version.textfsm"},
+        "arp": {"command": "display arp", "template": "hp_comware_display_arp.textfsm"},
+        "interface_brief": {"command": "display interface brief", "template": "hp_comware_display_interface_brief.textfsm"},
+        "ip_interface": {"command": "display ip interface", "template": "hp_comware_display_ip_interface.textfsm"},
+    },
     "Ruijie-switch": {
         "device_identity": {"command": "show version", "template": "ruijie_show_version.textfsm"},
         "fan_status": {"command": "show fan", "template": "ruijie_show_fan.textfsm"},
         "power_status": {"command": "show power", "template": "ruijie_show_power.textfsm"},
         "interface_brief": {"command": "show interfaces status", "template": "ruijie_show_interfaces_status.textfsm"},
-        "arp": {"command": "show ip arp", "template": ""},
-        "mac": {"command": "show mac", "template": ""},
+        "arp": {"command": "show ip arp", "template": "ruijie_show_ip_arp.textfsm"},
+        "mac": {"command": "show mac", "template": "ruijie_show_mac.textfsm"},
     },
     "Hillstone-firewall": {
         "device_identity": {"command": "show version", "template": "hillstone_show_version.textfsm"},
@@ -471,7 +716,7 @@ PROFILE_NETMIKO_SUB_PLAN_DEFAULTS: Dict[str, Dict[str, Dict[str, str]]] = {
     },
     "Cisco-switch": {
         "device_identity": {"command": "show version", "template": "cisco_ios_show_version.textfsm"},
-        "arp": {"command": "show ip arp", "template": ""},
+        "arp": {"command": "show ip arp", "template": "cisco_ios_show_ip_arp.textfsm"},
         "mac": {"command": "show mac-address-table", "template": "cisco_ios_show_mac-address-table.textfsm"},
     },
     "ZTE-switch": {
@@ -499,6 +744,39 @@ PROFILE_NETMIKO_SUB_PLAN_DEFAULTS: Dict[str, Dict[str, Dict[str, str]]] = {
 
 
 class PlatformProfileService:
+    _template_placeholder_cache: Dict[str, bool] = {}
+
+    @staticmethod
+    def template_exists(template_name: str) -> bool:
+        if not template_name:
+            return False
+        return (TEMPLATE_BASE_DIR / template_name).exists()
+
+    @classmethod
+    def template_is_placeholder(cls, template_name: str) -> bool:
+        if not template_name:
+            return False
+        if template_name in cls._template_placeholder_cache:
+            return cls._template_placeholder_cache[template_name]
+        template_path = TEMPLATE_BASE_DIR / template_name
+        if not template_path.exists():
+            cls._template_placeholder_cache[template_name] = False
+            return False
+        try:
+            content = template_path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            cls._template_placeholder_cache[template_name] = False
+            return False
+        is_placeholder = any(marker in content for marker in PLACEHOLDER_TEMPLATE_MARKERS)
+        cls._template_placeholder_cache[template_name] = is_placeholder
+        return is_placeholder
+
+    @staticmethod
+    def resolve_plan_collection_method(profile: PlatformProfile) -> str:
+        # 默认模板方案只走 CLI/Netmiko 兜底。
+        # 是否启用双栈或纯 NETCONF 由用户在方案层显式决定，不从画像自动放大。
+        return DeviceCollectionPlans.COLLECTION_METHOD_NETMIKO
+
     @staticmethod
     def ensure_builtin_profiles() -> List[PlatformProfile]:
         profiles = []
@@ -539,6 +817,11 @@ class PlatformProfileService:
         return str(value)
 
     @staticmethod
+    def normalize_device_category(value: str) -> str:
+        text = (value or "").strip()
+        return DEVICE_CATEGORY_ALIASES.get(text.lower(), text.lower())
+
+    @staticmethod
     def _match_patterns(value: str, patterns: List[str]) -> bool:
         if not patterns:
             return True
@@ -550,7 +833,9 @@ class PlatformProfileService:
     ) -> Optional[PlatformProfile]:
         profiles = profiles or cls.ensure_builtin_profiles()
         vendor_alias = getattr(getattr(device, "vendor", None), "alias", "") or ""
-        category_name = getattr(getattr(device, "category", None), "name", "") or ""
+        category_name = cls.normalize_device_category(
+            getattr(getattr(device, "category", None), "name", "") or ""
+        )
         model_name = getattr(getattr(device, "model", None), "name", "") or ""
         soft_version = cls._string_value(getattr(device, "soft_version", ""))
         device_name = cls._string_value(getattr(device, "name", ""))
@@ -559,7 +844,7 @@ class PlatformProfileService:
         for profile in profiles:
             if profile.vendor_alias != vendor_alias:
                 continue
-            if profile.category and profile.category != category_name:
+            if profile.category and cls.normalize_device_category(profile.category) != category_name:
                 continue
             if not cls._match_patterns(haystack, profile.series_patterns):
                 continue
@@ -569,7 +854,7 @@ class PlatformProfileService:
 
         for profile in profiles:
             if profile.vendor_alias == vendor_alias and (
-                not profile.category or profile.category == category_name
+                not profile.category or cls.normalize_device_category(profile.category) == category_name
             ):
                 return profile
         return None
@@ -578,6 +863,7 @@ class PlatformProfileService:
     def ensure_default_plan_for_profile(
         cls, profile: PlatformProfile
     ) -> DeviceCollectionPlans:
+        expected_collection_method = cls.resolve_plan_collection_method(profile)
         plan, _ = DeviceCollectionPlans.objects.get_or_create(
             name=profile.default_plan_name,
             defaults={
@@ -591,7 +877,7 @@ class PlatformProfileService:
                 "version": 1,
                 "is_default": True,
                 "enabled_collection_types": profile.supported_collection_types or [],
-                "collection_method": DeviceCollectionPlans.COLLECTION_METHOD_NETMIKO,
+                "collection_method": expected_collection_method,
             },
         )
 
@@ -612,8 +898,8 @@ class PlatformProfileService:
         if plan.enabled_collection_types != expected_enabled_types:
             plan.enabled_collection_types = expected_enabled_types
             updated_fields.append("enabled_collection_types")
-        if plan.collection_method != DeviceCollectionPlans.COLLECTION_METHOD_NETMIKO:
-            plan.collection_method = DeviceCollectionPlans.COLLECTION_METHOD_NETMIKO
+        if plan.collection_method != expected_collection_method:
+            plan.collection_method = expected_collection_method
             updated_fields.append("collection_method")
         if updated_fields:
             plan.save(update_fields=updated_fields + ["updated_at"])
@@ -621,6 +907,256 @@ class PlatformProfileService:
         DeviceCollectionService.ensure_default_sub_plans(plan)
         cls.apply_profile_defaults(plan, profile)
         return plan
+
+    @staticmethod
+    def audit_plan_readiness(plan: DeviceCollectionPlans) -> List[Dict[str, str]]:
+        blockers = []
+        enabled_sub_plans = []
+        for sub_plan in plan.collect_plans.all():
+            if any(
+                bool(getattr(sub_plan, field_name, False))
+                for field_name in (
+                    "netmiko_enabled",
+                    "netconf_enabled",
+                    "snmp_enabled",
+                    "restconf_enabled",
+                    "telemetry_enabled",
+                )
+            ):
+                enabled_sub_plans.append(sub_plan)
+
+        if not enabled_sub_plans:
+            blockers.append(
+                {
+                    "code": "missing_enabled_sub_plans",
+                    "message": "默认方案没有任何启用中的子方案",
+                }
+            )
+            return blockers
+
+        for sub_plan in enabled_sub_plans:
+            collection_type = getattr(sub_plan, "collection_type", "")
+            if getattr(sub_plan, "netmiko_enabled", False) and not getattr(
+                sub_plan, "netmiko_method", ""
+            ):
+                blockers.append(
+                    {
+                        "code": "missing_netmiko_command",
+                        "collection_type": collection_type,
+                        "message": "Netmiko 子方案缺少执行命令",
+                    }
+                )
+            if getattr(sub_plan, "netmiko_enabled", False):
+                template_name = getattr(sub_plan, "textfsm_template", "")
+                if not template_name:
+                    blockers.append(
+                        {
+                            "code": "missing_textfsm_template",
+                            "collection_type": collection_type,
+                            "message": "Netmiko 子方案缺少 TextFSM 模板",
+                        }
+                    )
+                elif not PlatformProfileService.template_exists(template_name):
+                    blockers.append(
+                        {
+                            "code": "missing_textfsm_template_file",
+                            "collection_type": collection_type,
+                            "message": f"TextFSM 模板文件不存在: {template_name}",
+                        }
+                    )
+                elif PlatformProfileService.template_is_placeholder(template_name):
+                    blockers.append(
+                        {
+                            "code": "placeholder_textfsm_template",
+                            "collection_type": collection_type,
+                            "message": f"TextFSM 模板仍为占位版本，解析能力未就绪: {template_name}",
+                        }
+                    )
+            if getattr(sub_plan, "netconf_enabled", False):
+                templates = []
+                if hasattr(sub_plan, "xml_templates"):
+                    templates = list(sub_plan.xml_templates.all())
+                if not templates:
+                    blockers.append(
+                        {
+                            "code": "missing_netconf_template",
+                            "collection_type": collection_type,
+                            "message": "NETCONF 子方案缺少 XML 模板",
+                        }
+                    )
+            if getattr(sub_plan, "snmp_enabled", False) and not getattr(
+                sub_plan, "snmp_oids", []
+            ):
+                blockers.append(
+                    {
+                        "code": "missing_snmp_oids",
+                        "collection_type": collection_type,
+                        "message": "SNMP 子方案缺少 OID 配置",
+                    }
+                )
+            if getattr(sub_plan, "restconf_enabled", False) and not getattr(
+                sub_plan, "restconf_endpoint", ""
+            ):
+                blockers.append(
+                    {
+                        "code": "missing_restconf_endpoint",
+                        "collection_type": collection_type,
+                        "message": "RESTCONF 子方案缺少端点配置",
+                    }
+                )
+            if getattr(sub_plan, "telemetry_enabled", False) and not getattr(
+                sub_plan, "telemetry_subscription_path", ""
+            ):
+                blockers.append(
+                    {
+                        "code": "missing_telemetry_path",
+                        "collection_type": collection_type,
+                        "message": "Telemetry 子方案缺少订阅路径",
+                    }
+                )
+        return blockers
+
+    @classmethod
+    def audit_device_coverage(cls, devices) -> Dict[str, object]:
+        profiles = cls.ensure_builtin_profiles()
+        summary = {
+            "total": 0,
+            "ready": 0,
+            "blocked": 0,
+            "profile_not_matched": 0,
+            "missing_default_plan": 0,
+            "missing_binding": 0,
+        }
+        results = []
+
+        for device in devices:
+            summary["total"] += 1
+            vendor_alias = getattr(getattr(device, "vendor", None), "alias", "") or ""
+            model_name = getattr(getattr(device, "model", None), "name", "") or ""
+            profile = cls.match_profile_for_device(device, profiles=profiles)
+            item = {
+                "manage_ip": getattr(device, "manage_ip", ""),
+                "serial_num": getattr(device, "serial_num", ""),
+                "vendor_alias": vendor_alias,
+                "model_name": model_name,
+                "profile_code": "",
+                "plan_id": None,
+                "plan_name": "",
+                "binding_id": None,
+                "use_local": None,
+                "execute_node": "",
+                "blockers": [],
+            }
+            if not profile:
+                summary["blocked"] += 1
+                summary["profile_not_matched"] += 1
+                item["blockers"].append(
+                    {"code": "profile_not_matched", "message": "设备未匹配到平台画像"}
+                )
+                results.append(item)
+                continue
+
+            item["profile_code"] = profile.code
+            plan = (
+                DeviceCollectionPlans.objects.filter(name=profile.default_plan_name)
+                .prefetch_related("collect_plans", "collect_plans__xml_templates")
+                .first()
+            )
+            if not plan:
+                summary["blocked"] += 1
+                summary["missing_default_plan"] += 1
+                item["blockers"].append(
+                    {"code": "missing_default_plan", "message": "画像默认方案不存在"}
+                )
+                results.append(item)
+                continue
+
+            item["plan_id"] = getattr(plan, "id", None)
+            item["plan_name"] = getattr(plan, "name", "")
+
+            bindings = list(
+                PlansToDevice.objects.select_related("plan")
+                .filter(device_serial_num=getattr(device, "serial_num", ""), is_active=True)
+            )
+            if not bindings and getattr(device, "manage_ip", ""):
+                bindings = list(
+                    PlansToDevice.objects.select_related("plan")
+                    .filter(manage_ip=getattr(device, "manage_ip", ""), is_active=True)
+                )
+
+            binding = next(
+                (
+                    relation
+                    for relation in bindings
+                    if getattr(relation, "plan_id", None) == getattr(plan, "id", None)
+                ),
+                bindings[0] if bindings else None,
+            )
+            if binding is None:
+                summary["blocked"] += 1
+                summary["missing_binding"] += 1
+                item["blockers"].append(
+                    {"code": "missing_binding", "message": "设备未绑定到 PlansToDevice"}
+                )
+                item["blockers"].extend(cls.audit_plan_readiness(plan))
+                results.append(item)
+                continue
+
+            item["binding_id"] = getattr(binding, "id", None)
+            item["use_local"] = getattr(binding, "use_local", None)
+            item["execute_node"] = getattr(binding, "execute_node", "") or ""
+            if getattr(binding, "plan_id", None) != getattr(plan, "id", None):
+                item["blockers"].append(
+                    {
+                        "code": "binding_plan_mismatch",
+                        "message": "设备已绑定方案与画像默认方案不一致",
+                    }
+                )
+
+            if getattr(binding, "use_local", True):
+                plan_blockers = cls.audit_plan_readiness(plan)
+                item["blockers"].extend(plan_blockers)
+                if any(
+                    bool(getattr(sub_plan, "netmiko_enabled", False))
+                    for sub_plan in plan.collect_plans.all()
+                ):
+                    if getattr(device, "ssh_enable", "") != "account" or not getattr(
+                        device, "ssh_account", None
+                    ):
+                        item["blockers"].append(
+                            {
+                                "code": "missing_ssh_account",
+                                "message": "本地 Netmiko 采集缺少 SSH 账号绑定",
+                            }
+                        )
+                if any(
+                    bool(getattr(sub_plan, "netconf_enabled", False))
+                    for sub_plan in plan.collect_plans.all()
+                ):
+                    if getattr(device, "netconf_enable", "") != "account" or not getattr(
+                        device, "netconf_account", None
+                    ):
+                        item["blockers"].append(
+                            {
+                                "code": "missing_netconf_account",
+                                "message": "本地 NETCONF 采集缺少 NETCONF 账号绑定",
+                            }
+                        )
+            elif not item["execute_node"]:
+                item["blockers"].append(
+                    {
+                        "code": "missing_execute_node",
+                        "message": "南向驱动采集缺少执行节点",
+                    }
+                )
+
+            if item["blockers"]:
+                summary["blocked"] += 1
+            else:
+                summary["ready"] += 1
+            results.append(item)
+
+        return {"summary": summary, "results": results}
 
     @staticmethod
     def _get_cli_defaults(profile: PlatformProfile, collection_type: str) -> Dict[str, str]:
