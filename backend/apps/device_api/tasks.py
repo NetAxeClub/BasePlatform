@@ -98,9 +98,12 @@ from apps.device_api.models_api import (
 from apps.device_api.tools.collect_device import get_auto_device
 from apps.device_api.platform_profiles import DeviceFactService
 from apps.device_api.cache_utils import cache_network_data
+from apps.device_api.analysis_hooks import (
+    count_expected_interface_devices,
+    schedule_batch_network_analysis,
+)
 from apps.device_api import COLLECTION_SUB_PLAN
 from apps.device_api import arp_mongo, mac_mongo, lldp_mongo, aggre_port_mongo
-from apps.network_analysis.tasks import refresh_network_analysis_for_batch
 from utils.db.mongo_ops import MongoOps, MongoNetOps
 
 logger = logging.getLogger("device_api")
@@ -661,6 +664,7 @@ def plan_collect_device_main(**kwargs):
     # 参数初始化
     net_tower_tasks = []  # 采集任务id集合
     total_expected_subtasks = sum(len(host.get("sub_plans", [])) for host in hosts)
+    total_expected_interface_devices = count_expected_interface_devices(hosts)
     batch_execute_time = hosts[0].get("execute_time") if hosts else ""
 
     # 清空历史采集数据
@@ -686,23 +690,24 @@ def plan_collect_device_main(**kwargs):
         f"批量下发任务完成, 总设备数: {len(hosts)}, 有效任务: {len(net_tower_tasks)}, 耗时: {total_time:.2f}分钟"
     )
 
+    analysis_trigger = {
+        "scheduled": False,
+        "reason": "missing_execute_time",
+    }
     if batch_execute_time:
-        refresh_network_analysis_for_batch.apply_async(
-            kwargs={
-                "execute_time": batch_execute_time,
-                "expected_devices": len(hosts),
-                "expected_subtasks": total_expected_subtasks,
-                "triggered_by": "device_api-plan_collect_device_main",
-            },
-            queue="config",
-            retry=True,
-            countdown=30,
+        analysis_trigger = schedule_batch_network_analysis(
+            execute_time=batch_execute_time,
+            expected_devices=len(hosts),
+            expected_subtasks=total_expected_subtasks,
+            expected_interface_devices=total_expected_interface_devices,
+            triggered_by="device_api-plan_collect_device_main",
         )
 
     return {
         "total": len(hosts),
         "tasks": len(net_tower_tasks),
         "time_cost": f"{total_time:.2f}分钟",
+        "analysis_trigger": analysis_trigger,
     }
 
 

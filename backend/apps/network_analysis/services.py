@@ -124,6 +124,20 @@ class InterfaceUtilizationAnalysisService:
         return list(latest_by_key.values())
 
     @classmethod
+    def ready_device_count(cls, device_ip: Optional[str] = None, execute_time: Optional[str] = None) -> int:
+        rows = cls._latest_interface_rows(device_ip=device_ip, execute_time=execute_time)
+        ready_devices = {
+            row.get("hostip")
+            for row in rows
+            if row.get("hostip") and not _skip_interface(row.get("interface", ""))
+        }
+        return len(ready_devices)
+
+    @classmethod
+    def has_ready_source_data(cls, device_ip: Optional[str] = None, execute_time: Optional[str] = None) -> bool:
+        return cls.ready_device_count(device_ip=device_ip, execute_time=execute_time) > 0
+
+    @classmethod
     def build_snapshots(cls, device_ip: Optional[str] = None, execute_time: Optional[str] = None) -> List[dict]:
         rows = cls._latest_interface_rows(device_ip=device_ip, execute_time=execute_time)
         device_context = _build_device_context()
@@ -781,6 +795,7 @@ class NetworkAnalysisOrchestratorService:
         execute_time: str,
         expected_devices: int = 0,
         expected_subtasks: int = 0,
+        expected_interface_devices: int = 0,
         wait_seconds: int = 15,
         max_attempts: int = 20,
         triggered_by: str = "device_api-batch",
@@ -788,11 +803,16 @@ class NetworkAnalysisOrchestratorService:
         from apps.device_api import COLLECTION_PLAN, COLLECTION_SUB_PLAN
 
         attempts = 0
+        interface_device_count = 0
         while attempts < max_attempts:
             parent_count = COLLECTION_PLAN.count_documents({"execute_time": execute_time})
             subtask_count = COLLECTION_SUB_PLAN.count_documents({"execute_time": execute_time})
+            interface_device_count = InterfaceUtilizationAnalysisService.ready_device_count(execute_time=execute_time)
             if (expected_devices == 0 or parent_count >= expected_devices) and (
                 expected_subtasks == 0 or subtask_count >= expected_subtasks
+            ) and (
+                expected_interface_devices == 0
+                or interface_device_count >= expected_interface_devices
             ):
                 break
             time.sleep(wait_seconds)
@@ -806,7 +826,9 @@ class NetworkAnalysisOrchestratorService:
             "attempts": attempts,
             "expected_devices": expected_devices,
             "expected_subtasks": expected_subtasks,
+            "expected_interface_devices": expected_interface_devices,
             "parent_count": COLLECTION_PLAN.count_documents({"execute_time": execute_time}),
             "subtask_count": COLLECTION_SUB_PLAN.count_documents({"execute_time": execute_time}),
+            "interface_device_count": InterfaceUtilizationAnalysisService.ready_device_count(execute_time=execute_time),
         }
         return result
