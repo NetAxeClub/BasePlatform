@@ -1562,7 +1562,7 @@ class DeviceApiTaskTests(SimpleTestCase):
         self.assertEqual(inserted_docs[0]["execute_time"], "2026-03-12T11:00:00")
         mock_insert_sub_task.assert_called_once()
 
-    @patch("apps.device_api.tasks.refresh_network_analysis_for_batch.apply_async")
+    @patch("apps.device_api.tasks.schedule_batch_network_analysis")
     @patch("apps.device_api.tasks.plan_collect_device.apply_async")
     @patch("apps.device_api.tasks.clear_his_collect_res")
     @patch("apps.device_api.tasks.MainIn.cmdb_to_mongo")
@@ -1575,32 +1575,36 @@ class DeviceApiTaskTests(SimpleTestCase):
         mock_cmdb_to_mongo,
         mock_clear_his_collect_res,
         mock_plan_collect_apply_async,
-        mock_analysis_apply_async,
+        mock_schedule_batch_network_analysis,
     ):
         mock_get_auto_device.return_value = [
             {
                 "manage_ip": "10.0.0.1",
                 "execute_time": "2026-03-15 10:00:00",
-                "sub_plans": [{"id": 1}, {"id": 2}],
+                "sub_plans": [{"id": 1, "collection_type": "interface_brief"}, {"id": 2, "collection_type": "arp"}],
             },
             {
                 "manage_ip": "10.0.0.2",
                 "execute_time": "2026-03-15 10:00:00",
-                "sub_plans": [{"id": 3}],
+                "sub_plans": [{"id": 3, "collection_type": "arp"}],
             },
         ]
         mock_plan_collect_apply_async.return_value = SimpleNamespace(id="task-1")
+        mock_schedule_batch_network_analysis.return_value = {"scheduled": True, "reason": "scheduled"}
 
         from apps.device_api.tasks import plan_collect_device_main
 
         result = plan_collect_device_main()
 
         self.assertEqual(result["total"], 2)
-        mock_analysis_apply_async.assert_called_once()
-        kwargs = mock_analysis_apply_async.call_args.kwargs["kwargs"]
-        self.assertEqual(kwargs["execute_time"], "2026-03-15 10:00:00")
-        self.assertEqual(kwargs["expected_devices"], 2)
-        self.assertEqual(kwargs["expected_subtasks"], 3)
+        mock_schedule_batch_network_analysis.assert_called_once_with(
+            execute_time="2026-03-15 10:00:00",
+            expected_devices=2,
+            expected_subtasks=3,
+            expected_interface_devices=1,
+            triggered_by="device_api-plan_collect_device_main",
+        )
+        self.assertTrue(result["analysis_trigger"]["scheduled"])
 
 
 class DeviceApiProtocolExtensionTests(SimpleTestCase):
