@@ -4,7 +4,12 @@ import importlib
 import time
 from datetime import datetime
 
-from apps.device_api.contract import STANDARD_COLLECTION_CONTEXT_FIELDS
+from apps.device_api.contract import (
+    STANDARD_COLLECTION_CONTEXT_FIELDS,
+    build_plan_collection_name,
+    freeze_collection_context,
+    normalize_collection_type_for_storage,
+)
 from apps.device_api.fields_mapping import (
     COLLECTION_TYPE_ALIASES,
     vendor_mapping,
@@ -44,6 +49,7 @@ from utils.db.mongo_ops import MongoOps
 # collection_type 到 MongoDB 实例的映射
 COLLECTION_TYPE_MONGO_MAP = {
     "device_identity": device_identity_mongo,
+    "version": device_identity_mongo,
     "arp": arp_mongo,
     "mac": mac_mongo,
     "lldp": lldp_mongo,
@@ -491,7 +497,7 @@ def celery_data_mongodb(**kwargs):
             {
                 "summary_plan_id": summary_plan_id,
                 "plan_id": plan_id,
-                "collection_type": collection_type,
+                "collection_type": normalize_collection_type_for_storage(collection_type),
                 "collection_method": collection_method,
                 "execute_time": execute_time,
             },
@@ -499,23 +505,26 @@ def celery_data_mongodb(**kwargs):
 
         try:
             # 根据collection_type选择MongoDB集合，优先使用预定义的实例
-            collection_name = f"plan_{collection_type}"
-            collection_db = COLLECTION_TYPE_MONGO_MAP.get(collection_type)
+            storage_collection_type = normalize_collection_type_for_storage(
+                collection_type
+            )
+            collection_name = build_plan_collection_name(storage_collection_type)
+            collection_db = COLLECTION_TYPE_MONGO_MAP.get(storage_collection_type)
             if not collection_db:
                 # 如果不在预定义列表中，则动态创建（向后兼容）
                 collection_db = MongoOps(db="Automation", coll=collection_name)
                 logging.warning(
-                    f"使用动态创建的MongoDB集合: Automation.{collection_name} (采集类型: {collection_type})"
+                    f"使用动态创建的MongoDB集合: Automation.{collection_name} (采集类型: {storage_collection_type})"
                 )
             else:
                 logging.info(
-                    f"使用MongoDB集合: Automation.{collection_name} (采集类型: {collection_type})"
+                    f"使用MongoDB集合: Automation.{collection_name} (采集类型: {storage_collection_type})"
                 )
 
             # 执行插入清洗后的数据
             collection_db.insert_many(collection_results)
             logging.info(
-                f"采集结果已保存: {device_ip} - 采集类型: {collection_type} - 共 {len(collection_results)} 条记录 - 集合: {collection_name}"
+                f"采集结果已保存: {device_ip} - 采集类型: {storage_collection_type} - 共 {len(collection_results)} 条记录 - 集合: {collection_name}"
             )
         except Exception as e:
             logging.error(
@@ -730,11 +739,15 @@ def inject_collection_context(data: list, context: dict) -> list:
     """向采集结果注入方案和执行批次元数据，便于后续精确查询。"""
     if not isinstance(data, list):
         return data
+    frozen_context = freeze_collection_context(context)
     for item in data:
         if isinstance(item, dict):
             for key in STANDARD_COLLECTION_CONTEXT_FIELDS:
-                item.setdefault(key, (context or {}).get(key, ""))
-            for key, value in (context or {}).items():
+                if key == "collection_type" or not item.get(key):
+                    item[key] = frozen_context.get(key, "")
+                else:
+                    item.setdefault(key, frozen_context.get(key, ""))
+            for key, value in frozen_context.items():
                 item.setdefault(key, value)
     return data
 

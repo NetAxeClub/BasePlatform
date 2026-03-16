@@ -4,6 +4,7 @@ import sys
 
 import pymongo
 
+from apps.device_api.contract import build_plan_collection_name
 from apps.device_api import (
     COLLECTION_PLAN,
     COLLECTION_RESULTS_DB,
@@ -47,29 +48,29 @@ MANAGEMENT_COMMANDS_SKIP_AUTO_INDEX = {
 }
 
 PLAN_DATA_COLLECTIONS = {
-    "plan_device_identity": device_identity_mongo,
-    "plan_arp": arp_mongo,
-    "plan_mac": mac_mongo,
-    "plan_lldp": lldp_mongo,
-    "plan_ip_interface": ip_interface_mongo,
-    "plan_interface_brief": interface_brief_mongo,
-    "plan_aggre_port": aggre_port_mongo,
-    "plan_fan_status": fan_status_mongo,
-    "plan_power_status": power_status_mongo,
-    "plan_temperature_status": temperature_status_mongo,
-    "plan_cpu_status": cpu_status_mongo,
-    "plan_memory_status": memory_status_mongo,
-    "plan_board_status": board_status_mongo,
-    "plan_transceiver_status": transceiver_status_mongo,
-    "plan_storage_status": storage_status_mongo,
-    "plan_environment_status": environment_status_mongo,
-    "plan_clock_status": clock_status_mongo,
-    "plan_route_table": route_table_mongo,
-    "plan_bgp_neighbors": bgp_neighbors_mongo,
-    "plan_bgp_summary": bgp_summary_mongo,
-    "plan_ospf_neighbors": ospf_neighbors_mongo,
-    "plan_ospf_interfaces": ospf_interfaces_mongo,
-    "plan_isis_neighbors": isis_neighbors_mongo,
+    build_plan_collection_name("device_identity"): device_identity_mongo,
+    build_plan_collection_name("arp"): arp_mongo,
+    build_plan_collection_name("mac"): mac_mongo,
+    build_plan_collection_name("lldp"): lldp_mongo,
+    build_plan_collection_name("ip_interface"): ip_interface_mongo,
+    build_plan_collection_name("interface_brief"): interface_brief_mongo,
+    build_plan_collection_name("aggre_port"): aggre_port_mongo,
+    build_plan_collection_name("fan_status"): fan_status_mongo,
+    build_plan_collection_name("power_status"): power_status_mongo,
+    build_plan_collection_name("temperature_status"): temperature_status_mongo,
+    build_plan_collection_name("cpu_status"): cpu_status_mongo,
+    build_plan_collection_name("memory_status"): memory_status_mongo,
+    build_plan_collection_name("board_status"): board_status_mongo,
+    build_plan_collection_name("transceiver_status"): transceiver_status_mongo,
+    build_plan_collection_name("storage_status"): storage_status_mongo,
+    build_plan_collection_name("environment_status"): environment_status_mongo,
+    build_plan_collection_name("clock_status"): clock_status_mongo,
+    build_plan_collection_name("route_table"): route_table_mongo,
+    build_plan_collection_name("bgp_neighbors"): bgp_neighbors_mongo,
+    build_plan_collection_name("bgp_summary"): bgp_summary_mongo,
+    build_plan_collection_name("ospf_neighbors"): ospf_neighbors_mongo,
+    build_plan_collection_name("ospf_interfaces"): ospf_interfaces_mongo,
+    build_plan_collection_name("isis_neighbors"): isis_neighbors_mongo,
 }
 
 PLAN_DATA_INDEXES = (
