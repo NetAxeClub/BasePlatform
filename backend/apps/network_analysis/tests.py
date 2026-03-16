@@ -176,29 +176,34 @@ class NetworkAnalysisArchitectureGuardTests(SimpleTestCase):
 class NetworkAnalysisBatchTaskTests(SimpleTestCase):
     @patch("apps.network_analysis.services.time.sleep")
     @patch("apps.network_analysis.services.NetworkAnalysisOrchestratorService.refresh_all")
+    @patch("apps.network_analysis.services.InterfaceUtilizationAnalysisService.ready_device_count")
     @patch("apps.device_api.COLLECTION_SUB_PLAN")
     @patch("apps.device_api.COLLECTION_PLAN")
     def test_wait_and_refresh_batch_runs_after_expected_counts(
         self,
         mock_collection_plan,
         mock_collection_sub_plan,
+        mock_ready_device_count,
         mock_refresh_all,
         mock_sleep,
     ):
         mock_refresh_all.return_value = {"run_id": 1}
         mock_collection_plan.count_documents.side_effect = [1, 2, 2]
         mock_collection_sub_plan.count_documents.side_effect = [1, 2, 2]
+        mock_ready_device_count.return_value = 1
 
         result = NetworkAnalysisOrchestratorService.wait_and_refresh_batch(
             execute_time="2026-03-15 10:00:00",
             expected_devices=2,
             expected_subtasks=2,
+            expected_interface_devices=1,
             wait_seconds=1,
             max_attempts=2,
         )
 
         self.assertEqual(result["run_id"], 1)
         self.assertEqual(result["monitor"]["expected_devices"], 2)
+        self.assertEqual(result["monitor"]["expected_interface_devices"], 1)
         mock_refresh_all.assert_called_once_with(
             triggered_by="device_api-batch",
             execute_time="2026-03-15 10:00:00",
