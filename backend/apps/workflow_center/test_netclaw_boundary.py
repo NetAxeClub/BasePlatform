@@ -1,0 +1,248 @@
+from django.test import SimpleTestCase
+from django.urls import resolve
+
+from apps.device_api.views import (
+    CollectionResultViewSet,
+    DeviceCapabilitiesAPIView,
+    DeviceFactsAPIView,
+    PlansToDeviceViewSet,
+    PlatformProfileViewSet,
+)
+from apps.network_analysis.views import (
+    AddressTraceSnapshotViewSet,
+    AnalysisRunViewSet,
+    InterfaceUtilizationSnapshotViewSet,
+)
+from apps.workflow_center.views import (
+    WorkflowAddressLocationView,
+    WorkflowDiagnoseView,
+    WorkflowExecutionViewSet,
+    WorkflowHostVarViewSet,
+    WorkflowInventoryViewSet,
+    WorkflowSecurityView,
+)
+
+
+class NetClawBoundaryUrlTests(SimpleTestCase):
+    def assert_viewset_route(self, path, viewset_class, method, action):
+        match = resolve(path)
+        self.assertIs(match.func.cls, viewset_class)
+        self.assertEqual(match.func.actions.get(method.lower()), action)
+
+    def assert_apiview_route(self, path, view_class):
+        match = resolve(path)
+        self.assertIs(match.func.view_class, view_class)
+
+    def test_device_api_primary_and_v1_routes_resolve_to_same_views(self):
+        self.assert_viewset_route(
+            "/base_platform/device_api/platform-profiles/",
+            PlatformProfileViewSet,
+            "get",
+            "list",
+        )
+        self.assert_viewset_route(
+            "/base_platform/device_api/v1/platform-profiles/",
+            PlatformProfileViewSet,
+            "get",
+            "list",
+        )
+        self.assert_viewset_route(
+            "/base_platform/device_api/plans-to-device/",
+            PlansToDeviceViewSet,
+            "get",
+            "list",
+        )
+        self.assert_viewset_route(
+            "/base_platform/device_api/v1/plans-to-device/",
+            PlansToDeviceViewSet,
+            "get",
+            "list",
+        )
+        self.assert_viewset_route(
+            "/base_platform/device_api/plans-to-device/auto_bind/",
+            PlansToDeviceViewSet,
+            "post",
+            "auto_bind",
+        )
+        self.assert_viewset_route(
+            "/base_platform/device_api/v1/plans-to-device/auto_bind/",
+            PlansToDeviceViewSet,
+            "post",
+            "auto_bind",
+        )
+        self.assert_viewset_route(
+            "/base_platform/device_api/collection-results/latest/",
+            CollectionResultViewSet,
+            "get",
+            "latest",
+        )
+        self.assert_viewset_route(
+            "/base_platform/device_api/v1/collection-results/latest/",
+            CollectionResultViewSet,
+            "get",
+            "latest",
+        )
+        self.assert_apiview_route(
+            "/base_platform/device_api/devices/SN123/facts/",
+            DeviceFactsAPIView,
+        )
+        self.assert_apiview_route(
+            "/base_platform/device_api/v1/devices/SN123/facts/",
+            DeviceFactsAPIView,
+        )
+        self.assert_apiview_route(
+            "/base_platform/device_api/devices/SN123/capabilities/",
+            DeviceCapabilitiesAPIView,
+        )
+        self.assert_apiview_route(
+            "/base_platform/device_api/v1/devices/SN123/capabilities/",
+            DeviceCapabilitiesAPIView,
+        )
+
+    def test_workflow_center_primary_and_v1_routes_resolve_to_same_views(self):
+        self.assert_viewset_route(
+            "/base_platform/workflow_center/executions/",
+            WorkflowExecutionViewSet,
+            "get",
+            "list",
+        )
+        self.assert_viewset_route(
+            "/base_platform/workflow_center/v1/executions/",
+            WorkflowExecutionViewSet,
+            "get",
+            "list",
+        )
+        self.assert_viewset_route(
+            "/base_platform/workflow_center/executions/inspection_results/",
+            WorkflowExecutionViewSet,
+            "get",
+            "inspection_results",
+        )
+        self.assert_viewset_route(
+            "/base_platform/workflow_center/v1/executions/inspection_results/",
+            WorkflowExecutionViewSet,
+            "get",
+            "inspection_results",
+        )
+        self.assert_viewset_route(
+            "/base_platform/workflow_center/executions/1/inspection_detail/",
+            WorkflowExecutionViewSet,
+            "get",
+            "inspection_detail",
+        )
+        self.assert_viewset_route(
+            "/base_platform/workflow_center/v1/executions/1/inspection_detail/",
+            WorkflowExecutionViewSet,
+            "get",
+            "inspection_detail",
+        )
+        self.assert_viewset_route(
+            "/base_platform/workflow_center/executions/write_inspection_result/",
+            WorkflowExecutionViewSet,
+            "post",
+            "write_inspection_result",
+        )
+        self.assert_viewset_route(
+            "/base_platform/workflow_center/v1/executions/write_inspection_result/",
+            WorkflowExecutionViewSet,
+            "post",
+            "write_inspection_result",
+        )
+        self.assert_viewset_route(
+            "/base_platform/workflow_center/inventories/",
+            WorkflowInventoryViewSet,
+            "get",
+            "list",
+        )
+        self.assert_viewset_route(
+            "/base_platform/workflow_center/v1/inventories/",
+            WorkflowInventoryViewSet,
+            "get",
+            "list",
+        )
+        self.assert_viewset_route(
+            "/base_platform/workflow_center/host-vars/",
+            WorkflowHostVarViewSet,
+            "get",
+            "list",
+        )
+        self.assert_viewset_route(
+            "/base_platform/workflow_center/v1/host-vars/",
+            WorkflowHostVarViewSet,
+            "get",
+            "list",
+        )
+        self.assert_apiview_route(
+            "/base_platform/workflow_center/address-location/",
+            WorkflowAddressLocationView,
+        )
+        self.assert_apiview_route(
+            "/base_platform/workflow_center/v1/address-location/",
+            WorkflowAddressLocationView,
+        )
+        self.assert_apiview_route(
+            "/base_platform/workflow_center/diagnose/",
+            WorkflowDiagnoseView,
+        )
+        self.assert_apiview_route(
+            "/base_platform/workflow_center/v1/diagnose/",
+            WorkflowDiagnoseView,
+        )
+        self.assert_apiview_route(
+            "/base_platform/workflow_center/sec-main/",
+            WorkflowSecurityView,
+        )
+        self.assert_apiview_route(
+            "/base_platform/workflow_center/v1/sec-main/",
+            WorkflowSecurityView,
+        )
+
+    def test_network_analysis_stable_routes_exist(self):
+        self.assert_viewset_route(
+            "/base_platform/network_analysis/analysis-runs/",
+            AnalysisRunViewSet,
+            "get",
+            "list",
+        )
+        self.assert_viewset_route(
+            "/base_platform/network_analysis/analysis-runs/rebuild_all/",
+            AnalysisRunViewSet,
+            "post",
+            "rebuild_all",
+        )
+        self.assert_viewset_route(
+            "/base_platform/network_analysis/interface-utilization/",
+            InterfaceUtilizationSnapshotViewSet,
+            "get",
+            "list",
+        )
+        self.assert_viewset_route(
+            "/base_platform/network_analysis/interface-utilization/overview/",
+            InterfaceUtilizationSnapshotViewSet,
+            "get",
+            "overview",
+        )
+        self.assert_viewset_route(
+            "/base_platform/network_analysis/interface-utilization/quality/",
+            InterfaceUtilizationSnapshotViewSet,
+            "get",
+            "quality",
+        )
+        self.assert_viewset_route(
+            "/base_platform/network_analysis/address-traces/",
+            AddressTraceSnapshotViewSet,
+            "get",
+            "list",
+        )
+        self.assert_viewset_route(
+            "/base_platform/network_analysis/address-traces/overview/",
+            AddressTraceSnapshotViewSet,
+            "get",
+            "overview",
+        )
+        self.assert_viewset_route(
+            "/base_platform/network_analysis/address-traces/quality/",
+            AddressTraceSnapshotViewSet,
+            "get",
+            "quality",
+        )
