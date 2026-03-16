@@ -859,6 +859,7 @@ class DeviceCollectionService:
                 "snmp_result": method_results.get("snmp"),
                 "restconf_result": method_results.get("restconf"),
                 "telemetry_result": method_results.get("telemetry"),
+                "execute_time": device_info.get("execute_time", ""),
             }
 
             if result.get("success"):

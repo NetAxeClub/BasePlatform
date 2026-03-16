@@ -11,8 +11,11 @@ from netaxe.celery import AxeTask
 
 
 @shared_task(base=AxeTask, once={"graceful": True})
-def refresh_interface_utilization(device_ip=None):
-    return InterfaceUtilizationAnalysisService.refresh(device_ip=device_ip)
+def refresh_interface_utilization(device_ip=None, execute_time=None):
+    return InterfaceUtilizationAnalysisService.refresh(
+        device_ip=device_ip,
+        execute_time=execute_time,
+    )
 
 
 @shared_task(base=AxeTask, once={"graceful": True})
@@ -34,6 +37,7 @@ def refresh_network_analysis_for_batch(
     execute_time,
     expected_devices=0,
     expected_subtasks=0,
+    expected_interface_devices=0,
     wait_seconds=15,
     max_attempts=20,
     triggered_by="device_api-batch",
@@ -42,6 +46,7 @@ def refresh_network_analysis_for_batch(
         execute_time=execute_time,
         expected_devices=expected_devices,
         expected_subtasks=expected_subtasks,
+        expected_interface_devices=expected_interface_devices,
         wait_seconds=wait_seconds,
         max_attempts=max_attempts,
         triggered_by=triggered_by,

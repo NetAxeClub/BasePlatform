@@ -30,6 +30,11 @@ from apps.device_api.models import (
     PlatformProfile,
 )
 from apps.device_api.models_api import plan_data_to_mongodb, celery_data_mongodb
+from apps.device_api.analysis_hooks import (
+    INTERFACE_ANALYSIS_COLLECTION_TYPES,
+    extract_webhook_args,
+    maybe_schedule_interface_utilization,
+)
 from apps.device_api.serializers import (
     DeviceCollectionMatchRuleSerializer,
     DeviceCollectionRuleSerializer,
@@ -626,6 +631,10 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
             results = []
             success_count = 0
             failed_count = 0
+            interface_trigger = {
+                "scheduled": False,
+                "reason": "no_interface_collection_success",
+            }
 
             for plan in collect_plans:
                 try:
@@ -657,9 +666,17 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
                             'status': 'success',
                             'message': collection_result['message'],
                             'netconf_result': collection_result['netconf_result'],
-                            'netmiko_result': collection_result['netmiko_result']
+                            'netmiko_result': collection_result['netmiko_result'],
+                            'execute_time': collection_result.get('execute_time', ''),
                         }
                         success_count += 1
+                        if use_local and plan.collection_type in INTERFACE_ANALYSIS_COLLECTION_TYPES:
+                            interface_trigger = maybe_schedule_interface_utilization(
+                                collection_type=plan.collection_type,
+                                device_ip=device_ip,
+                                execute_time=collection_result.get("execute_time"),
+                                triggered_by="device_api-execute_all_collections-local",
+                            )
                     else:
                         result = {
                             'plan_id': plan.id,
@@ -701,7 +718,8 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
                     "total_plans": total_plans,
                     "success_count": success_count,
                     "failed_count": failed_count,
-                    "results": results
+                    "results": results,
+                    "analysis_trigger": interface_trigger,
                 }
             })
 
@@ -948,6 +966,17 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
                 result = DeviceCollectionService.execute_both_collection(plan, device, south_driver)
             
             if result['success']:
+                analysis_trigger = {
+                    "scheduled": False,
+                    "reason": "not_local_execution",
+                }
+                if use_local:
+                    analysis_trigger = maybe_schedule_interface_utilization(
+                        collection_type=getattr(plan, "collection_type", ""),
+                        device_ip=device_ip,
+                        execute_time=result.get("execute_time"),
+                        triggered_by="device_api-execute_sub_plan-local",
+                    )
                 return JsonResponse({
                     "code": 200,
                     "message": result['message'],
@@ -957,6 +986,8 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
                         "snmp_result": result.get('snmp_result'),
                         "restconf_result": result.get('restconf_result'),
                         "telemetry_result": result.get('telemetry_result'),
+                        "execute_time": result.get("execute_time", ""),
+                        "analysis_trigger": analysis_trigger,
                     }
                 })
             else:
@@ -1058,10 +1089,26 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
 
         data = request.data
         result = plan_data_to_mongodb(**data)
+        webhook_args = extract_webhook_args(data)
+        analysis_trigger = {
+            "scheduled": False,
+            "reason": "collection_save_failed",
+        }
+        if result.get("status") == "success":
+            analysis_trigger = maybe_schedule_interface_utilization(
+                collection_type=webhook_args.get("collection_type", ""),
+                device_ip=webhook_args.get("device_ip", ""),
+                execute_time=webhook_args.get("execute_time"),
+                triggered_by="device_api-record_plan_data",
+                countdown=5,
+            )
 
         return JsonResponse({
             'code': 200 if result.get("status") == "success" else 500,
-            'message': result.get("message", "")
+            'message': result.get("message", ""),
+            'data': {
+                'analysis_trigger': analysis_trigger,
+            },
         })
 
     @action(detail=False, methods=['post'])
@@ -1070,10 +1117,26 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
 
         data = request.data
         result = celery_data_mongodb(**data)
+        webhook_args = extract_webhook_args(data)
+        analysis_trigger = {
+            "scheduled": False,
+            "reason": "collection_save_failed",
+        }
+        if result.get("status") == "success":
+            analysis_trigger = maybe_schedule_interface_utilization(
+                collection_type=webhook_args.get("collection_type", ""),
+                device_ip=webhook_args.get("device_ip", ""),
+                execute_time=webhook_args.get("execute_time"),
+                triggered_by="device_api-record_collection",
+                countdown=5,
+            )
 
         return JsonResponse({
             'code': 200 if result.get("status") == "success" else 500,
-            'message': result.get("message", "")
+            'message': result.get("message", ""),
+            'data': {
+                'analysis_trigger': analysis_trigger,
+            },
         })
 
     @action(detail=False, methods=['get'])

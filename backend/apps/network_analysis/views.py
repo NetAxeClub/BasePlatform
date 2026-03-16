@@ -34,7 +34,8 @@ class InterfaceUtilizationSnapshotViewSet(CustomViewBase):
     @action(detail=False, methods=["post"])
     def rebuild(self, request):
         result = InterfaceUtilizationAnalysisService.refresh(
-            device_ip=request.data.get("manage_ip")
+            device_ip=request.data.get("manage_ip"),
+            execute_time=request.data.get("execute_time"),
         )
         return JsonResponse({"code": 200, "message": "重建完成", "data": result})
 
