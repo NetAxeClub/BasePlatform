@@ -79,15 +79,20 @@
 - [x] Huawei NETCONF 处理器：arp/mac/ip_interface/lldp/aggre_port 已实现
 - [ ] 改造 `tools/` 为 Layer 2 规范化器（职责收窄）
 
-### 📅 待启动（Phase 3 - UX 简化）
+### ✅ 已完成（Phase 3 - UX 简化）
 - [x] 父方案模型增加 `enabled_collection_types` 和 `collection_method` 字段
 - [x] 父方案保存时自动同步子方案（含 `sync_collect_plans`）
 - [x] 新增方案级字段映射聚合接口
 - [x] 新增方案级一键验证接口
 
-### 🔮 长期规划（Phase 4）
-- [ ] 建立单元测试（预处理管道、字段映射、连接管理）
-- [ ] 补充 MongoDB 复合索引
+### 🔮 持续推进（Phase 4）
+- [x] 预处理链路回归测试：`resolve_raw_data` 处理器优先、`NotImplementedError` 降级、NETCONF 缺处理器分支
+- [x] 字段映射路径测试：嵌套数组路径、`path_config`、缺失数组分支
+- [x] `DeviceConnectionManager` 异常处理测试：SSH 缺账号、SNMP v3 用户名透传、RESTCONF token、Telemetry 缺依赖
+- [x] 本地执行链路测试：本地结果落库、`plan_*` 集合写入、部分成功聚合
+- [x] 南向驱动执行链路测试：Netmiko/NETCONF payload 拼装、`get/get_config` 分支、无 XML 模板错误返回
+- [x] 序列化器与执行入口边界测试：SNMP/NETCONF/Telemetry 必填项、`execute_sub_plan` 本地入口、`validate_execution_params` 本地/南向分流
+- [x] 补充 MongoDB 复合索引：`indexes.py` + `ensure_device_api_indexes` 管理命令 + `AppConfig.ready()` best-effort 启动
 - [ ] 补全 Cisco / Ruijie / Hillstone 厂商工具
 - [ ] 实现 Telemetry gNMI 采集
 
@@ -134,9 +139,9 @@
 
 ## 🚀 下一步行动
 
-1. **优先级 P1**：补齐 H3C/Huawei NETCONF 处理器（arp/mac/ip_interface/lldp/aggre_port）
-2. **优先级 P2**：落地父方案主导的配置简化方案
-3. **优先级 P3**：建立预处理管道单元测试，提升代码质量
+1. **优先级 P1**：继续收窄 `tools/` 的职责，明确只保留 Layer 2 规范化
+2. **优先级 P2**：补结果查询与列表接口的性能/边界测试
+3. **优先级 P3**：补剩余厂商覆盖与 Telemetry 真执行
 
 ---
 

@@ -336,16 +336,21 @@ mode          string   聚合模式（dynamic / static）
 ### Phase 4：质量与扩展（P3）
 
 - [ ] **[P3-1] 建立单元测试（优先级由高到低）**
-  - [ ] `preprocess_collection_data` 的各协议/厂商/类型组合测试（mock 原始数据，断言 processed_data 格式）
-  - [ ] `apply_field_mappings` 的路径解析边界测试（嵌套路径、单条 dict、空数组、路径不存在）
-  - [ ] `DeviceConnectionManager` 各协议连接失败的异常处理测试
+  - [x] `resolve_raw_data` 的处理器优先 / `NotImplementedError` 降级 / NETCONF 缺处理器回归测试
+  - [x] `apply_field_mappings` 的路径解析边界测试（嵌套路径、`path_config`、数组缺失）
+  - [x] `DeviceConnectionManager` 异常处理测试（SSH 缺账号、SNMP v3 参数透传、RESTCONF token、Telemetry 缺依赖）
+  - [x] 本地执行链路测试（本地结果落库、`plan_*` 集合写入、部分成功聚合）
+  - [x] 南向驱动执行测试（Netmiko/NETCONF payload、`get/get_config`、无 XML 模板失败）
+  - [x] 序列化器/执行入口边界测试（SNMP/NETCONF/Telemetry 必填项、`execute_sub_plan`、`validate_execution_params`）
   - [ ] 序列化器字段验证测试（创建/更新子方案时的入参校验）
 
-- [ ] **[P3-2] 补充 MongoDB 复合索引**
-  - 对 `plan_arp` / `plan_mac` 等集合添加：
-    - `[("device_ip", 1), ("collection_type", 1), ("collected_at", -1)]`
-    - `[("plan_id", 1), ("status", 1)]`
-    - `[("task_status", 1), ("collected_at", -1)]`
+- [x] **[P3-2] 补充 MongoDB 复合索引**
+  - 新增 `backend/apps/device_api/indexes.py` 统一声明索引：
+    - `plan_*`：`hostip + collection_type + execute_time`、`summary_plan_id + plan_id + execute_time`、`plan_id + collection_method + execute_time`
+    - `TestDeviceCollection`：`plan_id + collected_at`、`device_ip + collection_method + collected_at`、`status + collected_at`
+    - `PlanCollectionCelery` / `SubPlanCollectionCelery`：补查询链路所需的 `summary_plan_id/device_ip/execute_time` 与状态索引
+  - 新增管理命令：`python3 backend/manage.py ensure_device_api_indexes`
+  - `apps.py.ready()` 在非 `test/migrate/makemigrations/...` 管理命令下 best-effort 确保索引
 
 - [ ] **[P3-3] 补全 Cisco / Ruijie / Hillstone 厂商工具**
   - 整理采集矩阵，明确哪些厂商 × 类型已实现，哪些待补充

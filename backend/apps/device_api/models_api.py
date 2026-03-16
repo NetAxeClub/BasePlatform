@@ -875,6 +875,43 @@ def resolve_raw_data(plan, collection_result, collection_method):
         return False, f"resolve_raw_data_exception: {str(e)}", []
 
 
+_FIELD_MAPPING_PATH_MISSING = object()
+
+
+def _resolve_mapping_path(data, path, default=_FIELD_MAPPING_PATH_MISSING):
+    """解析 a.b.c 形式的嵌套路径，支持 dict 和 list 索引。"""
+    if path in (None, ""):
+        return data
+
+    current = data
+    for part in str(path).split("."):
+        if isinstance(current, dict):
+            if part not in current:
+                return default
+            current = current.get(part)
+            continue
+
+        if isinstance(current, list):
+            try:
+                index = int(part)
+            except (TypeError, ValueError):
+                return default
+            if index < 0 or index >= len(current):
+                return default
+            current = current[index]
+            continue
+
+        return default
+
+    return current
+
+
+def _split_array_mapping_path(field_path):
+    """拆分 data.items[*].field 为 (data.items, field)。"""
+    array_path, _, remainder = str(field_path).partition("[*]")
+    return array_path.rstrip("."), remainder.lstrip(".")
+
+
 def apply_field_mappings(data_dict, field_mappings, path_config=None):
     """[DEPRECATED] 应用字段映射 - 支持复杂字段映射配置
 
@@ -917,7 +954,7 @@ def apply_field_mappings(data_dict, field_mappings, path_config=None):
         array_key = None
         if path_config:
             # 如果提供了path_config，直接使用
-            array_key = path_config
+            array_key = str(path_config).rstrip(".")
         else:
             # 自动检测数组键
             for field_name, field_config in sorted_fields:
@@ -929,16 +966,16 @@ def apply_field_mappings(data_dict, field_mappings, path_config=None):
                     field_path = field_config
 
                 if "[*]" in field_path:
-                    parts = field_path.split("[*]")
-                    if parts[0]:
-                        array_key = parts[0].rstrip(".")
+                    detected_array_key, _ = _split_array_mapping_path(field_path)
+                    if detected_array_key:
+                        array_key = detected_array_key
                         break
 
-        if not array_key or array_key not in data_dict:
+        if not array_key:
             logging.warning(f"未找到数组键: {array_key}")
             return []
 
-        array_data = data_dict[array_key]
+        array_data = _resolve_mapping_path(data_dict, array_key)
         if not isinstance(array_data, list):
             logging.warning(f"键 {array_key} 对应的值不是数组")
             return []
@@ -969,21 +1006,23 @@ def apply_field_mappings(data_dict, field_mappings, path_config=None):
 
                 # 解析值路径
                 if "[*]" in field_path:
-                    # 处理数组路径，如 "data[*].type"
-                    parts = field_path.split("[*]")
-                    if len(parts) == 2 and parts[1]:
-                        # 从当前item中获取值
-                        field_key = parts[1].lstrip(".")
-                        value = item.get(field_key, "")
+                    # 处理数组路径，如 "top.items[*].meta.ip"
+                    current_array_key, item_path = _split_array_mapping_path(field_path)
+                    if current_array_key == array_key:
+                        value = _resolve_mapping_path(
+                            item,
+                            item_path,
+                            default="" if item_path else item,
+                        )
                     else:
-                        # 如果路径格式不正确，使用整个item
-                        value = item
-                elif field_path in data_dict:
-                    # 从data_dict顶层获取值
-                    value = data_dict[field_path]
+                        value = ""
                 else:
-                    # 直接使用值路径作为值
-                    value = field_path
+                    # 先从当前数组元素解析，再尝试根对象；都不存在时视为常量值
+                    value = _resolve_mapping_path(item, field_path)
+                    if value is _FIELD_MAPPING_PATH_MISSING:
+                        value = _resolve_mapping_path(data_dict, field_path)
+                    if value is _FIELD_MAPPING_PATH_MISSING:
+                        value = field_path
 
                 result_item[field_name] = value
 
