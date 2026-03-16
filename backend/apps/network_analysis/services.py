@@ -295,8 +295,18 @@ class InterfaceUtilizationAnalysisService:
 
 
 class AddressTrackingAnalysisService:
+    STATUS_PRIORITY = {
+        AddressTraceSnapshot.STATUS_LOCATED: 0,
+        AddressTraceSnapshot.STATUS_PARTIAL: 1,
+        AddressTraceSnapshot.STATUS_UNRESOLVED: 2,
+    }
+
     @staticmethod
-    def _latest_rows(collection: MongoOps, key_fields: Tuple[str, ...], execute_time: Optional[str] = None) -> List[dict]:
+    def _latest_rows(
+        collection: MongoOps,
+        key_fields: Tuple[str, ...],
+        execute_time: Optional[str] = None,
+    ) -> List[dict]:
         query = {"execute_time": execute_time} if execute_time else None
         rows = collection.find(query_dict=query, fields={"_id": 0})
         latest = {}
@@ -318,69 +328,241 @@ class AddressTrackingAnalysisService:
             return f"{idc_model}_{rack}_{start}-{end}"
         return ""
 
+    @staticmethod
+    def _batch_key(row: dict) -> str:
+        return str(row.get("execute_time", "") or "")
+
+    @staticmethod
+    def _normalize_interface_name(interface_name: str) -> str:
+        normalized = str(interface_name or "").strip()
+        for separator in (".", ":"):
+            if separator in normalized:
+                normalized = normalized.split(separator, 1)[0]
+        return normalized
+
+    @classmethod
+    def _mark_partial(cls, trace_status: str) -> str:
+        if trace_status == AddressTraceSnapshot.STATUS_LOCATED:
+            return trace_status
+        return AddressTraceSnapshot.STATUS_PARTIAL
+
+    @classmethod
+    def _target_arp_rows(
+        cls,
+        arp_rows: List[dict],
+        ip_address: Optional[str] = None,
+        execute_time: Optional[str] = None,
+    ) -> List[dict]:
+        target_rows = [row for row in arp_rows if not ip_address or row.get(
+            "ipaddress") == ip_address]
+        if execute_time:
+            return target_rows
+
+        latest_batch_by_ip = {}
+        for row in target_rows:
+            ip_key = row.get("ipaddress")
+            batch_key = cls._batch_key(row)
+            if batch_key >= latest_batch_by_ip.get(ip_key, ""):
+                latest_batch_by_ip[ip_key] = batch_key
+
+        return [
+            row
+            for row in target_rows
+            if cls._batch_key(row) == latest_batch_by_ip.get(row.get("ipaddress"), "")
+        ]
+
+    @classmethod
+    def _trace_preference_key(cls, item: dict) -> Tuple[int, int, str, str, str]:
+        return (
+            -cls.STATUS_PRIORITY.get(item["trace_status"], 99),
+            item.get("_candidate_score") or 0,
+            item.get("source_execute_time", ""),
+            item.get("manage_ip", ""),
+            item.get("interface_name", ""),
+        )
+
+    @classmethod
+    def _candidate_score(cls, arp: dict, mac_row: dict) -> int:
+        score = 0
+        if mac_row.get("hostip") == arp.get("hostip"):
+            score += 5
+        arp_interface = cls._normalize_interface_name(arp.get("interface", ""))
+        mac_interface = cls._normalize_interface_name(
+            mac_row.get("interface", ""))
+        if mac_interface and mac_interface == arp_interface:
+            score += 4
+        if mac_row.get("idc_name") and mac_row.get("idc_name") == arp.get("idc_name"):
+            score += 2
+        if mac_interface:
+            score += 1
+        return score
+
+    @classmethod
+    def _sort_mac_candidates(cls, arp: dict, mac_candidates: List[dict]) -> List[dict]:
+        return sorted(
+            mac_candidates,
+            key=lambda row: (
+                -cls._candidate_score(arp, row),
+                str(row.get("hostip", "") or ""),
+                str(row.get("interface", "") or ""),
+            ),
+        )
+
+    @classmethod
+    def _select_final_candidates(cls, candidates: List[dict]) -> List[dict]:
+        if not candidates:
+            return []
+
+        ordered = sorted(
+            candidates,
+            key=lambda item: (
+                cls.STATUS_PRIORITY.get(item["trace_status"], 99),
+                -(item.get("_candidate_score") or 0),
+                item.get("manage_ip", ""),
+                item.get("interface_name", ""),
+            ),
+        )
+        located = [item for item in ordered if item["trace_status"]
+                   == AddressTraceSnapshot.STATUS_LOCATED]
+        return located[:1] if located else ordered[:1]
+
     @classmethod
     def build_traces(cls, ip_address: Optional[str] = None, execute_time: Optional[str] = None) -> List[dict]:
         device_context = _build_device_context()
-        arp_rows = cls._latest_rows(ARP_COLLECTION, ("hostip", "ipaddress", "macaddress", "interface"), execute_time=execute_time)
-        mac_rows = cls._latest_rows(MAC_COLLECTION, ("hostip", "macaddress", "interface"), execute_time=execute_time)
-        lldp_rows = cls._latest_rows(LLDP_COLLECTION, ("hostip", "local_interface", "neighbor_ip", "neighbor_port"), execute_time=execute_time)
-        aggre_rows = cls._latest_rows(AGGRE_COLLECTION, ("hostip", "aggregroup"), execute_time=execute_time)
-        ip_rows = cls._latest_rows(IP_INTERFACE_COLLECTION, ("hostip", "ipaddress", "interface"), execute_time=execute_time)
+        arp_rows = cls._latest_rows(
+            ARP_COLLECTION, ("hostip", "ipaddress", "macaddress", "interface"), execute_time=execute_time)
+        mac_rows = cls._latest_rows(
+            MAC_COLLECTION, ("hostip", "macaddress", "interface"), execute_time=execute_time)
+        lldp_rows = cls._latest_rows(
+            LLDP_COLLECTION,
+            ("hostip", "local_interface", "neighbor_ip", "neighbor_port"),
+            execute_time=execute_time,
+        )
+        aggre_rows = cls._latest_rows(
+            AGGRE_COLLECTION, ("hostip", "aggregroup"), execute_time=execute_time)
+        ip_rows = cls._latest_rows(
+            IP_INTERFACE_COLLECTION, ("hostip", "ipaddress", "interface"), execute_time=execute_time)
 
         mac_index = defaultdict(list)
+        mac_index_without_idc = defaultdict(list)
         for row in mac_rows:
-            mac_index[(row.get("macaddress"), row.get("idc_name"))].append(row)
+            batch_key = cls._batch_key(row)
+            mac_index[(batch_key, row.get("macaddress"),
+                       row.get("idc_name"))].append(row)
+            mac_index_without_idc[(
+                batch_key, row.get("macaddress"))].append(row)
 
         lldp_index = defaultdict(list)
         lldp_reverse_index = defaultdict(list)
         for row in lldp_rows:
-            lldp_index[(row.get("hostip"), row.get("local_interface"))].append(row)
-            lldp_reverse_index[(row.get("hostip"), row.get("neighbor_port"))].append(row)
+            batch_key = cls._batch_key(row)
+            local_interface = cls._normalize_interface_name(
+                row.get("local_interface", ""))
+            neighbor_port = cls._normalize_interface_name(
+                row.get("neighbor_port", ""))
+            if local_interface:
+                lldp_index[(batch_key, row.get("hostip"),
+                            local_interface)].append(row)
+            if neighbor_port:
+                lldp_reverse_index[(batch_key, row.get(
+                    "hostip"), neighbor_port)].append(row)
 
         aggre_index = {
-            (row.get("hostip"), row.get("aggregroup")): row for row in aggre_rows
+            (
+                cls._batch_key(row),
+                row.get("hostip"),
+                cls._normalize_interface_name(row.get("aggregroup", "")),
+            ): row
+            for row in aggre_rows
         }
         ip_interface_index = defaultdict(list)
         for row in ip_rows:
-            ip_interface_index[(row.get("hostip"), row.get("ipaddress"))].append(row)
+            batch_key = cls._batch_key(row)
+            ip_interface_index[(batch_key, row.get(
+                "hostip"), row.get("ipaddress"))].append(row)
 
-        target_arp_rows = [row for row in arp_rows if not ip_address or row.get("ipaddress") == ip_address]
-        traces = []
+        target_arp_rows = cls._target_arp_rows(
+            arp_rows, ip_address=ip_address, execute_time=execute_time)
+        traces = OrderedDict()
         for arp in target_arp_rows:
-            mac_candidates = mac_index.get((arp.get("macaddress"), arp.get("idc_name")), [])
+            batch_key = cls._batch_key(arp)
+            mac_candidates = mac_index.get(
+                (batch_key, arp.get("macaddress"), arp.get("idc_name")), [])
+            if not mac_candidates:
+                mac_candidates = mac_index_without_idc.get(
+                    (batch_key, arp.get("macaddress")), [])
+            mac_candidates = cls._sort_mac_candidates(arp, mac_candidates)
             if not mac_candidates:
                 mac_candidates = [arp]
 
             candidates = []
             for mac_row in mac_candidates:
-                manage_ip = mac_row.get("hostip")
-                interface_name = mac_row.get("interface") or arp.get("interface") or ""
+                manage_ip = mac_row.get("hostip") or arp.get("hostip")
+                raw_interface_name = mac_row.get(
+                    "interface") or arp.get("interface") or ""
+                interface_name = cls._normalize_interface_name(
+                    raw_interface_name) or raw_interface_name
                 member_ports = []
-                trace_method = "arp-mac"
-                trace_status = AddressTraceSnapshot.STATUS_PARTIAL
-                trace_details = {"arp_host": arp.get("hostip"), "mac_host": manage_ip}
+                matched_from_mac = mac_row is not arp
+                trace_method = "arp-mac" if matched_from_mac else "arp-only"
+                trace_status = (
+                    AddressTraceSnapshot.STATUS_PARTIAL
+                    if matched_from_mac
+                    else AddressTraceSnapshot.STATUS_UNRESOLVED
+                )
+                trace_details = {
+                    "arp_host": arp.get("hostip"),
+                    "mac_host": manage_ip,
+                    "matched_execute_time": batch_key,
+                    "candidate_source": "mac_table" if matched_from_mac else "arp_fallback",
+                }
+                if raw_interface_name and interface_name != raw_interface_name:
+                    trace_details["raw_interface"] = raw_interface_name
 
-                aggre = aggre_index.get((manage_ip, interface_name))
+                aggre = aggre_index.get((batch_key, manage_ip, interface_name))
                 if aggre:
-                    member_ports = aggre.get("memberports") or []
-                    interface_candidates = member_ports
+                    member_ports = [
+                        cls._normalize_interface_name(port)
+                        for port in (aggre.get("memberports") or [])
+                        if cls._normalize_interface_name(port)
+                    ]
+                    interface_candidates = member_ports or [interface_name]
                     trace_method = "aggregation"
+                    trace_status = cls._mark_partial(trace_status)
                 else:
                     interface_candidates = [interface_name]
 
                 resolved = False
+                lldp_observed = False
                 for port in interface_candidates:
-                    lldp_candidates = lldp_index.get((manage_ip, port), []) + lldp_reverse_index.get((manage_ip, port), [])
+                    if not port:
+                        continue
+                    lldp_candidates = lldp_index.get((batch_key, manage_ip, port), []) + lldp_reverse_index.get(
+                        (batch_key, manage_ip, port),
+                        [],
+                    )
+                    if lldp_candidates:
+                        lldp_observed = True
                     for lldp in lldp_candidates:
-                        neighbor_ip = lldp.get("neighbor_ip")
-                        if neighbor_ip and ip_interface_index.get((neighbor_ip, arp.get("ipaddress"))):
+                        neighbor_ip = lldp.get(
+                            "neighbor_ip") or lldp.get("management_ip")
+                        if neighbor_ip and ip_interface_index.get((batch_key, neighbor_ip, arp.get("ipaddress"))):
                             trace_status = AddressTraceSnapshot.STATUS_LOCATED
                             trace_method = "lldp-neighbor"
                             trace_details["neighbor_ip"] = neighbor_ip
+                            trace_details["matched_port"] = port
+                            if lldp.get("neighbor_port"):
+                                trace_details["neighbor_port"] = cls._normalize_interface_name(
+                                    lldp.get("neighbor_port", "")
+                                )
                             resolved = True
                             break
                     if resolved:
                         break
+                if lldp_observed:
+                    trace_details["lldp_observed"] = True
+                    if not resolved:
+                        trace_status = cls._mark_partial(trace_status)
 
                 device_rows = device_context.get(manage_ip, [])
                 sample_device = device_rows[0] if device_rows else {}
@@ -400,18 +582,27 @@ class AddressTrackingAnalysisService:
                         "trace_method": trace_method,
                         "trace_details": trace_details,
                         "source_execute_time": str(arp.get("execute_time", "") or ""),
+                        "_candidate_score": cls._candidate_score(arp, mac_row),
                     }
                 )
 
-            deduped = OrderedDict()
-            for candidate in candidates:
-                deduped.setdefault((candidate["ip_address"], candidate["manage_ip"]), candidate)
-            traces.extend(deduped.values())
-        return traces
+            for candidate in cls._select_final_candidates(candidates):
+                trace_key = (
+                    candidate["ip_address"], candidate["manage_ip"], candidate["interface_name"])
+                current = traces.get(trace_key)
+                if current is None or cls._trace_preference_key(candidate) > cls._trace_preference_key(current):
+                    traces[trace_key] = candidate
+
+        result = []
+        for candidate in traces.values():
+            candidate.pop("_candidate_score", None)
+            result.append(candidate)
+        return result
 
     @classmethod
     def refresh(cls, ip_address: Optional[str] = None, execute_time: Optional[str] = None) -> Dict[str, int]:
-        traces = cls.build_traces(ip_address=ip_address, execute_time=execute_time)
+        traces = cls.build_traces(
+            ip_address=ip_address, execute_time=execute_time)
         touched = 0
         for trace in traces:
             AddressTraceSnapshot.objects.update_or_create(
