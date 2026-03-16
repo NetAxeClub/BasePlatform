@@ -1,0 +1,16 @@
+Value SYSTEM_ID (\S+)
+Value LOCAL_INTERFACE (\S+)
+Value CIRCUIT_ID (\S+)
+Value STATE (\S+)
+Value HOLD_TIME (\S+)
+Value NEIGHBOR_TYPE (\S+)
+Value PRIORITY (\S+)
+Value AREA (\S+)
+Value PEER_IP (\S+)
+Value UPTIME (\S+)
+
+Start
+  ^\s*System\s+Id\s+Interface\s+Circuit\s+State\s+Hold\s+Type\s+Pri\s+Area\s+PeerIP\s+Uptime\s*$$ -> Start
+  ^\s*-+\s*$$ -> Start
+  ^\s*$$ -> Start
+  ^\s*${SYSTEM_ID}\s+${LOCAL_INTERFACE}\s+${CIRCUIT_ID}\s+${STATE}\s+${HOLD_TIME}\s+${NEIGHBOR_TYPE}\s+${PRIORITY}\s+${AREA}\s+${PEER_IP}\s+${UPTIME}\s*$$ -> Record

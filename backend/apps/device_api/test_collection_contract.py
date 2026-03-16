@@ -109,6 +109,7 @@ class DeviceApiCollectionContractTests(SimpleTestCase):
             {
                 "Huawei-S",
                 "Huawei-CE",
+                "Huawei-router-cli",
                 "Huawei-USG",
                 "Huawei-YunShan",
                 "H3C-legacy-cli",

@@ -2,12 +2,14 @@ import json
 import importlib
 from datetime import datetime
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock, patch
 
 from bson import ObjectId
 from django.test import SimpleTestCase
 from rest_framework.test import APIRequestFactory
+from textfsm import TextFSM
 
 from apps.asset.models import Category, Model, NetworkDevice, Vendor
 from apps.device_api.fields_mapping import (
@@ -56,14 +58,26 @@ from apps.device_api.serializers import (
 )
 from apps.device_api.management.commands.sync_legacy_plan_bindings import Command as SyncLegacyPlanBindingsCommand
 from apps.device_api.management.commands.ensure_device_api_indexes import Command as EnsureDeviceApiIndexesCommand
+from apps.device_api.management.commands.audit_device_api_coverage import (
+    Command as AuditDeviceApiCoverageCommand,
+)
 from apps.device_api.apps import DeviceApiConfig
 from apps.device_api.indexes import (
     bootstrap_device_api_mongo_indexes,
     ensure_device_api_mongo_indexes,
     should_auto_ensure_device_api_indexes,
 )
-from apps.device_api.platform_profiles import PlatformProfileService
-from apps.device_api.tasks import _process_and_save_result
+from apps.device_api.platform_profiles import (
+    BUILTIN_PLATFORM_PROFILES,
+    PROFILE_NETMIKO_SUB_PLAN_DEFAULTS,
+    TEMPLATE_BASE_DIR,
+    PlatformProfileService,
+)
+from apps.device_api.tasks import (
+    _process_and_save_result,
+    split_runtime_control_kwargs,
+    should_clear_history_before_batch,
+)
 from apps.device_api.tools.collect_device import get_auto_device
 from apps.device_api.management.commands.import_legacy_collection_rules import (
     Command as ImportLegacyCollectionRulesCommand,
@@ -1519,6 +1533,126 @@ class DeviceApiBridgeCommandTests(SimpleTestCase):
             last_bound_at=None,
         )
 
+    @patch("apps.device_api.management.commands.audit_device_api_coverage.PlatformProfileService.audit_device_coverage")
+    @patch("apps.device_api.management.commands.audit_device_api_coverage.Command.collect_schema_blockers")
+    @patch("apps.device_api.management.commands.audit_device_api_coverage.NetworkDevice.objects")
+    def test_audit_device_api_coverage_command_outputs_summary(
+        self,
+        mock_network_device_objects,
+        mock_collect_schema_blockers,
+        mock_audit_device_coverage,
+    ):
+        queryset = mock_network_device_objects.filter.return_value.select_related.return_value
+        queryset.filter.return_value = queryset
+        queryset.__iter__ = Mock(return_value=iter([SimpleNamespace(manage_ip="10.0.0.1")]))
+        mock_collect_schema_blockers.return_value = []
+        mock_audit_device_coverage.return_value = {
+            "summary": {
+                "total": 1,
+                "ready": 0,
+                "blocked": 1,
+                "profile_not_matched": 1,
+                "missing_default_plan": 0,
+                "missing_binding": 0,
+            },
+            "results": [
+                {
+                    "manage_ip": "10.0.0.1",
+                    "serial_num": "SER-1",
+                    "profile_code": "",
+                    "plan_name": "",
+                    "blockers": [{"code": "profile_not_matched"}],
+                }
+            ],
+        }
+
+        command = AuditDeviceApiCoverageCommand()
+        with patch.object(command.stdout, "write") as mock_write:
+            command.handle(
+                manage_ip=None,
+                serial_num=None,
+                vendor_alias=None,
+                sync_default_plans=False,
+                auto_bind=False,
+                sample_limit=20,
+            )
+
+        written = "\n".join(call.args[0] for call in mock_write.call_args_list)
+        self.assertIn("summary: total=1 ready=0 blocked=1", written)
+        self.assertIn("blockers=profile_not_matched", written)
+
+    @patch("apps.device_api.management.commands.audit_device_api_coverage.PlatformProfileService.audit_device_coverage")
+    @patch("apps.device_api.management.commands.audit_device_api_coverage.Command.collect_schema_blockers")
+    @patch("apps.device_api.management.commands.audit_device_api_coverage.NetworkDevice.objects")
+    def test_audit_device_api_coverage_command_writes_json_report(
+        self,
+        mock_network_device_objects,
+        mock_collect_schema_blockers,
+        mock_audit_device_coverage,
+    ):
+        queryset = mock_network_device_objects.filter.return_value.select_related.return_value
+        queryset.filter.return_value = queryset
+        queryset.__iter__ = Mock(return_value=iter([]))
+        mock_collect_schema_blockers.return_value = []
+        mock_audit_device_coverage.return_value = {
+            "summary": {
+                "total": 0,
+                "ready": 0,
+                "blocked": 0,
+                "profile_not_matched": 0,
+                "missing_default_plan": 0,
+                "missing_binding": 0,
+            },
+            "results": [],
+        }
+
+        command = AuditDeviceApiCoverageCommand()
+        with TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "report.json"
+            command.handle(
+                manage_ip=None,
+                serial_num=None,
+                vendor_alias=None,
+                sync_default_plans=False,
+                auto_bind=False,
+                sample_limit=20,
+                output=str(output_path),
+            )
+            self.assertTrue(output_path.exists())
+            payload = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual(payload["summary"]["total"], 0)
+
+    @patch("apps.device_api.management.commands.audit_device_api_coverage.Command.collect_schema_blockers")
+    @patch("apps.device_api.management.commands.audit_device_api_coverage.NetworkDevice.objects")
+    def test_audit_device_api_coverage_command_reports_schema_blockers(
+        self,
+        mock_network_device_objects,
+        mock_collect_schema_blockers,
+    ):
+        queryset = mock_network_device_objects.filter.return_value.select_related.return_value
+        queryset.filter.return_value = queryset
+        queryset.__iter__ = Mock(return_value=iter([SimpleNamespace(manage_ip="10.0.0.1")]))
+        mock_collect_schema_blockers.return_value = [
+            {"code": "missing_table", "message": "缺少数据表: device_api_platform_profile"}
+        ]
+
+        command = AuditDeviceApiCoverageCommand()
+        with patch.object(command.stdout, "write") as mock_write:
+            command.handle(
+                manage_ip=None,
+                serial_num=None,
+                vendor_alias=None,
+                sync_default_plans=True,
+                auto_bind=True,
+                sample_limit=20,
+                output=None,
+            )
+
+        written = "\n".join(call.args[0] for call in mock_write.call_args_list)
+        self.assertIn("schema blockers:", written)
+        self.assertIn("skip sync_default_plans: schema blockers detected", written)
+        self.assertIn("skip auto_bind: schema blockers detected", written)
+
 
 class DeviceApiTaskTests(SimpleTestCase):
     @patch("apps.device_api.tasks.COLLECTION_SUB_PLAN.insert_one")
@@ -1604,10 +1738,183 @@ class DeviceApiTaskTests(SimpleTestCase):
             expected_interface_devices=1,
             triggered_by="device_api-plan_collect_device_main",
         )
+        self.assertTrue(result["clear_history"])
         self.assertTrue(result["analysis_trigger"]["scheduled"])
+
+    @patch("apps.device_api.tasks.schedule_batch_network_analysis")
+    @patch("apps.device_api.tasks.plan_collect_device.apply_async")
+    @patch("apps.device_api.tasks.clear_his_collect_res")
+    @patch("apps.device_api.tasks.MainIn.cmdb_to_mongo")
+    @patch("apps.device_api.tasks.datas_to_cache")
+    @patch("apps.device_api.tasks.get_auto_device")
+    def test_plan_collect_device_main_can_keep_history_for_gray_run(
+        self,
+        mock_get_auto_device,
+        mock_datas_to_cache,
+        mock_cmdb_to_mongo,
+        mock_clear_his_collect_res,
+        mock_plan_collect_apply_async,
+        mock_schedule_batch_network_analysis,
+    ):
+        mock_get_auto_device.return_value = [
+            {
+                "manage_ip": "10.0.0.1",
+                "execute_time": "2026-03-15 10:00:00",
+                "sub_plans": [{"id": 1, "collection_type": "arp"}],
+            }
+        ]
+        mock_plan_collect_apply_async.return_value = SimpleNamespace(id="task-1")
+        mock_schedule_batch_network_analysis.return_value = {
+            "scheduled": True,
+            "reason": "scheduled",
+        }
+
+        from apps.device_api.tasks import plan_collect_device_main
+
+        result = plan_collect_device_main(clear_history=False)
+
+        mock_clear_his_collect_res.assert_not_called()
+        self.assertFalse(result["clear_history"])
+        self.assertEqual(result["tasks"], 1)
+
+    @patch("apps.device_api.tasks.schedule_batch_network_analysis")
+    @patch("apps.device_api.tasks.plan_collect_device.apply_async")
+    @patch("apps.device_api.tasks.clear_his_collect_res")
+    @patch("apps.device_api.tasks.MainIn.cmdb_to_mongo")
+    @patch("apps.device_api.tasks.datas_to_cache")
+    @patch("apps.device_api.tools.collect_device.DeviceSubCollectionPlanSerializer")
+    @patch("apps.device_api.tools.collect_device.DeviceSubCollectionPlan.objects")
+    @patch("apps.device_api.tools.collect_device.AssetAccount.objects")
+    @patch("apps.device_api.tools.collect_device.PlansToDevice.objects")
+    @patch("apps.device_api.tools.collect_device.NetworkDevice.objects")
+    def test_plan_collect_device_main_strips_runtime_options_before_device_filtering(
+        self,
+        mock_device_objects,
+        mock_relation_objects,
+        mock_account_objects,
+        mock_sub_plan_objects,
+        mock_sub_plan_serializer,
+        mock_datas_to_cache,
+        mock_cmdb_to_mongo,
+        mock_clear_his_collect_res,
+        mock_plan_collect_apply_async,
+        mock_schedule_batch_network_analysis,
+    ):
+        device_row = {
+            "id": 1,
+            "serial_num": "SER-1",
+            "manage_ip": "10.0.0.1",
+            "name": "switch-a",
+            "soft_version": "v1",
+            "vendor__name": "Huawei",
+            "vendor__alias": "Huawei",
+            "category__name": "switch",
+            "model__name": "CE8850",
+            "ssh_enable": "0",
+            "ssh_account": None,
+            "netconf_enable": "0",
+            "netconf_account": None,
+            "patch_version": "p1",
+            "status": 0,
+            "idc__name": "IDC-A",
+            "auto_enable": True,
+            "ha_status": 0,
+            "chassis": 1,
+            "slot": 1,
+            "bind_ip__ipaddr": None,
+        }
+        base_queryset = mock_device_objects.filter.return_value
+        selected_queryset = base_queryset.select_related.return_value
+        filtered_queryset = selected_queryset.filter.return_value
+        filtered_queryset.values.return_value = [device_row]
+
+        mock_relation_objects.select_related.return_value.filter.return_value = [
+            SimpleNamespace(
+                manage_ip="10.0.0.1",
+                plan_id=201,
+                use_local=True,
+                execute_node="",
+                device_serial_num="SER-1",
+                profile_code="Huawei-CE",
+                binding_source="legacy_bridge",
+            )
+        ]
+        mock_account_objects.filter.return_value.values.return_value = []
+        mock_sub_plan_objects.filter.return_value.select_related.return_value.order_by.return_value = [
+            SimpleNamespace(id=11)
+        ]
+        mock_sub_plan_serializer.return_value.data = [
+            {"summary_plan": 201, "id": 11, "collection_type": "arp"}
+        ]
+        mock_plan_collect_apply_async.return_value = SimpleNamespace(id="task-1")
+        mock_schedule_batch_network_analysis.return_value = {
+            "scheduled": True,
+            "reason": "scheduled",
+        }
+
+        from apps.device_api.tasks import plan_collect_device_main
+
+        result = plan_collect_device_main(clear_history=False)
+
+        network_filter_kwargs = mock_device_objects.filter.call_args.kwargs
+        self.assertEqual(network_filter_kwargs, {"status": 0, "auto_enable": True})
+        selected_queryset.filter.assert_called_once_with(
+            vendor__alias__in=[
+                "H3C",
+                "Huawei",
+                "Ruijie",
+                "Maipu",
+                "Hillstone",
+                "Mellanox",
+                "centec",
+                "Cisco",
+                "CISCO",
+                "cisco",
+                "ZTE",
+            ]
+        )
+        mock_clear_his_collect_res.assert_not_called()
+        self.assertFalse(result["clear_history"])
+        self.assertEqual(result["total"], 1)
 
 
 class DeviceApiProtocolExtensionTests(SimpleTestCase):
+    @staticmethod
+    def _parse_textfsm_rows(template_name, raw_text):
+        template_path = TEMPLATE_BASE_DIR / template_name
+        with open(template_path, "r", encoding="utf-8") as template_file:
+            parser = TextFSM(template_file)
+        rows = parser.ParseText(raw_text)
+        return [dict(zip(parser.header, row)) for row in rows]
+
+    def test_split_runtime_control_kwargs_separates_device_filters(self):
+        runtime_options, device_filters = split_runtime_control_kwargs(
+            {
+                "clear_history": False,
+                "manage_ip": "10.0.0.1",
+                "plan_id": 201,
+            }
+        )
+
+        self.assertEqual(runtime_options, {"clear_history": False})
+        self.assertEqual(
+            device_filters,
+            {"manage_ip": "10.0.0.1", "plan_id": 201},
+        )
+
+    def test_should_clear_history_before_batch_defaults_to_true(self):
+        self.assertTrue(should_clear_history_before_batch())
+        self.assertTrue(should_clear_history_before_batch({}))
+        self.assertTrue(should_clear_history_before_batch({"clear_history": True}))
+        self.assertTrue(should_clear_history_before_batch({"clear_history": "true"}))
+
+    def test_should_clear_history_before_batch_supports_explicit_false_values(self):
+        for value in (False, "false", "False", "0", "no", "off"):
+            with self.subTest(value=value):
+                self.assertFalse(
+                    should_clear_history_before_batch({"clear_history": value})
+                )
+
     def test_default_collection_types_include_routing_protocol_types(self):
         expected_types = {
             "route_table",
@@ -2052,6 +2359,101 @@ class DeviceApiProtocolExtensionTests(SimpleTestCase):
         self.assertIn("huawei_vrp_display_ospf_interface.textfsm", index_content)
         self.assertIn("huawei_vrp_display_isis_peer_verbose.textfsm", index_content)
 
+    def test_profile_netmiko_defaults_have_commands_templates_and_index_entries(self):
+        index_content = (TEMPLATE_BASE_DIR / "index").read_text(encoding="utf-8")
+
+        for profile_code, mapping in PROFILE_NETMIKO_SUB_PLAN_DEFAULTS.items():
+            for collection_type, item in mapping.items():
+                with self.subTest(profile=profile_code, collection_type=collection_type):
+                    self.assertTrue(item.get("command"))
+                    self.assertTrue(item.get("template"))
+                    self.assertTrue((TEMPLATE_BASE_DIR / item["template"]).exists())
+                    self.assertIn(item["template"], index_content)
+
+    def test_huawei_ospf_peer_brief_template_parses_cli_rows(self):
+        rows = self._parse_textfsm_rows(
+            "huawei_vrp_display_ospf_peer_brief.textfsm",
+            (
+                "Area Interface Router ID Address State Pri Dead-Time\n"
+                "0.0.0.0 GE1/0/1 1.1.1.1 192.0.2.1 Full 1 00:00:31\n"
+            ),
+        )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["AREA_ID"], "0.0.0.0")
+        self.assertEqual(rows[0]["INTERFACE"], "GE1/0/1")
+        self.assertEqual(rows[0]["NEIGHBOR_IP"], "192.0.2.1")
+
+    def test_huawei_ospf_interface_template_parses_cli_rows(self):
+        rows = self._parse_textfsm_rows(
+            "huawei_vrp_display_ospf_interface.textfsm",
+            (
+                "Area Interface IP Address Type State Cost Pri DR BDR Hello/Dead\n"
+                "0.0.0.0 GE1/0/1 192.0.2.2 P2P FULL 10 1 192.0.2.3 192.0.2.4 10 40\n"
+            ),
+        )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["AREA"], "0.0.0.0")
+        self.assertEqual(rows[0]["INTERFACE_IP"], "192.0.2.2")
+        self.assertEqual(rows[0]["DEAD_INTERVAL"], "40")
+
+    def test_huawei_isis_peer_verbose_template_parses_cli_rows(self):
+        rows = self._parse_textfsm_rows(
+            "huawei_vrp_display_isis_peer_verbose.textfsm",
+            (
+                "System Id Interface Circuit State Hold Type Pri Area PeerIP Uptime\n"
+                "0000.0000.0001 GE1/0/1 001 Up 26 L1L2 64 49.0001 192.0.2.10 1d02h\n"
+            ),
+        )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["SYSTEM_ID"], "0000.0000.0001")
+        self.assertEqual(rows[0]["LOCAL_INTERFACE"], "GE1/0/1")
+        self.assertEqual(rows[0]["PEER_IP"], "192.0.2.10")
+
+    def test_h3c_ospf_peer_template_parses_cli_rows(self):
+        rows = self._parse_textfsm_rows(
+            "hp_comware_display_ospf_peer.textfsm",
+            (
+                "Area Interface Router ID Address State Pri Dead-Time\n"
+                "0.0.0.0 GE1/0/1 2.2.2.2 192.0.2.11 Full 1 00:00:39\n"
+            ),
+        )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["AREA"], "0.0.0.0")
+        self.assertEqual(rows[0]["ROUTER_ID"], "2.2.2.2")
+        self.assertEqual(rows[0]["ADDRESS"], "192.0.2.11")
+
+    def test_h3c_ospf_interface_template_parses_cli_rows(self):
+        rows = self._parse_textfsm_rows(
+            "hp_comware_display_ospf_interface.textfsm",
+            (
+                "Area Interface IP Address Type State Cost Pri DR BDR Hello/Dead\n"
+                "0.0.0.0 GE1/0/2 192.0.2.12 BROADCAST DR 10 1 192.0.2.13 192.0.2.14 10 40\n"
+            ),
+        )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["INTERFACE"], "GE1/0/2")
+        self.assertEqual(rows[0]["NETWORK_TYPE"], "BROADCAST")
+        self.assertEqual(rows[0]["HELLO_INTERVAL"], "10")
+
+    def test_h3c_isis_peer_verbose_template_parses_cli_rows(self):
+        rows = self._parse_textfsm_rows(
+            "hp_comware_display_isis_peer_verbose.textfsm",
+            (
+                "System Id Interface Circuit State Hold Type Pri Area PeerIP Uptime\n"
+                "0000.0000.0002 GE1/0/2 002 Up 23 L2 127 49.0002 192.0.2.15 2d03h\n"
+            ),
+        )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["SYSTEM_ID"], "0000.0000.0002")
+        self.assertEqual(rows[0]["NEIGHBOR_TYPE"], "L2")
+        self.assertEqual(rows[0]["UPTIME"], "2d03h")
+
 
 class DeviceApiHealthExtensionTests(SimpleTestCase):
     def test_default_collection_types_include_health_types(self):
@@ -2273,6 +2675,196 @@ class DeviceApiHealthExtensionTests(SimpleTestCase):
         self.assertEqual(sub_plan.netmiko_method, "display arp")
         self.assertEqual(sub_plan.textfsm_template, "huawei_vrp_display_arp.textfsm")
         self.assertTrue(sub_plan.netmiko_enabled)
+
+    def test_resolve_plan_collection_method_defaults_to_netmiko(self):
+        profile = SimpleNamespace(
+            preferred_methods={
+                "arp": ["netconf", "netmiko"],
+                "mac": ["netmiko"],
+            }
+        )
+
+        result = PlatformProfileService.resolve_plan_collection_method(profile)
+
+        self.assertEqual(result, DeviceCollectionPlans.COLLECTION_METHOD_NETMIKO)
+
+    def test_normalize_device_category_supports_localized_names(self):
+        self.assertEqual(
+            PlatformProfileService.normalize_device_category("交换机"),
+            "switch",
+        )
+        self.assertEqual(
+            PlatformProfileService.normalize_device_category("防火墙"),
+            "firewall",
+        )
+        self.assertEqual(
+            PlatformProfileService.normalize_device_category("TAP交换机"),
+            "switch",
+        )
+
+    def test_match_profile_for_h3c_router_and_firewall_devices(self):
+        profiles = [
+            SimpleNamespace(
+                code=item["code"],
+                vendor_alias=item["vendor_alias"],
+                category=item["category"],
+                series_patterns=item["series_patterns"],
+                version_patterns=item["version_patterns"],
+            )
+            for item in BUILTIN_PLATFORM_PROFILES
+        ]
+        router = SimpleNamespace(
+            vendor=SimpleNamespace(alias="H3C"),
+            category=SimpleNamespace(name="路由器"),
+            model=SimpleNamespace(name="SR8802-X-S"),
+            soft_version="7.1",
+            name="router-a",
+        )
+        firewall = SimpleNamespace(
+            vendor=SimpleNamespace(alias="H3C"),
+            category=SimpleNamespace(name="防火墙"),
+            model=SimpleNamespace(name="SecPath F5060"),
+            soft_version="7.1",
+            name="fw-a",
+        )
+
+        router_profile = PlatformProfileService.match_profile_for_device(router, profiles=profiles)
+        firewall_profile = PlatformProfileService.match_profile_for_device(firewall, profiles=profiles)
+
+        self.assertEqual(router_profile.code, "H3C-router-cli")
+        self.assertEqual(firewall_profile.code, "H3C-firewall-cli")
+
+    def test_match_profile_for_huawei_router_device(self):
+        profiles = [
+            SimpleNamespace(
+                code=item["code"],
+                vendor_alias=item["vendor_alias"],
+                category=item["category"],
+                series_patterns=item["series_patterns"],
+                version_patterns=item["version_patterns"],
+            )
+            for item in BUILTIN_PLATFORM_PROFILES
+        ]
+        router = SimpleNamespace(
+            vendor=SimpleNamespace(alias="Huawei"),
+            category=SimpleNamespace(name="路由器"),
+            model=SimpleNamespace(name="AR6280"),
+            soft_version="V300R021",
+            name="huawei-router-a",
+        )
+
+        router_profile = PlatformProfileService.match_profile_for_device(router, profiles=profiles)
+
+        self.assertEqual(router_profile.code, "Huawei-router-cli")
+
+    def test_audit_plan_readiness_flags_missing_templates(self):
+        sub_plan = SimpleNamespace(
+            collection_type="arp",
+            netmiko_enabled=True,
+            textfsm_template="",
+            netconf_enabled=True,
+            xml_templates=SimpleNamespace(all=lambda: []),
+            snmp_enabled=False,
+            restconf_enabled=False,
+            telemetry_enabled=False,
+        )
+        plan = SimpleNamespace(collect_plans=SimpleNamespace(all=lambda: [sub_plan]))
+
+        blockers = PlatformProfileService.audit_plan_readiness(plan)
+        blocker_codes = {item["code"] for item in blockers}
+
+        self.assertIn("missing_textfsm_template", blocker_codes)
+        self.assertIn("missing_netconf_template", blocker_codes)
+
+    def test_audit_plan_readiness_flags_missing_template_file(self):
+        sub_plan = SimpleNamespace(
+            collection_type="arp",
+            netmiko_enabled=True,
+            netmiko_method="display arp",
+            textfsm_template="not_exists.textfsm",
+            netconf_enabled=False,
+            snmp_enabled=False,
+            restconf_enabled=False,
+            telemetry_enabled=False,
+        )
+        plan = SimpleNamespace(collect_plans=SimpleNamespace(all=lambda: [sub_plan]))
+
+        blockers = PlatformProfileService.audit_plan_readiness(plan)
+        blocker_codes = {item["code"] for item in blockers}
+
+        self.assertIn("missing_textfsm_template_file", blocker_codes)
+
+    @patch("apps.device_api.platform_profiles.PlatformProfileService.template_is_placeholder")
+    def test_audit_plan_readiness_flags_placeholder_template_file(self, mock_template_is_placeholder):
+        mock_template_is_placeholder.return_value = True
+        sub_plan = SimpleNamespace(
+            collection_type="ospf_neighbors",
+            netmiko_enabled=True,
+            netmiko_method="display ospf peer brief",
+            textfsm_template="huawei_vrp_display_ospf_peer_brief.textfsm",
+            netconf_enabled=False,
+            snmp_enabled=False,
+            restconf_enabled=False,
+            telemetry_enabled=False,
+        )
+        plan = SimpleNamespace(collect_plans=SimpleNamespace(all=lambda: [sub_plan]))
+
+        blockers = PlatformProfileService.audit_plan_readiness(plan)
+        blocker_codes = {item["code"] for item in blockers}
+
+        self.assertIn("placeholder_textfsm_template", blocker_codes)
+
+    def test_long_tail_profiles_only_expose_supported_cli_subset(self):
+        profiles = {item["code"]: item for item in BUILTIN_PLATFORM_PROFILES}
+
+        self.assertEqual(
+            profiles["Cisco-switch"]["supported_collection_types"],
+            ["device_identity", "arp", "mac"],
+        )
+        self.assertEqual(
+            profiles["Centec-switch"]["supported_collection_types"],
+            ["arp", "ip_interface"],
+        )
+
+    @patch("apps.device_api.platform_profiles.PlansToDevice.objects")
+    @patch("apps.device_api.platform_profiles.DeviceCollectionPlans.objects")
+    @patch("apps.device_api.platform_profiles.PlatformProfileService.match_profile_for_device")
+    @patch("apps.device_api.platform_profiles.PlatformProfileService.ensure_builtin_profiles")
+    def test_audit_device_coverage_reports_missing_binding(
+        self,
+        mock_ensure_builtin_profiles,
+        mock_match_profile_for_device,
+        mock_plan_objects,
+        mock_binding_objects,
+    ):
+        device = SimpleNamespace(
+            manage_ip="10.0.0.1",
+            serial_num="SER-1",
+            vendor=SimpleNamespace(alias="Huawei"),
+            model=SimpleNamespace(name="CE8850"),
+            ssh_enable="account",
+            ssh_account=101,
+            netconf_enable="account",
+            netconf_account=102,
+        )
+        profile = SimpleNamespace(code="Huawei-CE", default_plan_name="default-huawei-ce-switch")
+        plan = SimpleNamespace(
+            id=201,
+            name="default-huawei-ce-switch",
+            collect_plans=SimpleNamespace(all=lambda: []),
+        )
+
+        mock_ensure_builtin_profiles.return_value = [profile]
+        mock_match_profile_for_device.return_value = profile
+        mock_plan_objects.filter.return_value.prefetch_related.return_value.first.return_value = plan
+        mock_binding_objects.select_related.return_value.filter.return_value = []
+
+        result = PlatformProfileService.audit_device_coverage([device])
+
+        self.assertEqual(result["summary"]["missing_binding"], 1)
+        self.assertEqual(result["results"][0]["profile_code"], "Huawei-CE")
+        blocker_codes = {item["code"] for item in result["results"][0]["blockers"]}
+        self.assertIn("missing_binding", blocker_codes)
 
 
 class DeviceCollectionServiceSyncTests(SimpleTestCase):
