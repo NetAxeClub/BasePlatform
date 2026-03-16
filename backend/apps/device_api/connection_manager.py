@@ -387,13 +387,18 @@ class DeviceConnectionManager:
         """
         session = self.get_snmp_session()
         results = {}
+        snmp_identity = (
+            session.get("username", "")
+            if str(session.get("version", "")).lower() == "v3"
+            else session.get("community", "")
+        )
 
         for oid in oids:
             try:
                 success, result = snmp_get_oid(
                     ip=session["ip"],
                     snmp_version=session["version"],
-                    snmp_community=session.get("community", ""),
+                    snmp_community=snmp_identity,
                     oid=oid,
                     port=session["port"],
                     timeout=session["timeout"],

@@ -431,14 +431,30 @@ def _snmp_get_oid_async(
     """使用 pysnmp 7.x 异步 API 查询指定 OID 的值"""
     try:
         async def _async_get():
-            dispatcher = SnmpDispatcher()
             if snmp_version == "v2c":
+                dispatcher = SnmpDispatcher()
                 auth_data = CommunityData(snmp_community, mpModel=1)
+                get_cmd_func = get_cmd
             else:
-                auth_data = CommunityData(snmp_community, mpModel=1)
+                from pysnmp.hlapi.v3arch.asyncio.dispatch import (
+                    SnmpDispatcher as SnmpDispatcherV3,
+                )
+
+                dispatcher = SnmpDispatcherV3()
+                if auth_key and priv_key:
+                    auth_data = UsmUserData(
+                        snmp_community,
+                        authKey=auth_key,
+                        privKey=priv_key,
+                    )
+                elif auth_key:
+                    auth_data = UsmUserData(snmp_community, authKey=auth_key)
+                else:
+                    auth_data = UsmUserData(snmp_community)
+                get_cmd_func = get_cmd_v3
 
             transport = await UdpTransportTarget.create((ip, port))
-            error_indication, error_status, error_index, var_binds = await get_cmd(
+            error_indication, error_status, error_index, var_binds = await get_cmd_func(
                 dispatcher,
                 auth_data,
                 transport,

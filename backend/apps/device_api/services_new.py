@@ -18,7 +18,13 @@ from apps.device_api.models import (
 )
 from apps.device_api import COLLECTION_RESULTS_DB, COLLECTION_PLAN, COLLECTION_SUB_PLAN
 from apps.device_api.connection_manager import DeviceConnectionManager
-from apps.device_api.models_api import resolve_raw_data, save_local_collection_result, inject_metadata
+from apps.device_api.models_api import (
+    COLLECTION_TYPE_MONGO_MAP,
+    inject_collection_context,
+    inject_metadata,
+    resolve_raw_data,
+    save_local_collection_result,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -492,6 +498,9 @@ class DeviceCollectionService:
         """
         try:
             manage_ip = device_info.get('manage_ip')
+            collection_type = plan.get('collection_type')
+            hostname = device_info.get("name", "") or device_info.get("device_name", "")
+            idc_name = device_info.get("idc__name", "") or device_info.get("idc_name", "")
             
             # 调用数据处理流程
             # 这里需要将 plan 字典转换为模型对象，或者直接传递字典
@@ -535,10 +544,70 @@ class DeviceCollectionService:
 
             if not resolve_status:
                 logger.error(f"数据处理失败: {manage_ip}, method={collection_method}, error={resolve_error}")
+                device_obj = type(
+                    "Device",
+                    (),
+                    {
+                        "manage_ip": manage_ip,
+                        "name": hostname,
+                        "idc": type("Idc", (), {"name": idc_name})() if idc_name else None,
+                    },
+                )()
+                save_local_collection_result(
+                    plan_obj,
+                    device_obj,
+                    collection_method,
+                    DeviceCollectionService._get_local_result_method_name(plan, collection_method),
+                    raw_result,
+                    [],
+                    "error",
+                    resolve_error,
+                )
                 return {
                     'success': False,
                     'error': resolve_error
                 }
+
+            meta = {
+                "hostip": manage_ip,
+                "hostname": hostname,
+                "idc_name": idc_name,
+            }
+            inject_metadata(processed_data, meta)
+            inject_collection_context(
+                processed_data,
+                {
+                    "summary_plan_id": plan.get("summary_plan"),
+                    "plan_id": plan.get("id"),
+                    "collection_type": collection_type,
+                    "collection_method": collection_method,
+                    "execute_time": execute_time,
+                },
+            )
+
+            if isinstance(processed_data, list) and processed_data and collection_type:
+                collection_db = COLLECTION_TYPE_MONGO_MAP.get(collection_type)
+                if not collection_db:
+                    from utils.db.mongo_ops import MongoOps
+
+                    collection_db = MongoOps(
+                        db="Automation", coll=f"plan_{collection_type}"
+                    )
+                    logger.warning(f"使用动态创建的 MongoDB 集合: plan_{collection_type}")
+                collection_db.insert_many(processed_data)
+
+                try:
+                    from apps.device_api.platform_profiles import DeviceFactService
+
+                    DeviceFactService.update_from_processed_data(
+                        collection_type=collection_type,
+                        device_info=device_info,
+                        processed_data=processed_data,
+                    )
+                except Exception as fact_error:
+                    logger.warning(
+                        f"本地采集事实回写失败: {manage_ip}, type={collection_type}, error={fact_error}"
+                    )
 
             # 更新子采集任务状态
             task_record = {
@@ -559,6 +628,24 @@ class DeviceCollectionService:
                 "log_time": time.time()
             }
             COLLECTION_SUB_PLAN.insert_one(task_record)
+            device_obj = type(
+                "Device",
+                (),
+                {
+                    "manage_ip": manage_ip,
+                    "name": hostname,
+                    "idc": type("Idc", (), {"name": idc_name})() if idc_name else None,
+                },
+            )()
+            save_local_collection_result(
+                plan_obj,
+                device_obj,
+                collection_method,
+                DeviceCollectionService._get_local_result_method_name(plan, collection_method),
+                raw_result,
+                processed_data,
+                "success",
+            )
 
             logger.info(f"采集结果处理完成: {manage_ip}, method={collection_method}, data_count={len(processed_data) if isinstance(processed_data, list) else 1}")
 
@@ -574,6 +661,24 @@ class DeviceCollectionService:
                 'success': False,
                 'error': str(e)
             }
+
+    @staticmethod
+    def _get_local_result_method_name(plan: Dict[str, Any], collection_method: str) -> str:
+        """为本地采集结果构建 method_name，便于结果列表检索。"""
+        if collection_method == "netmiko":
+            return plan.get("netmiko_method", "")
+        if collection_method == "netconf":
+            xml_templates = plan.get("xml_templates", []) or []
+            if xml_templates:
+                return xml_templates[0].get("collect_method", "get")
+            return "get"
+        if collection_method == "snmp":
+            return ",".join((plan.get("snmp_oids") or [])[:5])
+        if collection_method == "restconf":
+            return plan.get("restconf_endpoint", "")
+        if collection_method == "telemetry":
+            return plan.get("telemetry_subscription_path", "")
+        return collection_method
 
     @staticmethod
     def insert_parent_plan_data(plan: Dict[str, Any], device_info: Dict[str, Any], sub_plans_count: int = 0) -> Dict[str, Any]:
@@ -643,6 +748,9 @@ class DeviceCollectionService:
             "netconf_enable": bool(hasattr(device, "netconf_account") and device.netconf_account),
             "snmp_version": getattr(device, "snmp_version", "v2c"),
             "snmp_community": getattr(device, "snmp_community", ""),
+            "snmp_username": getattr(device, "snmp_username", ""),
+            "snmp_auth_key": getattr(device, "snmp_auth_key", None),
+            "snmp_priv_key": getattr(device, "snmp_priv_key", None),
             "snmp_port": getattr(device, "snmp_port", 161),
             "restconf_config": {},
             "telemetry_config": {},
@@ -886,7 +994,7 @@ class DeviceCollectionService:
             device_type = netconf_device_type_map.get(vendor_alias, "h3c")
             xml_templates = plan.xml_templates.first()
             if not xml_templates:
-                return {"status": "failed", "data": {}}
+                return {"success": False, "error": "未配置XML模板"}
             args_filter = xml_templates.xml_template.strip()
             if "<filter type=" not in args_filter:
                 filter_xml = f'<filter type="subtree">{args_filter}</filter>'

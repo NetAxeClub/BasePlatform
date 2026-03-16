@@ -1487,8 +1487,15 @@ class CollectionResultViewSet(CustomViewBase):
             execute_node = request.GET.get('execute_node', '').strip()
             summary_plan_id = request.GET.get('summary_plan_id', '').strip()
             sub_plan_id = request.GET.get('sub_plan_id', '').strip()
-            page = int(request.GET.get('page', 1))
-            page_size = int(request.GET.get('page_size', 10))
+            try:
+                page = int(request.GET.get('page', 1))
+                page_size = int(request.GET.get('page_size', 10))
+            except (TypeError, ValueError):
+                return JsonResponse({
+                    'code': 400,
+                    'message': '分页参数无效',
+                    'data': None
+                })
 
             conditions = []
 
@@ -1606,9 +1613,16 @@ class CollectionResultViewSet(CustomViewBase):
             plan_id = request.GET.get('plan_id', '').strip()
             device_ip = request.GET.get('device_ip', '').strip()
             execute_time = request.GET.get('execute_time', '').strip()
-            collection_type = request.GET.get('collection_type', 'arp').strip()
-            page = int(request.GET.get('page', 1))
-            page_size = int(request.GET.get('page_size', 10))
+            collection_type = request.GET.get('collection_type', '').strip()
+            try:
+                page = int(request.GET.get('page', 1))
+                page_size = int(request.GET.get('page_size', 10))
+            except (TypeError, ValueError):
+                return JsonResponse({
+                    'code': 400,
+                    'message': '分页参数无效',
+                    'data': None
+                })
 
             # 查询子采集方案数据
             query = {}
