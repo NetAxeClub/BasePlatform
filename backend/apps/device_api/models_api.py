@@ -4,6 +4,7 @@ import importlib
 import time
 from datetime import datetime
 
+from apps.device_api.contract import STANDARD_COLLECTION_CONTEXT_FIELDS
 from apps.device_api.fields_mapping import (
     COLLECTION_TYPE_ALIASES,
     vendor_mapping,
@@ -727,11 +728,13 @@ def inject_metadata(data: list, meta: dict) -> list:
 
 def inject_collection_context(data: list, context: dict) -> list:
     """向采集结果注入方案和执行批次元数据，便于后续精确查询。"""
-    if not context or not isinstance(data, list):
+    if not isinstance(data, list):
         return data
     for item in data:
         if isinstance(item, dict):
-            for key, value in context.items():
+            for key in STANDARD_COLLECTION_CONTEXT_FIELDS:
+                item.setdefault(key, (context or {}).get(key, ""))
+            for key, value in (context or {}).items():
                 item.setdefault(key, value)
     return data
 
