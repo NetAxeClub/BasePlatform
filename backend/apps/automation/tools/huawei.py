@@ -371,7 +371,7 @@ class HuaweiProc(BaseConn):
                     idc_name=self.idc_name,
                     ipaddress=i['ipaddress'],
                     macaddress=i['macaddress'],
-                    aging=i['expire'],
+                    aging=i.get('expire', ''),
                     type=i['type'],
                     vlan=i.get('vlan', ''),
                     interface=InterfaceFormat.huawei_interface_format(
@@ -847,7 +847,7 @@ class HuaweiProc(BaseConn):
                     idc_name=self.idc_name,
                     ipaddress=i['ipAddr'],
                     macaddress=i.get('macAddr'),
-                    aging=i.get('expireTime'),
+                    aging=i.get('expireTime', ''),
                     type=i.get('styleType'),
                     vlan=i.get('peVid'),
                     interface=i['ifName'],

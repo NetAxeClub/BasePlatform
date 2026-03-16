@@ -105,8 +105,24 @@ backend/venv/bin/python backend/manage.py test \
   apps.device_api.test_interface_analysis_hooks -v 2
 ```
 
+P1 覆盖审计入口：
+
+```bash
+backend/venv/bin/python backend/manage.py audit_device_api_coverage \
+  --sync-default-plans \
+  --auto-bind
+```
+
+当前 P1 覆盖结果见：
+
+- [P1-画像与绑定覆盖报告](./P1-画像与绑定覆盖报告.md)
+- [P1 覆盖 JSON 报告](./p1_coverage_report.json)
+- [P1.5-CLI画像与占位模板报告](./P1.5-CLI画像与占位模板报告.md)
+
 ## 7. 后续任务
 
 详细待办见：
 
+- [P0 范围冻结与切换门禁](./P0-范围冻结与切换门禁.md)
 - [后续任务](./后续任务.md)
+- [采集主链替代实施与验收清单](./采集主链替代实施与验收清单.md)
