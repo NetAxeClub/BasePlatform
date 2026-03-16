@@ -310,6 +310,6 @@ PR 或合并说明至少应包含：
 | ID | 任务 | 负责人 | 状态 | 验证 | 备注 |
 |---|---|---|---|---|---|
 | T-20260313-01 | 对齐 BasePlatform 与 workflow-test 仓库级开发规范 | team | DONE | self-review | `AGENTS.md` 已补齐团队开发规范、commit 规范与任务进度模板 |
-| T-20260316-01 | 推进 device_api 父方案主导配置与 NETCONF 处理器补齐 | codex | IN_PROGRESS | `python3 backend/manage.py test apps.device_api.tests -v 2` | 当前模块说明见 `backend/apps/device_api/doc/README.md`，后续事项见 `backend/apps/device_api/doc/后续任务.md` |
+| T-20260316-01 | 推进 device_api 父方案主导配置与 NETCONF 处理器补齐 | codex | IN_PROGRESS | `backend/venv/bin/python backend/manage.py test apps.device_api.tests -v 2` | P0、P1 结果见 `backend/apps/device_api/doc/P0-范围冻结与切换门禁.md` 和 `backend/apps/device_api/doc/P1-画像与绑定覆盖报告.md`，后续事项见 `backend/apps/device_api/doc/后续任务.md` |
 | T-20260316-02 | 建立四任务总体验收门禁、验收模板与总清单 | codex | DONE | self-review | 四任务验收方式与当前状态已合并到 `doc/10-当前任务与验收总览.md` |
 | T-20260316-03 | 清理四任务统一测试底座阻塞并推进总体验收 | codex | IN_PROGRESS | pending | 当前统一阻塞和验收关注点统一记录在 `doc/10-当前任务与验收总览.md` |

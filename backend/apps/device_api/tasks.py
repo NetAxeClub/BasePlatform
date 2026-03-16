@@ -108,6 +108,38 @@ from utils.db.mongo_ops import MongoOps, MongoNetOps
 
 logger = logging.getLogger("device_api")
 
+RUNTIME_CONTROL_KWARGS = {"clear_history"}
+
+
+def should_clear_history_before_batch(kwargs=None):
+    """决定批次前是否清理历史结果。
+
+    默认保持现有行为；灰度对比、回退演练或人工排障时可显式传入
+    clear_history=False 保留历史批次数据。
+    """
+    if not kwargs:
+        return True
+
+    clear_history = kwargs.get("clear_history", True)
+    if isinstance(clear_history, str):
+        return clear_history.strip().lower() not in {"0", "false", "no", "off"}
+    return bool(clear_history)
+
+
+def split_runtime_control_kwargs(kwargs=None):
+    """拆分运行控制参数与设备筛选参数。"""
+    if not kwargs:
+        return {}, {}
+
+    runtime_options = {}
+    device_filters = {}
+    for key, value in kwargs.items():
+        if key in RUNTIME_CONTROL_KWARGS:
+            runtime_options[key] = value
+        else:
+            device_filters[key] = value
+    return runtime_options, device_filters
+
 
 def datas_to_cache():
     # 获取ARP表的所有数据 tables 用来汇总查询条件
@@ -643,6 +675,7 @@ def plan_collect_device_main(**kwargs):
     logger.info("开始执行设备信息采集主调度任务")
     datas_to_cache()  # 将数据写入缓存
     logger.info("数据缓存更新完成")
+    runtime_options, device_filters = split_runtime_control_kwargs(kwargs)
 
     # 同步CMDB设备信息到MongoDB
     try:
@@ -652,9 +685,9 @@ def plan_collect_device_main(**kwargs):
         logger.warning(f"同步CMDB设备信息到MongoDB失败: {str(e)}")
 
     # 获取设备列表
-    if kwargs:
+    if device_filters:
         # 如果有过滤条件，使用过滤条件获取设备
-        hosts = get_auto_device(**kwargs)
+        hosts = get_auto_device(**device_filters)
     else:
         # 获取所有符合条件的设备（status=0, auto_enable=True, 有采集方案）
         hosts = get_auto_device()
@@ -667,13 +700,18 @@ def plan_collect_device_main(**kwargs):
     total_expected_interface_devices = count_expected_interface_devices(hosts)
     batch_execute_time = hosts[0].get("execute_time") if hosts else ""
 
+    clear_history = should_clear_history_before_batch(runtime_options)
+
     # 清空历史采集数据
-    try:
-        clear_his_collect_res()
-        logger.info("历史采集数据已清空")
-    except Exception as e:
-        logger.warning(f"清空历史采集数据失败: {str(e)}")
-        return
+    if clear_history:
+        try:
+            clear_his_collect_res()
+            logger.info("历史采集数据已清空")
+        except Exception as e:
+            logger.warning(f"清空历史采集数据失败: {str(e)}")
+            return
+    else:
+        logger.info("本批次保留历史采集数据: clear_history=False")
 
     start_time = time.time()
 
@@ -707,6 +745,7 @@ def plan_collect_device_main(**kwargs):
         "total": len(hosts),
         "tasks": len(net_tower_tasks),
         "time_cost": f"{total_time:.2f}分钟",
+        "clear_history": clear_history,
         "analysis_trigger": analysis_trigger,
     }
 
