@@ -10,6 +10,10 @@ import time
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from apps.asset.models import NetworkDevice
+from apps.device_api.contract import (
+    build_plan_collection_name,
+    normalize_collection_type_for_storage,
+)
 from apps.device_api.fields_mapping import DEFAULT_COLLECTION_TYPES, get_collection_output_fields
 from apps.device_api.models import (
     DeviceCollectionPlans,
@@ -499,6 +503,9 @@ class DeviceCollectionService:
         try:
             manage_ip = device_info.get('manage_ip')
             collection_type = plan.get('collection_type')
+            storage_collection_type = normalize_collection_type_for_storage(
+                collection_type
+            )
             hostname = device_info.get("name", "") or device_info.get("device_name", "")
             idc_name = device_info.get("idc__name", "") or device_info.get("idc_name", "")
             
@@ -579,34 +586,35 @@ class DeviceCollectionService:
                 {
                     "summary_plan_id": plan.get("summary_plan"),
                     "plan_id": plan.get("id"),
-                    "collection_type": collection_type,
+                    "collection_type": storage_collection_type,
                     "collection_method": collection_method,
                     "execute_time": execute_time,
                 },
             )
 
-            if isinstance(processed_data, list) and processed_data and collection_type:
-                collection_db = COLLECTION_TYPE_MONGO_MAP.get(collection_type)
+            if isinstance(processed_data, list) and processed_data and storage_collection_type:
+                collection_name = build_plan_collection_name(storage_collection_type)
+                collection_db = COLLECTION_TYPE_MONGO_MAP.get(storage_collection_type)
                 if not collection_db:
                     from utils.db.mongo_ops import MongoOps
 
                     collection_db = MongoOps(
-                        db="Automation", coll=f"plan_{collection_type}"
+                        db="Automation", coll=collection_name
                     )
-                    logger.warning(f"使用动态创建的 MongoDB 集合: plan_{collection_type}")
+                    logger.warning(f"使用动态创建的 MongoDB 集合: {collection_name}")
                 collection_db.insert_many(processed_data)
 
                 try:
                     from apps.device_api.platform_profiles import DeviceFactService
 
                     DeviceFactService.update_from_processed_data(
-                        collection_type=collection_type,
+                        collection_type=storage_collection_type,
                         device_info=device_info,
                         processed_data=processed_data,
                     )
                 except Exception as fact_error:
                     logger.warning(
-                        f"本地采集事实回写失败: {manage_ip}, type={collection_type}, error={fact_error}"
+                        f"本地采集事实回写失败: {manage_ip}, type={storage_collection_type}, error={fact_error}"
                     )
 
             # 更新子采集任务状态
@@ -618,7 +626,7 @@ class DeviceCollectionService:
                 "device_name": device_info.get("name"),
                 "idc_name": device_info.get("idc__name"),
                 "task_status": "finished",
-                "collection_type": plan.get('collection_type'),
+                "collection_type": storage_collection_type,
                 "collection_method": collection_method,
                 "vendor": plan.get('summary_plan_vendor'),
                 "device_type": plan.get('summary_plan_device_type'),

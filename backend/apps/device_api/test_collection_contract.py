@@ -4,6 +4,8 @@ from apps.device_api.contract import (
     REQUIRED_STANDARD_COLLECTION_FIELDS,
     STANDARD_COLLECTION_CONTEXT_FIELDS,
     STANDARD_PLAN_COLLECTIONS,
+    build_plan_collection_name,
+    normalize_collection_type_for_storage,
 )
 from apps.device_api.models_api import inject_collection_context, inject_metadata
 from apps.device_api.platform_profiles import BUILTIN_PLATFORM_PROFILES
@@ -32,6 +34,13 @@ class DeviceApiCollectionContractTests(SimpleTestCase):
             ("summary_plan_id", "plan_id", "collection_type", "collection_method", "execute_time"),
         )
 
+    def test_contract_builds_plan_collection_name_from_standard_type(self):
+        self.assertEqual(build_plan_collection_name("arp"), "plan_arp")
+
+    def test_storage_aliases_normalize_to_standard_collection_type(self):
+        self.assertEqual(normalize_collection_type_for_storage("version"), "device_identity")
+        self.assertEqual(build_plan_collection_name("version"), "plan_device_identity")
+
     def test_inject_collection_context_backfills_required_fields(self):
         data = [{}]
 
@@ -48,6 +57,19 @@ class DeviceApiCollectionContractTests(SimpleTestCase):
         self.assertEqual(result[0]["collection_type"], "arp")
         self.assertEqual(result[0]["collection_method"], "")
         self.assertEqual(result[0]["execute_time"], "")
+
+    def test_inject_collection_context_normalizes_storage_collection_type(self):
+        data = [{}]
+
+        result = inject_collection_context(
+            data,
+            {
+                "plan_id": 12,
+                "collection_type": "version",
+            },
+        )
+
+        self.assertEqual(result[0]["collection_type"], "device_identity")
 
     def test_metadata_and_context_together_produce_frozen_contract_fields(self):
         data = [{}]

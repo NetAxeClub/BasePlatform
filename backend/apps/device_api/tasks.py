@@ -80,6 +80,10 @@ from datetime import datetime
 from celery import shared_task
 from django.core.cache import cache
 from django.db import connections
+from apps.device_api.contract import (
+    build_plan_collection_name,
+    normalize_collection_type_for_storage,
+)
 from apps.device_api.fields_mapping import field_mapping
 from netaxe.celery import AxeTask
 from apps.asset.models import NetworkDevice
@@ -552,47 +556,51 @@ def _process_and_save_result(
         }
         inject_metadata(processed_data, meta)
         collection_type = plan.get("collection_type")
+        storage_collection_type = normalize_collection_type_for_storage(
+            collection_type
+        )
         inject_collection_context(
             processed_data,
             {
                 "summary_plan_id": plan.get("summary_plan"),
                 "plan_id": plan.get("id"),
-                "collection_type": collection_type,
+                "collection_type": storage_collection_type,
                 "collection_method": collection_method,
                 "execute_time": execute_time,
             },
         )
 
         # ── 写入类型专属 MongoDB 集合 ─────────────────────────────────────
-        if isinstance(processed_data, list) and processed_data and collection_type:
-            collection_db = COLLECTION_TYPE_MONGO_MAP.get(collection_type)
+        if isinstance(processed_data, list) and processed_data and storage_collection_type:
+            collection_name = build_plan_collection_name(storage_collection_type)
+            collection_db = COLLECTION_TYPE_MONGO_MAP.get(storage_collection_type)
             if not collection_db:
                 from utils.db.mongo_ops import MongoOps
 
                 collection_db = MongoOps(
-                    db="Automation", coll=f"plan_{collection_type}"
+                    db="Automation", coll=collection_name
                 )
-                logger.warning(f"使用动态创建的 MongoDB 集合: plan_{collection_type}")
+                logger.warning(f"使用动态创建的 MongoDB 集合: {collection_name}")
             try:
                 collection_db.insert_many(processed_data)
                 logger.info(
-                    f"采集数据已保存: {manage_ip}, type={collection_type}, "
+                    f"采集数据已保存: {manage_ip}, type={storage_collection_type}, "
                     f"method={collection_method}, count={len(processed_data)}"
                 )
             except Exception as e:
                 logger.error(
-                    f"保存采集数据到 MongoDB 失败: {manage_ip}, type={collection_type}, {str(e)}",
+                    f"保存采集数据到 MongoDB 失败: {manage_ip}, type={storage_collection_type}, {str(e)}",
                     exc_info=True,
                 )
                 return
         else:
             logger.warning(
-                f"采集结果为空或无法保存: {manage_ip}, type={collection_type}, "
+                f"采集结果为空或无法保存: {manage_ip}, type={storage_collection_type}, "
                 f"method={collection_method}"
             )
 
         DeviceFactService.update_from_processed_data(
-            collection_type=collection_type,
+            collection_type=storage_collection_type,
             device_info=device_info,
             processed_data=processed_data,
         )
@@ -606,7 +614,7 @@ def _process_and_save_result(
             "device_name": device_info.get("name"),
             "idc_name": device_info.get("idc__name"),
             "task_status": "finished",
-            "collection_type": collection_type,
+            "collection_type": storage_collection_type,
             "collection_method": collection_method,
             "vendor": plan.get("summary_plan_vendor"),
             "device_type": plan.get("summary_plan_device_type"),
