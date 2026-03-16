@@ -123,6 +123,8 @@ TRACE_FILTER_ALIAS_MAP = {
     "idc_name": "idc_name",
     "trace_status": "trace_status",
     "trace_method": "trace_method",
+    "execute_time": "source_execute_time",
+    "source_execute_time": "source_execute_time",
 }
 
 
@@ -148,16 +150,38 @@ def query_address_traces(params, last=False, page_size=10, page_num=1):
         if not value:
             continue
         mapped_key = TRACE_FILTER_ALIAS_MAP.get(key, key)
-        if mapped_key in {"ip_address", "mac_address", "manage_ip", "device_name", "interface_name", "device_serial_num", "category_name", "idc_name", "trace_status", "trace_method"}:
+        if mapped_key in {
+            "ip_address",
+            "mac_address",
+            "manage_ip",
+            "device_name",
+            "interface_name",
+            "device_serial_num",
+            "category_name",
+            "idc_name",
+            "trace_status",
+            "trace_method",
+            "source_execute_time",
+        }:
             filters[mapped_key] = value
 
     queryset = AddressTraceSnapshot.objects.filter(**filters).order_by("-observed_at")
     if last:
-        latest_time = queryset.values_list("observed_at", flat=True).first()
-        if latest_time:
-            queryset = queryset.filter(observed_at=latest_time)
+        latest_execute_time = (
+            AddressTraceSnapshot.objects.filter(**filters)
+            .exclude(source_execute_time="")
+            .order_by("-source_execute_time", "-observed_at")
+            .values_list("source_execute_time", flat=True)
+            .first()
+        )
+        if latest_execute_time:
+            queryset = queryset.filter(source_execute_time=latest_execute_time)
         else:
-            queryset = queryset.none()
+            latest_time = queryset.values_list("observed_at", flat=True).first()
+            if latest_time:
+                queryset = queryset.filter(observed_at=latest_time)
+            else:
+                queryset = queryset.none()
 
     start = (page_num - 1) * page_size
     end = start + page_size
