@@ -120,7 +120,7 @@ class WebSocket(object):
                         status="info",
                     ),
                 )
-            func(*args, **kwargs)
+            result = func(*args, **kwargs)
             # print('Ending')
             if len(room_group_name) > 1:
                 send_ws_msg(
@@ -132,6 +132,7 @@ class WebSocket(object):
                         status="success",
                     ),
                 )
+            return result
 
         return wrapper
 
@@ -244,7 +245,7 @@ def sec_callback(flow_record_id):
     flow_record = AutoFlow.objects.filter(id=flow_record_id).values().first()
     if not flow_record:
         log.warning("sec_callback: flow_record %s 不存在", flow_record_id)
-        return
+        return {"ok": False, "skipped": False, "error": "flow_record 不存在"}
 
     try:
         request_kwargs = json.loads(flow_record["kwargs"] or "{}")
@@ -252,7 +253,7 @@ def sec_callback(flow_record_id):
         request_kwargs = {}
     callback_url = (request_kwargs.get("callback_url") or "").strip()
     if not callback_url:
-        return
+        return {"ok": True, "skipped": True, "error": ""}
 
     # 将 flow_record 转为可 JSON 序列化的 dict（datetime 等转为字符串）
     def _to_json_serializable(obj):
@@ -273,9 +274,10 @@ def sec_callback(flow_record_id):
             flow_record_id,
             response.status_code,
         )
+        return {"ok": True, "skipped": False, "error": ""}
     except requests.RequestException as e:
         log.error("sec_callback 失败: flow_id=%s, error=%s", flow_record_id, str(e))
-    return
+        return {"ok": False, "skipped": False, "error": str(e)}
 
 
 # 下发SSH执行动作
@@ -466,7 +468,7 @@ class SecFirewallMain:
         # 下发命令， 回退命令， 对应类方法
         cmds, back_off_cmds = args
         # 获取设备实例
-        _device = NetworkDevice.objects.get(id=kwargs["device_id"])
+        # _device = NetworkDevice.objects.get(id=kwargs["device_id"])
         # 验证通过  创建流程
         flow_record = AutoFlow.objects.create(**kwargs)
         # 批准执行
@@ -632,7 +634,7 @@ class FirewallMain(object):
         if isinstance(flag, bool):
             kwargs.pop("flag")
         # 获取设备实例
-        _device = NetworkDevice.objects.get(id=kwargs["device_id"])
+        # _device = NetworkDevice.objects.get(id=kwargs["device_id"])
         # 验证通过  创建流程
         flow_record = AutoFlow.objects.create(**kwargs)
         # 批准执行
@@ -733,8 +735,9 @@ class FirewallMain(object):
                 )
             send_msg_sec_manage(msg)
         # 回调
-        sec_callback(flow_record.id)
-        return
+        callback_result = sec_callback(flow_record.id)
+        flow_record.callback_result = callback_result
+        return flow_record
 
     # 山石地址对象操作V2
     def hillstone_address_detail(self, **kwargs):
@@ -7809,6 +7812,16 @@ def config_snat(self, **post_param):
 
 # 配置DNATV2
 @shared_task(base=AxeTask, once={"graceful": True}, bind=True)
+def refresh_hillstone_dnat_configuration(self, hostip):
+    """
+    异步刷新 Hillstone 全局 DNAT 表。
+    """
+    _FirewallMain = FirewallMain(hostip)
+    _FirewallMain.refresh_hillstone_configuration()
+    return True
+
+
+@shared_task(base=AxeTask, once={"graceful": True}, bind=True)
 @WebSocket()
 def config_dnat(self, **post_param):
     """
@@ -7843,7 +7856,7 @@ def config_dnat(self, **post_param):
             method="NETCONF",
             back_off_commands=json.dumps(back_off_cmds),
         )
-        _FirewallMain.flow_engine(*[cmds, back_off_cmds, class_method], **_data)
+        return _FirewallMain.flow_engine(*[cmds, back_off_cmds, class_method], **_data)
     elif post_param["vendor"] == "Huawei":
         class_method = "config_dnat"  # 类方法，山石直接下发命令，所以不需要，主要给华三华为对应对应类方法使用
         cmds, back_off_cmds = _FirewallMain.huawei_dnat_detail(**post_param)
@@ -7862,7 +7875,7 @@ def config_dnat(self, **post_param):
             class_method=class_method,
             back_off_commands=json.dumps(back_off_cmds),
         )
-        _FirewallMain.flow_engine(*[cmds, back_off_cmds, class_method], **_data)
+        return _FirewallMain.flow_engine(*[cmds, back_off_cmds, class_method], **_data)
     elif post_param["vendor"] == "Hillstone":
         # 首先判断具体操作
         """
@@ -7906,7 +7919,21 @@ def config_dnat(self, **post_param):
                 back_off_commands=json.dumps(back_off_cmds),
             )
             # print(_data)
-            _FirewallMain.flow_engine(*[cmds, back_off_cmds, class_method], **_data)
+            flow_record = _FirewallMain.flow_engine(
+                *[cmds, back_off_cmds, class_method], **_data
+            )
+            try:
+                refresh_hillstone_dnat_configuration.apply_async(
+                    kwargs={"hostip": post_param["hostip"]},
+                    queue=CELERY_QUEUE,
+                    retry=True,
+                )
+            except Exception:
+                log.error(
+                    "config_dnat (Hillstone) 异步刷新全局DNAT表触发失败:\n%s",
+                    traceback.format_exc(),
+                )
+            return flow_record
         except RuntimeError as e:
             log.error(
                 "config_dnat (Hillstone) 生成配置异常:\n%s", traceback.format_exc()
