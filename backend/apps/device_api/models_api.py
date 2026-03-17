@@ -74,6 +74,27 @@ COLLECTION_TYPE_MONGO_MAP = {
     "isis_neighbors": isis_neighbors_mongo,
 }
 
+PROCESSOR_MODULES = (
+    "apps.device_api.processors.h3c",
+    "apps.device_api.processors.huawei",
+    "apps.device_api.processors.ruijie",
+    "apps.device_api.processors.cisco",
+    "apps.device_api.processors.hillstone",
+    "apps.device_api.processors.legacy_bridge",
+)
+_processors_bootstrapped = False
+
+
+def ensure_processors_bootstrapped():
+    """确保 processors 模块完成导入注册，避免未导入导致注册表为空。"""
+    global _processors_bootstrapped
+    if _processors_bootstrapped:
+        return
+
+    for module_path in PROCESSOR_MODULES:
+        importlib.import_module(module_path)
+    _processors_bootstrapped = True
+
 
 def save_local_collection_result(
     plan,
@@ -801,6 +822,7 @@ def resolve_raw_data(plan, collection_result, collection_method):
             normalize_processed_data,
         )
 
+        ensure_processors_bootstrapped()
         processor = ProcessorRegistry.get_processor(
             vendor=vendor_alias,
             device_type=device_type,

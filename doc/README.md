@@ -30,5 +30,5 @@
 
 - `device_api` 模块说明：
   - [README](../backend/apps/device_api/doc/README.md)
-  - [后续任务](../backend/apps/device_api/doc/后续任务.md)
-  - [采集主链替代实施与验收清单](../backend/apps/device_api/doc/采集主链替代实施与验收清单.md)
+  - [当前能力](../backend/apps/device_api/doc/当前能力.md)
+  - [遗留任务](../backend/apps/device_api/doc/遗留任务.md)

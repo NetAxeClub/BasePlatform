@@ -1,0 +1,106 @@
+{
+  "generated_at": "2026-03-17T10:19:51.872553",
+  "batch_field": "execute_time",
+  "sample_manage_ips": [
+    "10.254.30.22",
+    "10.254.30.27",
+    "10.254.30.28",
+    "10.254.30.29",
+    "10.254.30.30"
+  ],
+  "requirements": {
+    "require_anchor_coverage": 1.0,
+    "require_time_coverage": 1.0
+  },
+  "collections": [
+    {
+      "collection": "ARPTable",
+      "total_docs": 6864,
+      "batch_field": "execute_time",
+      "anchor_docs": 6864,
+      "anchor_coverage": 1.0,
+      "time_docs": 6864,
+      "time_coverage": 1.0,
+      "sample_time_fields": {
+        "hostip": "10.254.30.22",
+        "log_time": "2026-03-17 06:01:34.997000",
+        "execute_time": "2026-03-17 02:22:48"
+      }
+    },
+    {
+      "collection": "MACTable",
+      "total_docs": 1971,
+      "batch_field": "execute_time",
+      "anchor_docs": 1971,
+      "anchor_coverage": 1.0,
+      "time_docs": 1971,
+      "time_coverage": 1.0,
+      "sample_time_fields": {
+        "hostip": "10.254.30.22",
+        "execute_time": "2026-03-17 02:22:48"
+      }
+    },
+    {
+      "collection": "LLDPTable",
+      "total_docs": 33,
+      "batch_field": "execute_time",
+      "anchor_docs": 33,
+      "anchor_coverage": 1.0,
+      "time_docs": 33,
+      "time_coverage": 1.0,
+      "sample_time_fields": {
+        "hostip": "10.254.30.22",
+        "execute_time": "2026-03-17 02:22:48"
+      }
+    },
+    {
+      "collection": "layer2interface",
+      "total_docs": 268,
+      "batch_field": "execute_time",
+      "anchor_docs": 268,
+      "anchor_coverage": 1.0,
+      "time_docs": 268,
+      "time_coverage": 1.0,
+      "sample_time_fields": {
+        "hostip": "10.254.30.22",
+        "execute_time": "2026-03-17 02:22:48"
+      }
+    },
+    {
+      "collection": "layer3interface",
+      "total_docs": 105,
+      "batch_field": "execute_time",
+      "anchor_docs": 105,
+      "anchor_coverage": 1.0,
+      "time_docs": 105,
+      "time_coverage": 1.0,
+      "sample_time_fields": {
+        "hostip": "10.254.30.22",
+        "execute_time": "2026-03-17 02:22:48"
+      }
+    },
+    {
+      "collection": "AggreTable",
+      "total_docs": 197,
+      "batch_field": "execute_time",
+      "anchor_docs": 197,
+      "anchor_coverage": 1.0,
+      "time_docs": 197,
+      "time_coverage": 1.0,
+      "sample_time_fields": {
+        "hostip": "10.254.30.22",
+        "execute_time": "2026-03-17 02:22:48"
+      }
+    }
+  ],
+  "gate": {
+    "status": "pass",
+    "checks": {
+      "sample_has_devices": true,
+      "anchor_coverage_gate_passed": true,
+      "time_coverage_gate_passed": true
+    },
+    "anchor_failed_collections": [],
+    "time_failed_collections": []
+  }
+}

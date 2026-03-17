@@ -1,0 +1,137 @@
+{
+  "generated_at": "2026-03-17T09:27:47.949492",
+  "execute_time": "2026-03-17 02:22:48",
+  "sample_manage_ips": [
+    "10.254.30.30",
+    "10.254.30.29",
+    "10.254.30.28",
+    "10.254.30.27",
+    "10.254.30.22"
+  ],
+  "collections": [
+    {
+      "collection": "ARPTable",
+      "total_docs": 6864,
+      "strict_execute_time_count": 0,
+      "window_count": 0,
+      "time_field_non_null": {
+        "execute_time": 0,
+        "log_time": 6864,
+        "create_time": 0,
+        "collect_time": 0,
+        "createTime": 0,
+        "update_time": 0
+      },
+      "sample_time_fields": {
+        "hostip": "10.254.30.22",
+        "log_time": "2026-03-17 06:01:34.997000"
+      }
+    },
+    {
+      "collection": "MACTable",
+      "total_docs": 1971,
+      "strict_execute_time_count": 0,
+      "window_count": 0,
+      "time_field_non_null": {
+        "execute_time": 0,
+        "log_time": 63,
+        "create_time": 0,
+        "collect_time": 0,
+        "createTime": 0,
+        "update_time": 0
+      },
+      "sample_time_fields": {
+        "hostip": "10.254.30.22"
+      }
+    },
+    {
+      "collection": "LLDPTable",
+      "total_docs": 33,
+      "strict_execute_time_count": 0,
+      "window_count": 0,
+      "time_field_non_null": {
+        "execute_time": 0,
+        "log_time": 0,
+        "create_time": 0,
+        "collect_time": 0,
+        "createTime": 0,
+        "update_time": 0
+      },
+      "sample_time_fields": {
+        "hostip": "10.254.30.22"
+      }
+    },
+    {
+      "collection": "layer2interface",
+      "total_docs": 268,
+      "strict_execute_time_count": 0,
+      "window_count": 0,
+      "time_field_non_null": {
+        "execute_time": 0,
+        "log_time": 0,
+        "create_time": 0,
+        "collect_time": 0,
+        "createTime": 0,
+        "update_time": 0
+      },
+      "sample_time_fields": {
+        "hostip": "10.254.30.22"
+      }
+    },
+    {
+      "collection": "layer3interface",
+      "total_docs": 105,
+      "strict_execute_time_count": 0,
+      "window_count": 0,
+      "time_field_non_null": {
+        "execute_time": 0,
+        "log_time": 0,
+        "create_time": 0,
+        "collect_time": 0,
+        "createTime": 0,
+        "update_time": 0
+      },
+      "sample_time_fields": {
+        "hostip": "10.254.30.22"
+      }
+    },
+    {
+      "collection": "AggreTable",
+      "total_docs": 197,
+      "strict_execute_time_count": 0,
+      "window_count": 0,
+      "time_field_non_null": {
+        "execute_time": 0,
+        "log_time": 0,
+        "create_time": 0,
+        "collect_time": 0,
+        "createTime": 0,
+        "update_time": 0
+      },
+      "sample_time_fields": {
+        "hostip": "10.254.30.22"
+      }
+    }
+  ],
+  "conclusion": {
+    "execute_time_missing_collections": [
+      "ARPTable",
+      "MACTable",
+      "LLDPTable",
+      "layer2interface",
+      "layer3interface",
+      "AggreTable"
+    ],
+    "only_log_time_collections": [
+      "ARPTable",
+      "MACTable"
+    ],
+    "no_time_fields_collections": [
+      "LLDPTable",
+      "layer2interface",
+      "layer3interface",
+      "AggreTable"
+    ],
+    "strict_zero_root_cause": "legacy collections do not persist execute_time batch anchor; some collections also miss any timestamp field"
+  }
+}

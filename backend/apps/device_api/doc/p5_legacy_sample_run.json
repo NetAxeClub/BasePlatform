@@ -1,0 +1,42 @@
+{
+  "generated_at": "2026-03-17T02:55:02.731428",
+  "sample_manage_ips": [
+    "10.254.30.30",
+    "10.254.30.29",
+    "10.254.30.28",
+    "10.254.30.27",
+    "10.254.30.22"
+  ],
+  "before": {
+    "ARPTable": 6864,
+    "MACTable": 1982,
+    "LLDPTable": 33,
+    "layer2interface": 268,
+    "layer3interface": 105,
+    "AggreTable": 197
+  },
+  "after": {
+    "ARPTable": 6864,
+    "MACTable": 1980,
+    "LLDPTable": 33,
+    "layer2interface": 268,
+    "layer3interface": 105,
+    "AggreTable": 197
+  },
+  "delta": {
+    "ARPTable": 0,
+    "MACTable": -2,
+    "LLDPTable": 0,
+    "layer2interface": 0,
+    "layer3interface": 0,
+    "AggreTable": 0
+  },
+  "executed": [
+    "10.254.30.30",
+    "10.254.30.29",
+    "10.254.30.28",
+    "10.254.30.27",
+    "10.254.30.22"
+  ],
+  "failed": []
+}

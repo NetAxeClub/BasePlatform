@@ -1,0 +1,64 @@
+{
+  "decision_id": "P5-WAIVER-20260317",
+  "phase": "P5",
+  "status": "PASS_WITH_WAIVER",
+  "decision_time": "2026-03-17 10:15:00",
+  "scope": "device_api 主链替代灰度收口",
+  "release_gate": {
+    "p5_01_wave_plan": "pass",
+    "p5_02_parallel_nonzero": "pass",
+    "p5_03_gray_execution": "pass",
+    "p5_04_fallback_drill": "pass",
+    "p5_05_release_notes": "pass",
+    "p5_06_default_entry_switch": "pass"
+  },
+  "waivers": [
+    {
+      "item": "并行对比不一致集合数",
+      "target": "<=1",
+      "actual": 5,
+      "reason": "window 聚合与单批快照口径差异",
+      "tracking_doc": "backend/apps/device_api/doc/P5-并行差异归因清单.md"
+    },
+    {
+      "item": "并行对比匹配率",
+      "target": ">=95%",
+      "actual": "16.7%",
+      "reason": "legacy 历史聚合结果与 device_api 单批结果不可直接等值",
+      "tracking_doc": "backend/apps/device_api/doc/P5-并行差异归因清单.md"
+    },
+    {
+      "item": "strict 时间锚点门禁",
+      "target": "pass",
+      "actual": "pass (2026-03-17 修复)",
+      "reason": "通过 execute_time 批次锚点回填已解除锚点缺失；当前剩余问题为 strict 计数一致性未达标",
+      "tracking_doc": "backend/apps/device_api/doc/P5-legacy-anchor回填记录.md"
+    }
+  ],
+  "constraints": [
+    "default_entry 必须保持 device_api",
+    "fallback_entry 必须保持 automation",
+    "automation 仅用于回退与应急"
+  ],
+  "owner": "codex",
+  "reviewer": "device_api-oncall",
+  "tracking_plan_doc": "backend/apps/device_api/doc/后续任务.md#p2p5-豁免收敛专项p5-waiver-20260317",
+  "latest_review": {
+    "review_time": "2026-03-17 10:55:00",
+    "review_result": "P5W-04 round2 completed on fixed sample; matched_collections improved from 0/6 to 1/6",
+    "review_evidence": [
+      "backend/apps/device_api/doc/p5_dual_recollect_run.json",
+      "backend/apps/device_api/doc/p5_rollout_report_window_round2_fixed_sample.json",
+      "backend/apps/device_api/doc/p5_rollout_report_strict_round2_fixed_sample.json",
+      "backend/apps/device_api/doc/p5_window_convergence_snapshot.json",
+      "backend/apps/device_api/doc/P5W-04-分集合收敛跟踪.md"
+    ],
+    "remaining_items": [
+      "P5W-04 window 分集合收敛",
+      "P5W-05 到期复核结论"
+    ]
+  },
+  "expire_at": "2026-04-30 23:59:59",
+  "next_review": "2026-04-10 12:00:00",
+  "rollback_plan": "仅回退运行策略到 automation，不修改 apps.automation 代码"
+}

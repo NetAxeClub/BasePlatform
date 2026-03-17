@@ -65,12 +65,22 @@ class Config:
         self.nacos_password = data['nacos_password']
         self.local_dev = data['local_dev']
         self.api_key = data['api_key']
+        self.bypass_nacos = False
         for k, v in self.data.items():
             log.info("[Config set] key:%s, value:%s" % (k, v))
             setattr(self, k, v)
-        # if not self.local_dev:
-        self.client = nacos.NacosClient(server_addresses=f"{self.nacos}:{self.nacos_port}", username="nacos",
-                                        password=self.nacos_password, log_level="INFO")
+        bypass_flag = str(os.getenv("BYPASS_NACOS", "")).strip().lower() in {"1", "true", "yes", "on"}
+        self.bypass_nacos = bool(self.local_dev) or bypass_flag
+        if self.bypass_nacos:
+            self.client = None
+            log.warning("confload: bypass nacos enabled (local_dev or BYPASS_NACOS)")
+        else:
+            self.client = nacos.NacosClient(
+                server_addresses=f"{self.nacos}:{self.nacos_port}",
+                username="nacos",
+                password=self.nacos_password,
+                log_level="INFO",
+            )
 
     # 单例模式
     def __new__(cls):
@@ -105,6 +115,9 @@ class Config:
         return str(root_path)
 
     def service_dicovery(self, serviceName, groupName='default', namespaceId="public"):
+        if not self.client:
+            log.warning("confload: service_dicovery skipped because nacos client is disabled")
+            return {}
         res = self.client.list_naming_instance(service_name=serviceName, group_name=groupName, namespace_id=namespaceId)
         return res
 

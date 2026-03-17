@@ -920,7 +920,7 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
                         available_methods.append('restconf')
 
                     if enabled_methods['telemetry']:
-                        available_methods.append('telemetry')
+                        error_parts.append("Telemetry 仍在延期范围（未纳入默认主链）")
                 elif enabled_methods['snmp'] or enabled_methods['restconf'] or enabled_methods['telemetry']:
                     error_parts.append("南向驱动验证当前仅支持NETMIKO/NETCONF")
 
@@ -1264,7 +1264,7 @@ class CollectionResultViewSet(CustomViewBase):
             collection_db = MongoOps(db='Automation', coll=f'plan_{current_type}')
             records = list(
                 collection_db.coll.find({'hostip': manage_ip}, {'_id': 0})
-                .sort('execute_time', -1)
+                .sort([('execute_time', -1), ('log_time', -1)])
                 .limit(1)
             )
             if records:
@@ -1379,6 +1379,115 @@ class CollectionResultViewSet(CustomViewBase):
                 'code': 500,
                 'message': f"获取失败: {str(e)}",
                 'results': None
+            })
+
+    @action(detail=False, methods=['get'])
+    def batch_gate_metrics(self, request):
+        """按 execute_time 汇总主链门禁指标，供巡检与灰度放量判断。"""
+        try:
+            execute_time = request.GET.get('execute_time', '').strip()
+            vendor = request.GET.get('vendor', '').strip()
+            manage_ip = request.GET.get('manage_ip', '').strip()
+            summary_plan_id = request.GET.get('summary_plan_id', '').strip()
+
+            base_query = {}
+            if vendor:
+                base_query['vendor'] = vendor
+            if manage_ip:
+                base_query['device_ip'] = manage_ip
+            if summary_plan_id:
+                base_query['summary_plan_id'] = int(summary_plan_id)
+
+            if not execute_time:
+                latest_cursor = COLLECTION_PLAN.coll.find(
+                    base_query,
+                    {'_id': 0, 'execute_time': 1},
+                ).sort([('execute_time', -1), ('log_time', -1)]).limit(1)
+                latest_records = list(latest_cursor)
+                if latest_records and latest_records[0].get('execute_time'):
+                    execute_time = latest_records[0]['execute_time']
+
+            if not execute_time:
+                return JsonResponse({
+                    'code': 200,
+                    'message': '未找到可用批次',
+                    'data': {
+                        'execute_time': '',
+                        'parent_metrics': {
+                            'total': 0,
+                            'success': 0,
+                            'partial_success': 0,
+                            'failed': 0,
+                            'skipped': 0,
+                            'success_rate': 0.0,
+                        },
+                        'protocol_failures': {},
+                        'skip_reasons': {},
+                    },
+                })
+
+            parent_query = {**base_query, 'execute_time': execute_time}
+            parent_docs = list(
+                COLLECTION_PLAN.coll.find(
+                    parent_query,
+                    {
+                        '_id': 0,
+                        'task_status': 1,
+                        'failed_details': 1,
+                        'skipped_details': 1,
+                    },
+                )
+            )
+
+            metrics = {
+                'total': len(parent_docs),
+                'success': 0,
+                'partial_success': 0,
+                'failed': 0,
+                'skipped': 0,
+                'success_rate': 0.0,
+            }
+            protocol_failures = {}
+            skip_reasons = {}
+
+            for doc in parent_docs:
+                task_status = str(doc.get('task_status') or '').strip().lower()
+                if task_status in metrics:
+                    metrics[task_status] += 1
+
+                for detail in doc.get('failed_details', []) or []:
+                    protocol = detail.get('collection_method') or 'unknown'
+                    protocol_failures[protocol] = protocol_failures.get(protocol, 0) + 1
+                for detail in doc.get('skipped_details', []) or []:
+                    reason = detail.get('reason') or 'unknown'
+                    skip_reasons[reason] = skip_reasons.get(reason, 0) + 1
+
+            if metrics['total'] > 0:
+                metrics['success_rate'] = round(
+                    (metrics['success'] / metrics['total']) * 100, 2
+                )
+
+            return JsonResponse({
+                'code': 200,
+                'message': '获取成功',
+                'data': {
+                    'execute_time': execute_time,
+                    'filters': {
+                        'vendor': vendor,
+                        'manage_ip': manage_ip,
+                        'summary_plan_id': int(summary_plan_id) if summary_plan_id else None,
+                    },
+                    'parent_metrics': metrics,
+                    'protocol_failures': protocol_failures,
+                    'skip_reasons': skip_reasons,
+                },
+            })
+        except Exception as e:
+            logger.error(f"查询批次门禁指标失败: {str(e)}", exc_info=True)
+            return JsonResponse({
+                'code': 500,
+                'message': f'查询失败: {str(e)}',
+                'data': None,
             })
 
     @action(detail=False, methods=['get'])

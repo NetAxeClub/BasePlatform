@@ -1,0 +1,268 @@
+{
+  "generated_at": "2026-03-17T03:07:48.932550",
+  "execute_time": "2026-03-17 02:22:48",
+  "legacy_time_scope": {
+    "enabled": true,
+    "source": "execute_time_window",
+    "start": "2026-03-16 23:22:48",
+    "end": "2026-03-17 05:22:48",
+    "window_minutes": 180,
+    "legacy_time_fields": [
+      "execute_time",
+      "log_time",
+      "create_time",
+      "collect_time",
+      "createTime",
+      "update_time"
+    ]
+  },
+  "sample_manage_ips": [
+    "10.254.30.30",
+    "10.254.30.29",
+    "10.254.30.28",
+    "10.254.30.27",
+    "10.254.30.22"
+  ],
+  "collections": [
+    {
+      "collection_type": "arp",
+      "device_api_collection": "plan_arp",
+      "legacy_collection": "ARPTable",
+      "device_api_total": 2087,
+      "legacy_total": 6864,
+      "gap_total": -4777,
+      "by_ip": [
+        {
+          "manage_ip": "10.254.30.30",
+          "device_api_count": 671,
+          "legacy_count": 1490,
+          "gap": -819
+        },
+        {
+          "manage_ip": "10.254.30.29",
+          "device_api_count": 671,
+          "legacy_count": 1490,
+          "gap": -819
+        },
+        {
+          "manage_ip": "10.254.30.28",
+          "device_api_count": 745,
+          "legacy_count": 1638,
+          "gap": -893
+        },
+        {
+          "manage_ip": "10.254.30.27",
+          "device_api_count": 0,
+          "legacy_count": 1638,
+          "gap": -1638
+        },
+        {
+          "manage_ip": "10.254.30.22",
+          "device_api_count": 0,
+          "legacy_count": 608,
+          "gap": -608
+        }
+      ]
+    },
+    {
+      "collection_type": "mac",
+      "device_api_collection": "plan_mac",
+      "legacy_collection": "MACTable",
+      "device_api_total": 49,
+      "legacy_total": 68,
+      "gap_total": -19,
+      "by_ip": [
+        {
+          "manage_ip": "10.254.30.30",
+          "device_api_count": 15,
+          "legacy_count": 16,
+          "gap": -1
+        },
+        {
+          "manage_ip": "10.254.30.29",
+          "device_api_count": 20,
+          "legacy_count": 19,
+          "gap": 1
+        },
+        {
+          "manage_ip": "10.254.30.28",
+          "device_api_count": 14,
+          "legacy_count": 15,
+          "gap": -1
+        },
+        {
+          "manage_ip": "10.254.30.27",
+          "device_api_count": 0,
+          "legacy_count": 18,
+          "gap": -18
+        },
+        {
+          "manage_ip": "10.254.30.22",
+          "device_api_count": 0,
+          "legacy_count": 0,
+          "gap": 0
+        }
+      ]
+    },
+    {
+      "collection_type": "lldp",
+      "device_api_collection": "plan_lldp",
+      "legacy_collection": "LLDPTable",
+      "device_api_total": 22,
+      "legacy_total": 0,
+      "gap_total": 22,
+      "by_ip": [
+        {
+          "manage_ip": "10.254.30.30",
+          "device_api_count": 5,
+          "legacy_count": 0,
+          "gap": 5
+        },
+        {
+          "manage_ip": "10.254.30.29",
+          "device_api_count": 5,
+          "legacy_count": 0,
+          "gap": 5
+        },
+        {
+          "manage_ip": "10.254.30.28",
+          "device_api_count": 5,
+          "legacy_count": 0,
+          "gap": 5
+        },
+        {
+          "manage_ip": "10.254.30.27",
+          "device_api_count": 0,
+          "legacy_count": 0,
+          "gap": 0
+        },
+        {
+          "manage_ip": "10.254.30.22",
+          "device_api_count": 7,
+          "legacy_count": 0,
+          "gap": 7
+        }
+      ]
+    },
+    {
+      "collection_type": "interface_brief",
+      "device_api_collection": "plan_interface_brief",
+      "legacy_collection": "layer2interface",
+      "device_api_total": 202,
+      "legacy_total": 0,
+      "gap_total": 202,
+      "by_ip": [
+        {
+          "manage_ip": "10.254.30.30",
+          "device_api_count": 56,
+          "legacy_count": 0,
+          "gap": 56
+        },
+        {
+          "manage_ip": "10.254.30.29",
+          "device_api_count": 56,
+          "legacy_count": 0,
+          "gap": 56
+        },
+        {
+          "manage_ip": "10.254.30.28",
+          "device_api_count": 56,
+          "legacy_count": 0,
+          "gap": 56
+        },
+        {
+          "manage_ip": "10.254.30.27",
+          "device_api_count": 0,
+          "legacy_count": 0,
+          "gap": 0
+        },
+        {
+          "manage_ip": "10.254.30.22",
+          "device_api_count": 34,
+          "legacy_count": 0,
+          "gap": 34
+        }
+      ]
+    },
+    {
+      "collection_type": "ip_interface",
+      "device_api_collection": "plan_ip_interface",
+      "legacy_collection": "layer3interface",
+      "device_api_total": 81,
+      "legacy_total": 0,
+      "gap_total": 81,
+      "by_ip": [
+        {
+          "manage_ip": "10.254.30.30",
+          "device_api_count": 24,
+          "legacy_count": 0,
+          "gap": 24
+        },
+        {
+          "manage_ip": "10.254.30.29",
+          "device_api_count": 24,
+          "legacy_count": 0,
+          "gap": 24
+        },
+        {
+          "manage_ip": "10.254.30.28",
+          "device_api_count": 24,
+          "legacy_count": 0,
+          "gap": 24
+        },
+        {
+          "manage_ip": "10.254.30.27",
+          "device_api_count": 0,
+          "legacy_count": 0,
+          "gap": 0
+        },
+        {
+          "manage_ip": "10.254.30.22",
+          "device_api_count": 9,
+          "legacy_count": 0,
+          "gap": 9
+        }
+      ]
+    },
+    {
+      "collection_type": "aggre_port",
+      "device_api_collection": "plan_aggre_port",
+      "legacy_collection": "AggreTable",
+      "device_api_total": 0,
+      "legacy_total": 0,
+      "gap_total": 0,
+      "by_ip": [
+        {
+          "manage_ip": "10.254.30.30",
+          "device_api_count": 0,
+          "legacy_count": 0,
+          "gap": 0
+        },
+        {
+          "manage_ip": "10.254.30.29",
+          "device_api_count": 0,
+          "legacy_count": 0,
+          "gap": 0
+        },
+        {
+          "manage_ip": "10.254.30.28",
+          "device_api_count": 0,
+          "legacy_count": 0,
+          "gap": 0
+        },
+        {
+          "manage_ip": "10.254.30.27",
+          "device_api_count": 0,
+          "legacy_count": 0,
+          "gap": 0
+        },
+        {
+          "manage_ip": "10.254.30.22",
+          "device_api_count": 0,
+          "legacy_count": 0,
+          "gap": 0
+        }
+      ]
+    }
+  ]
+}

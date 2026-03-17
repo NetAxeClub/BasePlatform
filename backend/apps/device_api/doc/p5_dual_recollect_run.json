@@ -1,0 +1,61 @@
+{
+  "generated_at": "2026-03-17T10:46:21.771721",
+  "sample_manage_ips": [
+    "10.254.30.30",
+    "10.254.30.29",
+    "10.254.30.28",
+    "10.254.30.27",
+    "10.254.30.22"
+  ],
+  "device_api": {
+    "execute_time": "2026-03-17 10:46:21",
+    "executed": [
+      {
+        "manage_ip": "10.254.30.22",
+        "task_status": "success",
+        "successful_sub_plans": 14,
+        "failed_sub_plans": 0,
+        "skipped_sub_plans": 0
+      },
+      {
+        "manage_ip": "10.254.30.27",
+        "task_status": "success",
+        "successful_sub_plans": 14,
+        "failed_sub_plans": 0,
+        "skipped_sub_plans": 0
+      },
+      {
+        "manage_ip": "10.254.30.28",
+        "task_status": "success",
+        "successful_sub_plans": 14,
+        "failed_sub_plans": 0,
+        "skipped_sub_plans": 0
+      },
+      {
+        "manage_ip": "10.254.30.29",
+        "task_status": "success",
+        "successful_sub_plans": 14,
+        "failed_sub_plans": 0,
+        "skipped_sub_plans": 0
+      },
+      {
+        "manage_ip": "10.254.30.30",
+        "task_status": "success",
+        "successful_sub_plans": 14,
+        "failed_sub_plans": 0,
+        "skipped_sub_plans": 0
+      }
+    ],
+    "failed": []
+  },
+  "legacy": {
+    "executed": [
+      "10.254.30.22",
+      "10.254.30.27",
+      "10.254.30.28",
+      "10.254.30.29",
+      "10.254.30.30"
+    ],
+    "failed": []
+  }
+}

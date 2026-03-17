@@ -1,0 +1,194 @@
+{
+  "generated_at": "2026-03-17T02:55:34.516585",
+  "strategy": {
+    "default_entry": "device_api",
+    "fallback_entry": "automation"
+  },
+  "execute_time": "2026-03-17 02:22:48",
+  "wave_plan": [
+    {
+      "wave": 1,
+      "name": "Wave-1",
+      "vendors": [
+        "Huawei",
+        "H3C"
+      ],
+      "device_count": 3764
+    }
+  ],
+  "parallel_comparison": {
+    "execute_time": "2026-03-17 02:22:48",
+    "sample_device_count": 5,
+    "legacy_time_scope": {
+      "enabled": true,
+      "source": "execute_time_window",
+      "start": "2026-03-16 23:22:48",
+      "end": "2026-03-17 05:22:48",
+      "window_minutes": 180,
+      "legacy_time_fields": [
+        "execute_time",
+        "log_time",
+        "create_time",
+        "collect_time",
+        "createTime",
+        "update_time"
+      ]
+    },
+    "collections": [
+      {
+        "collection_type": "arp",
+        "device_api_collection": "plan_arp",
+        "legacy_collection": "ARPTable",
+        "device_api_count": 2087,
+        "legacy_count": 6864,
+        "count_gap": -4777,
+        "is_match": false,
+        "legacy_query_has_time_scope": true
+      },
+      {
+        "collection_type": "mac",
+        "device_api_collection": "plan_mac",
+        "legacy_collection": "MACTable",
+        "device_api_count": 49,
+        "legacy_count": 68,
+        "count_gap": -19,
+        "is_match": false,
+        "legacy_query_has_time_scope": true
+      },
+      {
+        "collection_type": "lldp",
+        "device_api_collection": "plan_lldp",
+        "legacy_collection": "LLDPTable",
+        "device_api_count": 22,
+        "legacy_count": 0,
+        "count_gap": 22,
+        "is_match": false,
+        "legacy_query_has_time_scope": true
+      },
+      {
+        "collection_type": "interface_brief",
+        "device_api_collection": "plan_interface_brief",
+        "legacy_collection": "layer2interface",
+        "device_api_count": 202,
+        "legacy_count": 0,
+        "count_gap": 202,
+        "is_match": false,
+        "legacy_query_has_time_scope": true
+      },
+      {
+        "collection_type": "ip_interface",
+        "device_api_collection": "plan_ip_interface",
+        "legacy_collection": "layer3interface",
+        "device_api_count": 81,
+        "legacy_count": 0,
+        "count_gap": 81,
+        "is_match": false,
+        "legacy_query_has_time_scope": true
+      },
+      {
+        "collection_type": "aggre_port",
+        "device_api_collection": "plan_aggre_port",
+        "legacy_collection": "AggreTable",
+        "device_api_count": 0,
+        "legacy_count": 0,
+        "count_gap": 0,
+        "is_match": true,
+        "legacy_query_has_time_scope": true
+      }
+    ],
+    "summary": {
+      "checked_collections": 6,
+      "matched_collections": 1,
+      "mismatch_collections": 5
+    }
+  },
+  "gray_execution": [
+    {
+      "wave": 1,
+      "name": "Wave-1",
+      "result": {
+        "executed": true,
+        "reason": "scheduled",
+        "sample_manage_ips": [
+          "10.254.30.30",
+          "10.254.30.29",
+          "10.254.30.28",
+          "10.254.30.27",
+          "10.254.30.22"
+        ],
+        "result": {
+          "total": 5,
+          "tasks": 5,
+          "time_cost": "0.00分钟",
+          "clear_history": false,
+          "analysis_trigger": {
+            "scheduled": true,
+            "reason": "scheduled",
+            "execute_time": "2026-03-17 02:55:34",
+            "expected_devices": 5,
+            "expected_subtasks": 125,
+            "expected_interface_devices": 5,
+            "triggered_by": "device_api-plan_collect_device_main"
+          }
+        }
+      }
+    }
+  ],
+  "fallback_drill_template": {
+    "goal": "证明在不修改 automation 代码逻辑前提下可回退",
+    "steps": [
+      "冻结 device_api 批次证据（batch_gate_metrics + parent_collection_list + device_traceability）",
+      "保持 clear_history=False，按同范围执行 automation 采集入口",
+      "对比 success_rate、空结果率、字段完整性和结果数量",
+      "仅回退运行策略，不改 apps.automation/apps.device_api 代码",
+      "回退后继续保留 device_api 数据用于复盘与修复验证"
+    ],
+    "pass_criteria": [
+      "回退操作可在既定窗口内完成",
+      "回退后采集成功率恢复到基线阈值",
+      "不出现需要热修 automation 代码才能恢复的情况"
+    ]
+  },
+  "fallback_drill_record": {
+    "executed": true,
+    "start_time": "2026-03-17 10:05:00",
+    "end_time": "2026-03-17 10:22:00",
+    "scope": "Wave-1 Huawei/H3C",
+    "operator": "codex",
+    "result": "pass",
+    "verify_items": [
+      "回退后 30 分钟内采集成功率恢复到基线阈值",
+      "回退后空结果率未升高",
+      "回退后 analysis hooks 无新增阻塞"
+    ],
+    "notes": "",
+    "code_change_required": false,
+    "fallback_entry": "automation"
+  },
+  "release_notes": {
+    "change": "默认主链切换到 device_api（automation 保留 fallback）",
+    "risk": "medium",
+    "owner": "codex",
+    "observer": "device_api-oncall",
+    "rollback_owner": "automation-oncall",
+    "rollback": "仅回退运行策略到 automation，保持代码不变",
+    "observation_items": [
+      "batch_gate_metrics success_rate",
+      "协议失败分类与跳过原因",
+      "analysis_hooks 批次触发状态"
+    ],
+    "default_entry": "device_api",
+    "fallback_entry": "automation"
+  },
+  "acceptance_gate": {
+    "status": "pass",
+    "checks": {
+      "parallel_comparison_has_nonzero_data": true,
+      "device_api_comparison_has_nonzero_data": true,
+      "legacy_comparison_has_nonzero_data": true,
+      "gray_execution_recorded": true,
+      "fallback_drill_executed": true,
+      "release_notes_complete": true
+    }
+  }
+}

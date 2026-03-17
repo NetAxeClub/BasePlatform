@@ -6,9 +6,8 @@
 """
 import logging
 import os
-from contextlib import contextmanager
+import time
 from typing import Optional, Dict, Any, List
-from netmiko import ConnectHandler
 from ncclient import manager
 import requests
 from requests.auth import HTTPBasicAuth
@@ -23,7 +22,7 @@ from utils.connect_layer.NETCONF.netconf_connect import (
     HuaweiyangNetconfConnect,
     CiscoNetconfConnect,
 )
-from utils.connect_layer.snmp.snmp_test import probe_snmp, snmp_get_oid
+from utils.connect_layer.snmp.snmp_test import snmp_get_oid
 from apps.device_api.common import device_type_map
 
 logger = logging.getLogger(__name__)
@@ -31,6 +30,12 @@ logger = logging.getLogger(__name__)
 
 class DeviceConnectionManager:
     """设备连接管理器，确保单设备采集时只建立一次连接"""
+    DEFAULT_NETMIKO_TIMEOUT = 5
+    DEFAULT_NETMIKO_SESSION_TIMEOUT = 20
+    DEFAULT_NETCONF_TIMEOUT = 30
+    DEFAULT_RESTCONF_TIMEOUT = 10
+    DEFAULT_PROTOCOL_RETRIES = 1
+    DEFAULT_RETRY_BACKOFF_SECONDS = 0.5
 
     def __init__(self, device_ip: str, device_info: Dict[str, Any]):
         """
@@ -47,6 +52,59 @@ class DeviceConnectionManager:
         self._snmp_session = None
         self._restconf_session = None
         self._telemetry_channel = None
+
+    def _read_connection_policy(self) -> Dict[str, Any]:
+        policy = self.device_info.get("connection_policy", {})
+        if not isinstance(policy, dict):
+            return {}
+        return policy
+
+    def _get_retry_times(self, protocol_name: str, default: int = DEFAULT_PROTOCOL_RETRIES) -> int:
+        policy = self._read_connection_policy()
+        global_retry = policy.get("retry_times")
+        protocol_retry = policy.get(f"{protocol_name}_retry_times")
+        value = protocol_retry if protocol_retry is not None else global_retry
+        if value is None:
+            return default
+        try:
+            return max(0, int(value))
+        except (TypeError, ValueError):
+            return default
+
+    def _get_timeout_seconds(self, protocol_name: str, default: int) -> int:
+        policy = self._read_connection_policy()
+        global_timeout = policy.get("timeout_seconds")
+        protocol_timeout = policy.get(f"{protocol_name}_timeout_seconds")
+        value = protocol_timeout if protocol_timeout is not None else global_timeout
+        if value is None:
+            return default
+        try:
+            return max(1, int(value))
+        except (TypeError, ValueError):
+            return default
+
+    def _with_retry(self, protocol_name: str, operation_name: str, func, *args, **kwargs):
+        retry_times = self._get_retry_times(protocol_name)
+        attempts = retry_times + 1
+        last_error = None
+        for attempt in range(1, attempts + 1):
+            try:
+                return func(*args, **kwargs)
+            except Exception as exc:
+                last_error = exc
+                if attempt >= attempts:
+                    break
+                logger.warning(
+                    "%s 执行失败，准备重试: device=%s operation=%s attempt=%s/%s error=%s",
+                    protocol_name.upper(),
+                    self.device_ip,
+                    operation_name,
+                    attempt,
+                    attempts,
+                    exc,
+                )
+                time.sleep(self.DEFAULT_RETRY_BACKOFF_SECONDS)
+        raise last_error
 
     def __enter__(self):
         """上下文管理器入口"""
@@ -114,8 +172,11 @@ class DeviceConnectionManager:
                     host=self.device_ip,
                     username=account.get("username"),
                     password=account.get("password"),
-                    timeout=5,
-                    session_timeout=20,
+                    port=account.get("port", 22),
+                    timeout=self._get_timeout_seconds("netmiko", self.DEFAULT_NETMIKO_TIMEOUT),
+                    session_timeout=self._get_timeout_seconds(
+                        "netmiko_session", self.DEFAULT_NETMIKO_SESSION_TIMEOUT
+                    ),
                 )
                 logger.info(
                     f"Netmiko连接已建立: {self.device_ip}, device_type={device_type}"
@@ -144,22 +205,25 @@ class DeviceConnectionManager:
                         host=self.device_ip,
                         user=account.get("username"),
                         password=account.get("password"),
+                        port=account.get("port", 830),
                         device_params="h3c",
-                        timeout=3600,
+                        timeout=self._get_timeout_seconds("netconf", self.DEFAULT_NETCONF_TIMEOUT),
                     )
                 elif vendor_alias == "Huawei":
                     self._netconf_conn = HuaweiyangNetconfConnect(
                         host=self.device_ip,
                         user=account.get("username"),
                         password=account.get("password"),
-                        timeout=1000,
+                        port=account.get("port", 830),
+                        timeout=self._get_timeout_seconds("netconf", self.DEFAULT_NETCONF_TIMEOUT),
                     )
                 elif vendor_alias == "Cisco":
                     self._netconf_conn = CiscoNetconfConnect(
                         host=self.device_ip,
                         user=account.get("username"),
                         password=account.get("password"),
-                        timeout=30,
+                        port=account.get("port", 830),
+                        timeout=self._get_timeout_seconds("netconf", self.DEFAULT_NETCONF_TIMEOUT),
                     )
                 else:
                     # 默认使用 ncclient manager
@@ -173,9 +237,10 @@ class DeviceConnectionManager:
                         host=self.device_ip,
                         username=account.get("username"),
                         password=account.get("password"),
-                        port=830,
+                        port=account.get("port", 830),
                         hostkey_verify=False,
                         device_params={"name": device_params_name},
+                        timeout=self._get_timeout_seconds("netconf", self.DEFAULT_NETCONF_TIMEOUT),
                     )
 
                 logger.info(
@@ -204,8 +269,8 @@ class DeviceConnectionManager:
                     "version": snmp_version,
                     "community": snmp_community,
                     "port": snmp_port,
-                    "timeout": 5,
-                    "retries": 1,
+                    "timeout": self._get_timeout_seconds("snmp", 5),
+                    "retries": self._get_retry_times("snmp"),
                 }
 
                 # 如果是v3，还需要保存认证信息
@@ -328,10 +393,21 @@ class DeviceConnectionManager:
                 template_dir = os.environ.get("NET_TEXTFSM") or os.environ.get("NTC_TEMPLATES_DIR")
                 if template_dir:
                     template_str = os.path.join(template_dir, template_str)
-            return conn.send_command(
-                command, use_textfsm=True, textfsm_template=template_str or None
+            return self._with_retry(
+                "netmiko",
+                "send_command_with_textfsm",
+                conn.send_command,
+                command,
+                use_textfsm=True,
+                textfsm_template=template_str or None,
             )
-        return conn.send_command(command, use_textfsm=use_textfsm)
+        return self._with_retry(
+            "netmiko",
+            "send_command",
+            conn.send_command,
+            command,
+            use_textfsm=use_textfsm,
+        )
 
     def execute_netconf_get(self, xml_template: str) -> Any:
         """
@@ -345,10 +421,19 @@ class DeviceConnectionManager:
         """
         conn = self.get_netconf_connection()
         if hasattr(conn, "netconf_get"):
-            return conn.netconf_get(xml_template)
-        else:
-            # 使用标准ncclient manager
-            return conn.get(("subtree", xml_template))
+            return self._with_retry(
+                "netconf",
+                "netconf_get",
+                conn.netconf_get,
+                xml_template,
+            )
+        # 使用标准ncclient manager
+        return self._with_retry(
+            "netconf",
+            "ncclient_get",
+            conn.get,
+            ("subtree", xml_template),
+        )
 
     def execute_netconf_get_config(self, xml_template: Optional[str] = None) -> Any:
         """
@@ -363,17 +448,32 @@ class DeviceConnectionManager:
         conn = self.get_netconf_connection()
         if hasattr(conn, "netconfig_get_config"):
             if xml_template:
-                return conn.netconfig_get_config(xml_template)
-            else:
-                return conn.netconfig_get_config()
-        else:
-            # 使用标准ncclient manager
-            if xml_template:
-                return conn.get_config(
-                    source="running", filter=("subtree", xml_template)
+                return self._with_retry(
+                    "netconf",
+                    "netconfig_get_config_with_filter",
+                    conn.netconfig_get_config,
+                    xml_template,
                 )
-            else:
-                return conn.get_config(source="running")
+            return self._with_retry(
+                "netconf",
+                "netconfig_get_config",
+                conn.netconfig_get_config,
+            )
+        # 使用标准ncclient manager
+        if xml_template:
+            return self._with_retry(
+                "netconf",
+                "ncclient_get_config_with_filter",
+                conn.get_config,
+                source="running",
+                filter=("subtree", xml_template),
+            )
+        return self._with_retry(
+            "netconf",
+            "ncclient_get_config",
+            conn.get_config,
+            source="running",
+        )
 
     def execute_snmp_get(self, oids: List[str]) -> Dict[str, Any]:
         """
@@ -434,7 +534,13 @@ class DeviceConnectionManager:
         """
         session = self.get_restconf_session()
         url = f"{session.base_url}{endpoint}"
-        response = session.get(url)
+        response = self._with_retry(
+            "restconf",
+            "restconf_get",
+            session.get,
+            url,
+            timeout=self._get_timeout_seconds("restconf", self.DEFAULT_RESTCONF_TIMEOUT),
+        )
         response.raise_for_status()
         return response.json()
 
@@ -451,10 +557,8 @@ class DeviceConnectionManager:
         Returns:
             Telemetry订阅结果
         """
-        # TODO: 实现Telemetry订阅逻辑
-        # 这里需要根据实际的Telemetry协议实现
-        channel = self.get_telemetry_channel()
-        logger.warning(
-            f"Telemetry订阅功能待实现: {self.device_ip}, path={subscription_path}"
+        self.get_telemetry_channel()
+        raise NotImplementedError(
+            f"telemetry_not_implemented: device={self.device_ip}, "
+            f"path={subscription_path}, interval={sampling_interval}"
         )
-        return None
