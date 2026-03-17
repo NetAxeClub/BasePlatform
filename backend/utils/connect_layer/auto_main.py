@@ -385,6 +385,7 @@ class BatManMain(object):
     @staticmethod
     def hillstone_config_v2(*cmds, **dev_info):
         filename = 'automation/' + dev_info['ip'] + '/' + 'config_' + str(int(time.time())) + '.txt'
+        save_warning = ''
         try:
             with ConnectHandler(**dev_info) as dev_connection:
                 # prompt = dev_connection.find_prompt()  # 找出设备的prompt
@@ -407,7 +408,12 @@ class BatManMain(object):
                                                cmd_verify=True,
                                                enter_config_mode=True, )
                 # content += dev_connection.exit_config_mode(exit_config="exit", pattern="#")
-                dev_connection.save_config()
+                try:
+                    dev_connection.save_config()
+                except Exception as e:
+                    # 保存配置失败不影响本次命令已下发成功，作为告警回传给上层流程记录。
+                    save_warning = '[Warn] save_config failed: {}'.format(str(e))
+                    logger.warning("hillstone_config_v2 save_config warning: %s", str(e))
                 # 自定义保存开始
                 # dev_connection.write_channel('save')
                 # dev_connection.write_channel(dev_connection.RETURN)
@@ -442,7 +448,7 @@ class BatManMain(object):
             # BatManMongo.insert_failed_logs(hostip=dev_info['ip'], device_type=dev_info['device_type'], info=error_text)
             # print(str(e))
             return False, filename, error_text
-        return True, filename, ''
+        return True, filename, save_warning
 
     # 山石防火墙配置过程， 不保存配置
     @staticmethod

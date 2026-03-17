@@ -477,6 +477,8 @@ class SecFirewallMain:
         if res:
             data_to_parse = default_storage.open(path).read()
             flow_record.task_result = data_to_parse.decode("utf-8")
+            if netmiko_error:
+                flow_record.task_result += "\n{}".format(str(netmiko_error))
             # 设置发布生效 后面根据配置结果，判断是否需要迁移到 失败
             flow_record.publish()
             _ttp_info = ""  # 存储ttp解析的错误结果内容
@@ -651,6 +653,8 @@ class FirewallMain(object):
             if res:
                 data_to_parse = default_storage.open(path).read()
                 flow_record.task_result = data_to_parse.decode("utf-8")
+                if netmiko_error:
+                    flow_record.task_result += "\n{}".format(str(netmiko_error))
         # 设置发布生效 后面根据配置结果，判断是否需要迁移到 失败
         flow_record.publish()
         if res:
@@ -710,7 +714,8 @@ class FirewallMain(object):
             #     sd_params = dict(code_id=flow_record.order_code, status=False,
             #                      user=flow_record.commit_user)
             #     service_desk_ops.apply_async(kwargs=sd_params)
-            flow_record.task_result = str(netconf_error)
+            error_info = netconf_error if class_method != "Hillstone" else netmiko_error
+            flow_record.task_result = str(error_info)
             flow_record.save()
             if class_method != "Hillstone":
                 msg = "[操作{}失败]\n用户:{}\n设备:{}\n状态:发布失败\n错误:{}\n==========".format(
@@ -724,7 +729,7 @@ class FirewallMain(object):
                     kwargs["task"],
                     kwargs["commit_user"],
                     kwargs["device"],
-                    netmiko_error,
+                    error_info,
                 )
             send_msg_sec_manage(msg)
         # 回调
