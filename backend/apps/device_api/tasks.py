@@ -20,7 +20,7 @@
       - 条件：status=0, auto_enable=True, 有采集方案(plan_id)
       - 返回设备信息（包含SSH/Netconf账号密码等）
    4. clear_his_collect_res() - 清空历史采集数据（MongoDB中的旧数据）
-   5. 批量下发 collect_device 任务到 Celery 队列（queue='config'）
+   5. 批量下发 collect_device 任务到 Celery 队列（DEBUG='dev'，否则='config'）
 
 二、单个设备采集任务 collect_device(**kwargs)
    执行流程：
@@ -102,13 +102,19 @@ from apps.device_api.analysis_hooks import (
     count_expected_interface_devices,
     schedule_batch_network_analysis,
 )
-from apps.device_api import COLLECTION_SUB_PLAN
+from apps.device_api import COLLECTION_PLAN, COLLECTION_SUB_PLAN
 from apps.device_api import arp_mongo, mac_mongo, lldp_mongo, aggre_port_mongo
+from netaxe.settings import DEBUG
 from utils.db.mongo_ops import MongoOps, MongoNetOps
 
 logger = logging.getLogger("device_api")
 
 RUNTIME_CONTROL_KWARGS = {"clear_history"}
+
+if DEBUG:
+    CELERY_QUEUE = "dev"
+else:
+    CELERY_QUEUE = "config"
 
 
 def should_clear_history_before_batch(kwargs=None):
@@ -362,6 +368,17 @@ def plan_collect_device(**kwargs):
             sub_plans_count=len(sub_plans_list),
         )
 
+        summary_plan_id = sub_plans_list[0].get("summary_plan")
+        execute_time = kwargs.get("execute_time", datetime.now().isoformat())
+        task_summary = {
+            "total_sub_plans": len(sub_plans_list),
+            "successful_sub_plans": 0,
+            "failed_sub_plans": 0,
+            "skipped_sub_plans": 0,
+            "failed_details": [],
+            "skipped_details": [],
+        }
+
         # 使用连接管理器执行所有子采集方案，确保单设备只建立一次连接
         try:
             # 按采集方式分组子方案
@@ -395,10 +412,19 @@ def plan_collect_device(**kwargs):
                             raw_result=result,
                             collection_method="netmiko",
                         )
+                        task_summary["successful_sub_plans"] += 1
                         logger.info(
                             f"Netmiko采集完成: {sub_plan['name']} (设备: {host_ip})"
                         )
                     except Exception as e:
+                        task_summary["failed_sub_plans"] += 1
+                        task_summary["failed_details"].append(
+                            {
+                                "plan_id": sub_plan.get("id"),
+                                "collection_method": "netmiko",
+                                "reason": str(e),
+                            }
+                        )
                         logger.error(
                             f"Netmiko采集异常: {sub_plan['name']} (设备: {host_ip}), {str(e)}",
                             exc_info=True,
@@ -434,10 +460,28 @@ def plan_collect_device(**kwargs):
                                 raw_result=result,
                                 collection_method="netconf",
                             )
+                            task_summary["successful_sub_plans"] += 1
                             logger.info(
                                 f"NETCONF采集完成: {sub_plan['name']} (设备: {host_ip})"
                             )
+                        else:
+                            task_summary["skipped_sub_plans"] += 1
+                            task_summary["skipped_details"].append(
+                                {
+                                    "plan_id": sub_plan.get("id"),
+                                    "collection_method": "netconf",
+                                    "reason": "missing_xml_template",
+                                }
+                            )
                     except Exception as e:
+                        task_summary["failed_sub_plans"] += 1
+                        task_summary["failed_details"].append(
+                            {
+                                "plan_id": sub_plan.get("id"),
+                                "collection_method": "netconf",
+                                "reason": str(e),
+                            }
+                        )
                         logger.error(
                             f"NETCONF采集异常: {sub_plan['name']} (设备: {host_ip}), {str(e)}",
                             exc_info=True,
@@ -460,10 +504,28 @@ def plan_collect_device(**kwargs):
                                 raw_result=result,
                                 collection_method="snmp",
                             )
+                            task_summary["successful_sub_plans"] += 1
                             logger.info(
                                 f"SNMP采集完成: {sub_plan['name']} (设备: {host_ip})"
                             )
+                        else:
+                            task_summary["skipped_sub_plans"] += 1
+                            task_summary["skipped_details"].append(
+                                {
+                                    "plan_id": sub_plan.get("id"),
+                                    "collection_method": "snmp",
+                                    "reason": "missing_snmp_oids",
+                                }
+                            )
                     except Exception as e:
+                        task_summary["failed_sub_plans"] += 1
+                        task_summary["failed_details"].append(
+                            {
+                                "plan_id": sub_plan.get("id"),
+                                "collection_method": "snmp",
+                                "reason": str(e),
+                            }
+                        )
                         logger.error(
                             f"SNMP采集异常: {sub_plan['name']} (设备: {host_ip}), {str(e)}",
                             exc_info=True,
@@ -486,10 +548,28 @@ def plan_collect_device(**kwargs):
                                 raw_result=result,
                                 collection_method="restconf",
                             )
+                            task_summary["successful_sub_plans"] += 1
                             logger.info(
                                 f"RESTCONF采集完成: {sub_plan['name']} (设备: {host_ip})"
                             )
+                        else:
+                            task_summary["skipped_sub_plans"] += 1
+                            task_summary["skipped_details"].append(
+                                {
+                                    "plan_id": sub_plan.get("id"),
+                                    "collection_method": "restconf",
+                                    "reason": "missing_restconf_endpoint",
+                                }
+                            )
                     except Exception as e:
+                        task_summary["failed_sub_plans"] += 1
+                        task_summary["failed_details"].append(
+                            {
+                                "plan_id": sub_plan.get("id"),
+                                "collection_method": "restconf",
+                                "reason": str(e),
+                            }
+                        )
                         logger.error(
                             f"RESTCONF采集异常: {sub_plan['name']} (设备: {host_ip}), {str(e)}",
                             exc_info=True,
@@ -501,29 +581,28 @@ def plan_collect_device(**kwargs):
                         logger.info(
                             f"执行Telemetry采集: {sub_plan['name']} (设备: {host_ip})"
                         )
-                        subscription_path = sub_plan.get(
-                            "telemetry_subscription_path", ""
+                        logger.warning(
+                            "Telemetry 仍在延期范围，本批次跳过执行: sub_plan=%s, device=%s",
+                            sub_plan.get("name"),
+                            host_ip,
                         )
-                        sampling_interval = sub_plan.get(
-                            "telemetry_sampling_interval", 10
+                        task_summary["skipped_sub_plans"] += 1
+                        task_summary["skipped_details"].append(
+                            {
+                                "plan_id": sub_plan.get("id"),
+                                "collection_method": "telemetry",
+                                "reason": "telemetry_deferred",
+                            }
                         )
-                        if subscription_path:
-                            result = conn_mgr.execute_telemetry_subscribe(
-                                subscription_path=subscription_path,
-                                sampling_interval=sampling_interval,
-                            )
-
-                            # 处理并保存结果
-                            _process_and_save_result(
-                                plan=sub_plan,
-                                device_info=kwargs,
-                                raw_result=result,
-                                collection_method="telemetry",
-                            )
-                            logger.info(
-                                f"Telemetry采集完成: {sub_plan['name']} (设备: {host_ip})"
-                            )
                     except Exception as e:
+                        task_summary["failed_sub_plans"] += 1
+                        task_summary["failed_details"].append(
+                            {
+                                "plan_id": sub_plan.get("id"),
+                                "collection_method": "telemetry",
+                                "reason": str(e),
+                            }
+                        )
                         logger.error(
                             f"Telemetry采集异常: {sub_plan['name']} (设备: {host_ip}), {str(e)}",
                             exc_info=True,
@@ -535,9 +614,52 @@ def plan_collect_device(**kwargs):
             logger.error(f"设备 {host_ip} 连接或采集异常: {str(e)}", exc_info=True)
             raise
 
+        parent_task_status = "success"
+        if task_summary["successful_sub_plans"] == 0:
+            if task_summary["failed_sub_plans"] > 0:
+                parent_task_status = "failed"
+            elif task_summary["skipped_sub_plans"] > 0:
+                parent_task_status = "skipped"
+        elif task_summary["failed_sub_plans"] > 0:
+            parent_task_status = "partial_success"
+
+        try:
+            COLLECTION_PLAN.update_one(
+                filter={
+                    "summary_plan_id": summary_plan_id,
+                    "device_ip": host_ip,
+                    "execute_time": execute_time,
+                },
+                update={
+                    "$set": {
+                        "task_status": parent_task_status,
+                        "successful_sub_plans": task_summary["successful_sub_plans"],
+                        "failed_sub_plans": task_summary["failed_sub_plans"],
+                        "skipped_sub_plans": task_summary["skipped_sub_plans"],
+                        "failed_details": task_summary["failed_details"][:20],
+                        "skipped_details": task_summary["skipped_details"][:20],
+                        "updated_at": datetime.now().isoformat(),
+                    }
+                },
+            )
+        except Exception as e:
+            logger.warning(
+                "更新主采集任务状态失败: device=%s summary_plan_id=%s execute_time=%s error=%s",
+                host_ip,
+                summary_plan_id,
+                execute_time,
+                e,
+            )
+
         logger.info(f"设备 {host_ip} 采集完成, 总计: {len(sub_plans_list)}")
 
-        return {"host_ip": host_ip, "total": len(sub_plans_list)}
+        return {
+            "host_ip": host_ip,
+            "total": len(sub_plans_list),
+            "execute_time": execute_time,
+            "task_status": parent_task_status,
+            **task_summary,
+        }
     except Exception as e:
         logger.error(f"设备 {host_ip} 采集任务异常: {str(e)}", exc_info=True)
         return {}
@@ -718,7 +840,7 @@ def plan_collect_device_main(**kwargs):
     # 批量下发任务
     for host in hosts:
         host_ip = host.get("manage_ip")
-        task = plan_collect_device.apply_async(kwargs=host, queue="config", retry=True)
+        task = plan_collect_device.apply_async(kwargs=host, queue=CELERY_QUEUE, retry=True)
         net_tower_tasks.append(task)
         logger.debug(f"已下发采集任务: {host_ip}, task_id: {task.id}")
 

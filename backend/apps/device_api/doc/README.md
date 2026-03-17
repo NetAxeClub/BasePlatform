@@ -1,128 +1,45 @@
-# device_api 功能说明
+# device_api 功能介绍
 
 ## 1. 模块定位
 
-`device_api` 是当前网络设备采集主链，负责：
+`device_api` 是 BasePlatform 当前默认的网络设备采集主链，负责把设备采集、标准化、入库、查询和事实回写收敛到统一链路中。
 
-- 采集方案管理：父方案 + 子方案
-- 多协议执行：Netmiko / NETCONF / SNMP / RESTCONF / Telemetry
-- 数据标准化：处理器解析、值规范化、元数据注入
-- 结果入库：统一写入 `plan_<collection_type>`
-- 设备事实发现与回写
+当前模块承担四类职责：
 
-## 2. 当前实现方式
+- 采集方案管理：父方案、子方案和设备绑定
+- 多协议执行：Netmiko、NETCONF、SNMP、RESTCONF、Telemetry 占位门禁
+- 标准结果入库：统一写入 `plan_<collection_type>`
+- 运维查询与联动：结果查询、能力查询、事实回写、分析触发
 
-### 2.1 方案模型
+## 2. 主链范围
+
+当前主链入口：
+
+- 默认入口：`plan_collect_device_main`
+- 单设备执行：`plan_collect_device`
+- fallback 入口：`automation`
+
+当前约束：
+
+- 新增采集能力默认进入 `device_api`
+- `automation` 仅保留为回退与应急入口
+- `asset` 数据模型不在 `device_api` 内直接改造
+
+## 3. 核心对象
 
 - 父方案：`DeviceCollectionPlans`
 - 子方案：`DeviceSubCollectionPlan`
 - 设备绑定：`PlansToDevice`
+- 标准合同：`backend/apps/device_api/contract.py`
+- 执行层：`backend/apps/device_api/services_new.py`
+- 协议层：`backend/apps/device_api/connection_manager.py`
+- 解析层：`backend/apps/device_api/processors/`
 
-父方案负责采集类型和采集方式的聚合配置，子方案负责具体协议细节。
+## 4. 当前文档入口
 
-### 2.2 预处理链路
+- [当前能力](./当前能力.md)
+- [遗留任务](./遗留任务.md)
 
-当前运行链路按以下顺序处理采集结果：
+## 5. 证据文件
 
-1. `processors/`
-   - 协议/厂商专属解析
-2. `tools/`
-   - 值规范化兜底
-3. 元数据注入
-   - `hostip`
-   - `hostname`
-   - `idc_name`
-   - `log_time`
-
-### 2.3 标准化结果合同
-
-标准结果统一写入：
-
-- `plan_arp`
-- `plan_mac`
-- `plan_lldp`
-- `plan_aggre_port`
-- `plan_ip_interface`
-- `plan_interface_brief`
-- 其它类型继续使用 `plan_<collection_type>`
-
-所有结果必须保留：
-
-- `hostip`
-- `hostname`
-- `idc_name`
-- `log_time`
-- `summary_plan_id`
-- `plan_id`
-- `collection_type`
-- `collection_method`
-- `execute_time`
-
-## 3. 当前重点能力
-
-### 3.1 采集执行
-
-- 主调度：`backend/apps/device_api/tasks.py`
-- 本地执行：`DeviceCollectionService.execute_both_collection_local`
-- 南向回调入库：`plan_data_to_mongodb` / `celery_data_mongodb`
-
-### 3.2 结果查询
-
-重点接口：
-
-- `/base_platform/device_api/collection-results/latest/`
-- `/base_platform/device_api/devices/{serial_num}/facts/`
-- `/base_platform/device_api/devices/{serial_num}/capabilities/`
-- `/base_platform/device_api/plans-to-device/`
-
-### 3.3 已合并的重要改进
-
-- 标准化采集合同已冻结
-- 接口利用率分析触发链路已统一接入
-- 地址定位消费链路已按标准结果对齐
-
-## 4. 关键文件
-
-- `backend/apps/device_api/tasks.py`
-- `backend/apps/device_api/services_new.py`
-- `backend/apps/device_api/models_api.py`
-- `backend/apps/device_api/contract.py`
-- `backend/apps/device_api/analysis_hooks.py`
-- `backend/apps/device_api/connection_manager.py`
-- `backend/apps/device_api/processors/`
-
-## 5. 当前边界
-
-- 新增采集能力应优先进入 `device_api`
-- 不应继续在 `apps.automation` 增加采集实现
-- `asset` 模型结构不在 `device_api` 内直接改造
-
-## 6. 推荐验证
-
-```bash
-backend/venv/bin/python backend/manage.py test \
-  apps.device_api.test_collection_contract \
-  apps.device_api.test_interface_analysis_hooks -v 2
-```
-
-P1 覆盖审计入口：
-
-```bash
-backend/venv/bin/python backend/manage.py audit_device_api_coverage \
-  --sync-default-plans \
-  --auto-bind
-```
-
-当前 P1 覆盖结果见：
-
-- [P1-画像与绑定覆盖报告](./P1-画像与绑定覆盖报告.md)
-- [P1 覆盖 JSON 报告](./p1_coverage_report.json)
-- [P1.5-CLI画像与占位模板报告](./P1.5-CLI画像与占位模板报告.md)
-
-## 7. 后续任务
-
-详细待办见：
-
-- [P0 范围冻结与切换门禁](./P0-范围冻结与切换门禁.md)
-- [后续任务](./后续任务.md)
-- [采集主链替代实施与验收清单](./采集主链替代实施与验收清单.md)
+验收和灰度证据保留在当前目录的 `*.json` 文件中，用于追溯，不再单独展开为 phase Markdown 文档。

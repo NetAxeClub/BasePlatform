@@ -285,6 +285,19 @@ class DeviceCollectionService:
         return queryset
 
     @staticmethod
+    def _build_method_error(
+        collection_method: str,
+        error: str,
+        error_code: str = "execution_failed",
+    ) -> Dict[str, Any]:
+        return {
+            "success": False,
+            "collection_method": collection_method,
+            "error": error,
+            "error_code": error_code,
+        }
+
+    @staticmethod
     def collect_with_connection_manager(plan: Dict[str, Any], device_info: Dict[str, Any]) -> Dict[str, Any]:
         """
         使用连接管理器执行采集（支持所有采集方式）
@@ -339,7 +352,10 @@ class DeviceCollectionService:
                         logger.info(f"Netmiko采集完成: {manage_ip}")
                     except Exception as e:
                         logger.error(f"Netmiko采集异常: {manage_ip}, {str(e)}", exc_info=True)
-                        results['netmiko'] = {'success': False, 'error': str(e)}
+                        results['netmiko'] = DeviceCollectionService._build_method_error(
+                            "netmiko",
+                            str(e),
+                        )
 
                 if plan.get('netconf_enabled') and device_info.get('netconf_enable'):
                     try:
@@ -371,9 +387,17 @@ class DeviceCollectionService:
                             logger.info(f"NETCONF采集完成: {manage_ip}")
                         else:
                             logger.warning(f"NETCONF采集跳过: {manage_ip} (未配置XML模板)")
+                            results['netconf'] = DeviceCollectionService._build_method_error(
+                                "netconf",
+                                "未配置XML模板",
+                                error_code="missing_xml_template",
+                            )
                     except Exception as e:
                         logger.error(f"NETCONF采集异常: {manage_ip}, {str(e)}", exc_info=True)
-                        results['netconf'] = {'success': False, 'error': str(e)}
+                        results['netconf'] = DeviceCollectionService._build_method_error(
+                            "netconf",
+                            str(e),
+                        )
 
                 if plan.get('snmp_enabled'):
                     try:
@@ -395,9 +419,17 @@ class DeviceCollectionService:
                             logger.info(f"SNMP采集完成: {manage_ip}")
                         else:
                             logger.warning(f"SNMP采集跳过: {manage_ip} (未配置OID)")
+                            results['snmp'] = DeviceCollectionService._build_method_error(
+                                "snmp",
+                                "未配置OID",
+                                error_code="missing_snmp_oids",
+                            )
                     except Exception as e:
                         logger.error(f"SNMP采集异常: {manage_ip}, {str(e)}", exc_info=True)
-                        results['snmp'] = {'success': False, 'error': str(e)}
+                        results['snmp'] = DeviceCollectionService._build_method_error(
+                            "snmp",
+                            str(e),
+                        )
 
                 if plan.get('restconf_enabled'):
                     try:
@@ -419,9 +451,17 @@ class DeviceCollectionService:
                             logger.info(f"RESTCONF采集完成: {manage_ip}")
                         else:
                             logger.warning(f"RESTCONF采集跳过: {manage_ip} (未配置端点)")
+                            results['restconf'] = DeviceCollectionService._build_method_error(
+                                "restconf",
+                                "未配置RESTCONF端点",
+                                error_code="missing_restconf_endpoint",
+                            )
                     except Exception as e:
                         logger.error(f"RESTCONF采集异常: {manage_ip}, {str(e)}", exc_info=True)
-                        results['restconf'] = {'success': False, 'error': str(e)}
+                        results['restconf'] = DeviceCollectionService._build_method_error(
+                            "restconf",
+                            str(e),
+                        )
 
                 if plan.get('telemetry_enabled'):
                     try:
@@ -447,15 +487,31 @@ class DeviceCollectionService:
                             logger.info(f"Telemetry采集完成: {manage_ip}")
                         else:
                             logger.warning(f"Telemetry采集跳过: {manage_ip} (未配置订阅路径)")
+                            results['telemetry'] = DeviceCollectionService._build_method_error(
+                                "telemetry",
+                                "未配置Telemetry订阅路径",
+                                error_code="missing_telemetry_subscription_path",
+                            )
+                    except NotImplementedError as e:
+                        logger.warning(f"Telemetry采集延期项: {manage_ip}, {str(e)}")
+                        results['telemetry'] = DeviceCollectionService._build_method_error(
+                            "telemetry",
+                            str(e),
+                            error_code="telemetry_not_implemented",
+                        )
                     except Exception as e:
                         logger.error(f"Telemetry采集异常: {manage_ip}, {str(e)}", exc_info=True)
-                        results['telemetry'] = {'success': False, 'error': str(e)}
+                        results['telemetry'] = DeviceCollectionService._build_method_error(
+                            "telemetry",
+                            str(e),
+                        )
 
         except Exception as e:
             logger.error(f"连接管理器异常: {manage_ip}, {str(e)}", exc_info=True)
             return {
                 'success': False,
                 'error': f"连接管理器异常: {str(e)}",
+                'error_code': 'connection_manager_failed',
                 'results': results
             }
 
@@ -469,6 +525,7 @@ class DeviceCollectionService:
             return {
                 'success': False,
                 'error': error_msg,
+                'error_code': 'all_methods_failed',
                 'results': results
             }
 
@@ -716,9 +773,14 @@ class DeviceCollectionService:
                 "soft_version": device_info.get("soft_version"),
                 "vendor": device_info.get('vendor__alias', ''),
                 "vendor_name": device_info.get('vendor__name', ''),
-                "task_status": "success",  # 初始状态设置为成功
+                "task_status": "running",
                 "device_type": plan.get('summary_plan_device_type', ''),
                 "sub_plans_count": sub_plans_count,  # 子方案数量
+                "successful_sub_plans": 0,
+                "failed_sub_plans": 0,
+                "skipped_sub_plans": 0,
+                "failed_details": [],
+                "skipped_details": [],
                 "execute_time": execute_time,
                 "log_time": time.time(),  # 用于排序和查询
             }
@@ -903,6 +965,9 @@ class DeviceCollectionService:
 
             logger.info(f"开始执行双重采集: 方案={plan.name}, 设备={device.manage_ip}")
             netconf_result, netmiko_result = None, None
+            snmp_result = None
+            restconf_result = None
+            telemetry_result = None
             netconf_success, netmiko_success = False, False
 
             if plan.netmiko_enabled and hasattr(device, "ssh_account") and device.ssh_account:
@@ -921,11 +986,33 @@ class DeviceCollectionService:
                 if netconf_result.get("success"):
                     netconf_success = True
 
+            if getattr(plan, "snmp_enabled", False):
+                snmp_result = DeviceCollectionService._build_method_error(
+                    "snmp",
+                    "南向驱动执行路径暂不支持 SNMP",
+                    error_code="method_not_supported_by_south_driver",
+                )
+            if getattr(plan, "restconf_enabled", False):
+                restconf_result = DeviceCollectionService._build_method_error(
+                    "restconf",
+                    "南向驱动执行路径暂不支持 RESTCONF",
+                    error_code="method_not_supported_by_south_driver",
+                )
+            if getattr(plan, "telemetry_enabled", False):
+                telemetry_result = DeviceCollectionService._build_method_error(
+                    "telemetry",
+                    "Telemetry 仍在延期范围，暂不纳入默认主链",
+                    error_code="telemetry_not_implemented",
+                )
+
             if not netconf_success and not netmiko_success:
                 return {
                     "success": False,
                     "netconf_result": netconf_result,
                     "netmiko_result": netmiko_result,
+                    "snmp_result": snmp_result,
+                    "restconf_result": restconf_result,
+                    "telemetry_result": telemetry_result,
                     "error": "所有可用的采集方式都失败了",
                 }
             success_message = []
@@ -937,6 +1024,9 @@ class DeviceCollectionService:
                 "success": True,
                 "netconf_result": netconf_result,
                 "netmiko_result": netmiko_result,
+                "snmp_result": snmp_result,
+                "restconf_result": restconf_result,
+                "telemetry_result": telemetry_result,
                 "message": "; ".join(success_message),
             }
         except Exception as e:
@@ -947,6 +1037,9 @@ class DeviceCollectionService:
                 "success": False,
                 "netconf_result": None,
                 "netmiko_result": None,
+                "snmp_result": None,
+                "restconf_result": None,
+                "telemetry_result": None,
                 "error": str(e),
             }
 

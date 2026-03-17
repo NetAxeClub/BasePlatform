@@ -5,6 +5,10 @@ Device API 应用
 
 from utils.db.mongo_ops import MongoOps
 
+# 运行策略：device_api 为默认主入口，automation 固定为兜底入口。
+DEFAULT_COLLECTION_ENTRY = "device_api"
+FALLBACK_COLLECTION_ENTRY = "automation"
+
 # 全局MongoDB连接对象
 COLLECTION_RESULTS_DB = MongoOps(db='Automation', coll='TestDeviceCollection')
 

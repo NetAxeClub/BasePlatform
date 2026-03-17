@@ -6,6 +6,7 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock, patch
 
+import requests
 from bson import ObjectId
 from django.test import SimpleTestCase
 from rest_framework.test import APIRequestFactory
@@ -21,8 +22,10 @@ from apps.device_api.models import DeviceCollectionPlans, DeviceDiscoveryState, 
 from apps.device_api.models_api import (
     COLLECTION_TYPE_MONGO_MAP,
     apply_field_mappings,
+    ensure_processors_bootstrapped,
     resolve_raw_data,
 )
+from apps.device_api.processors.base import get_processor, normalize_processed_data
 from apps.device_api.processors.h3c import (
     process_aggre_port_netconf as process_h3c_aggre_port_netconf,
     process_bgp_summary_netconf as process_h3c_bgp_summary_netconf,
@@ -75,12 +78,27 @@ from apps.device_api.platform_profiles import (
 )
 from apps.device_api.tasks import (
     _process_and_save_result,
+    plan_collect_device,
     split_runtime_control_kwargs,
     should_clear_history_before_batch,
 )
 from apps.device_api.tools.collect_device import get_auto_device
+from apps.device_api.tools.centec import CentecPlan
+from apps.device_api.tools.maipu import MaipuPlan
+from apps.device_api.tools.mellanox import MellanoxPlan
+from apps.device_api.tools.ruijie import RuiJiePlan
+from apps.device_api.tools.zte import ZtePlan
 from apps.device_api.management.commands.import_legacy_collection_rules import (
     Command as ImportLegacyCollectionRulesCommand,
+)
+from apps.device_api.management.commands.device_api_p5_rollout import (
+    Command as DeviceApiP5RolloutCommand,
+)
+from apps.device_api.management.commands.audit_legacy_time_anchor import (
+    Command as AuditLegacyTimeAnchorCommand,
+)
+from apps.device_api.management.commands.backfill_legacy_execute_time import (
+    Command as BackfillLegacyExecuteTimeCommand,
 )
 from apps.device_api.views import (
     CollectionResultViewSet,
@@ -307,6 +325,40 @@ class DeviceApiViewTests(SimpleTestCase):
 
         self.assertFalse(is_valid)
         self.assertIn("南向驱动验证当前仅支持NETMIKO/NETCONF", message)
+        self.assertIsNone(result_device)
+
+    @patch("apps.device_api.views.NetworkDevice.objects")
+    def test_validate_execution_params_rejects_telemetry_only_plan_for_local(
+        self,
+        mock_device_objects,
+    ):
+        device = SimpleNamespace(
+            manage_ip="10.0.0.1",
+            ssh_account=None,
+            netconf_account=None,
+            snmp_community="public",
+        )
+        queryset = Mock()
+        queryset.exists.return_value = True
+        queryset.first.return_value = device
+        mock_device_objects.select_related.return_value.filter.return_value = queryset
+        plan = SimpleNamespace(
+            netmiko_enabled=False,
+            netconf_enabled=False,
+            snmp_enabled=False,
+            restconf_enabled=False,
+            telemetry_enabled=True,
+        )
+
+        is_valid, message, result_device = DeviceSubCollectionPlanViewSet.validate_execution_params(
+            plan,
+            "10.0.0.1",
+            "both",
+            use_local=True,
+        )
+
+        self.assertFalse(is_valid)
+        self.assertIn("Telemetry 仍在延期范围", message)
         self.assertIsNone(result_device)
 
     @patch("apps.device_api.views.DeviceCollectionService.execute_both_collection_local")
@@ -711,6 +763,9 @@ class DeviceApiViewTests(SimpleTestCase):
         self.assertEqual(payload["code"], 200)
         self.assertEqual(payload["data"]["manage_ip"], "10.0.0.1")
         self.assertEqual(payload["data"]["results"][0]["collection_type"], "arp")
+        collection_db.coll.find.return_value.sort.assert_called_once_with(
+            [("execute_time", -1), ("log_time", -1)]
+        )
 
     @patch("apps.device_api.views.MongoOps")
     @patch("apps.device_api.views.NetworkDevice.objects")
@@ -740,6 +795,53 @@ class DeviceApiViewTests(SimpleTestCase):
         self.assertEqual(payload["code"], 200)
         self.assertEqual(payload["data"]["serial_num"], "SER-1")
         self.assertEqual(payload["data"]["manage_ip"], "10.0.0.1")
+
+    @patch("apps.device_api.views.COLLECTION_PLAN")
+    def test_collection_results_batch_gate_metrics_returns_latest_batch_summary(
+        self,
+        mock_collection_plan,
+    ):
+        latest_find_cursor = Mock()
+        latest_find_cursor.sort.return_value.limit.return_value = [
+            {"execute_time": "2026-03-17 01:00:00"}
+        ]
+
+        detail_find_cursor = [
+            {
+                "task_status": "success",
+                "failed_details": [],
+                "skipped_details": [],
+            },
+            {
+                "task_status": "partial_success",
+                "failed_details": [{"collection_method": "netmiko", "reason": "ssh_timeout"}],
+                "skipped_details": [{"collection_method": "telemetry", "reason": "telemetry_deferred"}],
+            },
+        ]
+
+        def _find_side_effect(query, projection=None):
+            if projection and "execute_time" in projection:
+                return latest_find_cursor
+            return detail_find_cursor
+
+        mock_collection_plan.coll.find.side_effect = _find_side_effect
+
+        request = self.factory.get(
+            "/base_platform/device_api/collection-results/batch_gate_metrics/",
+            {},
+        )
+        response = CollectionResultViewSet.as_view({"get": "batch_gate_metrics"})(request)
+        payload = json.loads(response.content)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["code"], 200)
+        self.assertEqual(payload["data"]["execute_time"], "2026-03-17 01:00:00")
+        self.assertEqual(payload["data"]["parent_metrics"]["total"], 2)
+        self.assertEqual(payload["data"]["parent_metrics"]["success"], 1)
+        self.assertEqual(payload["data"]["parent_metrics"]["partial_success"], 1)
+        self.assertEqual(payload["data"]["parent_metrics"]["success_rate"], 50.0)
+        self.assertEqual(payload["data"]["protocol_failures"]["netmiko"], 1)
+        self.assertEqual(payload["data"]["skip_reasons"]["telemetry_deferred"], 1)
 
     @patch("apps.device_api.views.COLLECTION_RESULTS_DB")
     def test_collection_results_by_plan_uses_filters(self, mock_results_db):
@@ -1295,6 +1397,190 @@ class DeviceApiModelApiTests(SimpleTestCase):
         self.assertEqual(processed, [])
         mock_get_vendor_class.assert_not_called()
 
+    @patch("apps.device_api.models_api.importlib.import_module")
+    def test_ensure_processors_bootstrapped_imports_once(self, mock_import_module):
+        with patch("apps.device_api.models_api._processors_bootstrapped", False):
+            ensure_processors_bootstrapped()
+            ensure_processors_bootstrapped()
+
+        self.assertEqual(mock_import_module.call_count, 6)
+
+    def test_ruijie_cisco_hillstone_processors_registered_for_main_matrix_types(self):
+        for vendor in (
+            "Ruijie",
+            "Cisco",
+            "Hillstone",
+            "ZTE",
+            "Maipu",
+            "Mellanox",
+            "centec",
+        ):
+            for collection_type in (
+                "arp",
+                "mac",
+                "lldp",
+                "interface_brief",
+                "ip_interface",
+                "aggre_port",
+            ):
+                with self.subTest(vendor=vendor, collection_type=collection_type):
+                    processor = get_processor(vendor, "switch", collection_type, "netmiko")
+                    self.assertIsNotNone(processor)
+
+
+class DeviceApiP3GoldenSampleTests(SimpleTestCase):
+    @staticmethod
+    def _build_plan(collection_type):
+        return SimpleNamespace(
+            name=f"Ruijie-{collection_type}-plan",
+            collection_type=collection_type,
+            summary_plan=SimpleNamespace(vendor="Ruijie", device_type="switch"),
+        )
+
+    def _assert_ruijie_golden_sample(self, collection_type, command_result):
+        plan = self._build_plan(collection_type=collection_type)
+        status, error, processed = resolve_raw_data(
+            plan,
+            {"data": command_result, "device_ip": "10.0.0.1"},
+            "netmiko",
+        )
+
+        self.assertTrue(status)
+        self.assertEqual(error, "")
+        legacy_result = getattr(RuiJiePlan, f"get_{collection_type}")(command_result)
+        expected = normalize_processed_data(collection_type, legacy_result)
+        for item in expected:
+            item["manage_ip"] = "10.0.0.1"
+        self.assertEqual(processed, expected)
+
+    def _assert_vendor_golden_sample(self, vendor, collection_type, command_result, tool_class):
+        plan = SimpleNamespace(
+            name=f"{vendor}-{collection_type}-plan",
+            collection_type=collection_type,
+            summary_plan=SimpleNamespace(vendor=vendor, device_type="switch"),
+        )
+        status, error, processed = resolve_raw_data(
+            plan,
+            {"data": command_result, "device_ip": "10.0.0.1"},
+            "netmiko",
+        )
+
+        self.assertTrue(status)
+        self.assertEqual(error, "")
+        legacy_result = getattr(tool_class, f"get_{collection_type}")(command_result)
+        expected = normalize_processed_data(collection_type, legacy_result)
+        for item in expected:
+            item["manage_ip"] = "10.0.0.1"
+        self.assertEqual(processed, expected)
+
+    def test_ruijie_golden_sample_arp(self):
+        self._assert_ruijie_golden_sample(
+            "arp",
+            [
+                {
+                    "address": "10.0.0.2",
+                    "hardware": "aaaa.bbbb.cccc",
+                    "agemin": "10",
+                    "type": "dynamic",
+                    "vlan": "100",
+                    "interface": "Gi1/0/1",
+                }
+            ],
+        )
+
+    def test_ruijie_golden_sample_mac(self):
+        self._assert_ruijie_golden_sample(
+            "mac",
+            [
+                {
+                    "macaddress": "aaaa.bbbb.cccc",
+                    "vlan": "100",
+                    "interface": "Gi1/0/1",
+                    "type": "dynamic",
+                }
+            ],
+        )
+
+    def test_ruijie_golden_sample_lldp(self):
+        self._assert_ruijie_golden_sample(
+            "lldp",
+            [
+                {
+                    "local_interface": "Te1/0/1",
+                    "chassis_id": "0011.2233.4455",
+                    "neighbor_port": "Eth1/1",
+                    "portdescription": "uplink",
+                    "neighborsysname": "core-a",
+                    "management_ip": "10.0.0.254",
+                    "management_type": "ipv4",
+                    "neighbor_ip": "10.0.0.254",
+                }
+            ],
+        )
+
+    def test_ruijie_golden_sample_interface_brief(self):
+        self._assert_ruijie_golden_sample(
+            "interface_brief",
+            [
+                {
+                    "interface": "Gi1/0/1",
+                    "status": "up",
+                    "speed": "1000M",
+                    "duplex": "full",
+                    "description": "uplink",
+                }
+            ],
+        )
+
+    def test_ruijie_golden_sample_ip_interface(self):
+        self._assert_ruijie_golden_sample(
+            "ip_interface",
+            [
+                {
+                    "interface": "Vlanif100",
+                    "status": "up",
+                    "protocol": "up",
+                    "priipaddr": "10.0.0.1/24",
+                    "secipaddr": "no address",
+                }
+            ],
+        )
+
+    def test_ruijie_golden_sample_aggre_port(self):
+        self._assert_ruijie_golden_sample(
+            "aggre_port",
+            [
+                {
+                    "aggregateport": "Ag1",
+                    "ports": "Gi1/0/1,Te1/0/1",
+                }
+            ],
+        )
+
+    def test_long_tail_vendor_golden_sample_arp(self):
+        sample = [
+            {
+                "address": "10.0.0.2",
+                "ipaddress": "10.0.0.2",
+                "hardware": "aaaa.bbbb.cccc",
+                "macaddress": "aaaa.bbbb.cccc",
+                "agemin": "5",
+                "age": "5",
+                "interface": "Eth1/0/1",
+                "vlan": "100",
+                "type": "dynamic",
+                "typeflag": "dynamic",
+            }
+        ]
+        for vendor, tool_class in (
+            ("ZTE", ZtePlan),
+            ("Maipu", MaipuPlan),
+            ("Mellanox", MellanoxPlan),
+            ("centec", CentecPlan),
+        ):
+            with self.subTest(vendor=vendor):
+                self._assert_vendor_golden_sample(vendor, "arp", list(sample), tool_class)
+
 
 class DeviceApiConnectionManagerTests(SimpleTestCase):
     def test_get_netmiko_connection_requires_ssh_account(self):
@@ -1378,6 +1664,45 @@ class DeviceApiConnectionManagerTests(SimpleTestCase):
 
         with self.assertRaisesRegex(ImportError, "grpcio"):
             manager.get_telemetry_channel()
+
+    @patch("apps.device_api.connection_manager.grpc", Mock())
+    def test_execute_telemetry_subscribe_raises_not_implemented(self):
+        manager = DeviceConnectionManager(
+            "10.0.0.1",
+            {"telemetry_config": {"port": 57400}},
+        )
+
+        with self.assertRaisesRegex(NotImplementedError, "telemetry_not_implemented"):
+            manager.execute_telemetry_subscribe("/interfaces/interface/state", 5)
+
+    def test_execute_restconf_get_retries_before_success(self):
+        manager = DeviceConnectionManager(
+            "10.0.0.1",
+            {
+                "connection_policy": {
+                    "restconf_retry_times": 2,
+                    "restconf_timeout_seconds": 3,
+                }
+            },
+        )
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {"ok": True}
+
+        session = Mock()
+        session.base_url = "https://10.0.0.1:443"
+        session.get.side_effect = [
+            requests.exceptions.Timeout("timeout"),
+            requests.exceptions.Timeout("timeout"),
+            response,
+        ]
+        manager._restconf_session = session
+
+        data = manager.execute_restconf_get("/restconf/data/interfaces")
+
+        self.assertEqual(data, {"ok": True})
+        self.assertEqual(session.get.call_count, 3)
+        self.assertEqual(session.get.call_args.kwargs["timeout"], 3)
 
 
 class DeviceApiCollectDeviceTests(SimpleTestCase):
@@ -1654,6 +1979,377 @@ class DeviceApiBridgeCommandTests(SimpleTestCase):
         self.assertIn("skip auto_bind: schema blockers detected", written)
 
 
+class DeviceApiP5RolloutCommandTests(SimpleTestCase):
+    @patch("apps.device_api.management.commands.device_api_p5_rollout.NetworkDevice.objects")
+    def test_build_wave_plan_counts_devices_by_vendor(
+        self,
+        mock_network_device_objects,
+    ):
+        queryset = Mock()
+        mock_network_device_objects.filter.return_value = queryset
+        queryset.count.side_effect = [10, 6, 3]
+
+        waves = DeviceApiP5RolloutCommand._build_wave_plan()
+
+        self.assertEqual(len(waves), 3)
+        self.assertEqual(waves[0]["wave"], 1)
+        self.assertEqual(waves[0]["device_count"], 10)
+        self.assertEqual(waves[1]["device_count"], 6)
+        self.assertEqual(waves[2]["device_count"], 3)
+
+    @patch("apps.device_api.management.commands.device_api_p5_rollout.MongoOps")
+    def test_build_parallel_comparison_calculates_mismatch_summary(
+        self,
+        mock_mongo_ops,
+    ):
+        mongo_one = Mock()
+        mongo_two = Mock()
+        mongo_three = Mock()
+        mongo_four = Mock()
+        mongo_five = Mock()
+        mongo_six = Mock()
+        mongo_seven = Mock()
+        mongo_eight = Mock()
+        mongo_nine = Mock()
+        mongo_ten = Mock()
+        mongo_eleven = Mock()
+        mongo_twelve = Mock()
+        mock_mongo_ops.side_effect = [
+            mongo_one, mongo_two,
+            mongo_three, mongo_four,
+            mongo_five, mongo_six,
+            mongo_seven, mongo_eight,
+            mongo_nine, mongo_ten,
+            mongo_eleven, mongo_twelve,
+        ]
+        mongo_one.coll.count_documents.return_value = 10
+        mongo_two.coll.count_documents.return_value = 9
+        mongo_three.coll.count_documents.return_value = 8
+        mongo_four.coll.count_documents.return_value = 8
+        mongo_five.coll.count_documents.return_value = 7
+        mongo_six.coll.count_documents.return_value = 7
+        mongo_seven.coll.count_documents.return_value = 6
+        mongo_eight.coll.count_documents.return_value = 5
+        mongo_nine.coll.count_documents.return_value = 4
+        mongo_ten.coll.count_documents.return_value = 4
+        mongo_eleven.coll.count_documents.return_value = 3
+        mongo_twelve.coll.count_documents.return_value = 1
+
+        legacy_scope = DeviceApiP5RolloutCommand._build_legacy_time_scope(
+            execute_time="2026-03-17 10:00:00",
+            legacy_window_minutes=60,
+        )
+        result = DeviceApiP5RolloutCommand._build_parallel_comparison(
+            execute_time="2026-03-17 10:00:00",
+            manage_ips=["10.0.0.1", "10.0.0.2"],
+            legacy_time_scope=legacy_scope,
+        )
+
+        self.assertEqual(result["summary"]["checked_collections"], 6)
+        self.assertEqual(result["summary"]["matched_collections"], 3)
+        self.assertEqual(result["summary"]["mismatch_collections"], 3)
+        self.assertTrue(result["legacy_time_scope"]["enabled"])
+        self.assertEqual(result["legacy_time_scope"]["source"], "execute_time_window")
+        legacy_query = mongo_two.coll.count_documents.call_args_list[0][0][0]
+        self.assertIn("$or", legacy_query)
+
+    @patch("apps.device_api.management.commands.device_api_p5_rollout.MongoOps")
+    def test_build_parallel_comparison_strict_mode_uses_batch_anchor(
+        self,
+        mock_mongo_ops,
+    ):
+        mongo_objects = []
+        for _ in range(12):
+            mongo = Mock()
+            mongo.coll.count_documents.return_value = 1
+            mongo_objects.append(mongo)
+        mock_mongo_ops.side_effect = mongo_objects
+
+        result = DeviceApiP5RolloutCommand._build_parallel_comparison(
+            execute_time="2026-03-17 10:00:00",
+            manage_ips=["10.0.0.1", "10.0.0.2"],
+            legacy_time_scope={"enabled": True},
+            comparison_mode="strict",
+            legacy_batch_field="execute_time",
+        )
+
+        self.assertEqual(result["comparison_mode"], "strict")
+        self.assertTrue(result["legacy_batch_anchor"]["enabled"])
+        self.assertEqual(result["legacy_batch_anchor"]["field"], "execute_time")
+        legacy_queries = [call.args[0] for call in mongo_objects[1].coll.count_documents.call_args_list]
+        exact_match_query = next(
+            (query for query in legacy_queries if query.get("execute_time") == "2026-03-17 10:00:00"),
+            None,
+        )
+        self.assertIsNotNone(exact_match_query)
+        self.assertNotIn("$or", exact_match_query)
+        self.assertIn("diagnostics", result)
+        self.assertIn("strict_anchor_missing_collections", result["diagnostics"])
+
+    @patch("apps.device_api.management.commands.device_api_p5_rollout.plan_collect_device_main")
+    @patch("apps.device_api.management.commands.device_api_p5_rollout.Command._sample_manage_ips_by_vendor")
+    @patch("apps.device_api.management.commands.device_api_p5_rollout.Command._count_active_devices_by_vendor")
+    @patch("apps.device_api.management.commands.device_api_p5_rollout.Command._latest_execute_time")
+    @patch("apps.device_api.management.commands.device_api_p5_rollout.MongoOps")
+    def test_handle_generates_report_and_can_run_gray(
+        self,
+        mock_mongo_ops,
+        mock_latest_execute_time,
+        mock_count_by_vendor,
+        mock_sample_ips,
+        mock_run_main,
+    ):
+        mock_latest_execute_time.return_value = "2026-03-17 10:00:00"
+        mock_count_by_vendor.side_effect = [2, 1, 1]
+        mock_sample_ips.side_effect = [
+            ["10.0.0.1", "10.0.0.2"],
+            ["10.0.0.3"],
+            ["10.0.0.4"],
+            ["10.0.0.1", "10.0.0.2"],
+        ]
+        mongo_objects = []
+        for idx in range(12):
+            mongo = Mock()
+            mongo.coll.count_documents.return_value = 2 if idx % 2 == 0 else 2
+            mongo_objects.append(mongo)
+        mock_mongo_ops.side_effect = mongo_objects
+        mock_run_main.return_value = {"total": 2, "tasks": 2}
+        command = DeviceApiP5RolloutCommand()
+
+        with patch.object(command.stdout, "write") as mock_write:
+            command.handle(
+                wave=1,
+                execute_time="",
+                sample_limit=10,
+                skip_compare=False,
+                run_gray=True,
+                gray_sample_limit=5,
+                dry_run=False,
+                output=None,
+                legacy_window_minutes=120,
+                legacy_start=None,
+                legacy_end=None,
+                evidence_dir=None,
+                drill_executed=False,
+                drill_start="",
+                drill_end="",
+                drill_scope="",
+                drill_operator="",
+                drill_result="pass",
+                drill_notes="",
+                drill_verify_item=[],
+                release_owner="",
+                release_observer="",
+                release_rollback_owner="",
+                release_risk="medium",
+                release_change="",
+                release_observation_item=[],
+            )
+
+        mock_run_main.assert_called_once()
+        writes = "\n".join(call.args[0] for call in mock_write.call_args_list)
+        self.assertIn("P5 灰度/对比/回退报告生成完成", writes)
+        self.assertIn("default_entry=device_api fallback_entry=automation", writes)
+        self.assertIn("legacy_scope: enabled=True source=execute_time_window", writes)
+        self.assertIn("acceptance_gate: status=fail", writes)
+        self.assertIn("gray_done=True", writes)
+
+    @patch("apps.device_api.management.commands.device_api_p5_rollout.Command._sample_manage_ips_by_vendor")
+    @patch("apps.device_api.management.commands.device_api_p5_rollout.Command._count_active_devices_by_vendor")
+    @patch("apps.device_api.management.commands.device_api_p5_rollout.Command._latest_execute_time")
+    def test_handle_writes_p5_evidence_files(self, mock_latest_execute_time, mock_count_by_vendor, mock_sample_ips):
+        mock_latest_execute_time.return_value = "2026-03-17 10:00:00"
+        mock_count_by_vendor.side_effect = [2, 1, 1]
+        mock_sample_ips.side_effect = [
+            ["10.0.0.1", "10.0.0.2"],
+            ["10.0.0.3"],
+            ["10.0.0.4"],
+        ]
+        command = DeviceApiP5RolloutCommand()
+        with TemporaryDirectory() as temp_dir:
+            command.handle(
+                wave=1,
+                execute_time="",
+                sample_limit=5,
+                skip_compare=True,
+                run_gray=False,
+                dry_run=True,
+                output=None,
+                legacy_window_minutes=120,
+                legacy_start=None,
+                legacy_end=None,
+                evidence_dir=temp_dir,
+                drill_executed=True,
+                drill_start="2026-03-17 09:00:00",
+                drill_end="2026-03-17 09:20:00",
+                drill_scope="Wave-1 Huawei/H3C",
+                drill_operator="codex",
+                drill_result="pass",
+                drill_notes="rollback drill completed",
+                drill_verify_item=["回退后 success_rate >= 95%"],
+                release_owner="codex",
+                release_observer="ops",
+                release_rollback_owner="ops",
+                release_risk="medium",
+                release_change="默认入口切换到 device_api",
+                release_observation_item=["batch_gate_metrics success_rate"],
+            )
+
+            rollout_report = Path(temp_dir) / "p5_rollout_report.json"
+            fallback_record = Path(temp_dir) / "p5_fallback_drill_record.json"
+            release_notes = Path(temp_dir) / "p5_release_notes.json"
+            self.assertTrue(rollout_report.exists())
+            self.assertTrue(fallback_record.exists())
+            self.assertTrue(release_notes.exists())
+
+            fallback_payload = json.loads(fallback_record.read_text(encoding="utf-8"))
+            release_payload = json.loads(release_notes.read_text(encoding="utf-8"))
+            rollout_payload = json.loads(rollout_report.read_text(encoding="utf-8"))
+            self.assertTrue(fallback_payload["executed"])
+            self.assertEqual(fallback_payload["result"], "pass")
+            self.assertEqual(fallback_payload["operator"], "codex")
+            self.assertEqual(release_payload["owner"], "codex")
+            self.assertEqual(release_payload["rollback_owner"], "ops")
+            self.assertEqual(rollout_payload["acceptance_gate"]["status"], "fail")
+
+
+class AuditLegacyTimeAnchorCommandTests(SimpleTestCase):
+    @patch("apps.device_api.management.commands.audit_legacy_time_anchor.Command._resolve_manage_ips")
+    @patch("apps.device_api.management.commands.audit_legacy_time_anchor.MongoOps")
+    def test_audit_legacy_time_anchor_reports_fail_when_anchor_missing(self, mock_mongo_ops, mock_resolve_manage_ips):
+        mock_resolve_manage_ips.return_value = ["10.0.0.1"]
+
+        mongo_objects = []
+        for _ in range(6):
+            mongo = Mock()
+            mongo.coll.count_documents.side_effect = [10, 0, 3]
+            mongo.coll.find_one.return_value = {"hostip": "10.0.0.1"}
+            mongo_objects.append(mongo)
+        mock_mongo_ops.side_effect = mongo_objects
+
+        command = AuditLegacyTimeAnchorCommand()
+        with TemporaryDirectory() as temp_dir:
+            output_file = Path(temp_dir) / "legacy_anchor_report.json"
+            with patch.object(command.stdout, "write") as mock_write:
+                command.handle(
+                    manage_ips=[],
+                    sample_limit=10,
+                    batch_field="execute_time",
+                    require_anchor_coverage=1.0,
+                    require_time_coverage=1.0,
+                    output=str(output_file),
+                )
+
+            self.assertTrue(output_file.exists())
+            payload = json.loads(output_file.read_text(encoding="utf-8"))
+            self.assertEqual(payload["gate"]["status"], "fail")
+            self.assertEqual(len(payload["gate"]["anchor_failed_collections"]), 6)
+            writes = "\n".join(call.args[0] for call in mock_write.call_args_list)
+            self.assertIn("gate: status=fail", writes)
+
+    @patch("apps.device_api.management.commands.audit_legacy_time_anchor.Command._resolve_manage_ips")
+    @patch("apps.device_api.management.commands.audit_legacy_time_anchor.MongoOps")
+    def test_audit_legacy_time_anchor_reports_pass_when_coverage_meets_gate(self, mock_mongo_ops, mock_resolve_manage_ips):
+        mock_resolve_manage_ips.return_value = ["10.0.0.1", "10.0.0.2"]
+
+        mongo_objects = []
+        for _ in range(6):
+            mongo = Mock()
+            mongo.coll.count_documents.side_effect = [10, 10, 10]
+            mongo.coll.find_one.return_value = {"hostip": "10.0.0.1", "execute_time": "2026-03-17 10:00:00"}
+            mongo_objects.append(mongo)
+        mock_mongo_ops.side_effect = mongo_objects
+
+        command = AuditLegacyTimeAnchorCommand()
+        with patch.object(command.stdout, "write") as mock_write:
+            command.handle(
+                manage_ips=[],
+                sample_limit=10,
+                batch_field="execute_time",
+                require_anchor_coverage=1.0,
+                require_time_coverage=1.0,
+                output=None,
+            )
+
+        writes = "\n".join(call.args[0] for call in mock_write.call_args_list)
+        self.assertIn("gate: status=pass", writes)
+
+
+class BackfillLegacyExecuteTimeCommandTests(SimpleTestCase):
+    @patch("apps.device_api.management.commands.backfill_legacy_execute_time.Command._resolve_manage_ips")
+    @patch("apps.device_api.management.commands.backfill_legacy_execute_time.MongoOps")
+    def test_backfill_dry_run_only_reports_missing_docs(self, mock_mongo_ops, mock_resolve_manage_ips):
+        mock_resolve_manage_ips.return_value = ["10.0.0.1"]
+
+        mongo_objects = []
+        for _ in range(6):
+            mongo = Mock()
+            mongo.coll.count_documents.side_effect = [10, 4]
+            mongo_objects.append(mongo)
+        mock_mongo_ops.side_effect = mongo_objects
+
+        command = BackfillLegacyExecuteTimeCommand()
+        with TemporaryDirectory() as temp_dir:
+            output_file = Path(temp_dir) / "backfill_report.json"
+            with patch.object(command.stdout, "write") as mock_write:
+                command.handle(
+                    manage_ips=[],
+                    sample_limit=5,
+                    collections=[],
+                    execute_time="2026-03-17 02:22:48",
+                    batch_field="execute_time",
+                    max_update_docs=20000,
+                    force=False,
+                    apply=False,
+                    output=str(output_file),
+                )
+
+            self.assertTrue(output_file.exists())
+            payload = json.loads(output_file.read_text(encoding="utf-8"))
+            self.assertFalse(payload["summary"]["apply_mode"])
+            self.assertEqual(payload["summary"]["total_to_update"], 24)
+            self.assertEqual(payload["summary"]["total_updated"], 0)
+            writes = "\n".join(call.args[0] for call in mock_write.call_args_list)
+            self.assertIn("dry_run: use --apply to execute backfill", writes)
+            for mongo in mongo_objects:
+                mongo.coll.update_many.assert_not_called()
+
+    @patch("apps.device_api.management.commands.backfill_legacy_execute_time.Command._resolve_manage_ips")
+    @patch("apps.device_api.management.commands.backfill_legacy_execute_time.MongoOps")
+    def test_backfill_apply_updates_only_missing_docs(self, mock_mongo_ops, mock_resolve_manage_ips):
+        mock_resolve_manage_ips.return_value = ["10.0.0.1", "10.0.0.2"]
+
+        mongo_objects = []
+        for _ in range(6):
+            mongo = Mock()
+            mongo.coll.count_documents.side_effect = [20, 3]
+            mongo.coll.update_many.return_value = SimpleNamespace(modified_count=3)
+            mongo_objects.append(mongo)
+        mock_mongo_ops.side_effect = mongo_objects
+
+        command = BackfillLegacyExecuteTimeCommand()
+        with patch.object(command.stdout, "write") as mock_write:
+            command.handle(
+                manage_ips=[],
+                sample_limit=5,
+                collections=[],
+                execute_time="2026-03-17 02:22:48",
+                batch_field="execute_time",
+                max_update_docs=20000,
+                force=False,
+                apply=True,
+                output=None,
+            )
+
+        writes = "\n".join(call.args[0] for call in mock_write.call_args_list)
+        self.assertIn("apply_mode=True", writes)
+        self.assertIn("updated=18", writes)
+        self.assertIn("post_check: run audit_legacy_time_anchor", writes)
+        first_update_args = mongo_objects[0].coll.update_many.call_args[0]
+        self.assertIn("$or", first_update_args[0])
+        self.assertEqual(first_update_args[1]["$set"]["execute_time"], "2026-03-17 02:22:48")
+
+
 class DeviceApiTaskTests(SimpleTestCase):
     @patch("apps.device_api.tasks.COLLECTION_SUB_PLAN.insert_one")
     @patch("apps.device_api.tasks.resolve_raw_data")
@@ -1696,6 +2392,140 @@ class DeviceApiTaskTests(SimpleTestCase):
         self.assertEqual(inserted_docs[0]["execute_time"], "2026-03-12T11:00:00")
         mock_insert_sub_task.assert_called_once()
 
+    @patch("apps.device_api.tasks.DeviceFactService.update_from_processed_data")
+    @patch("apps.device_api.tasks.COLLECTION_SUB_PLAN.insert_one")
+    @patch("apps.device_api.tasks.resolve_raw_data")
+    @patch("apps.device_api.models.DeviceSubCollectionPlan.objects")
+    def test_process_and_save_result_normalizes_version_to_device_identity(
+        self,
+        mock_plan_objects,
+        mock_resolve_raw_data,
+        mock_insert_sub_task,
+        mock_update_facts,
+    ):
+        mock_plan_objects.select_related.return_value.get.return_value = SimpleNamespace()
+        mock_resolve_raw_data.return_value = (True, "", [{"serial_num": "SER-1"}])
+        collection_db = Mock()
+
+        plan = {
+            "id": 9,
+            "summary_plan": 2,
+            "collection_type": "version",
+            "summary_plan_vendor": "Huawei",
+            "summary_plan_device_type": "switch",
+        }
+        device_info = {
+            "manage_ip": "10.0.0.9",
+            "name": "device-9",
+            "idc__name": "IDC-B",
+            "execute_time": "2026-03-17T10:00:00",
+        }
+
+        with patch("apps.device_api.tasks.COLLECTION_TYPE_MONGO_MAP", {"device_identity": collection_db}):
+            _process_and_save_result(
+                plan,
+                device_info,
+                raw_result=[{"version": "V1R1"}],
+                collection_method="netmiko",
+            )
+
+        inserted_docs = collection_db.insert_many.call_args[0][0]
+        self.assertEqual(inserted_docs[0]["collection_type"], "device_identity")
+        self.assertEqual(inserted_docs[0]["summary_plan_id"], 2)
+        self.assertEqual(inserted_docs[0]["plan_id"], 9)
+        mock_update_facts.assert_called_once()
+        self.assertEqual(
+            mock_update_facts.call_args.kwargs["collection_type"],
+            "device_identity",
+        )
+        mock_insert_sub_task.assert_called_once()
+
+    @patch("apps.device_api.tasks.COLLECTION_PLAN")
+    @patch("apps.device_api.tasks._process_and_save_result")
+    @patch("apps.device_api.tasks.DeviceCollectionService.insert_parent_plan_data")
+    @patch("apps.device_api.tasks.DeviceConnectionManager")
+    def test_plan_collect_device_updates_parent_status_with_partial_success(
+        self,
+        mock_connection_manager_cls,
+        mock_insert_parent,
+        mock_process_result,
+        mock_collection_plan,
+    ):
+        conn_mgr = Mock()
+        conn_mgr.execute_netmiko_command.side_effect = RuntimeError("ssh failed")
+        conn_mgr.execute_restconf_get.return_value = {"ok": True}
+        mock_connection_manager_cls.return_value.__enter__.return_value = conn_mgr
+        mock_connection_manager_cls.return_value.__exit__.return_value = False
+
+        result = plan_collect_device(
+            manage_ip="10.0.0.1",
+            plan_id=100,
+            execute_time="2026-03-17T11:00:00",
+            sub_plans=[
+                {
+                    "id": 1,
+                    "name": "arp-netmiko",
+                    "summary_plan": 100,
+                    "netmiko_enabled": True,
+                    "netmiko_method": "display arp",
+                },
+                {
+                    "id": 2,
+                    "name": "arp-restconf",
+                    "summary_plan": 100,
+                    "restconf_enabled": True,
+                    "restconf_endpoint": "/restconf/data/example",
+                },
+            ],
+        )
+
+        self.assertEqual(result["task_status"], "partial_success")
+        self.assertEqual(result["successful_sub_plans"], 1)
+        self.assertEqual(result["failed_sub_plans"], 1)
+        self.assertEqual(result["skipped_sub_plans"], 0)
+        mock_insert_parent.assert_called_once()
+        mock_process_result.assert_called_once()
+        mock_collection_plan.update_one.assert_called_once()
+        update_kwargs = mock_collection_plan.update_one.call_args.kwargs
+        self.assertEqual(update_kwargs["filter"]["execute_time"], "2026-03-17T11:00:00")
+        self.assertEqual(update_kwargs["update"]["$set"]["task_status"], "partial_success")
+
+    @patch("apps.device_api.tasks.COLLECTION_PLAN")
+    @patch("apps.device_api.tasks.DeviceCollectionService.insert_parent_plan_data")
+    @patch("apps.device_api.tasks.DeviceConnectionManager")
+    def test_plan_collect_device_marks_skipped_when_all_sub_plans_deferred(
+        self,
+        mock_connection_manager_cls,
+        mock_insert_parent,
+        mock_collection_plan,
+    ):
+        conn_mgr = Mock()
+        mock_connection_manager_cls.return_value.__enter__.return_value = conn_mgr
+        mock_connection_manager_cls.return_value.__exit__.return_value = False
+
+        result = plan_collect_device(
+            manage_ip="10.0.0.1",
+            plan_id=101,
+            execute_time="2026-03-17T11:30:00",
+            sub_plans=[
+                {
+                    "id": 9,
+                    "name": "telemetry-plan",
+                    "summary_plan": 101,
+                    "telemetry_enabled": True,
+                    "telemetry_subscription_path": "/interfaces/interface/state",
+                }
+            ],
+        )
+
+        self.assertEqual(result["task_status"], "skipped")
+        self.assertEqual(result["successful_sub_plans"], 0)
+        self.assertEqual(result["failed_sub_plans"], 0)
+        self.assertEqual(result["skipped_sub_plans"], 1)
+        self.assertEqual(result["skipped_details"][0]["reason"], "telemetry_deferred")
+        mock_insert_parent.assert_called_once()
+        mock_collection_plan.update_one.assert_called_once()
+
     @patch("apps.device_api.tasks.schedule_batch_network_analysis")
     @patch("apps.device_api.tasks.plan_collect_device.apply_async")
     @patch("apps.device_api.tasks.clear_his_collect_res")
@@ -1727,6 +2557,7 @@ class DeviceApiTaskTests(SimpleTestCase):
         mock_schedule_batch_network_analysis.return_value = {"scheduled": True, "reason": "scheduled"}
 
         from apps.device_api.tasks import plan_collect_device_main
+        from apps.device_api.tasks import CELERY_QUEUE
 
         result = plan_collect_device_main()
 
@@ -1740,6 +2571,11 @@ class DeviceApiTaskTests(SimpleTestCase):
         )
         self.assertTrue(result["clear_history"])
         self.assertTrue(result["analysis_trigger"]["scheduled"])
+        mock_plan_collect_apply_async.assert_any_call(
+            kwargs=mock_get_auto_device.return_value[0],
+            queue=CELERY_QUEUE,
+            retry=True,
+        )
 
     @patch("apps.device_api.tasks.schedule_batch_network_analysis")
     @patch("apps.device_api.tasks.plan_collect_device.apply_async")
@@ -3130,6 +3966,36 @@ class DeviceCollectionServiceExecutionTests(SimpleTestCase):
         self.assertFalse(result["results"]["netmiko"]["success"])
         self.assertTrue(result["results"]["snmp"]["success"])
         conn_mgr.execute_snmp_get.assert_called_once_with(["1.3.6.1.2.1.1.1.0"])
+
+    @patch("apps.device_api.services_new.DeviceConnectionManager")
+    def test_collect_with_connection_manager_marks_telemetry_as_deferred(
+        self,
+        mock_connection_manager_cls,
+    ):
+        conn_mgr = Mock()
+        conn_mgr.execute_telemetry_subscribe.side_effect = NotImplementedError(
+            "telemetry_not_implemented"
+        )
+        mock_connection_manager_cls.return_value.__enter__.return_value = conn_mgr
+        mock_connection_manager_cls.return_value.__exit__.return_value = False
+
+        result = DeviceCollectionService.collect_with_connection_manager(
+            {
+                "name": "telemetry-plan",
+                "telemetry_enabled": True,
+                "telemetry_subscription_path": "/interfaces/interface/state",
+            },
+            {
+                "manage_ip": "10.0.0.1",
+            },
+        )
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["error_code"], "all_methods_failed")
+        self.assertEqual(
+            result["results"]["telemetry"]["error_code"],
+            "telemetry_not_implemented",
+        )
 
     def test_execute_netmiko_south_builds_expected_payload(self):
         runner = Mock()
