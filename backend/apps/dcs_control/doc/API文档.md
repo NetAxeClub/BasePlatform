@@ -381,10 +381,16 @@ POST 操作（封堵、地址对象变更、DNAT 变更、安全策略变更）�
 
 ## DNAT 公网发布
 
-**路径**：`/dnat/`
+**路径**：
+
+- 同步：`/dnat/`
+- 异步：`/dnat_async/`
+
 **认证**：豁免（无需认证）
 
 ### GET — 查询设备 DNAT 规则列表
+
+`/dnat/` 与 `/dnat_async/` 的 GET 行为一致。
 
 场景一：按厂商实时查询设备 DNAT 规则。
 
@@ -410,6 +416,8 @@ POST 操作（封堵、地址对象变更、DNAT 变更、安全策略变更）�
 ---
 
 ### GET — 查询全局 DNAT 标准化表
+
+`/dnat/` 与 `/dnat_async/` 的 GET 行为一致。
 
 场景二：基于标准化后的 `DNAT` Mongo 集合做精确/范围混合查询。
 
@@ -486,6 +494,55 @@ GET /api/dcs_control/dnat/?hostip=172.16.75.1&global_ip=36.7.172.66&global_port=
       ]
     }
   ]
+}
+```
+
+---
+
+### POST — 同步下发 DNAT 配置
+
+**路径**：`/dnat/`
+
+说明：
+
+- 请求线程内直接执行配置下发
+- 成功时返回 `AutoFlow` 全字段，便于前端直接展示流程详情
+- 若配置成功但 `callback_url` 不可达，仍返回 `code=200`，并在 `message` 中提示“回调失败”
+
+**成功响应**
+
+```json
+{
+  "code": 200,
+  "message": "OK",
+  "data": {
+    "id": 101,
+    "task_id": "7f7f27d3-37f1-4b7c-a1f2-3b0d4a3cda6b",
+    "device": "10.254.15.98",
+    "task": "DNAT",
+    "state": "Published"
+  }
+}
+```
+
+---
+
+### POST — 异步下发 DNAT 配置
+
+**路径**：`/dnat_async/`
+
+说明：
+
+- 保持历史异步行为，调用 Celery 执行
+- 成功时返回 Celery 任务 ID，不等待设备执行完成
+
+**成功响应**
+
+```json
+{
+  "code": 200,
+  "message": "OK",
+  "data": "celery-task-id"
 }
 ```
 

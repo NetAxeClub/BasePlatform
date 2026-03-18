@@ -1276,7 +1276,7 @@ def check_data(data):
     PARSE_ID = [] ## 解析出来的ID结合
     NO_PARSE = [] ## 没有解析出来的ID集合
     ## print(data) 这里可以直接打印用于方法调试
-    ##print(data)
+    ## print(data)
     ##print('data', data[0]['counts']['count'])
     ##print(data[0]['dnat'][-1])
     if data != [{}]:
@@ -1288,20 +1288,19 @@ def check_data(data):
         for i in data[0]['counts']['count']:
             ID_LIST.append(i['ID'])
         ## 解析结果的集合
-        if isinstance(data[0]['dnat'], list):
-            for _data in data[0]['dnat']:
-                if _data != {}:
-                    if isinstance(_data['rule'], dict):
-                        _data['rule'] = [_data['rule']]
-                    if _data['rule']:
-                        for i in _data['rule']:
-                            if i['ID']:
-                                results.append(i)
-                                PARSE_ID.append(i['ID'])
-        else:
-            for i in data[0]['dnat']['rule']:
-                results.append(i)
-                PARSE_ID.append(i['ID'])
+        dnat_data = data[0].get('dnat') or []
+        if isinstance(dnat_data, dict):
+            dnat_data = [dnat_data]
+        for _data in dnat_data:
+            if not _data:
+                continue
+            rules = _data.get('rule') or []
+            if isinstance(rules, dict):
+                rules = [rules]
+            for i in rules:
+                if i.get('ID'):
+                    results.append(i)
+                    PARSE_ID.append(i['ID'])
         ## 找出没有解析出来的ID
         for out_id in ID_LIST:
             if out_id not in PARSE_ID:

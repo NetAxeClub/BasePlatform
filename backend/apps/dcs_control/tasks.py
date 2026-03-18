@@ -23,6 +23,7 @@ import copy
 import traceback
 import json
 import time
+from uuid import uuid4
 from datetime import datetime
 from functools import wraps
 import logging
@@ -99,6 +100,18 @@ def send_ws_msg(group_name, data):
 
 def send_msg_sec_manage(msg):
     log.info(msg)
+
+
+def resolve_task_id(task_obj=None, post_param=None):
+    if isinstance(post_param, dict):
+        task_id = post_param.get("task_id")
+        if task_id:
+            return str(task_id)
+    request = getattr(task_obj, "request", None)
+    request_id = getattr(request, "id", None)
+    if request_id:
+        return str(request_id)
+    return str(uuid4())
 
 
 # ws装饰器
@@ -7728,7 +7741,7 @@ def config_snat(self, **post_param):
         # step 2 生成流程
         _data = dict(
             order_code=post_param.get("order_code"),
-            task_id=str(self.request.id),
+            task_id=resolve_task_id(self, post_param),
             origin=post_param.get("origin") if post_param.get("origin") else "运维平台",
             commit_user=post_param["user"],
             remote_ip=post_param.get("remote_ip"),
@@ -7748,7 +7761,7 @@ def config_snat(self, **post_param):
         log.debug("config_snat (Huawei) cmds=%s, back_off=%s", cmds, back_off_cmds)
         _data = dict(
             order_code=post_param.get("order_code"),
-            task_id=str(self.request.id),
+            task_id=resolve_task_id(self, post_param),
             origin=post_param.get("origin") if post_param.get("origin") else "运维平台",
             commit_user=post_param["user"],
             remote_ip=post_param.get("remote_ip"),
@@ -7777,7 +7790,7 @@ def config_snat(self, **post_param):
                     if post_param.get("order_code")
                     else " "
                 ),
-                task_id=str(self.request.id),
+                task_id=resolve_task_id(self, post_param),
                 origin=(
                     post_param.get("origin") if post_param.get("origin") else "运维平台"
                 ),
@@ -7843,7 +7856,7 @@ def config_dnat(self, **post_param):
         # step 2 生成流程
         _data = dict(
             order_code=post_param.get("order_code"),
-            task_id=str(self.request.id),
+            task_id=resolve_task_id(self, post_param),
             origin=post_param.get("origin") if post_param.get("origin") else "运维平台",
             commit_user=post_param["user"],
             remote_ip=post_param.get("remote_ip"),
@@ -7862,7 +7875,7 @@ def config_dnat(self, **post_param):
         cmds, back_off_cmds = _FirewallMain.huawei_dnat_detail(**post_param)
         _data = dict(
             order_code=post_param.get("order_code"),
-            task_id=str(self.request.id),
+            task_id=resolve_task_id(self, post_param),
             origin=post_param.get("origin") if post_param.get("origin") else "运维平台",
             commit_user=post_param["user"],
             remote_ip=post_param.get("remote_ip"),
@@ -7903,7 +7916,7 @@ def config_dnat(self, **post_param):
                     if post_param.get("order_code")
                     else " "
                 ),
-                task_id=str(self.request.id),
+                task_id=resolve_task_id(self, post_param),
                 origin=(
                     post_param.get("origin") if post_param.get("origin") else "运维平台"
                 ),

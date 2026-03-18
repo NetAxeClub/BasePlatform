@@ -12,7 +12,12 @@ from apps.dcs_control.policy_audit import (
     get_vendor_aliases,
     normalize_sec_policy,
 )
-from apps.dcs_control.views import DestAddTranslate, SecPolicyAudit, SecPolicyAuditRecordView
+from apps.dcs_control.views import (
+    DestAddTranslate,
+    DestAddTranslateAsync,
+    SecPolicyAudit,
+    SecPolicyAuditRecordView,
+)
 
 
 class DcsControlPolicyAuditTests(SimpleTestCase):
@@ -309,3 +314,67 @@ class DcsControlPolicyAuditTests(SimpleTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(payload["code"], 400)
         self.assertIn("参数错误", payload["msg"])
+
+    @patch("apps.dcs_control.views.AutoFlow.objects.filter")
+    @patch("apps.dcs_control.views.config_dnat.run")
+    def test_dnat_sync_post_returns_autoflow_payload(self, mock_run, mock_filter):
+        mock_run.return_value = type(
+            "FlowRecord",
+            (),
+            {"id": 101, "callback_result": {"ok": True, "skipped": True, "error": ""}},
+        )()
+        mock_filter.return_value.values.return_value.first.return_value = {
+            "id": 101,
+            "task_id": "sync-task-id",
+            "device": "10.254.15.98",
+        }
+
+        request = self.factory.post(
+            "/base_platform/dcs_control/dnat/",
+            {
+                "vendor": "Hillstone",
+                "hostip": "10.254.15.98",
+                "hostid": 2494,
+                "add_object": True,
+                "name": "rule_1",
+                "from": {"any": True},
+                "to": {"ip": "117.71.98.25"},
+                "service": {"protocol": "TCP", "start_port": 8080, "end_port": 8080},
+                "trans_to": {"ip": "172.30.13.162"},
+            },
+            format="json",
+        )
+        response = DestAddTranslate.as_view()(request)
+        payload = json.loads(response.content)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["code"], 200)
+        self.assertEqual(payload["data"]["task_id"], "sync-task-id")
+        self.assertEqual(mock_run.call_count, 1)
+
+    @patch("apps.dcs_control.views.config_dnat.apply_async")
+    def test_dnat_async_post_returns_celery_task_id(self, mock_apply_async):
+        mock_apply_async.return_value = "celery-task-id"
+
+        request = self.factory.post(
+            "/base_platform/dcs_control/dnat_async/",
+            {
+                "vendor": "Hillstone",
+                "hostip": "10.254.15.98",
+                "hostid": 2494,
+                "add_object": True,
+                "name": "rule_1",
+                "from": {"any": True},
+                "to": {"ip": "117.71.98.25"},
+                "service": {"protocol": "TCP", "start_port": 8080, "end_port": 8080},
+                "trans_to": {"ip": "172.30.13.162"},
+            },
+            format="json",
+        )
+        response = DestAddTranslateAsync.as_view()(request)
+        payload = json.loads(response.content)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["code"], 200)
+        self.assertEqual(payload["data"], "celery-task-id")
+        self.assertEqual(mock_apply_async.call_count, 1)
