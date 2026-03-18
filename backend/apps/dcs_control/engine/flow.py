@@ -92,6 +92,8 @@ class FlowEngine:
             if res:
                 data_to_parse = default_storage.open(path).read()
                 flow_record.task_result = data_to_parse.decode('utf-8')
+                if netmiko_error:
+                    flow_record.task_result += '\n{}'.format(str(netmiko_error))
 
         flow_record.publish()
 

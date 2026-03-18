@@ -1,6 +1,8 @@
 import json
+from django.db import transaction
 from rest_framework.views import APIView
 from django.http import JsonResponse, HttpResponse
+from django.utils.decorators import method_decorator
 from netaddr import IPAddress
 from netaxe.settings import DEBUG
 from apps.asset.models import AssetIpInfo
@@ -20,6 +22,7 @@ from apps.dcs_control.db import (
 from apps.dcs_control.constants import Vendor
 from apps.dcs_control.models import FirewallPolicyAuditRecord
 from apps.dcs_control.serializers import FirewallPolicyAuditRecordSerializer
+from apps.automation.models import AutoFlow
 from apps.dcs_control.policy_audit import (
     build_sec_policy_audit_payload,
     extract_sec_policy_audit_summary,
@@ -266,6 +269,7 @@ class ServiceSet(APIView):
         return JsonResponse(dict(code=400, message='没有任何匹配'))
 
 
+@method_decorator(transaction.non_atomic_requests, name='dispatch')
 class DestAddTranslate(APIView):
     permission_classes = ()
 
@@ -317,7 +321,6 @@ class DestAddTranslate(APIView):
                             'end': {'$gte': local_port},
                         }
                     }
-
                 _res = dnat_mongo.find(query_dict=query, fields={'_id': 0})
                 return JsonResponse({
                     'results': _res,
@@ -371,7 +374,7 @@ class DestAddTranslate(APIView):
         # 更新单个设备DNAT信息
         if all(k in post_param for k in ("vendor", "update_device", "hostip")):
             if post_param['vendor'] == 'Hillstone':
-                config_dnat(**post_param)
+                config_dnat.run(**post_param)
                 return HttpResponse(json.dumps({'code': 200, 'message': 'OK', 'result': 'OK'}),
                                     content_type="application/json")
             return JsonResponse(dict(code=400, message='操作不被允许'))
@@ -382,17 +385,24 @@ class DestAddTranslate(APIView):
             if schema_res:
                 post_param['remote_ip'] = str(request.META.get("REMOTE_ADDR"))
                 post_param['user'] = str(request.user.username)
-                res = config_dnat.apply_async(kwargs=post_param, queue=CELERY_QUEUE,
-                                              retry=True)  # config_backup
-                if str(res) == 'None':
-                    print('forget')
-                    res.forget()
-                    return JsonResponse({'code': 400, 'message': '重复的任务参数', 'data': []})
-                if res:
-                    return JsonResponse({'code': 200, 'message': 'OK', 'data': str(res)})
+                # 同步执行时直接调用 run，避免 Celery Task 包装层（once/锁）污染请求事务
+                flow_record = config_dnat.run(**post_param)
+                if not flow_record:
+                    return JsonResponse({'code': 400, 'message': 'DNAT执行失败，请查看服务端日志', 'data': []})
+                flow_data = AutoFlow.objects.filter(id=flow_record.id).values().first()
+                if flow_data:
+                    callback_result = getattr(flow_record, 'callback_result', None) or {}
+                    if callback_result and not callback_result.get('ok') and not callback_result.get('skipped'):
+                        return JsonResponse({
+                            'code': 200,
+                            'message': f"DNAT下发成功，但回调失败: {callback_result.get('error')}",
+                            'data': flow_data,
+                        })
+                    return JsonResponse({'code': 200, 'message': 'OK', 'data': flow_data})
+                return JsonResponse({'code': 400, 'message': '未查询到流程记录', 'data': []})
             else:
                 return JsonResponse(msg, safe=False)
-            return JsonResponse(dict(code=400, message='操作不被允许', data=[]))
+            # return JsonResponse(dict(code=400, message='操作不被允许', data=[]))
 
         return JsonResponse(dict(code=400, message='没有任何匹配'))
 
