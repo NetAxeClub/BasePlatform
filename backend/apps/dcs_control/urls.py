@@ -24,6 +24,7 @@ urlpatterns = [
     path('address_set/', views.AddressSet.as_view(), name="address_set"),  # 地址对象
     path('service_set/', views.ServiceSet.as_view(), name="service_set"),  # 地址对象
     path('dnat/', views.DestAddTranslate.as_view(), name="dnat"),  # DNAT
+    path('dnat_async/', views.DestAddTranslateAsync.as_view(), name="dnat_async"),  # DNAT 异步
     path('sec_policy/', views.SecPolicy.as_view(), name="sec_policy"),  # 安全策略
     path('sec_policy_audit/', views.SecPolicyAudit.as_view(), name="sec_policy_audit"),  # 统一安全策略审计
     path('sec_policy_audit_records/', views.SecPolicyAuditRecordView.as_view(), name="sec_policy_audit_records"),  # 防火墙审计记录

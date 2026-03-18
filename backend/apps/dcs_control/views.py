@@ -1,4 +1,5 @@
 import json
+from uuid import uuid4
 from django.db import transaction
 from rest_framework.views import APIView
 from django.http import JsonResponse, HttpResponse
@@ -366,45 +367,76 @@ class DestAddTranslate(APIView):
                                          'code': 400})
         return JsonResponse({'code': 200})
 
-    # 表单验证
-    def post(self, request):
+    def _normalize_post_param(self, request):
         post_param = request.data
         if 'vendor' in post_param:
             post_param['vendor'] = Vendor.normalize(post_param['vendor'])
+        return post_param
+
+    def _handle_update_device_sync(self, post_param):
+        if post_param['vendor'] == 'Hillstone':
+            config_dnat.run(**post_param)
+            return HttpResponse(json.dumps({'code': 200, 'message': 'OK', 'result': 'OK'}),
+                                content_type="application/json")
+        return JsonResponse(dict(code=400, message='操作不被允许'))
+
+    def _handle_dnat_sync(self, request, post_param):
+        schema_res, msg = single_json_validate(post_param, post_dnat_schema)
+        if not schema_res:
+            return JsonResponse(msg, safe=False)
+
+        post_param['remote_ip'] = str(request.META.get("REMOTE_ADDR"))
+        post_param['user'] = str(request.user.username)
+        post_param['task_id'] = post_param.get('task_id') or str(uuid4())
+        flow_record = config_dnat.run(**post_param)
+        if not flow_record:
+            return JsonResponse({'code': 400, 'message': 'DNAT执行失败，请查看服务端日志', 'data': []})
+        flow_data = AutoFlow.objects.filter(id=flow_record.id).values().first()
+        if flow_data:
+            callback_result = getattr(flow_record, 'callback_result', None) or {}
+            if callback_result and not callback_result.get('ok') and not callback_result.get('skipped'):
+                return JsonResponse({
+                    'code': 200,
+                    'message': f"DNAT下发成功，但回调失败: {callback_result.get('error')}",
+                    'data': flow_data,
+                })
+            return JsonResponse({'code': 200, 'message': 'OK', 'data': flow_data})
+        return JsonResponse({'code': 400, 'message': '未查询到流程记录', 'data': []})
+
+    # 表单验证
+    def post(self, request):
+        post_param = self._normalize_post_param(request)
         # 更新单个设备DNAT信息
         if all(k in post_param for k in ("vendor", "update_device", "hostip")):
-            if post_param['vendor'] == 'Hillstone':
-                config_dnat.run(**post_param)
-                return HttpResponse(json.dumps({'code': 200, 'message': 'OK', 'result': 'OK'}),
-                                    content_type="application/json")
-            return JsonResponse(dict(code=400, message='操作不被允许'))
+            return self._handle_update_device_sync(post_param)
         # DNAT操作
         if all(k in post_param for k in ("vendor", "hostip", "hostid")):
-            schema_res, msg = single_json_validate(post_param, post_dnat_schema)
-            # json数据验证通过
-            if schema_res:
-                post_param['remote_ip'] = str(request.META.get("REMOTE_ADDR"))
-                post_param['user'] = str(request.user.username)
-                # 同步执行时直接调用 run，避免 Celery Task 包装层（once/锁）污染请求事务
-                flow_record = config_dnat.run(**post_param)
-                if not flow_record:
-                    return JsonResponse({'code': 400, 'message': 'DNAT执行失败，请查看服务端日志', 'data': []})
-                flow_data = AutoFlow.objects.filter(id=flow_record.id).values().first()
-                if flow_data:
-                    callback_result = getattr(flow_record, 'callback_result', None) or {}
-                    if callback_result and not callback_result.get('ok') and not callback_result.get('skipped'):
-                        return JsonResponse({
-                            'code': 200,
-                            'message': f"DNAT下发成功，但回调失败: {callback_result.get('error')}",
-                            'data': flow_data,
-                        })
-                    return JsonResponse({'code': 200, 'message': 'OK', 'data': flow_data})
-                return JsonResponse({'code': 400, 'message': '未查询到流程记录', 'data': []})
-            else:
-                return JsonResponse(msg, safe=False)
-            # return JsonResponse(dict(code=400, message='操作不被允许', data=[]))
+            return self._handle_dnat_sync(request, post_param)
 
         return JsonResponse(dict(code=400, message='没有任何匹配'))
+
+
+class DestAddTranslateAsync(DestAddTranslate):
+    def _handle_update_device_sync(self, post_param):
+        if post_param['vendor'] == 'Hillstone':
+            res = config_dnat.apply_async(kwargs=post_param, queue=CELERY_QUEUE, retry=True)
+            if str(res) == 'None':
+                return JsonResponse({'code': 400, 'message': '重复的任务参数', 'data': []})
+            return HttpResponse(json.dumps({'code': 200, 'message': 'OK', 'result': str(res)}),
+                                content_type="application/json")
+        return JsonResponse(dict(code=400, message='操作不被允许'))
+
+    def _handle_dnat_sync(self, request, post_param):
+        schema_res, msg = single_json_validate(post_param, post_dnat_schema)
+        if not schema_res:
+            return JsonResponse(msg, safe=False)
+
+        post_param['remote_ip'] = str(request.META.get("REMOTE_ADDR"))
+        post_param['user'] = str(request.user.username)
+        res = config_dnat.apply_async(kwargs=post_param, queue=CELERY_QUEUE, retry=True)
+        if str(res) == 'None':
+            return JsonResponse({'code': 400, 'message': '重复的任务参数', 'data': []})
+        return JsonResponse({'code': 200, 'message': 'OK', 'data': str(res)})
 
 
 class SecPolicy(APIView):
