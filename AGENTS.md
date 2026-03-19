@@ -313,3 +313,4 @@ PR 或合并说明至少应包含：
 | T-20260316-01 | 推进 device_api 父方案主导配置与 NETCONF 处理器补齐 | codex | DONE | `backend/venv/bin/python backend/manage.py test apps.device_api.tests.DeviceApiP5RolloutCommandTests -v 2` | P5-06 已收口并完成验收结论留痕，当前为 `PASS_WITH_WAIVER`（见 `p5_acceptance_decision.json`） |
 | T-20260316-02 | 建立四任务总体验收门禁、验收模板与总清单 | codex | DONE | self-review | 四任务验收方式与当前状态已合并到 `doc/10-当前任务与验收总览.md` |
 | T-20260316-03 | 清理四任务统一测试底座阻塞并推进总体验收 | codex | IN_PROGRESS | pending | 当前统一阻塞和验收关注点统一记录在 `doc/10-当前任务与验收总览.md` |
+| T-20260319-01 | 启动 NetClaw-CN Phase 0 架构定版与遗留切割 | codex | DONE | 文档逐条对照 + 仓库现状复核 | Phase 0 已正式验收通过，结论已回写到 `backend/doc/netclaw_cn/` |
