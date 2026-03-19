@@ -438,6 +438,12 @@ REST_FRAMEWORK_EXTENSIONS = {
     "DEFAULT_LIST_CACHE_KEY_FUNC": "rest_framework_extensions.utils.default_list_cache_key_func",
 }
 
+# 测试库初始化时不序列化 celery 元数据表，避免第三方调度表状态污染业务回放测试。
+TEST_NON_SERIALIZED_APPS = [
+    "django_celery_beat",
+    "django_celery_results",
+]
+
 # REST API REDIS缓存配置
 CACHES = {
     "default": {

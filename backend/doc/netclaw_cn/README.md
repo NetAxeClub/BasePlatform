@@ -37,7 +37,7 @@
 | 阶段 | 文档 | 目标 | 当前状态 | 验收结论 |
 |---|---|---|---|---|
 | Phase 0 | [01-phase-0-架构定版与遗留切割.md](./01-phase-0-%E6%9E%B6%E6%9E%84%E5%AE%9A%E7%89%88%E4%B8%8E%E9%81%97%E7%95%99%E5%88%87%E5%89%B2.md) | 架构定版、边界切割、遗留冻结 | DONE | PASS |
-| Phase 1 | [02-phase-1-巡检与事实主链.md](./02-phase-1-%E5%B7%A1%E6%A3%80%E4%B8%8E%E4%BA%8B%E5%AE%9E%E4%B8%BB%E9%93%BE.md) | facts/capabilities/inspection/security audit 统一只读主链 | PLANNED | 未验收 |
+| Phase 1 | [02-phase-1-巡检与事实主链.md](./02-phase-1-%E5%B7%A1%E6%A3%80%E4%B8%8E%E4%BA%8B%E5%AE%9E%E4%B8%BB%E9%93%BE.md) | facts/capabilities/inspection/security audit 统一只读主链 | DONE | PASS_WITH_WAIVER |
 | Phase 2 | [03-phase-2-变更治理主链.md](./03-phase-2-%E5%8F%98%E6%9B%B4%E6%B2%BB%E7%90%86%E4%B8%BB%E9%93%BE.md) | 审批、执行、验证、回滚闭环 | PLANNED | 未验收 |
 | Phase 3 | [04-phase-3-拓扑意图与漂移.md](./04-phase-3-%E6%8B%93%E6%89%91%E6%84%8F%E5%9B%BE%E4%B8%8E%E6%BC%82%E7%A7%BB.md) | 事实拓扑、意图对比、漂移诊断 | PLANNED | 未验收 |
 | Phase 4 | [05-phase-4-mcp与skill产品化.md](./05-phase-4-mcp%E4%B8%8Eskill%E4%BA%A7%E5%93%81%E5%8C%96.md) | MCP / Skill 产品化边界 | PLANNED | 未验收 |
