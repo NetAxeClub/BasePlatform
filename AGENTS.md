@@ -313,4 +313,7 @@ PR 或合并说明至少应包含：
 | T-20260316-01 | 推进 device_api 父方案主导配置与 NETCONF 处理器补齐 | codex | DONE | `backend/venv/bin/python backend/manage.py test apps.device_api.tests.DeviceApiP5RolloutCommandTests -v 2` | P5-06 已收口并完成验收结论留痕，当前为 `PASS_WITH_WAIVER`（见 `p5_acceptance_decision.json`） |
 | T-20260316-02 | 建立四任务总体验收门禁、验收模板与总清单 | codex | DONE | self-review | 四任务验收方式与当前状态已合并到 `doc/10-当前任务与验收总览.md` |
 | T-20260316-03 | 清理四任务统一测试底座阻塞并推进总体验收 | codex | IN_PROGRESS | pending | 当前统一阻塞和验收关注点统一记录在 `doc/10-当前任务与验收总览.md` |
+| T-20260319-03 | 整改 Phase 1 认证链阻塞项 | codex | DONE | `python3 backend/manage.py test apps.api.tests_agent_v1 -v 2` | `agent/v1` 已补齐认证与权限控制，匿名拒绝 / IAM 身份通过测试已覆盖，等待复验关闭 `RID-P1-001` |
+| T-20260319-04 | 推进 Phase 1 数据库级回放证据补齐 | codex | DONE | `backend/venv/bin/python backend/manage.py test apps.api.tests_agent_v1_integration -v 2 --keepdb` | 已补齐数据库级回放证据，并通过 `config_center` migration 与测试序列化配置修复测试底座阻塞 |
+| T-20260319-02 | 推进 NetClaw-CN Phase 1 统一只读主链开发 | codex | DONE | `backend/venv/bin/python backend/manage.py test apps.api.tests_agent_v1 -v 2` + `backend/venv/bin/python backend/manage.py test apps.api.tests_agent_v1_integration -v 2 --keepdb` | Phase 1 已复验通过，当前为 `PASS_WITH_WAIVER`，豁免项见 `backend/doc/netclaw_cn/07-风险台账与豁免记录.md` |
 | T-20260319-01 | 启动 NetClaw-CN Phase 0 架构定版与遗留切割 | codex | DONE | 文档逐条对照 + 仓库现状复核 | Phase 0 已正式验收通过，结论已回写到 `backend/doc/netclaw_cn/` |

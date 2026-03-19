@@ -64,6 +64,13 @@
 - Phase 1 测试报告
 - Phase 1 验收结论
 
+当前实现索引：
+
+- `backend/apps/api/agent_views.py`
+- `backend/apps/api/agent_urls.py`
+- `backend/apps/api/tests_agent_v1.py`
+- [02a-phase-1-完成包与自查记录.md](./02a-phase-1-%E5%AE%8C%E6%88%90%E5%8C%85%E4%B8%8E%E8%87%AA%E6%9F%A5%E8%AE%B0%E5%BD%95.md)
+
 ## 7. 接口或模型变更
 
 本阶段必须形成可直接消费的只读接口：
@@ -94,6 +101,11 @@
 - 安全审计结果能独立查询和回放
 - analysis 结果可回溯到源批次或源任务
 - 未覆盖画像设备返回明确阻塞原因
+
+当前已执行验证：
+
+- `python3 -m py_compile backend/apps/api/agent_views.py backend/apps/api/agent_urls.py backend/apps/api/tests_agent_v1.py backend/netaxe/urls.py`
+- `python3 backend/manage.py test apps.api.tests_agent_v1 apps.workflow_center.test_netclaw_boundary -v 2`
 
 ## 9. 验收标准
 
@@ -141,8 +153,29 @@
 
 ## 13. 验收结论
 
-- 当前状态：`PLANNED`
-- Gate 结论：`未验收`
-- 验收负责人：`待填写`
-- 验收时间：`待填写`
-- 证据引用：`待填写`
+- 当前状态：`DONE`
+- Phase：`Phase 1`
+- Decision：`PASS_WITH_WAIVER`
+- Summary：`Phase 1 已完成统一只读主链实现，facts/capabilities/inspection/analysis/security audit 合同可统一消费；认证链、国产主厂商覆盖清单及巡检/安全审计数据库级回放证据已补齐，当前以豁免方式放行后续阶段。`
+- Blocking Issues：
+  - `无`
+- Waivers：
+  - `WVR-P1-001`：统一出口当前仍以聚合层为主，`analysis` 更强端到端回放证据及若干 app 的 migration 警告尚待后续清理
+- Required Follow-ups：
+  - 补充 `analysis` 基于真实 `AnalysisRun` 数据源的更强回放证据
+  - 清理 `automation`、`django_celery_beat`、`django_celery_results`、`network_analysis` 的未生成 migration 警告
+  - 在 Phase 2 验收前复核统一出口是否仍只是聚合层薄包装
+- 证据引用：
+  - `backend/apps/api/agent_views.py`
+  - `backend/apps/api/agent_urls.py`
+  - `backend/apps/api/tests_agent_v1.py`
+  - `backend/apps/api/tests_agent_v1_integration.py`
+  - `backend/apps/workflow_center/test_netclaw_boundary.py`
+  - `02a-phase-1-完成包与自查记录.md`
+  - `02b-phase-1-国产主厂商覆盖清单.md`
+  - `02c-phase-1-巡检与安全审计回放证据.md`
+  - `backend/venv/bin/python -m py_compile backend/apps/api/agent_views.py backend/apps/api/tests_agent_v1.py backend/apps/api/tests_agent_v1_integration.py`
+  - `backend/venv/bin/python backend/manage.py test apps.api.tests_agent_v1 -v 2`
+  - `backend/venv/bin/python backend/manage.py test apps.api.tests_agent_v1_integration -v 2 --keepdb`
+- Accepted By：`codex`
+- Accepted At：`2026-03-19 17:40:00 CST`
