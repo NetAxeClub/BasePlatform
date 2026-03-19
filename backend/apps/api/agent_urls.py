@@ -8,6 +8,8 @@ from apps.api.agent_views import (
     AgentExecutionDetailAPIView,
     AgentInspectionTaskAPIView,
     AgentSecurityAuditTaskAPIView,
+    AgentToolCatalogAPIView,
+    AgentTopologyReconcileAPIView,
 )
 
 
@@ -26,5 +28,7 @@ urlpatterns = [
         name="agent-security-audit",
     ),
     path("analysis/", AgentAnalysisAPIView.as_view(), name="agent-analysis"),
+    path("tools/catalog/", AgentToolCatalogAPIView.as_view(), name="agent-tool-catalog"),
+    path("topology/reconcile/", AgentTopologyReconcileAPIView.as_view(), name="agent-topology-reconcile"),
     path("executions/<int:execution_id>/", AgentExecutionDetailAPIView.as_view(), name="agent-execution-detail"),
 ]

@@ -14,6 +14,8 @@
 ## 3. 非目标
 
 - 不在本阶段继续扩展底层业务域功能
+- 不以 `automation`、`monitor`、`support` 作为 MCP / Skill 产品化的能力来源或接口依据
+- 不允许为了接入速度绕过统一后端，直接把 legacy app 包装成 tool
 - 不在本阶段重构全部现有 OpenClaw Skill 实现细节
 
 ## 4. 研发任务拆分
@@ -40,6 +42,12 @@
 - 明确 OpenClaw / Skill 不应直接拼接内部接口
 - 明确后续集成必须消费 MCP / REST 统一合同
 
+### 4.5 legacy app 禁止事项
+
+- `automation`、`monitor`、`support` 不允许作为 tool schema、权限模型、错误语义或验收样例的直接来源
+- 若历史能力仍在线，只允许通过主链模块暴露统一合同，不允许直接包装 legacy app 路由或模型
+- 所有产品化接入都必须以 Phase 0 到 Phase 3 已确认的主链模块为唯一后端依据
+
 ## 5. 依赖与前置条件
 
 - Phase 3 已正式通过
@@ -55,6 +63,14 @@
 - OpenClaw / Skill 接入约束文档
 - Phase 4 测试报告
 - Phase 4 验收结论
+
+当前实现索引：
+
+- `backend/apps/api/agent_views.py`
+- `backend/apps/api/agent_urls.py`
+- `backend/apps/api/tests_agent_v1.py`
+- [05a-phase-4-完成包与产品化约束.md](./05a-phase-4-%E5%AE%8C%E6%88%90%E5%8C%85%E4%B8%8E%E4%BA%A7%E5%93%81%E5%8C%96%E7%BA%A6%E6%9D%9F.md)
+- [05b-phase-4-错误语义与权限规则.md](./05b-phase-4-%E9%94%99%E8%AF%AF%E8%AF%AD%E4%B9%89%E4%B8%8E%E6%9D%83%E9%99%90%E8%A7%84%E5%88%99.md)
 
 ## 7. 接口或模型变更
 
@@ -79,6 +95,7 @@
 以下标准全部满足，Phase 4 才能放行：
 
 - agent 不直接拼接零散内部接口
+- tool 不直接消费 `automation`、`monitor`、`support` 等 legacy app
 - REST / MCP 合同稳定
 - tool metadata 足以支撑调用、出错、重试和审计
 - 权限边界清晰，agent service account 不等同普通用户
@@ -101,6 +118,7 @@
 本阶段重点风险：
 
 - tool schema 只是 REST 透传，缺少稳定语义
+- 为了快速接入而直接包装 `automation`、`monitor`、`support`，导致 legacy 能力重新暴露给 agent
 - agent 权限边界不清，高风险操作可能越权
 - 错误码设计不完整，导致 Skill 侧无法正确处理
 
@@ -115,8 +133,44 @@
 
 ## 13. 验收结论
 
-- 当前状态：`PLANNED`
-- Gate 结论：`未验收`
-- 验收负责人：`待填写`
-- 验收时间：`待填写`
-- 证据引用：`待填写`
+- 当前状态：`DONE`
+- Phase：`Phase 4`
+- Decision：`PASS`
+- Summary：`Phase 4 已完成 MCP/Skill 产品化边界基线，主链 tool schema、权限边界、错误语义、限流 enforcement 和 legacy 禁止事项已固定并通过复核。`
+- Blocking Issues：
+  - `无`
+- Waivers：
+  - `无`
+- Required Follow-ups：
+  - 在后续产品化阶段继续完善 MCP server 实现细节和更丰富的错误语义
+- Evidence Refs：
+  - `backend/apps/api/agent_views.py`
+  - `backend/apps/api/agent_urls.py`
+  - `backend/apps/api/tests_agent_v1.py`
+  - `05a-phase-4-完成包与产品化约束.md`
+  - `05b-phase-4-错误语义与权限规则.md`
+  - `backend/apps/api/error_codes.py`
+  - `backend/apps/api/throttles.py`
+  - `backend/apps/api/tests_agent_v1_integration.py`
+  - `backend/venv/bin/python backend/manage.py test apps.api.tests_agent_v1 -v 2`
+  - `backend/venv/bin/python backend/manage.py test apps.api.tests_agent_v1 apps.api.tests_agent_v1_integration -v 2 --keepdb`
+- Accepted By：`codex`
+- Accepted At：`2026-03-20 00:20:00 CST`
+
+## 14. 整改回写
+
+- 回写时间：`2026-03-20`
+- 对应豁免：`WVR-P4-001`
+- 当前结论：`CLOSED`
+- 整改结果：
+  - 已新增统一错误码字典，固定 `http_status`、`retryable`、`category`、`recommended_action`，并复用于 tool catalog 与接口错误返回。
+  - 已新增运行时 throttle，实现 `device_facts`、`inspection_run`、`security_audit_run`、`change_run`、`execution_query` 的 burst / sustained enforcement。
+  - 已补齐限流测试与错误码一致性测试，确认 tool metadata 不再只是静态说明。
+- Evidence Refs：
+  - `backend/apps/api/error_codes.py`
+  - `backend/apps/api/throttles.py`
+  - `backend/apps/api/agent_views.py`
+  - `backend/apps/api/tests_agent_v1.py`
+  - `backend/apps/api/tests_agent_v1_integration.py`
+  - `backend/venv/bin/python backend/manage.py test apps.api.tests_agent_v1 -v 2`
+  - `backend/venv/bin/python backend/manage.py test apps.api.tests_agent_v1_integration -v 2 --keepdb`

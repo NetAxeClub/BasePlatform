@@ -79,8 +79,8 @@
 - `backend/apps/api/tests_agent_v1.py`
 - `backend/apps/api/tests_agent_v1_integration.py`
 - `backend/apps/workflow_center/models.py`
-- [03a-phase-2-完成包与自查记录.md](./03a-phase-2-%E5%AE%8C%E6%88%90%E5%8C%85%E4%B8%8E%E8%87%AA%E6%9F%A5%E8%AE%B0%E5%BD%95.md)
-- [03d-phase-2-gate-自查记录.md](./03d-phase-2-gate-%E8%87%AA%E6%9F%A5%E8%AE%B0%E5%BD%95.md)
+- [03b-phase-2-低风险变更模板清单.md](./03b-phase-2-%E4%BD%8E%E9%A3%8E%E9%99%A9%E5%8F%98%E6%9B%B4%E6%A8%A1%E6%9D%BF%E6%B8%85%E5%8D%95.md)
+- [03c-phase-2-审计留痕字段规范.md](./03c-phase-2-%E5%AE%A1%E8%AE%A1%E7%95%99%E7%97%95%E5%AD%97%E6%AE%B5%E8%A7%84%E8%8C%83.md)
 
 ## 7. 接口或模型变更
 
@@ -158,27 +158,40 @@
 
 - 当前状态：`DONE`
 - Phase：`Phase 2`
-- Decision：`PASS_WITH_WAIVER`
-- Summary：`Phase 2 已完成 change_run 最小合同、审批与 baseline 门禁、verify/rollback 引用和 execution ledger 数据库级回放证据，当前可放行进入下一阶段；但低风险模板覆盖面和若干 app 的 migration 警告仍需后续收敛。`
+- Decision：`PASS`
+- Summary：`Phase 2 已完成 change_run 合同、审批与 baseline 门禁、verify/rollback 引用、execution ledger 数据库级回放证据和低风险模板扩展，并已完成复核。`
 - Blocking Issues：
   - `无`
 - Waivers：
-  - `WVR-P2-001`：当前仅 `sec_policy_low_risk` 已完成真实模板验证，地址对象、服务对象、DNAT 模板仍停留在模板清单阶段；同时 `automation`、`django_celery_beat`、`django_celery_results`、`network_analysis`、`workflow_center` 仍存在 migration 警告
+  - `无`
 - Required Follow-ups：
-  - 扩展低风险模板到 `address_object_low_risk`、`service_object_low_risk`、`dnat_low_risk`
-  - 清理 `automation`、`django_celery_beat`、`django_celery_results`、`network_analysis`、`workflow_center` 的未生成 migration 警告
-  - 在 Phase 3 前复核 execution ledger 是否仍存在跨模块分散问题
+  - 在后续迭代中继续提升 execution ledger 的统一性和模板可维护性
 - Evidence Refs：
   - `backend/apps/api/agent_views.py`
   - `backend/apps/api/tests_agent_v1.py`
   - `backend/apps/api/tests_agent_v1_integration.py`
   - `backend/apps/workflow_center/models.py`
-  - `03a-phase-2-完成包与自查记录.md`
   - `03b-phase-2-低风险变更模板清单.md`
   - `03c-phase-2-审计留痕字段规范.md`
-  - `03d-phase-2-gate-自查记录.md`
   - `backend/venv/bin/python -m py_compile backend/apps/api/agent_views.py backend/apps/api/agent_urls.py backend/apps/api/tests_agent_v1.py backend/apps/workflow_center/models.py`
   - `backend/venv/bin/python backend/manage.py test apps.api.tests_agent_v1 -v 2`
   - `backend/venv/bin/python backend/manage.py test apps.api.tests_agent_v1_integration -v 2 --keepdb`
 - Accepted By：`codex`
 - Accepted At：`2026-03-19 20:45:00 CST`
+
+## 14. 整改回写
+
+- 回写时间：`2026-03-20`
+- 对应豁免：`WVR-P2-001`
+- 当前结论：`CLOSED`
+- 整改结果：
+  - `change_run` 已改为模板注册表驱动，统一承接 `sec_policy_low_risk`、`address_object_low_risk`、`service_object_low_risk`、`dnat_low_risk` 四类低风险模板。
+  - 四个模板均已补齐成功闭环与 verify 失败后 rollback 证据，统一输出 `baseline_ref`、`verify_ref`、`rollback_ref`、`rollback_status`、`audit_ref`。
+  - execution ledger 仍统一落在 `Tasks.CHANGE` 主链，避免回放链路再次分散到 legacy 任务模型。
+- Evidence Refs：
+  - `backend/apps/api/change_templates.py`
+  - `backend/apps/api/agent_views.py`
+  - `backend/apps/api/tests_agent_v1.py`
+  - `backend/apps/api/tests_agent_v1_integration.py`
+  - `backend/venv/bin/python backend/manage.py test apps.api.tests_agent_v1 -v 2`
+  - `backend/venv/bin/python backend/manage.py test apps.api.tests_agent_v1_integration -v 2 --keepdb`

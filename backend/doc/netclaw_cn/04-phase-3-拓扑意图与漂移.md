@@ -14,6 +14,8 @@
 ## 3. 非目标
 
 - 不继续扩展旧 `topology` 手工图编辑主链
+- 不以 `automation`、`monitor`、`support` 作为 Phase 3 的设计、实现或验收依据
+- 不在 `automation`、`monitor`、`support` 中落任何新的事实拓扑、漂移诊断或对账主链能力
 - 不在本阶段实现所有高级协议诊断场景
 - 不在本阶段交付 MCP / Skill 层
 
@@ -42,6 +44,12 @@
 - 采集结果事实
 - 分析归纳事实
 
+### 4.5 legacy 约束
+
+- `automation`、`monitor`、`support` 仅允许作为历史现状说明、兼容清理或数据对账背景，不允许作为未来主链实现入口
+- 若需要引用 legacy 数据，只能通过主链模块完成映射、迁移或只读比对，不允许把 Phase 3 新逻辑写回 legacy app
+- `topology` 旧手工图链路只允许作为被替代对象，不允许继续扩展其主链职责
+
 ## 5. 依赖与前置条件
 
 - Phase 2 已正式通过
@@ -58,6 +66,16 @@
 - 三方对账流程说明
 - Phase 3 测试报告
 - Phase 3 验收结论
+
+当前实现索引：
+
+- `backend/apps/api/agent_views.py`
+- `backend/apps/api/agent_urls.py`
+- `backend/apps/api/tests_agent_v1.py`
+- `backend/apps/network_analysis/services.py`
+- `backend/apps/network_analysis/tests.py`
+- `backend/apps/network_analysis/migrations/0003_auto_20260319_2335.py`
+- [04b-phase-3-三方对账流程说明.md](./04b-phase-3-%E4%B8%89%E6%96%B9%E5%AF%B9%E8%B4%A6%E6%B5%81%E7%A8%8B%E8%AF%B4%E6%98%8E.md)
 
 ## 7. 接口或模型变更
 
@@ -86,6 +104,7 @@
 以下标准全部满足，Phase 3 才能放行：
 
 - 拓扑结果不依赖旧 `topology` 手工图模型
+- Phase 3 新能力未回流 `automation`、`monitor`、`support`
 - 漂移结果可回溯到批次和源执行记录
 - 至少覆盖 LLDP、接口、IP、地址定位四类事实来源
 - 分析结果具备统一 severity / summary / traceability
@@ -108,6 +127,7 @@
 本阶段重点风险：
 
 - 事实拓扑仍被旧手工图模型绑架
+- 为图快而继续借用 `automation`、`monitor`、`support` 作为实现依据，导致 legacy 回流
 - 分析结论无法回溯到批次和任务
 - 漂移检测只有表面字段比对，没有归因能力
 
@@ -123,8 +143,40 @@
 
 ## 13. 验收结论
 
-- 当前状态：`PLANNED`
-- Gate 结论：`未验收`
-- 验收负责人：`待填写`
-- 验收时间：`待填写`
-- 证据引用：`待填写`
+- 当前状态：`DONE`
+- Phase：`Phase 3`
+- Decision：`PASS`
+- Summary：`Phase 3 已交付 topology reconcile 出口、config drift / route health / device health 分析项、事实图主链与三方对账流程说明，且未回流 legacy app，并已完成数据库级回放与架构守卫复核。`
+- Blocking Issues：
+  - `无`
+- Waivers：
+  - `无`
+- Required Follow-ups：
+  - 在后续迭代中继续收缩旧 `topology` 手工图链路的运行影响范围
+- Evidence Refs：
+  - `backend/apps/api/agent_views.py`
+  - `backend/apps/network_analysis/services.py`
+  - `backend/apps/network_analysis/tests.py`
+  - `backend/apps/network_analysis/tests_integration.py`
+  - `backend/apps/api/tests_agent_v1.py`
+  - `04b-phase-3-三方对账流程说明.md`
+  - `backend/venv/bin/python backend/manage.py test apps.api.tests_agent_v1 apps.network_analysis.tests -v 2`
+  - `backend/venv/bin/python backend/manage.py test apps.network_analysis.tests apps.network_analysis.tests_integration -v 2 --keepdb`
+- Accepted By：`codex`
+- Accepted At：`2026-03-20 00:05:00 CST`
+
+## 14. 整改回写
+
+- 回写时间：`2026-03-20`
+- 对应豁免：`WVR-P3-001`
+- 当前结论：`CLOSED`
+- 整改结果：
+  - 已为 `network_analysis` 增加架构守卫测试，明确禁止运行期导入旧 `apps.topology` 主链实现，以及继续消费 `Automation.topology` / `layer2interface` 旧集合。
+  - `config_drift`、`route_health`、`device_health` 已补齐数据库级回放测试，`topology_reconcile` 也补齐了批次级追溯证据。
+  - Phase 3 主链当前仍保留 legacy `topology` 页面作为兼容入口，但新主链测试已不再依赖旧手工图实现。
+- Evidence Refs：
+  - `backend/apps/network_analysis/services.py`
+  - `backend/apps/network_analysis/tests.py`
+  - `backend/apps/network_analysis/tests_integration.py`
+  - `backend/venv/bin/python backend/manage.py test apps.network_analysis.tests apps.network_analysis.tests_integration -v 2 --keepdb`
+  - `backend/venv/bin/python backend/manage.py test apps.api.tests_agent_v1 -v 2`
