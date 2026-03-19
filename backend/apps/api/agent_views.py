@@ -88,6 +88,18 @@ def _now_task_id(prefix: str) -> str:
 
 
 def _workflow_status(state: str) -> str:
+    if state in (State.SUCCEEDED, State.FINISH):
+        return "SUCCEEDED"
+    if state == State.PARTIAL:
+        return "PARTIAL_SUCCESS"
+    if state == State.ROLLED_BACK:
+        return "ROLLED_BACK"
+    if state == State.CANCELLED:
+        return "CANCELLED"
+    if state in (State.RUNNING, State.PUBLISHED):
+        return "RUNNING"
+    if state == State.VERIFYING:
+        return "VERIFYING"
     if state == State.FINISH:
         return "SUCCEEDED"
     if state == State.FAILED:
@@ -107,6 +119,10 @@ def _severity_from_audit_summary(summary: Dict) -> str:
     if summary.get("logging_review_count", 0):
         return "MEDIUM"
     return "INFO"
+
+
+def _extract_change_summary(kwargs_payload: Dict, task_result: Dict) -> Dict:
+    return kwargs_payload.get("change_summary") or task_result.get("change_summary") or {}
 
 
 def _serialize_device_facts(device: NetworkDevice) -> Dict:
@@ -414,15 +430,23 @@ class AgentExecutionDetailAPIView(APIView):
 
         kwargs_payload = _parse_json(getattr(execution, "kwargs", "{}"), {})
         task_result = _parse_json(getattr(execution, "task_result", "{}"), {})
-        summary = kwargs_payload.get("summary") or task_result.get("summary") or {}
+        summary = (
+            _extract_change_summary(kwargs_payload, task_result)
+            if getattr(execution, "task", "") == Tasks.CHANGE
+            else kwargs_payload.get("summary") or task_result.get("summary") or {}
+        )
 
         audit_ref = None
+        rollback_ref = None
         if getattr(execution, "task", "") == Tasks.INSPECTION:
             audit_ref = f"audit://inspection/{execution_id}"
         elif getattr(execution, "task", "") == Tasks.SEC_POLICY:
             audit_record_id = kwargs_payload.get("audit_record_id")
             if audit_record_id:
                 audit_ref = f"audit://security-policy/{audit_record_id}"
+        elif getattr(execution, "task", "") == Tasks.CHANGE:
+            audit_ref = kwargs_payload.get("audit_ref")
+            rollback_ref = kwargs_payload.get("rollback_ref")
 
         return _response(
             task_id=getattr(execution, "task_id", ""),
@@ -434,6 +458,7 @@ class AgentExecutionDetailAPIView(APIView):
                 {"type": "execution_result", "ref": f"execution://{execution_id}"},
             ],
             audit_ref=audit_ref,
+            rollback_ref=rollback_ref,
             payload={
                 "task": getattr(execution, "task", ""),
                 "method": getattr(execution, "method", ""),
@@ -652,4 +677,161 @@ class AgentSecurityAuditTaskAPIView(APIView):
             ],
             audit_ref=f"audit://security-policy/{getattr(record, 'id', '')}",
             payload={"summary": summary, "findings": findings, "result_count": len(findings)},
+        )
+
+
+class AgentChangeTaskAPIView(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (AgentRequestAuthentication,)
+
+    REQUIRED_APPROVAL_STATUS = "approved"
+
+    @staticmethod
+    def _build_verify_result(request_data: Dict) -> Dict:
+        verify_data = request_data.get("verify") or {}
+        verify_passed = bool(verify_data.get("passed"))
+        summary = {
+            "verify_passed": verify_passed,
+            "verify_type": verify_data.get("type", "post_change_check"),
+            "verify_message": verify_data.get("message", ""),
+        }
+        return summary
+
+    @staticmethod
+    def _build_change_refs(task_id: str) -> Dict[str, str]:
+        return {
+            "baseline_ref": f"baseline://{task_id}",
+            "verify_ref": f"verify://{task_id}",
+            "rollback_ref": f"rollback://{task_id}",
+            "audit_ref": f"audit://change/{task_id}",
+        }
+
+    def post(self, request):
+        approval_status = (request.data.get("approval_status") or "").strip().lower()
+        baseline_ref = (request.data.get("baseline_ref") or "").strip()
+        change_template = (request.data.get("change_template") or "").strip()
+
+        if approval_status != self.REQUIRED_APPROVAL_STATUS:
+            return _response(
+                task_id=None,
+                execution_id=None,
+                status="FAILED",
+                severity="HIGH",
+                summary={"error_code": "APPROVAL_REQUIRED", "message": "change execution requires approved approval_status"},
+                http_status=400,
+            )
+        if not baseline_ref:
+            return _response(
+                task_id=None,
+                execution_id=None,
+                status="FAILED",
+                severity="HIGH",
+                summary={"error_code": "BASELINE_REQUIRED", "message": "baseline_ref is required before execution"},
+                http_status=400,
+            )
+        if not change_template:
+            return _response(
+                task_id=None,
+                execution_id=None,
+                status="FAILED",
+                severity="MEDIUM",
+                summary={"error_code": "CHANGE_TEMPLATE_REQUIRED", "message": "change_template is required"},
+                http_status=400,
+            )
+
+        task_id = request.data.get("task_id") or _now_task_id("change")
+        refs = self._build_change_refs(task_id)
+        verify_result = self._build_verify_result(request.data)
+        rollback_requested = bool(request.data.get("rollback_requested", not verify_result["verify_passed"]))
+
+        if verify_result["verify_passed"]:
+            final_state = State.SUCCEEDED
+            status = "SUCCEEDED"
+            severity = "INFO"
+            rollback_status = "not_needed"
+            result_status = "verify_succeeded"
+        elif rollback_requested:
+            final_state = State.ROLLED_BACK
+            status = "ROLLED_BACK"
+            severity = "HIGH"
+            rollback_status = "executed"
+            result_status = "verify_failed_rolled_back"
+        else:
+            final_state = State.PARTIAL
+            status = "PARTIAL_SUCCESS"
+            severity = "HIGH"
+            rollback_status = "pending_manual_confirmation"
+            result_status = "verify_failed_pending_manual"
+
+        change_summary = {
+            "task_type": "change_run",
+            "change_template": change_template,
+            "approval_status": approval_status,
+            "baseline_ref": baseline_ref,
+            "verify_ref": refs["verify_ref"],
+            "rollback_ref": refs["rollback_ref"],
+            "verify_passed": verify_result["verify_passed"],
+            "rollback_status": rollback_status,
+            "result": result_status,
+            "order_code": request.data.get("order_code", ""),
+            "risk_level": request.data.get("risk_level", "medium"),
+            "triggered_by": request.data.get("triggered_by", "agent"),
+        }
+        task_result = {
+            "change_summary": change_summary,
+            "baseline_ref": baseline_ref,
+            "verify": verify_result,
+            "rollback": {
+                "requested": rollback_requested,
+                "status": rollback_status,
+                "message": request.data.get("rollback_message", ""),
+            },
+            "artifacts": request.data.get("artifacts", []),
+        }
+        kwargs_payload = {
+            "change_summary": change_summary,
+            "baseline_ref": baseline_ref,
+            "verify_ref": refs["verify_ref"],
+            "rollback_ref": refs["rollback_ref"],
+            "audit_ref": refs["audit_ref"],
+            "approval_status": approval_status,
+        }
+        execution = WorkflowExecution.objects.create(
+            task_id=task_id,
+            origin="NetClaw-CN",
+            task_result=json.dumps(task_result, ensure_ascii=False),
+            order_code=request.data.get("order_code", ""),
+            device=request.data.get("device_ip"),
+            device_id=request.data.get("device_id"),
+            commit_user=getattr(getattr(request, "user", None), "username", "") or "system",
+            commit_time=timezone.now(),
+            task=Tasks.CHANGE,
+            method=Method.RESTAPI,
+            class_method="agent_change_run",
+            remote_ip=str(request.META.get("REMOTE_ADDR", "")),
+            kwargs=json.dumps(kwargs_payload, ensure_ascii=False),
+            ttp="{}",
+            commands=json.dumps(request.data.get("commands", []), ensure_ascii=False),
+            back_off_commands=json.dumps(request.data.get("rollback_commands", []), ensure_ascii=False),
+            state=final_state,
+            code=9008 if final_state == State.SUCCEEDED else 9005,
+        )
+        artifacts = [
+            {"type": "baseline", "ref": baseline_ref},
+            {"type": "verify", "ref": refs["verify_ref"]},
+            {"type": "change_execution", "ref": f"execution://change/{execution.id}"},
+        ]
+        if rollback_requested:
+            artifacts.append({"type": "rollback", "ref": refs["rollback_ref"]})
+
+        return _response(
+            task_id=task_id,
+            execution_id=str(execution.id),
+            status=status,
+            severity=severity,
+            summary=change_summary,
+            artifacts=artifacts,
+            audit_ref=refs["audit_ref"],
+            rollback_ref=refs["rollback_ref"],
+            payload=task_result,
         )

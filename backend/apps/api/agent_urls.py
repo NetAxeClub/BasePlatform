@@ -2,6 +2,7 @@ from django.urls import path
 
 from apps.api.agent_views import (
     AgentAnalysisAPIView,
+    AgentChangeTaskAPIView,
     AgentDeviceCapabilitiesAPIView,
     AgentDeviceFactsAPIView,
     AgentExecutionDetailAPIView,
@@ -18,6 +19,7 @@ urlpatterns = [
         name="agent-device-capabilities",
     ),
     path("tasks/inspect/", AgentInspectionTaskAPIView.as_view(), name="agent-inspect"),
+    path("tasks/change/", AgentChangeTaskAPIView.as_view(), name="agent-change"),
     path(
         "tasks/audit/security-policy/",
         AgentSecurityAuditTaskAPIView.as_view(),

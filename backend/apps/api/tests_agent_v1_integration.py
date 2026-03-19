@@ -6,6 +6,7 @@ from django.test import TestCase
 from rest_framework.test import APIRequestFactory
 
 from apps.api.agent_views import (
+    AgentChangeTaskAPIView,
     AgentExecutionDetailAPIView,
     AgentInspectionTaskAPIView,
     AgentSecurityAuditTaskAPIView,
@@ -141,3 +142,77 @@ class AgentApiIntegrationTests(TestCase):
         self.assertGreaterEqual(record_payload["count"], 1)
         self.assertEqual(record_payload["data"][0]["device_ip"], self.device.manage_ip)
         self.assertEqual(record_payload["data"][0]["summary"]["permit_any_any_count"], 1)
+
+    def test_change_task_persists_execution_and_verify_success_can_be_replayed(self):
+        create_request = self._attach_iam(
+            self.factory.post(
+                "/base_platform/agent/v1/tasks/change/",
+                {
+                    "change_template": "sec_policy_low_risk",
+                    "approval_status": "approved",
+                    "baseline_ref": "baseline://change-int-1",
+                    "verify": {"passed": True, "message": "post-check passed"},
+                    "device_ip": self.device.manage_ip,
+                    "order_code": "OC-INT-001",
+                    "commands": ["display current-configuration"],
+                },
+                format="json",
+            )
+        )
+        create_response = AgentChangeTaskAPIView.as_view()(create_request)
+        create_payload = self._json_payload(create_response)
+
+        self.assertEqual(create_response.status_code, 200)
+        self.assertEqual(create_payload["status"], "SUCCEEDED")
+        self.assertTrue(create_payload["rollback_ref"].startswith("rollback://"))
+
+        execution_id = int(create_payload["execution_id"])
+        execution = WorkflowExecution.objects.get(id=execution_id)
+        self.assertEqual(execution.task, Tasks.CHANGE)
+        self.assertEqual(execution.order_code, "OC-INT-001")
+
+        replay_request = self._attach_iam(
+            self.factory.get(f"/base_platform/agent/v1/executions/{execution_id}/")
+        )
+        replay_response = AgentExecutionDetailAPIView.as_view()(replay_request, execution_id=execution_id)
+        replay_payload = self._json_payload(replay_response)
+
+        self.assertEqual(replay_response.status_code, 200)
+        self.assertEqual(replay_payload["status"], "SUCCEEDED")
+        self.assertEqual(replay_payload["summary"]["baseline_ref"], "baseline://change-int-1")
+        self.assertEqual(replay_payload["summary"]["verify_passed"], True)
+
+    def test_change_task_persists_execution_and_failed_verify_rolls_back(self):
+        create_request = self._attach_iam(
+            self.factory.post(
+                "/base_platform/agent/v1/tasks/change/",
+                {
+                    "change_template": "sec_policy_low_risk",
+                    "approval_status": "approved",
+                    "baseline_ref": "baseline://change-int-2",
+                    "verify": {"passed": False, "message": "policy mismatch"},
+                    "rollback_requested": True,
+                    "device_ip": self.device.manage_ip,
+                    "order_code": "OC-INT-002",
+                    "rollback_commands": ["undo policy test"],
+                },
+                format="json",
+            )
+        )
+        create_response = AgentChangeTaskAPIView.as_view()(create_request)
+        create_payload = self._json_payload(create_response)
+
+        self.assertEqual(create_response.status_code, 200)
+        self.assertEqual(create_payload["status"], "ROLLED_BACK")
+        self.assertEqual(create_payload["summary"]["rollback_status"], "executed")
+
+        execution_id = int(create_payload["execution_id"])
+        replay_request = self._attach_iam(
+            self.factory.get(f"/base_platform/agent/v1/executions/{execution_id}/")
+        )
+        replay_response = AgentExecutionDetailAPIView.as_view()(replay_request, execution_id=execution_id)
+        replay_payload = self._json_payload(replay_response)
+
+        self.assertEqual(replay_response.status_code, 200)
+        self.assertEqual(replay_payload["status"], "ROLLED_BACK")
+        self.assertTrue(replay_payload["rollback_ref"].startswith("rollback://"))

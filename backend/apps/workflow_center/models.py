@@ -3,6 +3,7 @@ from django.utils import timezone
 
 
 class Tasks(object):
+    CHANGE = "变更"
     DNAT = "DNAT"
     SNAT = "SNAT"
     SEC_POLICY = "安全策略"
@@ -15,6 +16,7 @@ class Tasks(object):
     INSPECTION = "巡检"
 
     CHOICES = (
+        (CHANGE, CHANGE),
         (DNAT, DNAT),
         (SNAT, SNAT),
         (SEC_POLICY, SEC_POLICY),
@@ -78,6 +80,12 @@ class State(object):
     BACKOFF = "BackOff"
     FAILED = "Failed"
     FINISH = "Finish"
+    RUNNING = "running"
+    VERIFYING = "verifying"
+    SUCCEEDED = "succeeded"
+    PARTIAL = "partial"
+    ROLLED_BACK = "rolled_back"
+    CANCELLED = "cancelled"
 
     CHOICES = (
         (DRAFT, DRAFT),
@@ -86,6 +94,12 @@ class State(object):
         (FAILED, FAILED),
         (BACKOFF, BACKOFF),
         (FINISH, FINISH),
+        (RUNNING, RUNNING),
+        (VERIFYING, VERIFYING),
+        (SUCCEEDED, SUCCEEDED),
+        (PARTIAL, PARTIAL),
+        (ROLLED_BACK, ROLLED_BACK),
+        (CANCELLED, CANCELLED),
     )
 
 
