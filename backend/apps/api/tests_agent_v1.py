@@ -9,6 +9,7 @@ from rest_framework.test import APIRequestFactory
 
 from apps.api.agent_views import (
     AgentAnalysisAPIView,
+    AgentChangeTaskAPIView,
     AgentDeviceCapabilitiesAPIView,
     AgentDeviceFactsAPIView,
     AgentExecutionDetailAPIView,
@@ -30,6 +31,10 @@ class AgentApiRouteTests(SimpleTestCase):
         self.assertIs(
             resolve("/base_platform/agent/v1/tasks/inspect/").func.view_class,
             AgentInspectionTaskAPIView,
+        )
+        self.assertIs(
+            resolve("/base_platform/agent/v1/tasks/change/").func.view_class,
+            AgentChangeTaskAPIView,
         )
         self.assertIs(
             resolve("/base_platform/agent/v1/tasks/audit/security-policy/").func.view_class,
@@ -297,3 +302,80 @@ class AgentApiViewTests(SimpleTestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertTrue("detail" in payload or "msg" in payload or "message" in payload)
+
+    def test_change_view_blocks_execution_without_approval(self):
+        request = self._with_iam(
+            self.factory.post(
+                "/base_platform/agent/v1/tasks/change/",
+                {"change_template": "sec_policy_low_risk", "baseline_ref": "baseline://1"},
+                format="json",
+            )
+        )
+        response = AgentChangeTaskAPIView.as_view()(request)
+        payload = self._json_payload(response)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(payload["summary"]["error_code"], "APPROVAL_REQUIRED")
+
+    def test_change_view_blocks_execution_without_baseline(self):
+        request = self._with_iam(
+            self.factory.post(
+                "/base_platform/agent/v1/tasks/change/",
+                {"change_template": "sec_policy_low_risk", "approval_status": "approved"},
+                format="json",
+            )
+        )
+        response = AgentChangeTaskAPIView.as_view()(request)
+        payload = self._json_payload(response)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(payload["summary"]["error_code"], "BASELINE_REQUIRED")
+
+    @patch("apps.api.agent_views.WorkflowExecution.objects.create")
+    def test_change_view_returns_succeeded_when_verify_passes(self, mock_create):
+        mock_create.return_value = SimpleNamespace(id=31)
+        request = self._with_iam(
+            self.factory.post(
+                "/base_platform/agent/v1/tasks/change/",
+                {
+                    "change_template": "sec_policy_low_risk",
+                    "approval_status": "approved",
+                    "baseline_ref": "baseline://change-1",
+                    "verify": {"passed": True, "message": "policy matched"},
+                    "order_code": "OC-001",
+                },
+                format="json",
+            )
+        )
+        response = AgentChangeTaskAPIView.as_view()(request)
+        payload = self._json_payload(response)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["status"], "SUCCEEDED")
+        self.assertEqual(payload["summary"]["baseline_ref"], "baseline://change-1")
+        self.assertTrue(payload["rollback_ref"].startswith("rollback://"))
+        self.assertTrue(payload["summary"]["verify_passed"])
+
+    @patch("apps.api.agent_views.WorkflowExecution.objects.create")
+    def test_change_view_rolls_back_when_verify_fails(self, mock_create):
+        mock_create.return_value = SimpleNamespace(id=32)
+        request = self._with_iam(
+            self.factory.post(
+                "/base_platform/agent/v1/tasks/change/",
+                {
+                    "change_template": "sec_policy_low_risk",
+                    "approval_status": "approved",
+                    "baseline_ref": "baseline://change-2",
+                    "verify": {"passed": False, "message": "policy mismatch"},
+                    "rollback_requested": True,
+                },
+                format="json",
+            )
+        )
+        response = AgentChangeTaskAPIView.as_view()(request)
+        payload = self._json_payload(response)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["status"], "ROLLED_BACK")
+        self.assertEqual(payload["summary"]["rollback_status"], "executed")
+        self.assertEqual(payload["payload"]["rollback"]["status"], "executed")

@@ -72,6 +72,16 @@
 - Phase 2 测试报告
 - Phase 2 验收结论
 
+当前实现索引：
+
+- `backend/apps/api/agent_views.py`
+- `backend/apps/api/agent_urls.py`
+- `backend/apps/api/tests_agent_v1.py`
+- `backend/apps/api/tests_agent_v1_integration.py`
+- `backend/apps/workflow_center/models.py`
+- [03a-phase-2-完成包与自查记录.md](./03a-phase-2-%E5%AE%8C%E6%88%90%E5%8C%85%E4%B8%8E%E8%87%AA%E6%9F%A5%E8%AE%B0%E5%BD%95.md)
+- [03d-phase-2-gate-自查记录.md](./03d-phase-2-gate-%E8%87%AA%E6%9F%A5%E8%AE%B0%E5%BD%95.md)
+
 ## 7. 接口或模型变更
 
 本阶段必须形成以下稳定接口或等价合同：
@@ -146,8 +156,29 @@
 
 ## 13. 验收结论
 
-- 当前状态：`PLANNED`
-- Gate 结论：`未验收`
-- 验收负责人：`待填写`
-- 验收时间：`待填写`
-- 证据引用：`待填写`
+- 当前状态：`DONE`
+- Phase：`Phase 2`
+- Decision：`PASS_WITH_WAIVER`
+- Summary：`Phase 2 已完成 change_run 最小合同、审批与 baseline 门禁、verify/rollback 引用和 execution ledger 数据库级回放证据，当前可放行进入下一阶段；但低风险模板覆盖面和若干 app 的 migration 警告仍需后续收敛。`
+- Blocking Issues：
+  - `无`
+- Waivers：
+  - `WVR-P2-001`：当前仅 `sec_policy_low_risk` 已完成真实模板验证，地址对象、服务对象、DNAT 模板仍停留在模板清单阶段；同时 `automation`、`django_celery_beat`、`django_celery_results`、`network_analysis`、`workflow_center` 仍存在 migration 警告
+- Required Follow-ups：
+  - 扩展低风险模板到 `address_object_low_risk`、`service_object_low_risk`、`dnat_low_risk`
+  - 清理 `automation`、`django_celery_beat`、`django_celery_results`、`network_analysis`、`workflow_center` 的未生成 migration 警告
+  - 在 Phase 3 前复核 execution ledger 是否仍存在跨模块分散问题
+- Evidence Refs：
+  - `backend/apps/api/agent_views.py`
+  - `backend/apps/api/tests_agent_v1.py`
+  - `backend/apps/api/tests_agent_v1_integration.py`
+  - `backend/apps/workflow_center/models.py`
+  - `03a-phase-2-完成包与自查记录.md`
+  - `03b-phase-2-低风险变更模板清单.md`
+  - `03c-phase-2-审计留痕字段规范.md`
+  - `03d-phase-2-gate-自查记录.md`
+  - `backend/venv/bin/python -m py_compile backend/apps/api/agent_views.py backend/apps/api/agent_urls.py backend/apps/api/tests_agent_v1.py backend/apps/workflow_center/models.py`
+  - `backend/venv/bin/python backend/manage.py test apps.api.tests_agent_v1 -v 2`
+  - `backend/venv/bin/python backend/manage.py test apps.api.tests_agent_v1_integration -v 2 --keepdb`
+- Accepted By：`codex`
+- Accepted At：`2026-03-19 20:45:00 CST`
