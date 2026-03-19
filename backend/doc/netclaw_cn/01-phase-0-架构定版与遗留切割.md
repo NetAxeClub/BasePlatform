@@ -74,6 +74,14 @@
 - `device_api/asset/config_center/api/topology/dcs_control` 产品化与前端联动原则清单
 - Phase 0 验收结论
 
+当前交付物索引：
+
+- [01a-phase-0-领域边界与责任矩阵.md](./01a-phase-0-%E9%A2%86%E5%9F%9F%E8%BE%B9%E7%95%8C%E4%B8%8E%E8%B4%A3%E4%BB%BB%E7%9F%A9%E9%98%B5.md)
+- [01b-phase-0-主链与遗留切割清单.md](./01b-phase-0-%E4%B8%BB%E9%93%BE%E4%B8%8E%E9%81%97%E7%95%99%E5%88%87%E5%89%B2%E6%B8%85%E5%8D%95.md)
+- [01c-phase-0-统一-agent-api-草案.md](./01c-phase-0-%E7%BB%9F%E4%B8%80-agent-api-%E8%8D%89%E6%A1%88.md)
+- [01d-phase-0-模块迁移清单.md](./01d-phase-0-%E6%A8%A1%E5%9D%97%E8%BF%81%E7%A7%BB%E6%B8%85%E5%8D%95.md)
+- [01e-phase-0-gate-自查记录.md](./01e-phase-0-gate-%E8%87%AA%E6%9F%A5%E8%AE%B0%E5%BD%95.md)
+
 ## 7. 接口或模型变更
 
 本阶段主要交付架构合同，不要求代码落地，但必须把后续实现边界写死：
@@ -93,6 +101,12 @@
 - API 合同审查
 - 依赖链和遗留链检查
 - 与当前仓库现状的一致性说明
+
+当前证据基线：
+
+- `backend/apps/asset/models.py` 中 `NetworkDevice.plan` 仍依赖 `automation.CollectionPlan`
+- `backend/apps/topology/views.py` 中仍存在旧 Mongo 手工图读写链路
+- `backend/apps/device_api` 已具备父方案/子方案主链模型，可作为默认采集主链依据
 
 ## 9. 验收标准
 
@@ -135,8 +149,25 @@
 
 ## 13. 验收结论
 
-- 当前状态：`PLANNED`
-- Gate 结论：`未验收`
-- 验收负责人：`待填写`
-- 验收时间：`待填写`
-- 证据引用：`待填写`
+- 当前状态：`DONE`
+- Phase：`Phase 0`
+- Decision：`PASS`
+- Summary：`Phase 0 所需的领域边界、主链/legacy 切割、统一 agent API 草案和模块迁移清单已完成，并与当前仓库现状保持一致，可作为后续 phase 的正式实施依据。`
+- Blocking Issues：
+  - `无`
+- Waivers：
+  - `无`
+- Required Follow-ups：
+  - `Phase 1` 设计与实施不得新增对 `automation`、`monitor`、`support` 的设计级依赖
+  - `Phase 2` 必须将 `workflow_center` 收敛为统一执行台账主链，补齐审批、执行、验证、回滚闭环
+  - `Phase 3` 必须完成事实拓扑对旧 `topology` 手工图主链的替代
+- Evidence Refs：
+  - `01a-phase-0-领域边界与责任矩阵.md`
+  - `01b-phase-0-主链与遗留切割清单.md`
+  - `01c-phase-0-统一-agent-api-草案.md`
+  - `01d-phase-0-模块迁移清单.md`
+  - `01e-phase-0-gate-自查记录.md`
+  - `backend/apps/asset/models.py:431`
+  - `backend/apps/topology/views.py:22`
+- Accepted By：`codex`
+- Accepted At：`2026-03-19 10:41:40 CST`
