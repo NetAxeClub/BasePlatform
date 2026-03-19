@@ -4,10 +4,14 @@ from uuid import uuid4
 
 from django.http import JsonResponse
 from django.utils import timezone
+from rest_framework import exceptions
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
+from apps.api.change_templates import get_change_template_spec
+from apps.api.error_codes import ERROR_CODE_CATALOG, build_error_summary, get_error_code_definition
+from apps.api.throttles import AgentBurstRateThrottle, AgentSustainedRateThrottle
 from apps.asset.models import NetworkDevice
 from apps.dcs_control.constants import Vendor
 from apps.dcs_control.models import FirewallPolicyAuditRecord
@@ -24,6 +28,10 @@ from apps.network_analysis.models import (
     AddressTraceSnapshot,
     AnalysisRun,
     InterfaceUtilizationSnapshot,
+)
+from apps.network_analysis.services import (
+    DriftAnalysisService,
+    TopologyReconcileService,
 )
 from apps.workflow_center.inspection import inspection_payload, inspection_summary
 from apps.workflow_center.models import Method, State, Tasks, WorkflowExecution
@@ -42,6 +50,22 @@ class AgentRequestAuthentication(BaseAuthentication):
         if user is not None and getattr(user, "is_authenticated", False):
             return user, None
         return None
+
+
+class AgentRateLimitMixin:
+    def throttled(self, request, wait):
+        raise exceptions.Throttled(wait=wait)
+
+    def handle_exception(self, exc):
+        if isinstance(exc, exceptions.Throttled):
+            return _error_response(
+                code="RATE_LIMITED",
+                message="request was throttled by runtime enforcement",
+                severity="MEDIUM",
+                http_status=429,
+                wait_seconds=getattr(exc, "wait", None),
+            )
+        return super().handle_exception(exc)
 
 
 def _parse_json(value, default):
@@ -81,6 +105,131 @@ def _response(
     if payload is not None:
         body["payload"] = payload
     return JsonResponse(body, status=http_status)
+
+
+def _error_response(
+    *,
+    code: str,
+    message: str,
+    task_id: Optional[str] = None,
+    execution_id: Optional[str] = None,
+    status: str = "FAILED",
+    severity: str = "MEDIUM",
+    payload: Optional[Dict] = None,
+    http_status: Optional[int] = None,
+    **extra,
+):
+    return _response(
+        task_id=task_id,
+        execution_id=execution_id,
+        status=status,
+        severity=severity,
+        summary=build_error_summary(code, message, **extra),
+        payload=payload,
+        http_status=http_status or get_error_code_definition(code)["http_status"],
+    )
+
+
+def _tool_error_semantics(*codes: str) -> Dict[str, Dict[str, object]]:
+    return {code: get_error_code_definition(code) for code in codes}
+
+
+def _tool_schema_catalog() -> List[Dict]:
+    return [
+        {
+            "tool_name": "device_facts",
+            "method": "GET",
+            "path": "/base_platform/agent/v1/devices/{serial_num}/facts/",
+            "risk_level": "low",
+            "requires_approval": False,
+            "retryable_errors": ["DEVICE_NOT_FOUND", "UPSTREAM_TIMEOUT"],
+            "non_retryable_errors": ["INVALID_SERIAL_NUM", "UNAUTHORIZED"],
+            "required_params": ["serial_num"],
+            "output_fields": ["task_id", "execution_id", "status", "severity", "summary", "artifacts"],
+            "rate_limit": {"burst": 30, "burst_window_seconds": 10, "sustained_per_minute": 120, "enforced": True},
+            "error_semantics": _tool_error_semantics(
+                "DEVICE_NOT_FOUND",
+                "UPSTREAM_TIMEOUT",
+                "INVALID_SERIAL_NUM",
+                "UNAUTHORIZED",
+                "RATE_LIMITED",
+            ),
+        },
+        {
+            "tool_name": "inspection_run",
+            "method": "POST",
+            "path": "/base_platform/agent/v1/tasks/inspect/",
+            "risk_level": "low",
+            "requires_approval": False,
+            "retryable_errors": ["UPSTREAM_TIMEOUT", "DEVICE_UNREACHABLE"],
+            "non_retryable_errors": ["INVALID_TARGET", "UNAUTHORIZED"],
+            "required_params": ["serial_num|serial_nums"],
+            "output_fields": ["task_id", "execution_id", "status", "severity", "summary", "artifacts", "audit_ref"],
+            "rate_limit": {"burst": 10, "burst_window_seconds": 10, "sustained_per_minute": 30, "enforced": True},
+            "error_semantics": _tool_error_semantics(
+                "UPSTREAM_TIMEOUT",
+                "DEVICE_UNREACHABLE",
+                "INVALID_TARGET",
+                "UNAUTHORIZED",
+                "RATE_LIMITED",
+            ),
+        },
+        {
+            "tool_name": "security_audit_run",
+            "method": "POST",
+            "path": "/base_platform/agent/v1/tasks/audit/security-policy/",
+            "risk_level": "medium",
+            "requires_approval": False,
+            "retryable_errors": ["UPSTREAM_TIMEOUT"],
+            "non_retryable_errors": ["INVALID_TARGET", "UNAUTHORIZED"],
+            "required_params": ["device_ip|hostip"],
+            "output_fields": ["task_id", "execution_id", "status", "severity", "summary", "artifacts", "audit_ref"],
+            "rate_limit": {"burst": 10, "burst_window_seconds": 10, "sustained_per_minute": 20, "enforced": True},
+            "error_semantics": _tool_error_semantics(
+                "UPSTREAM_TIMEOUT",
+                "INVALID_TARGET",
+                "UNAUTHORIZED",
+                "RATE_LIMITED",
+            ),
+        },
+        {
+            "tool_name": "change_run",
+            "method": "POST",
+            "path": "/base_platform/agent/v1/tasks/change/",
+            "risk_level": "high",
+            "requires_approval": True,
+            "retryable_errors": ["UPSTREAM_TIMEOUT"],
+            "non_retryable_errors": ["APPROVAL_REQUIRED", "BASELINE_REQUIRED", "UNAUTHORIZED"],
+            "required_params": ["change_template", "approval_status", "baseline_ref"],
+            "output_fields": ["task_id", "execution_id", "status", "severity", "summary", "artifacts", "audit_ref", "rollback_ref"],
+            "rate_limit": {"burst": 3, "burst_window_seconds": 10, "sustained_per_minute": 10, "enforced": True},
+            "error_semantics": _tool_error_semantics(
+                "UPSTREAM_TIMEOUT",
+                "APPROVAL_REQUIRED",
+                "BASELINE_REQUIRED",
+                "UNAUTHORIZED",
+                "RATE_LIMITED",
+            ),
+        },
+        {
+            "tool_name": "execution_query",
+            "method": "GET",
+            "path": "/base_platform/agent/v1/executions/{id}/",
+            "risk_level": "low",
+            "requires_approval": False,
+            "retryable_errors": ["UPSTREAM_TIMEOUT"],
+            "non_retryable_errors": ["EXECUTION_NOT_FOUND", "UNAUTHORIZED"],
+            "required_params": ["execution_id"],
+            "output_fields": ["task_id", "execution_id", "status", "severity", "summary", "artifacts", "audit_ref", "rollback_ref"],
+            "rate_limit": {"burst": 30, "burst_window_seconds": 10, "sustained_per_minute": 120, "enforced": True},
+            "error_semantics": _tool_error_semantics(
+                "UPSTREAM_TIMEOUT",
+                "EXECUTION_NOT_FOUND",
+                "UNAUTHORIZED",
+                "RATE_LIMITED",
+            ),
+        },
+    ]
 
 
 def _now_task_id(prefix: str) -> str:
@@ -129,7 +278,6 @@ def _serialize_device_facts(device: NetworkDevice) -> Dict:
     vendor = getattr(device, "vendor", None)
     category = getattr(device, "category", None)
     model = getattr(device, "model", None)
-    plan = getattr(device, "plan", None)
     return {
         "id": getattr(device, "id", None),
         "serial_num": getattr(device, "serial_num", ""),
@@ -141,7 +289,6 @@ def _serialize_device_facts(device: NetworkDevice) -> Dict:
         "model_name": getattr(model, "name", ""),
         "soft_version": getattr(device, "soft_version", ""),
         "patch_version": getattr(device, "patch_version", ""),
-        "legacy_plan_name": getattr(plan, "name", ""),
     }
 
 
@@ -156,14 +303,18 @@ def _serialize_discovery_state(discovery_state: Optional[DeviceDiscoveryState]) 
     }
 
 
-class AgentDeviceFactsAPIView(APIView):
+class AgentDeviceFactsAPIView(AgentRateLimitMixin, APIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (AgentRequestAuthentication,)
+    throttle_classes = (AgentBurstRateThrottle, AgentSustainedRateThrottle)
+    throttle_cache_scope = "device_facts"
+    throttle_burst_limit = 30
+    throttle_sustained_limit = 120
 
     @staticmethod
     def _get_device(serial_num: str):
         return (
-            NetworkDevice.objects.select_related("vendor", "category", "model", "plan")
+            NetworkDevice.objects.select_related("vendor", "category", "model")
             .filter(serial_num=serial_num)
             .first()
         )
@@ -171,14 +322,9 @@ class AgentDeviceFactsAPIView(APIView):
     def get(self, request, serial_num):
         device = self._get_device(serial_num)
         if not device:
-            return _response(
-                task_id=None,
-                execution_id=None,
-                status="FAILED",
-                severity="MEDIUM",
-                summary={"error_code": "DEVICE_NOT_FOUND", "message": "device serial_num does not exist"},
-                payload=None,
-                http_status=404,
+            return _error_response(
+                code="DEVICE_NOT_FOUND",
+                message="device serial_num does not exist",
             )
 
         discovery_state = DeviceDiscoveryState.objects.filter(device_serial_num=serial_num).first()
@@ -207,14 +353,18 @@ class AgentDeviceFactsAPIView(APIView):
         )
 
 
-class AgentDeviceCapabilitiesAPIView(APIView):
+class AgentDeviceCapabilitiesAPIView(AgentRateLimitMixin, APIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (AgentRequestAuthentication,)
+    throttle_classes = (AgentBurstRateThrottle, AgentSustainedRateThrottle)
+    throttle_cache_scope = "device_capabilities"
+    throttle_burst_limit = 30
+    throttle_sustained_limit = 120
 
     @staticmethod
     def _get_device(serial_num: str):
         return (
-            NetworkDevice.objects.select_related("vendor", "category", "model", "plan")
+            NetworkDevice.objects.select_related("vendor", "category", "model")
             .filter(serial_num=serial_num)
             .first()
         )
@@ -230,14 +380,9 @@ class AgentDeviceCapabilitiesAPIView(APIView):
     def get(self, request, serial_num):
         device = self._get_device(serial_num)
         if not device:
-            return _response(
-                task_id=None,
-                execution_id=None,
-                status="FAILED",
-                severity="MEDIUM",
-                summary={"error_code": "DEVICE_NOT_FOUND", "message": "device serial_num does not exist"},
-                payload=None,
-                http_status=404,
+            return _error_response(
+                code="DEVICE_NOT_FOUND",
+                message="device serial_num does not exist",
             )
 
         capabilities = PlatformProfileService.build_capabilities(device)
@@ -268,14 +413,18 @@ class AgentDeviceCapabilitiesAPIView(APIView):
         )
 
 
-class AgentInspectionTaskAPIView(APIView):
+class AgentInspectionTaskAPIView(AgentRateLimitMixin, APIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (AgentRequestAuthentication,)
+    throttle_classes = (AgentBurstRateThrottle, AgentSustainedRateThrottle)
+    throttle_cache_scope = "inspection_run"
+    throttle_burst_limit = 10
+    throttle_sustained_limit = 30
 
     @staticmethod
     def _load_devices(serial_nums: List[str]):
         return list(
-            NetworkDevice.objects.select_related("vendor", "category", "model", "plan")
+            NetworkDevice.objects.select_related("vendor", "category", "model")
             .filter(serial_num__in=serial_nums)
         )
 
@@ -327,13 +476,9 @@ class AgentInspectionTaskAPIView(APIView):
             serial_nums.append(serial_num)
         serial_nums = [item for item in dict.fromkeys(serial_nums) if item]
         if not serial_nums:
-            return _response(
-                task_id=None,
-                execution_id=None,
-                status="FAILED",
-                severity="MEDIUM",
-                summary={"error_code": "INVALID_TARGET", "message": "serial_num or serial_nums is required"},
-                http_status=400,
+            return _error_response(
+                code="INVALID_TARGET",
+                message="serial_num or serial_nums is required",
             )
 
         devices = self._load_devices(serial_nums)
@@ -408,9 +553,13 @@ class AgentInspectionTaskAPIView(APIView):
         )
 
 
-class AgentExecutionDetailAPIView(APIView):
+class AgentExecutionDetailAPIView(AgentRateLimitMixin, APIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (AgentRequestAuthentication,)
+    throttle_classes = (AgentBurstRateThrottle, AgentSustainedRateThrottle)
+    throttle_cache_scope = "execution_query"
+    throttle_burst_limit = 30
+    throttle_sustained_limit = 120
 
     @staticmethod
     def _get_execution(execution_id: int):
@@ -419,13 +568,9 @@ class AgentExecutionDetailAPIView(APIView):
     def get(self, request, execution_id):
         execution = self._get_execution(execution_id)
         if not execution:
-            return _response(
-                task_id=None,
-                execution_id=None,
-                status="FAILED",
-                severity="MEDIUM",
-                summary={"error_code": "EXECUTION_NOT_FOUND", "message": "execution id does not exist"},
-                http_status=404,
+            return _error_response(
+                code="EXECUTION_NOT_FOUND",
+                message="execution id does not exist",
             )
 
         kwargs_payload = _parse_json(getattr(execution, "kwargs", "{}"), {})
@@ -563,19 +708,49 @@ class AgentAnalysisAPIView(APIView):
         )
         return summary, payload_items, artifacts
 
+    @staticmethod
+    def _build_config_drift_items(request):
+        manage_ip = request.GET.get("manage_ip")
+        result = DriftAnalysisService.config_drift(manage_ip=manage_ip)
+        return result["summary"], result["payload"]["results"], result["artifacts"], result["severity"]
+
+    @staticmethod
+    def _build_route_health_items(request):
+        manage_ip = request.GET.get("manage_ip")
+        execute_time = request.GET.get("execute_time")
+        result = DriftAnalysisService.route_health(manage_ip=manage_ip, execute_time=execute_time)
+        return result["summary"], result["payload"]["results"], result["artifacts"], result["severity"]
+
+    @staticmethod
+    def _build_device_health_items(request):
+        manage_ip = request.GET.get("manage_ip")
+        result = DriftAnalysisService.device_health(manage_ip=manage_ip)
+        return result["summary"], result["payload"]["results"], result["artifacts"], result["severity"]
+
     def get(self, request):
         kind = request.GET.get("kind", "").strip()
         if kind == "interface_utilization":
             summary, payload_items, artifacts = self._build_interface_items(request)
+            severity = "INFO"
         elif kind == "address_tracking":
             summary, payload_items, artifacts = self._build_address_items(request)
+            severity = "INFO"
+        elif kind == "config_drift":
+            summary, payload_items, artifacts, severity = self._build_config_drift_items(request)
+        elif kind == "route_health":
+            summary, payload_items, artifacts, severity = self._build_route_health_items(request)
+        elif kind == "device_health":
+            summary, payload_items, artifacts, severity = self._build_device_health_items(request)
         else:
             return _response(
                 task_id=None,
                 execution_id=None,
                 status="FAILED",
                 severity="MEDIUM",
-                summary={"error_code": "INVALID_ANALYSIS_KIND", "message": "kind must be interface_utilization or address_tracking"},
+                summary=build_error_summary(
+                    "INVALID_ANALYSIS_KIND",
+                    "kind must be interface_utilization, address_tracking, config_drift, route_health or device_health",
+                ),
                 http_status=400,
             )
 
@@ -583,16 +758,60 @@ class AgentAnalysisAPIView(APIView):
             task_id=_now_task_id("analysis"),
             execution_id=None,
             status="SUCCEEDED",
-            severity="INFO",
+            severity=severity,
             summary=summary,
             artifacts=artifacts,
             payload={"results": payload_items},
         )
 
 
-class AgentSecurityAuditTaskAPIView(APIView):
+class AgentTopologyReconcileAPIView(APIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (AgentRequestAuthentication,)
+
+    def get(self, request):
+        manage_ip = request.GET.get("manage_ip")
+        execute_time = request.GET.get("execute_time")
+        result = TopologyReconcileService.reconcile(manage_ip=manage_ip, execute_time=execute_time)
+        return _response(
+            task_id=_now_task_id("topology-reconcile"),
+            execution_id=None,
+            status="SUCCEEDED",
+            severity=result["severity"],
+            summary=result["summary"],
+            artifacts=result["artifacts"],
+            payload=result["payload"],
+        )
+
+
+class AgentToolCatalogAPIView(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (AgentRequestAuthentication,)
+
+    def get(self, request):
+        catalog = _tool_schema_catalog()
+        return _response(
+            task_id=_now_task_id("tool-catalog"),
+            execution_id=None,
+            status="SUCCEEDED",
+            severity="INFO",
+            summary={
+                "tool_count": len(catalog),
+                "high_risk_tools": [item["tool_name"] for item in catalog if item["risk_level"] == "high"],
+                "requires_agent_identity": True,
+            },
+            artifacts=[{"type": "tool_schema", "ref": f"tool://{item['tool_name']}"} for item in catalog],
+            payload={"tools": catalog, "error_codes": {code: get_error_code_definition(code) for code in sorted(ERROR_CODE_CATALOG)}},
+        )
+
+
+class AgentSecurityAuditTaskAPIView(AgentRateLimitMixin, APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (AgentRequestAuthentication,)
+    throttle_classes = (AgentBurstRateThrottle, AgentSustainedRateThrottle)
+    throttle_cache_scope = "security_audit_run"
+    throttle_burst_limit = 10
+    throttle_sustained_limit = 20
 
     @staticmethod
     def _load_policies(device_ip: str, vendor: str):
@@ -609,13 +828,9 @@ class AgentSecurityAuditTaskAPIView(APIView):
             vendor = Vendor.normalize(vendor)
 
         if not device_ip:
-            return _response(
-                task_id=None,
-                execution_id=None,
-                status="FAILED",
-                severity="MEDIUM",
-                summary={"error_code": "INVALID_TARGET", "message": "device_ip or hostip is required"},
-                http_status=400,
+            return _error_response(
+                code="INVALID_TARGET",
+                message="device_ip or hostip is required",
             )
 
         task_id = request.data.get("task_id") or _now_task_id("security-audit")
@@ -680,9 +895,13 @@ class AgentSecurityAuditTaskAPIView(APIView):
         )
 
 
-class AgentChangeTaskAPIView(APIView):
+class AgentChangeTaskAPIView(AgentRateLimitMixin, APIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (AgentRequestAuthentication,)
+    throttle_classes = (AgentBurstRateThrottle, AgentSustainedRateThrottle)
+    throttle_cache_scope = "change_run"
+    throttle_burst_limit = 3
+    throttle_sustained_limit = 10
 
     REQUIRED_APPROVAL_STATUS = "approved"
 
@@ -706,37 +925,55 @@ class AgentChangeTaskAPIView(APIView):
             "audit_ref": f"audit://change/{task_id}",
         }
 
+    @staticmethod
+    def _build_change_artifacts(
+        *,
+        execution_id: int,
+        baseline_ref: str,
+        verify_ref: str,
+        rollback_ref: str,
+        rollback_requested: bool,
+        audit_ref: str,
+        template_category: str,
+    ) -> List[Dict]:
+        artifacts = [
+            {"type": "baseline", "ref": baseline_ref},
+            {"type": "verify", "ref": verify_ref},
+            {"type": "change_execution", "ref": f"execution://change/{execution_id}"},
+            {"type": "audit", "ref": audit_ref},
+            {"type": "change_template", "ref": f"change-template://{template_category}"},
+        ]
+        if rollback_requested:
+            artifacts.append({"type": "rollback", "ref": rollback_ref})
+        return artifacts
+
     def post(self, request):
         approval_status = (request.data.get("approval_status") or "").strip().lower()
         baseline_ref = (request.data.get("baseline_ref") or "").strip()
         change_template = (request.data.get("change_template") or "").strip()
 
         if approval_status != self.REQUIRED_APPROVAL_STATUS:
-            return _response(
-                task_id=None,
-                execution_id=None,
-                status="FAILED",
+            return _error_response(
+                code="APPROVAL_REQUIRED",
+                message="change execution requires approved approval_status",
                 severity="HIGH",
-                summary={"error_code": "APPROVAL_REQUIRED", "message": "change execution requires approved approval_status"},
-                http_status=400,
             )
         if not baseline_ref:
-            return _response(
-                task_id=None,
-                execution_id=None,
-                status="FAILED",
+            return _error_response(
+                code="BASELINE_REQUIRED",
+                message="baseline_ref is required before execution",
                 severity="HIGH",
-                summary={"error_code": "BASELINE_REQUIRED", "message": "baseline_ref is required before execution"},
-                http_status=400,
             )
         if not change_template:
-            return _response(
-                task_id=None,
-                execution_id=None,
-                status="FAILED",
-                severity="MEDIUM",
-                summary={"error_code": "CHANGE_TEMPLATE_REQUIRED", "message": "change_template is required"},
-                http_status=400,
+            return _error_response(
+                code="CHANGE_TEMPLATE_REQUIRED",
+                message="change_template is required",
+            )
+        template_spec = get_change_template_spec(change_template)
+        if template_spec is None:
+            return _error_response(
+                code="UNSUPPORTED_CHANGE_TEMPLATE",
+                message="change_template is not registered",
             )
 
         task_id = request.data.get("task_id") or _now_task_id("change")
@@ -766,20 +1003,28 @@ class AgentChangeTaskAPIView(APIView):
         change_summary = {
             "task_type": "change_run",
             "change_template": change_template,
+            "template_display_name": template_spec.display_name,
+            "template_category": template_spec.category,
+            "workflow_task": template_spec.workflow_task,
             "approval_status": approval_status,
             "baseline_ref": baseline_ref,
             "verify_ref": refs["verify_ref"],
             "rollback_ref": refs["rollback_ref"],
+            "audit_ref": refs["audit_ref"],
             "verify_passed": verify_result["verify_passed"],
             "rollback_status": rollback_status,
             "result": result_status,
             "order_code": request.data.get("order_code", ""),
-            "risk_level": request.data.get("risk_level", "medium"),
+            "risk_level": request.data.get("risk_level", template_spec.risk_level),
             "triggered_by": request.data.get("triggered_by", "agent"),
         }
         task_result = {
             "change_summary": change_summary,
+            "template_spec": template_spec.to_summary_dict(),
             "baseline_ref": baseline_ref,
+            "verify_ref": refs["verify_ref"],
+            "rollback_ref": refs["rollback_ref"],
+            "audit_ref": refs["audit_ref"],
             "verify": verify_result,
             "rollback": {
                 "requested": rollback_requested,
@@ -795,6 +1040,7 @@ class AgentChangeTaskAPIView(APIView):
             "rollback_ref": refs["rollback_ref"],
             "audit_ref": refs["audit_ref"],
             "approval_status": approval_status,
+            "template_spec": template_spec.to_summary_dict(),
         }
         execution = WorkflowExecution.objects.create(
             task_id=task_id,
@@ -816,13 +1062,15 @@ class AgentChangeTaskAPIView(APIView):
             state=final_state,
             code=9008 if final_state == State.SUCCEEDED else 9005,
         )
-        artifacts = [
-            {"type": "baseline", "ref": baseline_ref},
-            {"type": "verify", "ref": refs["verify_ref"]},
-            {"type": "change_execution", "ref": f"execution://change/{execution.id}"},
-        ]
-        if rollback_requested:
-            artifacts.append({"type": "rollback", "ref": refs["rollback_ref"]})
+        artifacts = self._build_change_artifacts(
+            execution_id=execution.id,
+            baseline_ref=baseline_ref,
+            verify_ref=refs["verify_ref"],
+            rollback_ref=refs["rollback_ref"],
+            rollback_requested=rollback_requested,
+            audit_ref=refs["audit_ref"],
+            template_category=template_spec.category,
+        )
 
         return _response(
             task_id=task_id,

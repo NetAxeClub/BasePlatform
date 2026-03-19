@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Dict, Iterable, List, Optional, Tuple
 
 from apps.asset.models import NetworkDevice
+from apps.config_center.models import ConfigComplianceResult
 from django.utils import timezone
 
 from apps.network_analysis.models import (
@@ -22,6 +23,7 @@ MAC_COLLECTION = MongoOps(db="Automation", coll="plan_mac")
 LLDP_COLLECTION = MongoOps(db="Automation", coll="plan_lldp")
 AGGRE_COLLECTION = MongoOps(db="Automation", coll="plan_aggre_port")
 IP_INTERFACE_COLLECTION = MongoOps(db="Automation", coll="plan_ip_interface")
+ROUTE_TABLE_COLLECTION = MongoOps(db="Automation", coll="plan_route_table")
 
 SKIPPED_INTERFACE_PREFIXES = (
     "lo",
@@ -109,6 +111,16 @@ def _latest_batch_rows(
         if str(row.get("execute_time", "") or "") == latest_times.get(batch_key, ""):
             filtered.append(row)
     return filtered
+
+
+def _format_execute_time(value) -> str:
+    if not value:
+        return ""
+    if hasattr(value, "tzinfo") and timezone.is_aware(value):
+        value = timezone.localtime(value)
+    if hasattr(value, "strftime"):
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+    return str(value)
 
 
 class InterfaceUtilizationAnalysisService:
@@ -832,3 +844,280 @@ class NetworkAnalysisOrchestratorService:
             "interface_device_count": InterfaceUtilizationAnalysisService.ready_device_count(execute_time=execute_time),
         }
         return result
+
+
+class TopologyReconcileService:
+    @staticmethod
+    def _latest_rows(collection: MongoOps, key_fields: Tuple[str, ...], query: Optional[dict] = None) -> List[dict]:
+        rows = _latest_batch_rows(collection, ("hostip",), query=query)
+        latest = OrderedDict()
+        for row in rows:
+            latest[tuple(row.get(field) for field in key_fields)] = row
+        return list(latest.values())
+
+    @classmethod
+    def reconcile(cls, manage_ip: Optional[str] = None, execute_time: Optional[str] = None) -> Dict[str, object]:
+        device_queryset = NetworkDevice.objects.filter(status=0)
+        if manage_ip:
+            device_queryset = device_queryset.filter(manage_ip=manage_ip)
+        devices = list(
+            device_queryset.values("serial_num", "manage_ip", "name", "category__name")
+        )
+        device_map = {item["manage_ip"]: item for item in devices if item.get("manage_ip")}
+
+        query = {}
+        if manage_ip:
+            query["hostip"] = manage_ip
+        if execute_time:
+            query["execute_time"] = execute_time
+        query = query or None
+
+        lldp_rows = cls._latest_rows(
+            LLDP_COLLECTION,
+            ("hostip", "local_interface", "neighbor_ip", "neighbor_port"),
+            query=query,
+        )
+        interface_rows = cls._latest_rows(
+            INTERFACE_COLLECTION,
+            ("hostip", "interface"),
+            query=query,
+        )
+        ip_rows = cls._latest_rows(
+            IP_INTERFACE_COLLECTION,
+            ("hostip", "ipaddress", "interface"),
+            query=query,
+        )
+        trace_queryset = AddressTraceSnapshot.objects.all()
+        if manage_ip:
+            trace_queryset = trace_queryset.filter(manage_ip=manage_ip)
+        if execute_time:
+            trace_queryset = trace_queryset.filter(source_execute_time=execute_time)
+        traces = list(trace_queryset)
+
+        observed_manage_ips = {
+            row.get("hostip") for row in lldp_rows + interface_rows + ip_rows if row.get("hostip")
+        }
+        device_set = sorted(set(device_map.keys()) | observed_manage_ips)
+        execute_times = sorted(
+            {
+                str(row.get("execute_time", "") or "")
+                for row in lldp_rows + interface_rows + ip_rows
+                if row.get("execute_time")
+            }
+            | {
+                str(item.source_execute_time or "")
+                for item in traces
+                if getattr(item, "source_execute_time", "")
+            },
+            reverse=True,
+        )
+        source_task_ids = [f"batch://{item}" for item in execute_times if item]
+
+        missing_in_facts = sorted(ip for ip in device_map if ip not in observed_manage_ips)
+        unregistered_devices = sorted(ip for ip in observed_manage_ips if ip not in device_map)
+        unresolved_traces = [
+            {
+                "ip_address": item.ip_address,
+                "manage_ip": item.manage_ip,
+                "trace_status": item.trace_status,
+                "source_execute_time": item.source_execute_time,
+            }
+            for item in traces
+            if item.trace_status != AddressTraceSnapshot.STATUS_LOCATED
+        ]
+        edges = [
+            {
+                "source_manage_ip": row.get("hostip", ""),
+                "source_interface": row.get("local_interface", ""),
+                "neighbor_manage_ip": row.get("neighbor_ip") or row.get("management_ip") or "",
+                "neighbor_port": row.get("neighbor_port", ""),
+                "neighbor_name": row.get("neighborsysname", ""),
+                "execute_time": row.get("execute_time", ""),
+                "source_task_id": f"batch://{row.get('execute_time', '')}" if row.get("execute_time") else "",
+            }
+            for row in lldp_rows
+        ]
+        conflict_counter = defaultdict(int)
+        for edge in edges:
+            if edge["source_manage_ip"] and edge["source_interface"]:
+                conflict_counter[(edge["source_manage_ip"], edge["source_interface"])] += 1
+        conflicts = [
+            {"source_manage_ip": key[0], "source_interface": key[1], "neighbor_count": count}
+            for key, count in conflict_counter.items()
+            if count > 1
+        ]
+
+        severity = "HIGH" if unregistered_devices or conflicts else "MEDIUM" if missing_in_facts or unresolved_traces else "INFO"
+        summary = {
+            "analysis_kind": "topology_reconcile",
+            "execute_time": execute_times[0] if execute_times else "",
+            "source_task_id": source_task_ids[0] if source_task_ids else "",
+            "device_set": device_set,
+            "fact_counts": {
+                "devices": len(devices),
+                "lldp_edges": len(edges),
+                "interfaces": len(interface_rows),
+                "ip_facts": len(ip_rows),
+                "address_traces": len(traces),
+            },
+            "drift_counts": {
+                "missing_in_facts": len(missing_in_facts),
+                "unregistered_devices": len(unregistered_devices),
+                "unresolved_traces": len(unresolved_traces),
+                "conflicts": len(conflicts),
+            },
+        }
+        payload = {
+            "fact_graph": {
+                "devices": devices,
+                "edges": edges,
+                "interfaces": [
+                    {"manage_ip": row.get("hostip", ""), "interface": row.get("interface", ""), "execute_time": row.get("execute_time", "")}
+                    for row in interface_rows
+                ],
+                "ip_facts": [
+                    {"manage_ip": row.get("hostip", ""), "ip_address": row.get("ipaddress", ""), "interface": row.get("interface", ""), "execute_time": row.get("execute_time", "")}
+                    for row in ip_rows
+                ],
+            },
+            "reconcile": {
+                "missing_in_facts": missing_in_facts,
+                "unregistered_devices": unregistered_devices,
+                "unresolved_traces": unresolved_traces,
+                "conflicts": conflicts,
+            },
+            "traceability": {
+                "execute_times": execute_times,
+                "source_task_ids": source_task_ids,
+                "device_set": device_set,
+            },
+        }
+        artifacts = [{"type": "execute_time", "ref": f"execute-time://{item}"} for item in execute_times if item]
+        artifacts.extend({"type": "source_task", "ref": item} for item in source_task_ids)
+        return {"severity": severity, "summary": summary, "payload": payload, "artifacts": artifacts}
+
+
+class DriftAnalysisService:
+    @staticmethod
+    def config_drift(manage_ip: Optional[str] = None) -> Dict[str, object]:
+        queryset = ConfigComplianceResult.objects.all()
+        if manage_ip:
+            queryset = queryset.filter(manage_ip=manage_ip)
+        latest_log_time = queryset.order_by("-log_time").values_list("log_time", flat=True).first()
+        rows = []
+        if latest_log_time:
+            rows = list(queryset.filter(log_time=latest_log_time).order_by("manage_ip", "rule"))
+        non_compliant = [item for item in rows if str(item.compliance or "").strip() == "不合规"]
+        execute_time = _format_execute_time(latest_log_time)
+        source_task_id = f"config-drift://{execute_time}" if execute_time else ""
+        summary = {
+            "analysis_kind": "config_drift",
+            "items": len(rows),
+            "non_compliant": len(non_compliant),
+            "execute_time": execute_time,
+            "source_task_id": source_task_id,
+            "device_set": sorted({item.manage_ip for item in rows if item.manage_ip}),
+        }
+        payload = {
+            "results": [
+                {
+                    "manage_ip": item.manage_ip,
+                    "hostname": item.hostname,
+                    "rule": item.rule,
+                    "compliance": item.compliance,
+                    "log_time": item.log_time.strftime("%Y-%m-%d %H:%M:%S"),
+                }
+                for item in rows
+            ]
+        }
+        artifacts = [{"type": "source_task", "ref": source_task_id}] if source_task_id else []
+        return {"severity": "HIGH" if non_compliant else "INFO", "summary": summary, "payload": payload, "artifacts": artifacts}
+
+    @staticmethod
+    def route_health(manage_ip: Optional[str] = None, execute_time: Optional[str] = None) -> Dict[str, object]:
+        device_queryset = NetworkDevice.objects.filter(status=0)
+        if manage_ip:
+            device_queryset = device_queryset.filter(manage_ip=manage_ip)
+        route_counts = {
+            item: 0
+            for item in device_queryset.values_list("manage_ip", flat=True)
+            if item
+        }
+
+        query = {}
+        if manage_ip:
+            query["hostip"] = manage_ip
+        if execute_time:
+            query["execute_time"] = execute_time
+        rows = _latest_batch_rows(ROUTE_TABLE_COLLECTION, ("hostip",), query=query or None)
+        execute_times = set()
+        for row in rows:
+            hostip = row.get("hostip")
+            if hostip:
+                route_counts[hostip] = route_counts.get(hostip, 0) + 1
+            if row.get("execute_time"):
+                execute_times.add(str(row["execute_time"]))
+        latest_execute = execute_time or (sorted(execute_times, reverse=True)[0] if execute_times else "")
+        if latest_execute:
+            filtered_counts = {ip: 0 for ip in route_counts.keys()}
+            for row in rows:
+                hostip = row.get("hostip")
+                if hostip and str(row.get("execute_time", "") or "") == latest_execute:
+                    filtered_counts[hostip] = filtered_counts.get(hostip, 0) + 1
+            route_counts = filtered_counts
+        degraded = [ip for ip, count in sorted(route_counts.items()) if count == 0]
+        source_task_id = f"batch://{latest_execute}" if latest_execute else ""
+        summary = {
+            "analysis_kind": "route_health",
+            "devices": len(route_counts),
+            "degraded_devices": len(degraded),
+            "execute_time": latest_execute,
+            "source_task_id": source_task_id,
+            "device_set": sorted(route_counts.keys()),
+        }
+        payload = {
+            "results": [
+                {"manage_ip": ip, "route_count": count, "status": "healthy" if count else "degraded"}
+                for ip, count in sorted(route_counts.items())
+            ]
+        }
+        artifacts = []
+        if latest_execute:
+            artifacts.append({"type": "execute_time", "ref": f"execute-time://{latest_execute}"})
+        if source_task_id:
+            artifacts.append({"type": "source_task", "ref": source_task_id})
+        return {"severity": "MEDIUM" if degraded else "INFO", "summary": summary, "payload": payload, "artifacts": artifacts}
+
+    @staticmethod
+    def device_health(manage_ip: Optional[str] = None) -> Dict[str, object]:
+        queryset = NetworkDevice.objects.all()
+        if manage_ip:
+            queryset = queryset.filter(manage_ip=manage_ip)
+        rows = list(queryset.order_by("manage_ip", "serial_num").values("serial_num", "manage_ip", "name", "status", "soft_version", "patch_version"))
+        degraded = [item for item in rows if item.get("status") != 0]
+        execute_time = _format_execute_time(timezone.now())
+        source_task_id = f"device-health://{execute_time}" if execute_time else "device-health://snapshot"
+        summary = {
+            "analysis_kind": "device_health",
+            "devices": len(rows),
+            "degraded_devices": len(degraded),
+            "execute_time": execute_time,
+            "source_task_id": source_task_id,
+            "device_set": sorted(item["manage_ip"] for item in rows if item.get("manage_ip")),
+        }
+        payload = {
+            "results": [
+                {
+                    "serial_num": item.get("serial_num", ""),
+                    "manage_ip": item.get("manage_ip", ""),
+                    "device_name": item.get("name", ""),
+                    "status": item.get("status"),
+                    "health": "healthy" if item.get("status") == 0 else "degraded",
+                    "soft_version": item.get("soft_version", ""),
+                    "patch_version": item.get("patch_version", ""),
+                }
+                for item in rows
+            ]
+        }
+        artifacts = [{"type": "source_task", "ref": source_task_id}] if source_task_id else []
+        return {"severity": "MEDIUM" if degraded else "INFO", "summary": summary, "payload": payload, "artifacts": artifacts}

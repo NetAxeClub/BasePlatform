@@ -37,10 +37,10 @@
 | 阶段 | 文档 | 目标 | 当前状态 | 验收结论 |
 |---|---|---|---|---|
 | Phase 0 | [01-phase-0-架构定版与遗留切割.md](./01-phase-0-%E6%9E%B6%E6%9E%84%E5%AE%9A%E7%89%88%E4%B8%8E%E9%81%97%E7%95%99%E5%88%87%E5%89%B2.md) | 架构定版、边界切割、遗留冻结 | DONE | PASS |
-| Phase 1 | [02-phase-1-巡检与事实主链.md](./02-phase-1-%E5%B7%A1%E6%A3%80%E4%B8%8E%E4%BA%8B%E5%AE%9E%E4%B8%BB%E9%93%BE.md) | facts/capabilities/inspection/security audit 统一只读主链 | DONE | PASS_WITH_WAIVER |
-| Phase 2 | [03-phase-2-变更治理主链.md](./03-phase-2-%E5%8F%98%E6%9B%B4%E6%B2%BB%E7%90%86%E4%B8%BB%E9%93%BE.md) | 审批、执行、验证、回滚闭环 | DONE | PASS_WITH_WAIVER |
-| Phase 3 | [04-phase-3-拓扑意图与漂移.md](./04-phase-3-%E6%8B%93%E6%89%91%E6%84%8F%E5%9B%BE%E4%B8%8E%E6%BC%82%E7%A7%BB.md) | 事实拓扑、意图对比、漂移诊断 | PLANNED | 未验收 |
-| Phase 4 | [05-phase-4-mcp与skill产品化.md](./05-phase-4-mcp%E4%B8%8Eskill%E4%BA%A7%E5%93%81%E5%8C%96.md) | MCP / Skill 产品化边界 | PLANNED | 未验收 |
+| Phase 1 | [02-phase-1-巡检与事实主链.md](./02-phase-1-%E5%B7%A1%E6%A3%80%E4%B8%8E%E4%BA%8B%E5%AE%9E%E4%B8%BB%E9%93%BE.md) | facts/capabilities/inspection/security audit 统一只读主链 | DONE | PASS |
+| Phase 2 | [03-phase-2-变更治理主链.md](./03-phase-2-%E5%8F%98%E6%9B%B4%E6%B2%BB%E7%90%86%E4%B8%BB%E9%93%BE.md) | 审批、执行、验证、回滚闭环 | DONE | PASS |
+| Phase 3 | [04-phase-3-拓扑意图与漂移.md](./04-phase-3-%E6%8B%93%E6%89%91%E6%84%8F%E5%9B%BE%E4%B8%8E%E6%BC%82%E7%A7%BB.md) | 事实拓扑、意图对比、漂移诊断 | DONE | PASS |
+| Phase 4 | [05-phase-4-mcp与skill产品化.md](./05-phase-4-mcp%E4%B8%8Eskill%E4%BA%A7%E5%93%81%E5%8C%96.md) | MCP / Skill 产品化边界 | DONE | PASS |
 
 ## 5. 文档入口
 
@@ -54,3 +54,19 @@
 - 每个阶段结束后，必须补齐证据、测试结果、风险状态和验收结论。
 - 所有豁免必须登记到风险台账，且必须有截止时间与复核条件。
 - 未在本目录登记的阶段结论、风险和例外，不视为正式有效。
+
+## 7. 总体验收结论
+
+- Decision：`PASS`
+- Summary：`NetClaw-CN 在 NetAxe backend 侧的 Phase 0 到 Phase 4 已全部完成阶段验收与豁免复核，统一后端控制面、只读主链、变更治理主链、拓扑与漂移能力、MCP/Skill 产品化边界均已形成可用且已正式签收的基线。`
+- Overall Checks：
+  - `device_facts`、`inspection`、`security_audit`、`change_run`、`execution_query` 主链能力已具备统一合同
+  - 审批、baseline、verify、rollback 与审计留痕闭环已形成最小可用实现
+  - `automation` 不再承接新功能，`monitor`、`support` 不作为设计、实施、验收依据
+  - OpenClaw / MCP / Skill 已以统一 REST / tool schema 为唯一产品化后端依据
+- Active Waivers：
+  - `无`
+- Required Follow-ups：
+  - 在后续产品化和发布阶段继续收缩 legacy 运行影响范围，禁止主链能力回流
+- Accepted By：`codex`
+- Accepted At：`2026-03-20 01:47:14 CST`

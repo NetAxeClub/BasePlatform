@@ -69,7 +69,7 @@
 - `backend/apps/api/agent_views.py`
 - `backend/apps/api/agent_urls.py`
 - `backend/apps/api/tests_agent_v1.py`
-- [02a-phase-1-完成包与自查记录.md](./02a-phase-1-%E5%AE%8C%E6%88%90%E5%8C%85%E4%B8%8E%E8%87%AA%E6%9F%A5%E8%AE%B0%E5%BD%95.md)
+- [02b-phase-1-国产主厂商覆盖清单.md](./02b-phase-1-%E5%9B%BD%E4%BA%A7%E4%B8%BB%E5%8E%82%E5%95%86%E8%A6%86%E7%9B%96%E6%B8%85%E5%8D%95.md)
 
 ## 7. 接口或模型变更
 
@@ -155,27 +155,42 @@
 
 - 当前状态：`DONE`
 - Phase：`Phase 1`
-- Decision：`PASS_WITH_WAIVER`
-- Summary：`Phase 1 已完成统一只读主链实现，facts/capabilities/inspection/analysis/security audit 合同可统一消费；认证链、国产主厂商覆盖清单及巡检/安全审计数据库级回放证据已补齐，当前以豁免方式放行后续阶段。`
+- Decision：`PASS`
+- Summary：`Phase 1 已完成统一只读主链实现，facts/capabilities/inspection/analysis/security audit 合同可统一消费；认证链、国产主厂商覆盖清单及巡检/安全审计数据库级回放证据已补齐并完成复核。`
 - Blocking Issues：
   - `无`
 - Waivers：
-  - `WVR-P1-001`：统一出口当前仍以聚合层为主，`analysis` 更强端到端回放证据及若干 app 的 migration 警告尚待后续清理
+  - `无`
 - Required Follow-ups：
-  - 补充 `analysis` 基于真实 `AnalysisRun` 数据源的更强回放证据
-  - 清理 `automation`、`django_celery_beat`、`django_celery_results`、`network_analysis` 的未生成 migration 警告
-  - 在 Phase 2 验收前复核统一出口是否仍只是聚合层薄包装
+  - 在后续迭代中继续提升 analysis 深度和统一出口可维护性
 - 证据引用：
   - `backend/apps/api/agent_views.py`
   - `backend/apps/api/agent_urls.py`
   - `backend/apps/api/tests_agent_v1.py`
   - `backend/apps/api/tests_agent_v1_integration.py`
   - `backend/apps/workflow_center/test_netclaw_boundary.py`
-  - `02a-phase-1-完成包与自查记录.md`
   - `02b-phase-1-国产主厂商覆盖清单.md`
-  - `02c-phase-1-巡检与安全审计回放证据.md`
   - `backend/venv/bin/python -m py_compile backend/apps/api/agent_views.py backend/apps/api/tests_agent_v1.py backend/apps/api/tests_agent_v1_integration.py`
   - `backend/venv/bin/python backend/manage.py test apps.api.tests_agent_v1 -v 2`
   - `backend/venv/bin/python backend/manage.py test apps.api.tests_agent_v1_integration -v 2 --keepdb`
 - Accepted By：`codex`
 - Accepted At：`2026-03-19 17:40:00 CST`
+
+## 14. 整改回写
+
+- 回写时间：`2026-03-20`
+- 对应豁免：`WVR-P1-001`
+- 当前结论：`CLOSED`
+- 整改结果：
+  - `config_drift`、`route_health`、`device_health` 已补齐数据库级回放测试，并固定 `execute_time`、`source_task_id`、`device_set` 追溯字段。
+  - `automation`、`network_analysis`、`workflow_center` 已补齐未生成 migration，`backend/venv/bin/python backend/manage.py makemigrations --check` 返回 `No changes detected`。
+  - `analysis` 聚合出口仍维持主链实现，但补强后的证据已经足以支撑 Phase 1 豁免关闭。
+- 证据引用：
+  - `backend/apps/network_analysis/services.py`
+  - `backend/apps/network_analysis/tests.py`
+  - `backend/apps/network_analysis/tests_integration.py`
+  - `backend/apps/automation/migrations/0006_auto_20260320_0050.py`
+  - `backend/apps/network_analysis/migrations/0003_auto_20260319_2335.py`
+  - `backend/apps/workflow_center/migrations/0002_auto_20260319_2335.py`
+  - `backend/venv/bin/python backend/manage.py test apps.network_analysis.tests apps.network_analysis.tests_integration -v 2 --keepdb`
+  - `backend/venv/bin/python backend/manage.py makemigrations --check`

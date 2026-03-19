@@ -8,8 +8,10 @@ from rest_framework.test import APIRequestFactory
 
 from apps.network_analysis.services import (
     AddressTrackingAnalysisService,
+    DriftAnalysisService,
     InterfaceUtilizationAnalysisService,
     NetworkAnalysisOrchestratorService,
+    TopologyReconcileService,
 )
 from apps.network_analysis.views import (
     AddressTraceSnapshotViewSet,
@@ -67,6 +69,79 @@ class NetworkAnalysisServiceTests(SimpleTestCase):
         self.assertEqual(rows[0]["trace_status"], "partial")
         self.assertEqual(rows[0]["interface_name"], "GigabitEthernet1/0/1")
 
+    @patch("apps.network_analysis.services.AddressTraceSnapshot.objects")
+    @patch("apps.network_analysis.services.NetworkDevice.objects")
+    @patch.object(TopologyReconcileService, "_latest_rows")
+    def test_topology_reconcile_summarizes_fact_sources_and_drift(
+        self,
+        mock_latest_rows,
+        mock_device_objects,
+        mock_trace_objects,
+    ):
+        mock_device_objects.filter.return_value.values.return_value = [
+            {"serial_num": "SER-1", "manage_ip": "10.0.0.1", "name": "sw-a", "category__name": "switch"},
+            {"serial_num": "SER-2", "manage_ip": "10.0.0.2", "name": "sw-b", "category__name": "switch"},
+        ]
+        mock_latest_rows.side_effect = [
+            [
+                {
+                    "hostip": "10.0.0.1",
+                    "local_interface": "GE1/0/1",
+                    "neighbor_ip": "10.0.0.2",
+                    "neighbor_port": "GE1/0/2",
+                    "neighborsysname": "sw-b",
+                    "execute_time": "2026-03-19 20:00:00",
+                }
+            ],
+            [{"hostip": "10.0.0.1", "interface": "GE1/0/1", "execute_time": "2026-03-19 20:00:00"}],
+            [{"hostip": "10.0.0.1", "ipaddress": "10.1.1.1", "interface": "GE1/0/1", "execute_time": "2026-03-19 20:00:00"}],
+        ]
+        mock_trace_objects.all.return_value = [
+            SimpleNamespace(
+                ip_address="10.1.1.2",
+                manage_ip="10.0.0.1",
+                trace_status="partial",
+                source_execute_time="2026-03-19 20:00:00",
+            )
+        ]
+
+        result = TopologyReconcileService.reconcile()
+
+        self.assertEqual(result["summary"]["analysis_kind"], "topology_reconcile")
+        self.assertEqual(result["summary"]["fact_counts"]["lldp_edges"], 1)
+        self.assertEqual(result["summary"]["drift_counts"]["missing_in_facts"], 1)
+        self.assertEqual(result["payload"]["reconcile"]["missing_in_facts"][0], "10.0.0.2")
+
+    @patch("apps.network_analysis.services.NetworkDevice.objects")
+    def test_device_health_returns_degraded_device_summary(self, mock_objects):
+        mock_objects.all.return_value.order_by.return_value.values.return_value = [
+            {"serial_num": "SER-1", "manage_ip": "10.0.0.1", "name": "sw-a", "status": 0, "soft_version": "V1", "patch_version": "P1"},
+            {"serial_num": "SER-2", "manage_ip": "10.0.0.2", "name": "sw-b", "status": 1, "soft_version": "V1", "patch_version": "P1"},
+        ]
+
+        result = DriftAnalysisService.device_health()
+
+        self.assertEqual(result["summary"]["analysis_kind"], "device_health")
+        self.assertEqual(result["summary"]["degraded_devices"], 1)
+        self.assertEqual(result["severity"], "MEDIUM")
+
+    @patch("apps.network_analysis.services.NetworkDevice.objects")
+    @patch("apps.network_analysis.services._latest_batch_rows")
+    def test_route_health_marks_devices_without_routes_as_degraded(self, mock_latest_batch_rows, mock_device_objects):
+        mock_device_objects.filter.return_value.values_list.return_value = ["10.0.0.1", "10.0.0.2"]
+        mock_latest_batch_rows.return_value = [
+            {"hostip": "10.0.0.1", "execute_time": "2026-03-19 20:00:00", "prefix": "0.0.0.0/0"},
+            {"hostip": "10.0.0.1", "execute_time": "2026-03-19 20:00:00", "prefix": "10.0.0.0/24"},
+        ]
+
+        result = DriftAnalysisService.route_health()
+
+        self.assertEqual(result["summary"]["analysis_kind"], "route_health")
+        self.assertEqual(result["summary"]["devices"], 2)
+        self.assertEqual(result["summary"]["degraded_devices"], 1)
+        self.assertEqual(result["summary"]["device_set"], ["10.0.0.1", "10.0.0.2"])
+        self.assertEqual(result["payload"]["results"][1]["status"], "degraded")
+
 
 class NetworkAnalysisViewTests(SimpleTestCase):
     def setUp(self):
@@ -86,7 +161,7 @@ class NetworkAnalysisViewTests(SimpleTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(payload["data"]["snapshots"], 3)
-        mock_refresh.assert_called_once_with(device_ip="10.0.0.1")
+        mock_refresh.assert_called_once_with(device_ip="10.0.0.1", execute_time=None)
 
     @patch("apps.network_analysis.views.AddressTrackingAnalysisService.refresh")
     def test_address_trace_rebuild_endpoint(self, mock_refresh):
@@ -171,6 +246,33 @@ class NetworkAnalysisArchitectureGuardTests(SimpleTestCase):
             source = path.read_text()
             self.assertNotIn("from apps.automation", source, f"forbidden legacy import in {path}")
             self.assertNotIn("import apps.automation", source, f"forbidden legacy import in {path}")
+
+    def test_phase3_runtime_does_not_import_legacy_topology_modules(self):
+        guarded_files = [
+            Path("/Users/lijiamin/PycharmProjects/BasePlatform/backend/apps/network_analysis/services.py"),
+            Path("/Users/lijiamin/PycharmProjects/BasePlatform/backend/apps/api/agent_views.py"),
+        ]
+        for path in guarded_files:
+            source = path.read_text()
+            self.assertNotIn("from apps.topology", source, f"forbidden topology import in {path}")
+            self.assertNotIn("import apps.topology", source, f"forbidden topology import in {path}")
+
+    def test_phase3_runtime_does_not_use_legacy_topology_collections(self):
+        guarded_files = [
+            Path("/Users/lijiamin/PycharmProjects/BasePlatform/backend/apps/network_analysis/services.py"),
+            Path("/Users/lijiamin/PycharmProjects/BasePlatform/backend/apps/api/agent_views.py"),
+        ]
+        forbidden_markers = [
+            'coll="topology"',
+            "coll='topology'",
+            'coll="layer2interface"',
+            "coll='layer2interface'",
+            "Automation.topology",
+        ]
+        for path in guarded_files:
+            source = path.read_text()
+            for marker in forbidden_markers:
+                self.assertNotIn(marker, source, f"forbidden legacy topology collection usage in {path}")
 
 
 class NetworkAnalysisBatchTaskTests(SimpleTestCase):

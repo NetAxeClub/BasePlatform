@@ -313,6 +313,11 @@ PR 或合并说明至少应包含：
 | T-20260316-01 | 推进 device_api 父方案主导配置与 NETCONF 处理器补齐 | codex | DONE | `backend/venv/bin/python backend/manage.py test apps.device_api.tests.DeviceApiP5RolloutCommandTests -v 2` | P5-06 已收口并完成验收结论留痕，当前为 `PASS_WITH_WAIVER`（见 `p5_acceptance_decision.json`） |
 | T-20260316-02 | 建立四任务总体验收门禁、验收模板与总清单 | codex | DONE | self-review | 四任务验收方式与当前状态已合并到 `doc/10-当前任务与验收总览.md` |
 | T-20260316-03 | 清理四任务统一测试底座阻塞并推进总体验收 | codex | IN_PROGRESS | pending | 当前统一阻塞和验收关注点统一记录在 `doc/10-当前任务与验收总览.md` |
+| T-20260320-02 | 发起 NetClaw-CN 总体验收并回写结论 | codex | DONE | 文档总览复核 + 阶段结论汇总 | 总体验收结论已回写到 `backend/doc/netclaw_cn/README.md`，当前为 `PASS` |
+| T-20260320-03 | 制定活跃豁免整改计划 | codex | DONE | self-review | 活跃豁免整改计划已用于推进复核并完成收口，相关中间文档已归档移除 |
+| T-20260320-04 | 完成活跃豁免复核并收口 NetClaw-CN 文档 | codex | DONE | `backend/venv/bin/python backend/manage.py test apps.network_analysis.tests apps.network_analysis.tests_integration -v 2 --keepdb` + `backend/venv/bin/python backend/manage.py test apps.api.tests_agent_v1 apps.api.tests_agent_v1_integration -v 2 --keepdb` + `backend/venv/bin/python backend/manage.py makemigrations --check` | 4 个活跃豁免已关闭，NetClaw-CN 整体验收结论已提升为 `PASS`，文档已收口 |
+| T-20260320-01 | 启动 Phase 4 MCP 与 Skill 产品化基线 | codex | DONE | `backend/venv/bin/python backend/manage.py test apps.api.tests_agent_v1 -v 2` | Phase 4 已以 `PASS_WITH_WAIVER` 正式回写，豁免项见 `backend/doc/netclaw_cn/07-风险台账与豁免记录.md` |
+| T-20260319-06 | 启动 Phase 3 拓扑意图与漂移最小实现 | codex | DONE | `backend/venv/bin/python backend/manage.py test apps.api.tests_agent_v1 apps.network_analysis.tests -v 2` | Phase 3 已以 `PASS_WITH_WAIVER` 正式回写，豁免项见 `backend/doc/netclaw_cn/07-风险台账与豁免记录.md` |
 | T-20260319-05 | 启动 Phase 2 变更治理主链最小实现 | codex | DONE | `backend/venv/bin/python backend/manage.py test apps.api.tests_agent_v1 -v 2` + `backend/venv/bin/python backend/manage.py test apps.api.tests_agent_v1_integration -v 2 --keepdb` | Phase 2 已复验通过，当前为 `PASS_WITH_WAIVER`，豁免项见 `backend/doc/netclaw_cn/07-风险台账与豁免记录.md` |
 | T-20260319-03 | 整改 Phase 1 认证链阻塞项 | codex | DONE | `python3 backend/manage.py test apps.api.tests_agent_v1 -v 2` | `agent/v1` 已补齐认证与权限控制，匿名拒绝 / IAM 身份通过测试已覆盖，等待复验关闭 `RID-P1-001` |
 | T-20260319-04 | 推进 Phase 1 数据库级回放证据补齐 | codex | DONE | `backend/venv/bin/python backend/manage.py test apps.api.tests_agent_v1_integration -v 2 --keepdb` | 已补齐数据库级回放证据，并通过 `config_center` migration 与测试序列化配置修复测试底座阻塞 |
