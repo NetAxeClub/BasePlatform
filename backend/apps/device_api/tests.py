@@ -47,10 +47,13 @@ from apps.device_api.processors.h3c import (
     process_version_netmiko as process_h3c_version_netmiko,
 )
 from apps.device_api.processors.huawei import (
+    process_address_set_netconf as process_huawei_address_set_netconf,
     process_aggre_port_netconf as process_huawei_aggre_port_netconf,
     process_arp_netconf as process_huawei_arp_netconf,
     process_bgp_neighbors_netconf as process_huawei_bgp_neighbors_netconf,
     process_bgp_summary_netconf as process_huawei_bgp_summary_netconf,
+    process_dnat_netconf as process_huawei_dnat_netconf,
+    process_hrp_state_netconf as process_huawei_hrp_state_netconf,
     process_interface_brief_netconf as process_huawei_interface_brief_netconf,
     process_ip_interface_netconf as process_huawei_ip_interface_netconf,
     process_isis_neighbors_netmiko as process_huawei_isis_neighbors_netmiko,
@@ -59,15 +62,24 @@ from apps.device_api.processors.huawei import (
     process_mac_netconf as process_huawei_mac_netconf,
     process_mac_vxlan_control_netconf as process_huawei_mac_vxlan_control_netconf,
     process_mac_vxlan_netconf as process_huawei_mac_vxlan_netconf,
+    process_nat_address_netconf as process_huawei_nat_address_netconf,
     process_netconf_capability_netconf as process_huawei_netconf_capability_netconf,
     process_power_status_netmiko as process_huawei_power_status_netmiko,
     process_route_table_netconf as process_huawei_route_table_netconf,
+    process_security_policy_netconf as process_huawei_security_policy_netconf,
+    process_service_set_netconf as process_huawei_service_set_netconf,
+    process_slb_info_netconf as process_huawei_slb_info_netconf,
+    process_snat_netconf as process_huawei_snat_netconf,
     process_temperature_status_netmiko as process_huawei_temperature_status_netmiko,
     process_version_netconf as process_huawei_version_netconf,
+    process_vrrp_info_netconf as process_huawei_vrrp_info_netconf,
 )
 from apps.device_api.processors.ruijie import (
+    process_ruijie_irf_status_netmiko,
     process_ruijie_fan_status_netmiko,
     process_ruijie_power_status_netmiko,
+    process_ruijie_stack_status_netmiko,
+    process_ruijie_version_netmiko,
 )
 from apps.device_api.services_new import DeviceCollectionService
 from apps.device_api.serializers import (
@@ -1646,6 +1658,80 @@ class DeviceApiP3GoldenSampleTests(SimpleTestCase):
             ],
         )
 
+    def test_ruijie_version_processor_extracts_identity_fields(self):
+        result = process_ruijie_version_netmiko(
+            [
+                {
+                    "Description": "Ruijie Networks RG-N18000-X (RG-N18010-X)",
+                    "Version": "10.4(5b16)",
+                    "SerialNum": "RUIJIE-SN-001",
+                }
+            ]
+        )
+
+        self.assertEqual(
+            result,
+            [
+                {
+                    "serial_num": "RUIJIE-SN-001",
+                    "vendor_alias": "Ruijie",
+                    "model_name": "RG-N18010-X",
+                    "soft_version": "10.4(5b16)",
+                    "patch_version": "",
+                }
+            ],
+        )
+
+    def test_ruijie_stack_status_processor_maps_switch_virtual(self):
+        result = process_ruijie_stack_status_netmiko(
+            [
+                {
+                    "MEMBER": "1",
+                    "DOMAIN": "1",
+                    "PRIORITY": "120",
+                    "POSITION": "LOCAL",
+                    "STATUS": "READY",
+                    "ROLE": "ACTIVE",
+                },
+                {
+                    "MEMBER": "2",
+                    "DOMAIN": "1",
+                    "PRIORITY": "100",
+                    "POSITION": "REMOTE",
+                    "STATUS": "READY",
+                    "ROLE": "STANDBY",
+                },
+            ]
+        )
+
+        self.assertEqual(result[0]["member_id"], "1")
+        self.assertEqual(result[0]["role"], "ACTIVE")
+        self.assertEqual(result[1]["slot"], "2")
+        self.assertEqual(result[1]["priority"], "100")
+
+    def test_ruijie_irf_status_processor_maps_member_roles(self):
+        result = process_ruijie_irf_status_netmiko(
+            [
+                {
+                    "MEMBER": "1",
+                    "PRIORITY": "120",
+                    "MACADDR": "1414.4b74.d658",
+                    "SOFTVER": "10.4(5b16)",
+                },
+                {
+                    "MEMBER": "2",
+                    "PRIORITY": "100",
+                    "MACADDR": "1414.4b74.d659",
+                    "SOFTVER": "10.4(5b16)",
+                },
+            ]
+        )
+
+        self.assertEqual(result[0]["role"], "master")
+        self.assertEqual(result[0]["mac"], "1414-4b74-d658")
+        self.assertEqual(result[1]["role"], "standby")
+        self.assertEqual(result[1]["soft_version"], "10.4(5b16)")
+
     def test_long_tail_vendor_golden_sample_arp(self):
         sample = [
             {
@@ -1851,6 +1937,23 @@ class DeviceApiConnectionManagerTests(SimpleTestCase):
         self.assertEqual(mock_handler.call_args.kwargs["username"], "ops")
         self.assertEqual(mock_handler.call_args.kwargs["port"], 23)
 
+    @patch("apps.device_api.connection_manager.HuaweiyangNetconfConnect")
+    def test_get_netconf_connection_prefers_netconf_manage_ip(self, mock_huawei_connect):
+        mock_huawei_connect.return_value = Mock()
+        manager = DeviceConnectionManager(
+            "10.0.0.1",
+            {
+                "vendor__alias": "Huawei",
+                "netconf": {"username": "netconf", "password": "secret", "port": 830},
+                "netconf_manage_ip": "192.0.2.10",
+            },
+        )
+
+        manager.get_netconf_connection()
+
+        self.assertEqual(mock_huawei_connect.call_args.kwargs["host"], "192.0.2.10")
+        self.assertEqual(mock_huawei_connect.call_args.kwargs["port"], 830)
+
     @patch("apps.device_api.connection_manager.snmp_get_oid")
     def test_execute_snmp_get_uses_v3_username_and_collects_failures(
         self,
@@ -1968,12 +2071,14 @@ class DeviceApiCollectDeviceTests(SimpleTestCase):
     @patch("apps.device_api.tools.collect_device.DeviceSubCollectionPlanSerializer")
     @patch("apps.device_api.tools.collect_device.DeviceSubCollectionPlan.objects")
     @patch("apps.device_api.tools.collect_device.AssetAccount.objects")
+    @patch("apps.device_api.tools.collect_device.AssetIpInfo.objects")
     @patch("apps.device_api.tools.collect_device.PlansToDevice.objects")
     @patch("apps.device_api.tools.collect_device.NetworkDevice.objects")
     def test_get_auto_device_uses_plans_to_device_as_binding_source(
         self,
         mock_device_objects,
         mock_relation_objects,
+        mock_asset_ip_objects,
         mock_account_objects,
         mock_sub_plan_objects,
         mock_sub_plan_serializer,
@@ -2010,6 +2115,9 @@ class DeviceApiCollectDeviceTests(SimpleTestCase):
             {"id": 101, "name": "ssh", "username": "u1", "password": "gAAAA", "protocol": "ssh", "port": 22},
             {"id": 102, "name": "netconf", "username": "u2", "password": "gBBBB", "protocol": "netconf", "port": 830},
         ]
+        mock_asset_ip_objects.filter.return_value.values.return_value = [
+            {"device_id": 1, "name": "netconf", "ipaddr": "192.0.2.10"},
+        ]
         mock_sub_plan_objects.filter.return_value.select_related.return_value.order_by.return_value = [SimpleNamespace(id=11), SimpleNamespace(id=12)]
         mock_sub_plan_serializer.return_value.data = [
             {"summary_plan": 201, "id": 11, "collection_type": "arp"},
@@ -2021,6 +2129,7 @@ class DeviceApiCollectDeviceTests(SimpleTestCase):
 
         self.assertEqual(len(result), 2)
         self.assertEqual(result[0]["manage_ip"], "10.0.0.1")
+        self.assertEqual(result[0]["netconf_manage_ip"], "192.0.2.10")
         self.assertEqual(result[0]["plan_id"], 201)
         self.assertEqual(result[0]["sub_plans"], [{"summary_plan": 201, "id": 11, "collection_type": "arp"}])
         self.assertTrue(result[0]["use_local"])
@@ -2040,10 +2149,12 @@ class DeviceApiCollectDeviceTests(SimpleTestCase):
         self.assertFalse(relation_filter_kwargs["use_local"])
 
     @patch("apps.device_api.tools.collect_device.PlansToDevice.objects")
+    @patch("apps.device_api.tools.collect_device.AssetIpInfo.objects")
     @patch("apps.device_api.tools.collect_device.NetworkDevice.objects")
     def test_get_auto_device_skips_devices_without_plan_binding(
         self,
         mock_device_objects,
+        mock_asset_ip_objects,
         mock_relation_objects,
     ):
         device_row = {
@@ -2069,6 +2180,7 @@ class DeviceApiCollectDeviceTests(SimpleTestCase):
             "slot": 1,
         }
         mock_device_objects.filter.return_value.select_related.return_value.values.return_value = [device_row]
+        mock_asset_ip_objects.filter.return_value.values.return_value = []
         mock_relation_objects.select_related.return_value.filter.return_value = []
 
         result = get_auto_device(manage_ip="10.0.0.1")
@@ -2078,12 +2190,14 @@ class DeviceApiCollectDeviceTests(SimpleTestCase):
     @patch("apps.device_api.tools.collect_device.DeviceSubCollectionPlanSerializer")
     @patch("apps.device_api.tools.collect_device.DeviceSubCollectionPlan.objects")
     @patch("apps.device_api.tools.collect_device.AssetAccount.objects")
+    @patch("apps.device_api.tools.collect_device.AssetIpInfo.objects")
     @patch("apps.device_api.tools.collect_device.PlansToDevice.objects")
     @patch("apps.device_api.tools.collect_device.NetworkDevice.objects")
     def test_get_auto_device_exposes_binding_metadata_for_batch_dedupe(
         self,
         mock_device_objects,
         mock_relation_objects,
+        mock_asset_ip_objects,
         mock_account_objects,
         mock_sub_plan_objects,
         mock_sub_plan_serializer,
@@ -2124,6 +2238,7 @@ class DeviceApiCollectDeviceTests(SimpleTestCase):
             updated_at=datetime(2026, 3, 21, 10, 0, 0),
         )
         mock_relation_objects.select_related.return_value.filter.return_value = [relation]
+        mock_asset_ip_objects.filter.return_value.values.return_value = []
         mock_account_objects.filter.return_value.values.return_value = []
         mock_sub_plan_objects.filter.return_value.select_related.return_value.order_by.return_value = []
         mock_sub_plan_serializer.return_value.data = []
@@ -3016,6 +3131,7 @@ class BackfillLegacyExecuteTimeCommandTests(SimpleTestCase):
 
 
 class DeviceApiTaskTests(SimpleTestCase):
+    @patch("apps.device_api.tasks.save_local_collection_result")
     @patch("apps.device_api.tasks.COLLECTION_SUB_PLAN.insert_one")
     @patch("apps.device_api.tasks.resolve_raw_data")
     @patch("apps.device_api.models.DeviceSubCollectionPlan.objects")
@@ -3024,6 +3140,7 @@ class DeviceApiTaskTests(SimpleTestCase):
         mock_plan_objects,
         mock_resolve_raw_data,
         mock_insert_sub_task,
+        mock_save_local_result,
     ):
         mock_plan_objects.select_related.return_value.get.return_value = SimpleNamespace()
         mock_resolve_raw_data.return_value = (True, "", [{"ipaddress": "10.0.0.2"}])
@@ -3056,7 +3173,9 @@ class DeviceApiTaskTests(SimpleTestCase):
         self.assertEqual(inserted_docs[0]["collection_method"], "netmiko")
         self.assertEqual(inserted_docs[0]["execute_time"], "2026-03-12T11:00:00")
         mock_insert_sub_task.assert_called_once()
+        mock_save_local_result.assert_called_once()
 
+    @patch("apps.device_api.tasks.save_local_collection_result")
     @patch("apps.device_api.tasks.DeviceFactService.update_from_processed_data")
     @patch("apps.device_api.tasks.COLLECTION_SUB_PLAN.insert_one")
     @patch("apps.device_api.tasks.resolve_raw_data")
@@ -3067,6 +3186,7 @@ class DeviceApiTaskTests(SimpleTestCase):
         mock_resolve_raw_data,
         mock_insert_sub_task,
         mock_update_facts,
+        mock_save_local_result,
     ):
         mock_plan_objects.select_related.return_value.get.return_value = SimpleNamespace()
         mock_resolve_raw_data.return_value = (True, "", [{"serial_num": "SER-1"}])
@@ -3104,7 +3224,98 @@ class DeviceApiTaskTests(SimpleTestCase):
             "device_identity",
         )
         mock_insert_sub_task.assert_called_once()
+        mock_save_local_result.assert_called_once()
 
+    @patch("apps.device_api.tasks.save_local_collection_result")
+    @patch("apps.device_api.tasks.DeviceFactService.mark_discovery_failure")
+    @patch("apps.device_api.tasks.resolve_raw_data")
+    @patch("apps.device_api.models.DeviceSubCollectionPlan.objects")
+    def test_process_and_save_result_records_local_error_when_resolve_fails(
+        self,
+        mock_plan_objects,
+        mock_resolve_raw_data,
+        mock_mark_failure,
+        mock_save_local_result,
+    ):
+        mock_plan_objects.select_related.return_value.get.return_value = SimpleNamespace()
+        mock_resolve_raw_data.return_value = (False, "processor_failed", [])
+
+        plan = {
+            "id": 2,
+            "summary_plan": 1,
+            "collection_type": "arp",
+            "summary_plan_vendor": "Huawei",
+            "summary_plan_device_type": "switch",
+            "netmiko_method": "display arp",
+        }
+        device_info = {
+            "manage_ip": "10.0.0.1",
+            "name": "device-1",
+            "idc__name": "IDC-A",
+            "execute_time": "2026-03-12T11:00:00",
+        }
+
+        result = _process_and_save_result(
+            plan,
+            device_info,
+            raw_result=[{"raw": "data"}],
+            collection_method="netmiko",
+        )
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["reason"], "processor_failed")
+        mock_mark_failure.assert_called_once()
+        mock_save_local_result.assert_called_once()
+        self.assertEqual(mock_save_local_result.call_args[0][6], "error")
+        self.assertEqual(mock_save_local_result.call_args[0][7], "processor_failed")
+
+    @patch("apps.device_api.tasks.save_local_collection_result")
+    @patch("apps.device_api.tasks.DeviceFactService.update_from_processed_data")
+    @patch("apps.device_api.tasks.COLLECTION_SUB_PLAN.insert_one")
+    @patch("apps.device_api.tasks.resolve_raw_data")
+    @patch("apps.device_api.models.DeviceSubCollectionPlan.objects")
+    def test_process_and_save_result_marks_empty_processed_data_as_coverage_issue(
+        self,
+        mock_plan_objects,
+        mock_resolve_raw_data,
+        mock_insert_sub_task,
+        mock_update_facts,
+        mock_save_local_result,
+    ):
+        mock_plan_objects.select_related.return_value.get.return_value = SimpleNamespace()
+        mock_resolve_raw_data.return_value = (True, "", [])
+
+        plan = {
+            "id": 3,
+            "summary_plan": 1,
+            "collection_type": "arp",
+            "summary_plan_vendor": "Huawei",
+            "summary_plan_device_type": "switch",
+            "netmiko_method": "display arp",
+        }
+        device_info = {
+            "manage_ip": "10.0.0.3",
+            "name": "device-3",
+            "idc__name": "IDC-A",
+            "execute_time": "2026-03-18T10:00:00",
+        }
+
+        result = _process_and_save_result(
+            plan,
+            device_info,
+            raw_result=[],
+            collection_method="netmiko",
+        )
+
+        self.assertTrue(result["success"])
+        self.assertTrue(result["coverage_issue"])
+        self.assertEqual(result["reason"], "empty_processed_data")
+        inserted_doc = mock_insert_sub_task.call_args[0][0]
+        self.assertTrue(inserted_doc["coverage_issue"])
+        self.assertEqual(inserted_doc["coverage_reason"], "empty_processed_data")
+        mock_save_local_result.assert_called_once()
+
+    @patch("apps.device_api.tasks._record_execution_event")
     @patch("apps.device_api.tasks.COLLECTION_PLAN")
     @patch("apps.device_api.tasks._process_and_save_result")
     @patch("apps.device_api.tasks.DeviceCollectionService.insert_parent_plan_data")
@@ -3115,6 +3326,7 @@ class DeviceApiTaskTests(SimpleTestCase):
         mock_insert_parent,
         mock_process_result,
         mock_collection_plan,
+        mock_record_event,
     ):
         conn_mgr = Mock()
         conn_mgr.execute_netmiko_command.return_value = [{"raw": "data"}]
@@ -3143,7 +3355,9 @@ class DeviceApiTaskTests(SimpleTestCase):
         self.assertEqual(result["failed_sub_plans"], 1)
         self.assertEqual(result["failed_details"][0]["reason"], "resolve_failed")
         mock_collection_plan.update_one.assert_called_once()
+        mock_record_event.assert_called()
 
+    @patch("apps.device_api.tasks._record_execution_event")
     @patch("apps.device_api.tasks.COLLECTION_PLAN")
     @patch("apps.device_api.tasks.DeviceCollectionService.insert_parent_plan_data")
     @patch("apps.device_api.tasks.DeviceConnectionManager")
@@ -3152,6 +3366,7 @@ class DeviceApiTaskTests(SimpleTestCase):
         mock_connection_manager_cls,
         mock_insert_parent,
         mock_collection_plan,
+        mock_record_event,
     ):
         mock_connection_manager_cls.return_value.__enter__.side_effect = RuntimeError("connect failed")
         mock_insert_parent.return_value = {"success": True, "action": "inserted"}
@@ -3179,7 +3394,9 @@ class DeviceApiTaskTests(SimpleTestCase):
             update_kwargs["update"]["$set"]["failed_details"][0]["collection_method"],
             "device",
         )
+        mock_record_event.assert_called()
 
+    @patch("apps.device_api.tasks._record_execution_event")
     @patch("apps.device_api.tasks.COLLECTION_PLAN")
     @patch("apps.device_api.tasks.DeviceCollectionService.insert_parent_plan_data")
     @patch("apps.device_api.tasks.DeviceConnectionManager")
@@ -3188,6 +3405,7 @@ class DeviceApiTaskTests(SimpleTestCase):
         mock_connection_manager_cls,
         mock_insert_parent,
         mock_collection_plan,
+        mock_record_event,
     ):
         conn_mgr = Mock()
         mock_connection_manager_cls.return_value.__enter__.return_value = conn_mgr
@@ -3219,7 +3437,9 @@ class DeviceApiTaskTests(SimpleTestCase):
         self.assertIn("仅允许 get/get_config", result["failed_details"][0]["reason"])
         conn_mgr.execute_netconf_get.assert_not_called()
         mock_collection_plan.update_one.assert_called_once()
+        mock_record_event.assert_called()
 
+    @patch("apps.device_api.tasks._record_execution_event")
     @patch("apps.device_api.tasks.COLLECTION_PLAN")
     @patch("apps.device_api.tasks._process_and_save_result")
     @patch("apps.device_api.tasks.DeviceCollectionService.insert_parent_plan_data")
@@ -3230,6 +3450,7 @@ class DeviceApiTaskTests(SimpleTestCase):
         mock_insert_parent,
         mock_process_result,
         mock_collection_plan,
+        mock_record_event,
     ):
         conn_mgr = Mock()
         conn_mgr.execute_netmiko_command.side_effect = RuntimeError("ssh failed")
@@ -3269,7 +3490,9 @@ class DeviceApiTaskTests(SimpleTestCase):
         update_kwargs = mock_collection_plan.update_one.call_args.kwargs
         self.assertEqual(update_kwargs["filter"]["execute_time"], "2026-03-17T11:00:00")
         self.assertEqual(update_kwargs["update"]["$set"]["task_status"], "partial_success")
+        mock_record_event.assert_called()
 
+    @patch("apps.device_api.tasks._record_execution_event")
     @patch("apps.device_api.tasks.COLLECTION_PLAN")
     @patch("apps.device_api.tasks.DeviceCollectionService.insert_parent_plan_data")
     @patch("apps.device_api.tasks.DeviceConnectionManager")
@@ -3278,6 +3501,7 @@ class DeviceApiTaskTests(SimpleTestCase):
         mock_connection_manager_cls,
         mock_insert_parent,
         mock_collection_plan,
+        mock_record_event,
     ):
         conn_mgr = Mock()
         mock_connection_manager_cls.return_value.__enter__.return_value = conn_mgr
@@ -3305,7 +3529,9 @@ class DeviceApiTaskTests(SimpleTestCase):
         self.assertEqual(result["skipped_details"][0]["reason"], "telemetry_deferred")
         mock_insert_parent.assert_called_once()
         mock_collection_plan.update_one.assert_called_once()
+        mock_record_event.assert_called()
 
+    @patch("apps.device_api.tasks._record_execution_event")
     @patch("apps.device_api.tasks.schedule_batch_network_analysis")
     @patch("apps.device_api.tasks.plan_collect_device.apply_async")
     @patch("apps.device_api.tasks.clear_his_collect_res")
@@ -3320,6 +3546,7 @@ class DeviceApiTaskTests(SimpleTestCase):
         mock_clear_his_collect_res,
         mock_plan_collect_apply_async,
         mock_schedule_batch_network_analysis,
+        mock_record_event,
     ):
         mock_get_auto_device.return_value = [
             {
@@ -3357,7 +3584,9 @@ class DeviceApiTaskTests(SimpleTestCase):
             queue=CELERY_QUEUE,
             retry=True,
         )
+        mock_record_event.assert_called()
 
+    @patch("apps.device_api.tasks._record_execution_event")
     @patch("apps.device_api.tasks.schedule_batch_network_analysis")
     @patch("apps.device_api.tasks.plan_collect_device.apply_async")
     @patch("apps.device_api.tasks.clear_his_collect_res")
@@ -3372,6 +3601,7 @@ class DeviceApiTaskTests(SimpleTestCase):
         mock_clear_his_collect_res,
         mock_plan_collect_apply_async,
         mock_schedule_batch_network_analysis,
+        mock_record_event,
     ):
         mock_get_auto_device.return_value = [
             {
@@ -3393,7 +3623,9 @@ class DeviceApiTaskTests(SimpleTestCase):
         mock_clear_his_collect_res.assert_not_called()
         self.assertFalse(result["clear_history"])
         self.assertEqual(result["tasks"], 1)
+        mock_record_event.assert_called()
 
+    @patch("apps.device_api.tasks._record_execution_event")
     @patch("apps.device_api.tasks.schedule_batch_network_analysis")
     @patch("apps.device_api.tasks.plan_collect_device.apply_async")
     @patch("apps.device_api.tasks.clear_his_collect_res")
@@ -3408,6 +3640,7 @@ class DeviceApiTaskTests(SimpleTestCase):
         mock_clear_his_collect_res,
         mock_plan_collect_apply_async,
         mock_schedule_batch_network_analysis,
+        mock_record_event,
     ):
         mock_get_auto_device.return_value = [
             {
@@ -3459,7 +3692,9 @@ class DeviceApiTaskTests(SimpleTestCase):
             expected_interface_devices=1,
             triggered_by="device_api-plan_collect_device_main",
         )
+        mock_record_event.assert_called()
 
+    @patch("apps.device_api.tasks._record_execution_event")
     @patch("apps.device_api.tasks.schedule_batch_network_analysis")
     @patch("apps.device_api.tasks.plan_collect_device.apply_async")
     @patch("apps.device_api.tasks.clear_his_collect_res")
@@ -3474,6 +3709,7 @@ class DeviceApiTaskTests(SimpleTestCase):
         mock_clear_his_collect_res,
         mock_plan_collect_apply_async,
         mock_schedule_batch_network_analysis,
+        mock_record_event,
     ):
         mock_get_auto_device.return_value = [
             {
@@ -3508,7 +3744,9 @@ class DeviceApiTaskTests(SimpleTestCase):
         self.assertEqual(result["skipped_without_sub_plans"], 0)
         dispatched_host = mock_plan_collect_apply_async.call_args.kwargs["kwargs"]
         self.assertEqual(dispatched_host["plan_id"], 301)
+        mock_record_event.assert_called()
 
+    @patch("apps.device_api.tasks._record_execution_event")
     @patch("apps.device_api.tasks.clear_his_collect_res", side_effect=RuntimeError("mongo down"))
     @patch("apps.device_api.tasks.MainIn.cmdb_to_mongo")
     @patch("apps.device_api.tasks.datas_to_cache")
@@ -3519,6 +3757,7 @@ class DeviceApiTaskTests(SimpleTestCase):
         mock_datas_to_cache,
         mock_cmdb_to_mongo,
         mock_clear_his_collect_res,
+        mock_record_event,
     ):
         mock_get_auto_device.return_value = [
             {
@@ -3530,7 +3769,61 @@ class DeviceApiTaskTests(SimpleTestCase):
 
         with self.assertRaises(RuntimeError):
             plan_collect_device_main()
+        mock_record_event.assert_called()
 
+    @patch("apps.device_api.tasks._record_execution_event")
+    @patch("apps.device_api.tasks.schedule_batch_network_analysis")
+    @patch("apps.device_api.tasks.plan_collect_device.apply_async")
+    @patch("apps.device_api.tasks.clear_his_collect_res")
+    @patch("apps.device_api.tasks.MainIn.cmdb_to_mongo")
+    @patch("apps.device_api.tasks.datas_to_cache")
+    @patch("apps.device_api.tasks.get_auto_device")
+    def test_plan_collect_device_main_continues_when_dispatch_fails(
+        self,
+        mock_get_auto_device,
+        mock_datas_to_cache,
+        mock_cmdb_to_mongo,
+        mock_clear_his_collect_res,
+        mock_plan_collect_apply_async,
+        mock_schedule_batch_network_analysis,
+        mock_record_event,
+    ):
+        mock_get_auto_device.return_value = [
+            {
+                "manage_ip": "10.0.0.1",
+                "execute_time": "2026-03-19 10:00:00",
+                "sub_plans": [{"id": 1, "collection_type": "arp"}],
+            },
+            {
+                "manage_ip": "10.0.0.2",
+                "execute_time": "2026-03-19 10:00:00",
+                "sub_plans": [{"id": 2, "collection_type": "arp"}],
+            },
+        ]
+        mock_plan_collect_apply_async.side_effect = [
+            SimpleNamespace(id="task-1"),
+            RuntimeError("broker down"),
+        ]
+        mock_schedule_batch_network_analysis.return_value = {
+            "scheduled": True,
+            "reason": "scheduled",
+        }
+
+        result = plan_collect_device_main(clear_history=False)
+
+        self.assertEqual(result["total"], 1)
+        self.assertEqual(result["tasks"], 1)
+        self.assertEqual(result["dispatch_failed_devices"], 1)
+        mock_schedule_batch_network_analysis.assert_called_once_with(
+            execute_time="2026-03-19 10:00:00",
+            expected_devices=1,
+            expected_subtasks=1,
+            expected_interface_devices=0,
+            triggered_by="device_api-plan_collect_device_main",
+        )
+        mock_record_event.assert_called()
+
+    @patch("apps.device_api.tasks._record_execution_event")
     @patch("apps.device_api.tasks.schedule_batch_network_analysis")
     @patch("apps.device_api.tasks.plan_collect_device.apply_async")
     @patch("apps.device_api.tasks.clear_his_collect_res")
@@ -3539,12 +3832,14 @@ class DeviceApiTaskTests(SimpleTestCase):
     @patch("apps.device_api.tools.collect_device.DeviceSubCollectionPlanSerializer")
     @patch("apps.device_api.tools.collect_device.DeviceSubCollectionPlan.objects")
     @patch("apps.device_api.tools.collect_device.AssetAccount.objects")
+    @patch("apps.device_api.tools.collect_device.AssetIpInfo.objects")
     @patch("apps.device_api.tools.collect_device.PlansToDevice.objects")
     @patch("apps.device_api.tools.collect_device.NetworkDevice.objects")
     def test_plan_collect_device_main_strips_runtime_options_before_device_filtering(
         self,
         mock_device_objects,
         mock_relation_objects,
+        mock_asset_ip_objects,
         mock_account_objects,
         mock_sub_plan_objects,
         mock_sub_plan_serializer,
@@ -3553,6 +3848,7 @@ class DeviceApiTaskTests(SimpleTestCase):
         mock_clear_his_collect_res,
         mock_plan_collect_apply_async,
         mock_schedule_batch_network_analysis,
+        mock_record_event,
     ):
         device_row = {
             "id": 1,
@@ -3581,6 +3877,7 @@ class DeviceApiTaskTests(SimpleTestCase):
         selected_queryset = base_queryset.select_related.return_value
         filtered_queryset = selected_queryset.filter.return_value
         filtered_queryset.values.return_value = [device_row]
+        mock_asset_ip_objects.filter.return_value.values.return_value = []
 
         mock_relation_objects.select_related.return_value.filter.return_value = [
             SimpleNamespace(
@@ -3630,6 +3927,7 @@ class DeviceApiTaskTests(SimpleTestCase):
         mock_clear_his_collect_res.assert_not_called()
         self.assertFalse(result["clear_history"])
         self.assertEqual(result["total"], 1)
+        mock_record_event.assert_called()
 
 
 class DeviceApiProcessorOnlyTests(SimpleTestCase):
@@ -3733,6 +4031,69 @@ class DeviceApiH3CIdentityTests(TestCase):
         self.assertEqual(self.device.model.name, "S6860-54HF")
         self.assertEqual(self.device.soft_version, "7.1.070 Feature 2707")
         self.assertEqual(self.device.patch_version, "Feature 2707H17")
+
+
+class DeviceApiRuijieIdentityTests(TestCase):
+    def setUp(self):
+        self.vendor, _ = Vendor.objects.get_or_create(name="锐捷", defaults={"alias": "Ruijie"})
+        if self.vendor.alias != "Ruijie":
+            self.vendor.alias = "Ruijie"
+            self.vendor.save(update_fields=["alias"])
+        self.category, _ = Category.objects.get_or_create(name="switch")
+        self.old_model = Model.objects.create(name="OLD-RUIJIE", vendor=self.vendor)
+        self.device = NetworkDevice.objects.create(
+            name="old-ruijie",
+            manage_ip="192.0.2.88",
+            serial_num="SER-RG-OLD",
+            vendor=self.vendor,
+            category=self.category,
+            model=self.old_model,
+            soft_version="old-version",
+            patch_version="old-patch",
+        )
+
+    def test_ruijie_device_identity_updates_network_device(self):
+        plan = SimpleNamespace(
+            name="ruijie-device-identity-plan",
+            collection_type="device_identity",
+            summary_plan=SimpleNamespace(vendor="Ruijie", device_type="switch"),
+        )
+
+        status, error, processed = resolve_raw_data(
+            plan,
+            {
+                "data": [
+                    {
+                        "Description": "Ruijie Networks RG-N18000-X (RG-N18010-X)",
+                        "Version": "10.4(5b16)",
+                        "SerialNum": "RUIJIE-SN-001",
+                    }
+                ],
+                "device_ip": self.device.manage_ip,
+            },
+            "netmiko",
+        )
+
+        self.assertTrue(status)
+        self.assertEqual(error, "")
+        self.assertEqual(processed[0]["model_name"], "RG-N18010-X")
+        self.assertEqual(processed[0]["soft_version"], "10.4(5b16)")
+
+        DeviceFactService.update_from_processed_data(
+            collection_type="device_identity",
+            device_info={
+                "manage_ip": self.device.manage_ip,
+                "serial_num": self.device.serial_num,
+                "vendor__alias": "Ruijie",
+                "platform_profile_code": "Ruijie-switch",
+            },
+            processed_data=processed,
+        )
+
+        self.device.refresh_from_db()
+        self.assertEqual(self.device.model.name, "RG-N18010-X")
+        self.assertEqual(self.device.soft_version, "10.4(5b16)")
+        self.assertEqual(self.device.serial_num, "SER-RG-OLD")
 
 
 class DeviceApiHuaweiIdentityTests(TestCase):
@@ -5019,6 +5380,243 @@ class DeviceApiProtocolExtensionTests(SimpleTestCase):
         self.assertEqual(result[0]["status"], "up")
         self.assertEqual(result[0]["mode"], "dynamic")
 
+    def test_huawei_hrp_state_netconf_processor_maps_usg_state(self):
+        result = process_huawei_hrp_state_netconf(
+            {
+                "hrp-state": {
+                    "hrp-status": "active",
+                    "peer-status": "standby",
+                    "heartbeat-status": "running",
+                    "config-master": "true",
+                    "hrp-switch-info": {
+                        "id": "1",
+                        "time": "2026-03-23T10:00:00+08:00",
+                        "reason": "HRP is enabled.",
+                    },
+                }
+            }
+        )
+
+        self.assertEqual(result[0]["ha_state"], "active")
+        self.assertEqual(result[0]["peer_status"], "standby")
+        self.assertEqual(result[0]["switch_reason"], "HRP is enabled.")
+
+    def test_huawei_security_policy_netconf_processor_maps_usg_rules(self):
+        result = process_huawei_security_policy_netconf(
+            {
+                "sec-policy": {
+                    "vsys": {
+                        "name": "public",
+                        "static-policy": {
+                            "rule": [
+                                {
+                                    "name": "allow-web",
+                                    "desc": "web allow",
+                                    "source-zone": "trust",
+                                    "destination-zone": "untrust",
+                                    "source-ip": {"address-set": "SRC-GRP"},
+                                    "destination-ip": {"address-ipv4": "203.0.113.10/32"},
+                                    "service": {"service-object": ["tcp80", "tcp443"]},
+                                    "enable": "true",
+                                    "action": "true",
+                                }
+                            ]
+                        },
+                    }
+                }
+            }
+        )
+
+        self.assertEqual(result[0]["rule_id"], "allow-web")
+        self.assertEqual(result[0]["action"], "permit")
+        self.assertEqual(result[0]["src_zone"], "trust")
+        self.assertEqual(result[0]["src_addr"][0]["name"], "SRC-GRP")
+        self.assertEqual(result[0]["src_addr"][0]["resolved"][0]["result"], "SRC-GRP")
+        self.assertEqual(result[0]["dst_addr"][0]["resolved"][0]["result"], "203.0.113.10/32")
+        self.assertEqual(result[0]["service"][0]["name"], "tcp80")
+        self.assertEqual(result[0]["service"][0]["items"][0]["result"], "tcp80")
+        self.assertFalse(result[0]["disabled"])
+
+    def test_huawei_snat_netconf_processor_maps_usg_nat_policy(self):
+        result = process_huawei_snat_netconf(
+            {
+                "nat-policy": {
+                    "vsys": {
+                        "name": "public",
+                        "rule": [
+                            {
+                                "name": "snat-web",
+                                "source-zone": "trust",
+                                "destination-zone": "untrust",
+                                "source-ip": {"address-set": "src-users"},
+                                "destination-ip": {
+                                    "address-ipv4-range": {
+                                        "start-ipv4": "198.51.100.10",
+                                        "end-ipv4": "198.51.100.20",
+                                    }
+                                },
+                                "service": {
+                                    "service-items": {
+                                        "tcp": {
+                                            "source-port": "0 to 65535",
+                                            "dest-port": "80",
+                                        }
+                                    }
+                                },
+                                "action": "nat-address-group",
+                                "nat-address-group": "public-pool",
+                                "enable": "true",
+                            }
+                        ],
+                    }
+                }
+            }
+        )
+
+        self.assertEqual(result[0]["rule_id"], "snat-web")
+        self.assertEqual(result[0]["trans_ip"], [{"object": "public-pool"}])
+        self.assertEqual(result[0]["source_zone"], "trust")
+        self.assertEqual(result[0]["destination_zone"], "untrust")
+        self.assertEqual(result[0]["destination_port"][0]["start"], 80)
+        self.assertEqual(result[0]["destination_port"][0]["protocol"], "tcp")
+
+    def test_huawei_dnat_netconf_processor_maps_usg_nat_server(self):
+        result = process_huawei_dnat_netconf(
+            {
+                "nat-server": {
+                    "server-mapping": [
+                        {
+                            "name": "dnat-web",
+                            "protocol": "6",
+                            "global": {
+                                "start-ip": "203.0.113.20",
+                                "if-type": "GigabitEthernet0/0/1",
+                            },
+                            "global-port": {"start-port": "8443"},
+                            "inside": {"start-ip": "10.0.0.20"},
+                            "inside-port": {"start-port": "443"},
+                            "enable": "true",
+                        }
+                    ]
+                }
+            }
+        )
+
+        self.assertEqual(result[0]["rule_id"], "dnat-web")
+        self.assertEqual(result[0]["ingress_interface"], "GigabitEthernet0/0/1")
+        self.assertEqual(result[0]["global_ip"][0]["result"], "203.0.113.20")
+        self.assertEqual(result[0]["global_port"][0]["protocol"], "tcp")
+        self.assertEqual(result[0]["local_port"][0]["start"], 443)
+
+    def test_huawei_address_set_netconf_processor_maps_usg_objects(self):
+        result = process_huawei_address_set_netconf(
+            {
+                "address-set": {
+                    "addr-object": {
+                        "vsys": "public",
+                        "name": "SRC-GRP",
+                        "desc": "source group",
+                        "elements": [
+                            {"address-ipv4": "10.0.0.0/24"},
+                            {
+                                "address-ipv4-range": {
+                                    "start-ipv4": "10.0.1.1",
+                                    "end-ipv4": "10.0.1.10",
+                                }
+                            },
+                        ],
+                    }
+                }
+            }
+        )
+
+        self.assertEqual(result[0]["name"], "SRC-GRP")
+        self.assertEqual(result[0]["ip"], [{"ip": "10.0.0.0/24"}])
+        self.assertEqual(result[0]["range"], [{"start": "10.0.1.1", "end": "10.0.1.10"}])
+        self.assertEqual(result[0]["resolved"][0]["result"], "10.0.0.0/24")
+        self.assertEqual(result[0]["resolved"][1]["result"], "10.0.1.1-10.0.1.10")
+
+    def test_huawei_nat_address_netconf_processor_maps_usg_address_group(self):
+        result = process_huawei_nat_address_netconf(
+            {
+                "nat-address-group": {
+                    "nat-address-group": {
+                        "name": "public-pool",
+                        "vsys": "public",
+                        "section": {"start-ip": "203.0.113.100", "end-ip": "203.0.113.110"},
+                    }
+                }
+            }
+        )
+
+        self.assertEqual(result[0]["name"], "public-pool")
+        self.assertEqual(result[0]["section_count"], 1)
+        self.assertEqual(result[0]["items"], ["203.0.113.100-203.0.113.110"])
+
+    def test_huawei_service_set_netconf_processor_maps_usg_objects(self):
+        result = process_huawei_service_set_netconf(
+            {
+                "service-set": {
+                    "service-object": {
+                        "vsys": "public",
+                        "name": "tcp-web",
+                        "desc": "web service",
+                        "items": {
+                            "tcp": {
+                                "source-port": "0 to 65535",
+                                "dest-port": "80",
+                            }
+                        },
+                    }
+                }
+            }
+        )
+
+        self.assertEqual(result[0]["name"], "tcp-web")
+        self.assertEqual(result[0]["protocol"], "tcp")
+        self.assertEqual(result[0]["dst_port_min"], 80)
+        self.assertEqual(result[0]["items"][0]["dst-port-min"], 80)
+        self.assertEqual(result[0]["items"][0]["src-port-max"], 65535)
+
+    def test_huawei_slb_and_vrrp_netconf_processors_map_usg_payloads(self):
+        slb_result = process_huawei_slb_info_netconf(
+            {
+                "slb": {
+                    "slb-pool": {
+                        "name": "pool-web",
+                        "protocol": "tcp",
+                        "real-server": [
+                            {"name": "10.0.0.10"},
+                            {"name": "10.0.0.11"},
+                        ],
+                    }
+                }
+            }
+        )
+        vrrp_result = process_huawei_vrrp_info_netconf(
+            {
+                "vrrp": {
+                    "vrrp-instance": {
+                        "interface-name": "GigabitEthernet0/0/1",
+                        "vrid": "1",
+                        "vrrp4": {
+                            "virtual-ip": "192.0.2.254 255.255.255.0",
+                            "priority": "120",
+                            "preempt-mode": "true",
+                            "admin-state": "up",
+                            "config-state": "active",
+                        },
+                    }
+                }
+            }
+        )
+
+        self.assertEqual(slb_result[0]["name"], "pool-web")
+        self.assertEqual(slb_result[0]["items"], ["10.0.0.10", "10.0.0.11"])
+        self.assertEqual(vrrp_result[0]["interface"], "GigabitEthernet0/0/1")
+        self.assertEqual(vrrp_result[0]["virtual_ip"], "192.0.2.254")
+        self.assertEqual(vrrp_result[0]["ipmask"], "255.255.255.0")
+
     def test_huawei_netconf_capability_processor_maps_schema_features(self):
         result = process_huawei_netconf_capability_netconf(
             {
@@ -5393,6 +5991,38 @@ class DeviceApiProtocolExtensionTests(SimpleTestCase):
         self.assertEqual(rows[0]["MEMBERPORTS"], ["FGE1/0/53", "FGE1/0/54"])
         self.assertEqual(rows[0]["STATUS"], ["S", "S"])
 
+    def test_ruijie_lldp_detail_template_parses_cli_rows(self):
+        rows = self._parse_textfsm_rows(
+            "ruijie_show_lldp_neighbors_detail.textfsm",
+            (
+                "Local Interface: Te1/0/1\n"
+                "Chassis ID: 0011.2233.4455\n"
+                "Port ID: Eth1/1\n"
+                "Port Description: uplink\n"
+                "System Name: core-a\n"
+                "Management Address Type: ipv4\n"
+                "Management Address: 10.0.0.254\n"
+                "----------\n"
+            ),
+        )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["LOCAL_INTERFACE"], "Te1/0/1")
+        self.assertEqual(rows[0]["CHASSIS_ID"], "0011.2233.4455")
+        self.assertEqual(rows[0]["NEIGHBOR_PORT"], "Eth1/1")
+        self.assertEqual(rows[0]["PORTDESCRIPTION"], "uplink")
+        self.assertEqual(rows[0]["NEIGHBORSYSNAME"], "core-a")
+        self.assertEqual(rows[0]["MANAGEMENT_TYPE"], "ipv4")
+        self.assertEqual(rows[0]["MANAGEMENT_IP"], "10.0.0.254")
+
+    def test_ruijie_lldp_template_registered_in_index(self):
+        index_content = (TEMPLATE_BASE_DIR / "index").read_text(encoding="utf-8")
+
+        self.assertIn(
+            "ruijie_show_lldp_neighbors_detail.textfsm, .*, ruijie, sho[[w]] lldp neighbors detail",
+            index_content,
+        )
+
 
 class DeviceApiHealthExtensionTests(SimpleTestCase):
     databases = {"default"}
@@ -5617,10 +6247,62 @@ class DeviceApiHealthExtensionTests(SimpleTestCase):
         self.assertEqual(sub_plan.textfsm_template, "huawei_vrp_display_arp.textfsm")
         self.assertTrue(sub_plan.netmiko_enabled)
 
+    def test_apply_profile_defaults_populates_ruijie_cli_commands(self):
+        sub_plans = []
+        for collection_type in ("ip_interface", "aggre_port", "stack_status", "irf_status", "lldp"):
+            sub_plans.append(
+                SimpleNamespace(
+                    collection_type=collection_type,
+                    description="",
+                    netmiko_method="",
+                    textfsm_template="",
+                    netmiko_enabled=False,
+                    netconf_enabled=False,
+                    netconf_path="",
+                    xml_templates=SimpleNamespace(
+                        filter=lambda **kwargs: SimpleNamespace(first=lambda: None)
+                    ),
+                    save=Mock(),
+                )
+            )
+
+        plan = SimpleNamespace(
+            collection_method="netmiko",
+            collect_plans=SimpleNamespace(all=lambda: sub_plans),
+        )
+        profile = SimpleNamespace(
+            code="Ruijie-switch",
+            vendor_alias="Ruijie",
+            preferred_methods={
+                "ip_interface": ["netmiko"],
+                "aggre_port": ["netmiko"],
+                "stack_status": ["netmiko"],
+                "irf_status": ["netmiko"],
+                "lldp": ["netmiko"],
+            },
+            fallback_methods={},
+            supported_collection_types=["ip_interface", "aggre_port", "stack_status", "irf_status", "lldp"],
+        )
+
+        PlatformProfileService.apply_profile_defaults(plan, profile)
+
+        expectations = {
+            "ip_interface": ("show ip interface brief", "ruijie_show_ip_interface_brief.textfsm"),
+            "aggre_port": ("show aggregatePort summary", "ruijie_show_aggregatePort_summary.textfsm"),
+            "stack_status": ("show switch virtual", "ruijie_show_switch_virtual.textfsm"),
+            "irf_status": ("show member", "ruijie_show_member.textfsm"),
+            "lldp": ("show lldp neighbors detail", "ruijie_show_lldp_neighbors_detail.textfsm"),
+        }
+        for sub_plan in sub_plans:
+            expected_command, expected_template = expectations[sub_plan.collection_type]
+            self.assertEqual(sub_plan.netmiko_method, expected_command)
+            self.assertEqual(sub_plan.textfsm_template, expected_template)
+            self.assertTrue(sub_plan.netmiko_enabled)
+
     @patch("apps.device_api.platform_profiles.NetconfXMLTemplate.objects.create")
     def test_apply_profile_defaults_populates_huawei_usg_netconf_templates(self, mock_create):
         sub_plan = SimpleNamespace(
-            collection_type="route_table",
+            collection_type="security_policy",
             description="",
             netmiko_method="",
             textfsm_template="",
@@ -5639,16 +6321,48 @@ class DeviceApiHealthExtensionTests(SimpleTestCase):
         profile = SimpleNamespace(
             code="Huawei-USG",
             vendor_alias="Huawei",
-            preferred_methods={"route_table": ["netconf"]},
+            preferred_methods={"security_policy": ["netconf"]},
             fallback_methods={},
-            supported_collection_types=["route_table"],
+            supported_collection_types=["security_policy"],
         )
 
         PlatformProfileService.apply_profile_defaults(plan, profile)
 
         self.assertTrue(sub_plan.netconf_enabled)
-        self.assertEqual(sub_plan.netconf_path, "get_device_route")
+        self.assertEqual(sub_plan.netconf_path, "get_sec_policy")
         mock_create.assert_called_once()
+
+    def test_apply_profile_defaults_sets_huawei_usg_cli_commands(self):
+        sub_plan = SimpleNamespace(
+            collection_type="arp",
+            description="",
+            netmiko_method="",
+            textfsm_template="",
+            netmiko_enabled=False,
+            netconf_enabled=False,
+            netconf_path="",
+            xml_templates=SimpleNamespace(
+                filter=lambda **kwargs: SimpleNamespace(first=lambda: None)
+            ),
+            save=Mock(),
+        )
+        plan = SimpleNamespace(
+            collection_method="both",
+            collect_plans=SimpleNamespace(all=lambda: [sub_plan]),
+        )
+        profile = SimpleNamespace(
+            code="Huawei-USG",
+            vendor_alias="Huawei",
+            preferred_methods={"arp": ["netmiko"]},
+            fallback_methods={"arp": ["netmiko"]},
+            supported_collection_types=["arp"],
+        )
+
+        PlatformProfileService.apply_profile_defaults(plan, profile)
+
+        self.assertEqual(sub_plan.netmiko_method, "display arp all")
+        self.assertEqual(sub_plan.textfsm_template, "huawei_vrp_display_arp.textfsm")
+        self.assertTrue(sub_plan.netmiko_enabled)
 
     @patch("apps.device_api.platform_profiles.NetconfXMLTemplate.objects.create")
     def test_apply_profile_defaults_populates_huawei_yunshan_identity_template(self, mock_create):
@@ -6356,6 +7070,25 @@ class DeviceCollectionServiceExecutionTests(SimpleTestCase):
             {"netconf_timeout_seconds": 5, "netconf_retry_times": 0},
         )
 
+    @patch("apps.device_api.services_new.AssetIpInfo.objects")
+    def test_build_device_info_for_local_uses_asset_ip_netconf_entry(self, mock_asset_ip_objects):
+        device = SimpleNamespace(
+            id=7,
+            manage_ip="10.0.0.1",
+            name="fw-a",
+            idc=None,
+            vendor=SimpleNamespace(alias="Huawei"),
+            ssh_account=None,
+            netconf_account=SimpleNamespace(username="netconf", decode_password="secret"),
+        )
+        mock_asset_ip_objects.filter.return_value.values_list.return_value.first.side_effect = [
+            "192.0.2.10",
+        ]
+
+        info = DeviceCollectionService._build_device_info_for_local(device)
+
+        self.assertEqual(info["netconf_manage_ip"], "192.0.2.10")
+
     @patch("apps.device_api.platform_profiles.DeviceFactService.update_from_processed_data")
     @patch("apps.device_api.services_new.save_local_collection_result")
     @patch("apps.device_api.services_new.COLLECTION_SUB_PLAN.insert_one")
@@ -6644,6 +7377,40 @@ class DeviceCollectionServiceExecutionTests(SimpleTestCase):
             payload["connection_args"]["device_params"],
             {"name": "nexus"},
         )
+
+    def test_execute_netconf_south_prefers_netconf_manage_ip(self):
+        runner = Mock()
+        runner.get_device_config.return_value = {"success": True}
+        config = SimpleNamespace(south_http_port="18080")
+        xml_template = SimpleNamespace(
+            xml_template='<filter type="subtree"><top><LLDP/></top></filter>',
+            collect_method="get_config",
+        )
+        plan = SimpleNamespace(
+            id=16,
+            collection_type="lldp",
+            xml_templates=SimpleNamespace(first=lambda: xml_template),
+        )
+        device = SimpleNamespace(
+            manage_ip="10.0.0.3",
+            netconf_manage_ip="192.0.2.30",
+            name="fw-c",
+            vendor=SimpleNamespace(alias="Huawei"),
+            idc=SimpleNamespace(name="IDC-C"),
+            netconf_account=SimpleNamespace(username="netconf", decode_password="secret"),
+        )
+
+        result = DeviceCollectionService._execute_netconf_south(
+            plan,
+            device,
+            "10.0.0.200",
+            runner,
+            config,
+        )
+
+        self.assertTrue(result["success"])
+        payload = runner.get_device_config.call_args.kwargs["netpalm_info"]
+        self.assertEqual(payload["connection_args"]["host"], "192.0.2.30")
 
     def test_execute_netconf_south_rejects_rpc_collect_method(self):
         runner = Mock()

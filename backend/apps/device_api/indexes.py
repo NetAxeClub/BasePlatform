@@ -6,6 +6,7 @@ import pymongo
 
 from apps.device_api.contract import build_plan_collection_name
 from apps.device_api import (
+    COLLECTION_EXECUTION_LOG,
     COLLECTION_PLAN,
     COLLECTION_RESULTS_DB,
     COLLECTION_SUB_PLAN,
@@ -24,6 +25,12 @@ from apps.device_api import (
     ip_interface_mongo,
     isis_neighbors_mongo,
     lldp_mongo,
+    hrp_state_mongo,
+    address_set_mongo,
+    nat_address_mongo,
+    service_set_mongo,
+    slb_info_mongo,
+    vrrp_info_mongo,
     mac_mongo,
     mac_bd_mongo,
     mac_vxlan_mongo,
@@ -75,6 +82,12 @@ PLAN_DATA_COLLECTIONS = {
     build_plan_collection_name("ip_interface"): ip_interface_mongo,
     build_plan_collection_name("interface_brief"): interface_brief_mongo,
     build_plan_collection_name("aggre_port"): aggre_port_mongo,
+    build_plan_collection_name("hrp_state"): hrp_state_mongo,
+    build_plan_collection_name("address_set"): address_set_mongo,
+    build_plan_collection_name("nat_address"): nat_address_mongo,
+    build_plan_collection_name("service_set"): service_set_mongo,
+    build_plan_collection_name("slb_info"): slb_info_mongo,
+    build_plan_collection_name("vrrp_info"): vrrp_info_mongo,
     build_plan_collection_name("zone"): zone_mongo,
     build_plan_collection_name("service_predefined"): service_predefined_mongo,
     build_plan_collection_name("policy_hit_count"): policy_hit_count_mongo,
@@ -155,6 +168,24 @@ RESULT_COLLECTION_INDEXES = {
             {"name": "idx_task_status_execute_time"},
         ),
     ),
+    "DeviceApiExecutionLog": (
+        (
+            [("execute_time", pymongo.DESCENDING), ("event_scope", pymongo.ASCENDING), ("severity", pymongo.ASCENDING)],
+            {"name": "idx_execute_scope_severity"},
+        ),
+        (
+            [("device_ip", pymongo.ASCENDING), ("execute_time", pymongo.DESCENDING), ("event_type", pymongo.ASCENDING)],
+            {"name": "idx_device_execute_event"},
+        ),
+        (
+            [("summary_plan_id", pymongo.ASCENDING), ("plan_id", pymongo.ASCENDING), ("execute_time", pymongo.DESCENDING)],
+            {"name": "idx_summary_plan_execute_time"},
+        ),
+        (
+            [("status", pymongo.ASCENDING), ("execute_time", pymongo.DESCENDING)],
+            {"name": "idx_status_execute_time"},
+        ),
+    ),
 }
 
 _AUTO_INDEXES_BOOTSTRAPPED = False
@@ -176,6 +207,7 @@ def build_device_api_index_targets():
         ("TestDeviceCollection", COLLECTION_RESULTS_DB, RESULT_COLLECTION_INDEXES["TestDeviceCollection"]),
         ("PlanCollectionCelery", COLLECTION_PLAN, RESULT_COLLECTION_INDEXES["PlanCollectionCelery"]),
         ("SubPlanCollectionCelery", COLLECTION_SUB_PLAN, RESULT_COLLECTION_INDEXES["SubPlanCollectionCelery"]),
+        ("DeviceApiExecutionLog", COLLECTION_EXECUTION_LOG, RESULT_COLLECTION_INDEXES["DeviceApiExecutionLog"]),
     ]
     for collection_name, mongo in PLAN_DATA_COLLECTIONS.items():
         targets.append((collection_name, mongo, PLAN_DATA_INDEXES))

@@ -13,7 +13,7 @@
 import traceback
 from datetime import datetime
 from django.db import connections
-from apps.asset.models import NetworkDevice, AssetAccount
+from apps.asset.models import NetworkDevice, AssetAccount, AssetIpInfo
 from apps.device_api.models import DeviceSubCollectionPlan, PlansToDevice
 from apps.device_api.serializers import DeviceSubCollectionPlanSerializer
 from utils.crypt_pwd import CryptPwd
@@ -53,7 +53,7 @@ def get_auto_device(**kwargs):
             'category__name', 'model__name', 'ssh_enable', 'ssh_account',
             'netconf_enable', 'netconf_account',
             'patch_version', 'status', 'idc__name', 'auto_enable',
-            'ha_status', 'chassis', 'slot', 'bind_ip__ipaddr'
+            'ha_status', 'chassis', 'slot'
         )
     )
 
@@ -64,14 +64,37 @@ def get_auto_device(**kwargs):
     device_by_serial = {}
     manage_ip_list = []
     serial_num_list = []
+    device_id_list = []
     for dev in all_devs:
+        device_id = dev.get("id")
         serial_num = dev.get("serial_num")
         manage_ip = dev.get("manage_ip")
+        if device_id:
+            device_id_list.append(device_id)
         if serial_num:
             device_by_serial[serial_num] = dev
             serial_num_list.append(serial_num)
         if manage_ip:
             manage_ip_list.append(manage_ip)
+
+    bind_ip_rows = []
+    if device_id_list:
+        bind_ip_rows = list(
+            AssetIpInfo.objects.filter(device_id__in=device_id_list).values(
+                "device_id", "name", "ipaddr"
+            )
+        )
+
+    bind_ip_by_device_id = {}
+    netconf_bind_ip_by_device_id = {}
+    for row in bind_ip_rows:
+        device_id = row.get("device_id")
+        ipaddr = row.get("ipaddr")
+        if not device_id or not ipaddr:
+            continue
+        bind_ip_by_device_id.setdefault(device_id, ipaddr)
+        if str(row.get("name") or "").strip().lower() == "netconf":
+            netconf_bind_ip_by_device_id[device_id] = ipaddr
 
     # 获取所有不重复的account_ids
     account_ids = set()
@@ -138,6 +161,11 @@ def get_auto_device(**kwargs):
                 continue
 
             dev = dict(dev)
+            device_id = dev.get("id")
+            bind_ip = bind_ip_by_device_id.get(device_id)
+            netconf_bind_ip = netconf_bind_ip_by_device_id.get(device_id) or bind_ip
+            dev["bind_ip__ipaddr"] = bind_ip
+            dev["netconf_manage_ip"] = netconf_bind_ip
             tmp_protocol = []
             if dev.get('ssh_enable') == 'account' and dev.get('ssh_account'):
                 tmp_account = account_dict.get(dev['ssh_account'])

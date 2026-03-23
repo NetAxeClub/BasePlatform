@@ -59,6 +59,15 @@ class DeviceConnectionManager:
             return {}
         return policy
 
+    def _get_protocol_host(self, protocol_name: str) -> str:
+        if protocol_name == "netconf":
+            return (
+                self.device_info.get("netconf_manage_ip")
+                or self.device_info.get("bind_ip__ipaddr")
+                or self.device_ip
+            )
+        return self.device_ip
+
     def _get_retry_times(self, protocol_name: str, default: int = DEFAULT_PROTOCOL_RETRIES) -> int:
         policy = self._read_connection_policy()
         global_retry = policy.get("retry_times")
@@ -202,13 +211,14 @@ class DeviceConnectionManager:
                 account = self.device_info.get("netconf")
                 if not account:
                     raise ValueError("NETCONF账号信息不存在")
+                netconf_host = self._get_protocol_host("netconf")
 
                 vendor_alias = self.device_info.get("vendor__alias", "H3C")
 
                 # 根据厂商选择对应的NETCONF连接类
                 if vendor_alias == "H3C":
                     self._netconf_conn = H3CNetconf(
-                        host=self.device_ip,
+                        host=netconf_host,
                         user=account.get("username"),
                         password=account.get("password"),
                         port=account.get("port", 830),
@@ -217,7 +227,7 @@ class DeviceConnectionManager:
                     )
                 elif vendor_alias == "Huawei":
                     self._netconf_conn = HuaweiyangNetconfConnect(
-                        host=self.device_ip,
+                        host=netconf_host,
                         user=account.get("username"),
                         password=account.get("password"),
                         port=account.get("port", 830),
@@ -225,7 +235,7 @@ class DeviceConnectionManager:
                     )
                 elif vendor_alias == "Cisco":
                     self._netconf_conn = CiscoNetconfConnect(
-                        host=self.device_ip,
+                        host=netconf_host,
                         user=account.get("username"),
                         password=account.get("password"),
                         port=account.get("port", 830),
@@ -240,7 +250,7 @@ class DeviceConnectionManager:
                     }
                     device_params_name = device_params_map.get(vendor_alias, "h3c")
                     self._netconf_conn = manager.connect(
-                        host=self.device_ip,
+                        host=netconf_host,
                         username=account.get("username"),
                         password=account.get("password"),
                         port=account.get("port", 830),
@@ -250,7 +260,10 @@ class DeviceConnectionManager:
                     )
 
                 logger.info(
-                    f"NETCONF连接已建立: {self.device_ip}, vendor={vendor_alias}"
+                    "NETCONF连接已建立: 逻辑设备=%s, 目标地址=%s, vendor=%s",
+                    self.device_ip,
+                    netconf_host,
+                    vendor_alias,
                 )
             except Exception as e:
                 logger.error(

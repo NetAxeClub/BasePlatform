@@ -4,15 +4,53 @@ from apps.device_api.common import InterfaceFormat
 
 
 class RuiJiePlan:
+    @staticmethod
+    def _pick_first(item, *keys):
+        for key in keys:
+            value = item.get(key)
+            if value not in (None, ""):
+                return value
+        return ""
 
     @staticmethod
     def _ruijie_interface_format(interface):
         """格式化Ruijie设备接口名称"""
+        interface = str(interface or "").strip()
         if re.search(r'^(Ag)', interface):
             return interface.replace('Ag', 'AggregatePort')
         elif re.search(r'^(Te)', interface):
             return interface.replace('Te', 'TenGigabitEthernetn')
         return interface
+
+    @staticmethod
+    def get_version(data_list):
+        """处理锐捷设备标识数据。"""
+        records = data_list if isinstance(data_list, list) else [data_list]
+        for item in records:
+            if not isinstance(item, dict):
+                continue
+            description = str(RuiJiePlan._pick_first(item, "Description", "description")).strip()
+            version = str(RuiJiePlan._pick_first(item, "Version", "version")).strip()
+            serial_num = str(
+                RuiJiePlan._pick_first(item, "SerialNum", "serialnum", "serial_num")
+            ).strip()
+            model_name = ""
+            model_match = re.search(r"\(([^)]+)\)", description)
+            if model_match:
+                model_name = model_match.group(1).strip()
+            elif description:
+                model_name = description.split(",")[0].strip()
+            if any((serial_num, model_name, version)):
+                return [
+                    dict(
+                        serial_num=serial_num,
+                        vendor_alias="Ruijie",
+                        model_name=model_name,
+                        soft_version=version,
+                        patch_version="",
+                    )
+                ]
+        return []
 
     @staticmethod
     def get_arp(data_list):
@@ -205,3 +243,78 @@ class RuiJiePlan:
             )
             aggre_datas.append(temp)
         return aggre_datas
+
+    @staticmethod
+    def get_stack_status(data_list):
+        """处理锐捷虚拟交换/堆叠状态。"""
+        records = data_list if isinstance(data_list, list) else [data_list]
+        rows = []
+        for item in records:
+            if not isinstance(item, dict):
+                continue
+            member_id = str(RuiJiePlan._pick_first(item, "MEMBER", "member")).strip()
+            rows.append(
+                dict(
+                    member_id=member_id,
+                    slot=member_id,
+                    role=str(RuiJiePlan._pick_first(item, "ROLE", "role")).strip(),
+                    priority=str(RuiJiePlan._pick_first(item, "PRIORITY", "priority")).strip(),
+                    mac="",
+                    position=str(RuiJiePlan._pick_first(item, "POSITION", "position")).strip(),
+                    status=str(RuiJiePlan._pick_first(item, "STATUS", "status")).strip(),
+                    domain=str(RuiJiePlan._pick_first(item, "DOMAIN", "domain")).strip(),
+                )
+            )
+        return rows
+
+    @staticmethod
+    def get_irf_status(data_list):
+        """兼容 show member 输出到统一成员状态字段。"""
+        records = [
+            item for item in (data_list if isinstance(data_list, list) else [data_list])
+            if isinstance(item, dict)
+        ]
+        priorities = []
+        for item in records:
+            try:
+                priorities.append(int(RuiJiePlan._pick_first(item, "PRIORITY", "priority")))
+            except Exception:
+                continue
+        max_priority = max(priorities) if priorities else None
+        min_priority = min(priorities) if priorities else None
+
+        rows = []
+        for item in records:
+            member_id = str(RuiJiePlan._pick_first(item, "MEMBER", "member")).strip()
+            priority = str(RuiJiePlan._pick_first(item, "PRIORITY", "priority")).strip()
+            mac = str(RuiJiePlan._pick_first(item, "MACADDR", "macaddr", "mac")).strip()
+            role = ""
+            try:
+                numeric_priority = int(priority)
+            except Exception:
+                numeric_priority = None
+            if (
+                numeric_priority is not None
+                and max_priority is not None
+                and min_priority is not None
+                and max_priority != min_priority
+            ):
+                if numeric_priority == max_priority:
+                    role = "master"
+                elif numeric_priority == min_priority:
+                    role = "standby"
+            elif len(records) == 1:
+                role = "master"
+
+            rows.append(
+                dict(
+                    chassis_id="",
+                    member_id=member_id,
+                    slot=member_id,
+                    role=role,
+                    priority=priority,
+                    mac=mac.replace(".", "-"),
+                    soft_version=str(RuiJiePlan._pick_first(item, "SOFTVER", "softver")).strip(),
+                )
+            )
+        return rows

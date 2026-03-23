@@ -1,6 +1,12 @@
 from .base import register_processor
 from apps.device_api.tools.ruijie import RuiJiePlan
 
+@register_processor(vendor='Ruijie', device_type='', collection_type='version', method='netmiko')
+def process_ruijie_version_netmiko(data):
+    """锐捷设备标识处理 (Netmiko/TextFSM)"""
+    return RuiJiePlan.get_version(data)
+
+
 @register_processor(vendor='Ruijie', device_type='', collection_type='arp', method='netmiko')
 def process_ruijie_arp_netmiko(data):
     """锐捷 交换机 ARP 处理 (Netmiko)"""
@@ -34,6 +40,18 @@ def process_ruijie_ip_interface_netmiko(data):
 def process_ruijie_aggre_port_netmiko(data):
     """锐捷聚合端口处理 (Netmiko)"""
     return RuiJiePlan.get_aggre_port(data)
+
+
+@register_processor(vendor='Ruijie', device_type='', collection_type='stack_status', method='netmiko')
+def process_ruijie_stack_status_netmiko(data):
+    """锐捷虚拟交换/堆叠状态处理 (Netmiko/TextFSM)"""
+    return RuiJiePlan.get_stack_status(data)
+
+
+@register_processor(vendor='Ruijie', device_type='', collection_type='irf_status', method='netmiko')
+def process_ruijie_irf_status_netmiko(data):
+    """锐捷成员状态处理 (Netmiko/TextFSM)"""
+    return RuiJiePlan.get_irf_status(data)
 
 
 @register_processor(vendor='Ruijie', device_type='', collection_type='fan_status', method='netmiko')

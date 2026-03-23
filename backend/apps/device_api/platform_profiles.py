@@ -337,10 +337,18 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
             "arp": ["netmiko"],
             "mac": ["netmiko"],
             "lldp": ["netmiko"],
-            "interface_brief": ["netconf", "netmiko"],
-            "ip_interface": ["netconf", "netmiko"],
+            "interface_brief": ["netconf"],
+            "ip_interface": ["netconf"],
             "aggre_port": ["netconf"],
-            "route_table": ["netconf"],
+            "hrp_state": ["netconf"],
+            "security_policy": ["netconf"],
+            "dnat": ["netconf"],
+            "snat": ["netconf"],
+            "nat_address": ["netconf"],
+            "address_set": ["netconf"],
+            "service_set": ["netconf"],
+            "slb_info": ["netconf"],
+            "vrrp_info": ["netconf"],
         },
         "fallback_methods": {
             "device_identity": ["netmiko"],
@@ -358,7 +366,15 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
             "interface_brief",
             "ip_interface",
             "aggre_port",
-            "route_table",
+            "hrp_state",
+            "security_policy",
+            "dnat",
+            "snat",
+            "nat_address",
+            "address_set",
+            "service_set",
+            "slb_info",
+            "vrrp_info",
         ),
         "default_plan_name": "default-huawei-usg-firewall",
     },
@@ -584,6 +600,12 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
             "device_identity": ["netmiko"],
             "arp": ["netmiko"],
             "mac": ["netmiko"],
+            "lldp": ["netmiko"],
+            "interface_brief": ["netmiko"],
+            "ip_interface": ["netmiko"],
+            "aggre_port": ["netmiko"],
+            "stack_status": ["netmiko"],
+            "irf_status": ["netmiko"],
             "fan_status": ["netmiko"],
             "power_status": ["netmiko"],
         },
@@ -592,9 +614,14 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
             "device_identity",
             "arp",
             "mac",
+            "lldp",
+            "interface_brief",
+            "ip_interface",
+            "aggre_port",
+            "stack_status",
+            "irf_status",
             "fan_status",
             "power_status",
-            "interface_brief",
         ),
         "default_plan_name": "default-ruijie-switch",
     },
@@ -1066,7 +1093,7 @@ PROFILE_NETMIKO_SUB_PLAN_DEFAULTS: Dict[str, Dict[str, Dict[str, str]]] = {
     },
     "Huawei-USG": {
         "device_identity": {"command": "display version", "template": "huawei_vrp_display_version.textfsm"},
-        "arp": {"command": "display arp", "template": "huawei_vrp_display_arp.textfsm"},
+        "arp": {"command": "display arp all", "template": "huawei_vrp_display_arp.textfsm"},
         "lldp": {"command": "display lldp neighbor", "template": "huawei_usg_display_lldp_neighbor.textfsm"},
         "mac": {"command": "display mac-address", "template": "huawei_usg_display_mac-address.textfsm"},
     },
@@ -1180,8 +1207,13 @@ PROFILE_NETMIKO_SUB_PLAN_DEFAULTS: Dict[str, Dict[str, Dict[str, str]]] = {
         "fan_status": {"command": "show fan", "template": "ruijie_show_fan.textfsm"},
         "power_status": {"command": "show power", "template": "ruijie_show_power.textfsm"},
         "interface_brief": {"command": "show interfaces status", "template": "ruijie_show_interfaces_status.textfsm"},
+        "ip_interface": {"command": "show ip interface brief", "template": "ruijie_show_ip_interface_brief.textfsm"},
         "arp": {"command": "show ip arp", "template": "ruijie_show_ip_arp.textfsm"},
         "mac": {"command": "show mac", "template": "ruijie_show_mac.textfsm"},
+        "lldp": {"command": "show lldp neighbors detail", "template": "ruijie_show_lldp_neighbors_detail.textfsm"},
+        "aggre_port": {"command": "show aggregatePort summary", "template": "ruijie_show_aggregatePort_summary.textfsm"},
+        "stack_status": {"command": "show switch virtual", "template": "ruijie_show_switch_virtual.textfsm"},
+        "irf_status": {"command": "show member", "template": "ruijie_show_member.textfsm"},
     },
     "Hillstone-firewall": {
         "device_identity": {"command": "show version", "template": "hillstone_show_version.textfsm"},
@@ -1584,6 +1616,15 @@ PROFILE_NETCONF_XML_TEMPLATE_DEFAULTS["Huawei-USG"] = {
 """.strip(),
         "description": "HuaweiUSG.get_system_info",
     },
+    "hrp_state": {
+        "collect_method": "get",
+        "legacy_method": "get_hrp_state",
+        "xml_template": """
+<hrp-state xmlns="urn:huawei:params:xml:ns:yang:huawei-hrp">
+</hrp-state>
+""".strip(),
+        "description": "HuaweiUSG.get_hrp_state",
+    },
     "interface_brief": {
         "collect_method": "get_config",
         "legacy_method": "get_interface_list",
@@ -1625,6 +1666,94 @@ PROFILE_NETCONF_XML_TEMPLATE_DEFAULTS["Huawei-USG"] = {
 </filter>
 """.strip(),
         "description": "HuaweiUSG.get_trunk_lacp",
+    },
+    "security_policy": {
+        "collect_method": "get_config",
+        "legacy_method": "get_sec_policy",
+        "xml_template": """
+<filter type="subtree">
+  <sec-policy xmlns="urn:huawei:params:xml:ns:yang:huawei-security-policy">
+  </sec-policy>
+</filter>
+""".strip(),
+        "description": "HuaweiUSG.get_sec_policy",
+    },
+    "snat": {
+        "collect_method": "get_config",
+        "legacy_method": "get_nat_policy",
+        "xml_template": """
+<filter type="subtree">
+  <nat-policy xmlns="urn:huawei:params:xml:ns:yang:huawei-nat-policy">
+  </nat-policy>
+</filter>
+""".strip(),
+        "description": "HuaweiUSG.get_nat_policy",
+    },
+    "dnat": {
+        "collect_method": "get_config",
+        "legacy_method": "get_nat_server",
+        "xml_template": """
+<filter type="subtree">
+  <nat-server xmlns="urn:huawei:params:xml:ns:yang:huawei-nat-server">
+  </nat-server>
+</filter>
+""".strip(),
+        "description": "HuaweiUSG.get_nat_server",
+    },
+    "nat_address": {
+        "collect_method": "get_config",
+        "legacy_method": "get_nat_address",
+        "xml_template": """
+<filter type="subtree">
+  <nat-address-group xmlns="urn:huawei:params:xml:ns:yang:huawei-nat-address-group">
+  </nat-address-group>
+</filter>
+""".strip(),
+        "description": "HuaweiUSG.get_nat_address",
+    },
+    "address_set": {
+        "collect_method": "get_config",
+        "legacy_method": "get_address_set",
+        "xml_template": """
+<filter type="subtree">
+  <address-set xmlns="urn:huawei:params:xml:ns:yang:huawei-address-set">
+  </address-set>
+</filter>
+""".strip(),
+        "description": "HuaweiUSG.get_address_set",
+    },
+    "service_set": {
+        "collect_method": "get_config",
+        "legacy_method": "get_service_set",
+        "xml_template": """
+<filter type="subtree">
+  <service-set xmlns="urn:huawei:params:xml:ns:yang:huawei-service-set">
+  </service-set>
+</filter>
+""".strip(),
+        "description": "HuaweiUSG.get_service_set",
+    },
+    "slb_info": {
+        "collect_method": "get_config",
+        "legacy_method": "get_slb_info",
+        "xml_template": """
+<filter type="subtree">
+  <slb xmlns="urn:huawei:params:xml:ns:yang:huawei-slb">
+  </slb>
+</filter>
+""".strip(),
+        "description": "HuaweiUSG.get_slb_info",
+    },
+    "vrrp_info": {
+        "collect_method": "get_config",
+        "legacy_method": "get_vrrp_info",
+        "xml_template": """
+<filter type="subtree">
+  <vrrp xmlns="urn:huawei:params:xml:ns:yang:huawei-vrrp">
+  </vrrp>
+</filter>
+""".strip(),
+        "description": "HuaweiUSG.get_vrrp_info",
     },
     "route_table": {
         "collect_method": "get_config",

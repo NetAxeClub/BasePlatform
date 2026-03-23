@@ -9,7 +9,7 @@ import re
 import time
 from datetime import datetime
 from typing import List, Dict, Any, Optional
-from apps.asset.models import NetworkDevice
+from apps.asset.models import AssetIpInfo, NetworkDevice
 from apps.device_api.contract import (
     build_plan_collection_name,
     normalize_collection_type_for_storage,
@@ -40,6 +40,42 @@ logger = logging.getLogger(__name__)
 class DeviceCollectionService:
     """设备采集服务类（新版本）"""
     FIELD_MAPPING_PROTOCOLS = ("netmiko", "netconf", "snmp", "restconf", "telemetry")
+
+    @staticmethod
+    def _resolve_netconf_manage_ip_for_local(device) -> str:
+        bind_ip_manager = getattr(device, "bind_ip", None)
+        if bind_ip_manager is not None and hasattr(bind_ip_manager, "all"):
+            try:
+                bind_ips = list(bind_ip_manager.all())
+            except Exception:
+                bind_ips = []
+            for bind_ip in bind_ips:
+                if (
+                    str(getattr(bind_ip, "name", "") or "").strip().lower() == "netconf"
+                    and getattr(bind_ip, "ipaddr", None)
+                ):
+                    return bind_ip.ipaddr
+            for bind_ip in bind_ips:
+                if getattr(bind_ip, "ipaddr", None):
+                    return bind_ip.ipaddr
+
+        device_id = getattr(device, "id", None)
+        if not device_id:
+            return ""
+
+        netconf_ip = (
+            AssetIpInfo.objects.filter(device_id=device_id, name__iexact="netconf")
+            .values_list("ipaddr", flat=True)
+            .first()
+        )
+        if netconf_ip:
+            return netconf_ip
+        return (
+            AssetIpInfo.objects.filter(device_id=device_id)
+            .values_list("ipaddr", flat=True)
+            .first()
+            or ""
+        )
 
     @staticmethod
     def get_enabled_collection_types(summary_plan) -> List[str]:
@@ -883,6 +919,7 @@ class DeviceCollectionService:
             "telemetry_config": {},
             "ssh": None,
             "netconf": None,
+            "netconf_manage_ip": DeviceCollectionService._resolve_netconf_manage_ip_for_local(device),
             "connection_policy": dict(connection_policy or {}),
         }
         if hasattr(device, "ssh_account") and device.ssh_account:
@@ -1153,6 +1190,12 @@ class DeviceCollectionService:
         """南向驱动 NETCONF 采集（内部方法）"""
         try:
             account = device.netconf_account
+            netconf_host = (
+                getattr(device, "netconf_manage_ip", None)
+                or getattr(device, "bind_ip__ipaddr", None)
+                or DeviceCollectionService._resolve_netconf_manage_ip_for_local(device)
+                or device.manage_ip
+            )
             host_info = {"host": south_driver, "port": int(config.south_http_port)}
             vendor_alias = device.vendor.alias if device.vendor else "Default"
             netconf_device_type_map = {
@@ -1170,7 +1213,7 @@ class DeviceCollectionService:
             netpalm_info = {
                 "library": "ncclient",
                 "connection_args": {
-                    "host": device.manage_ip, "username": account.username,
+                    "host": netconf_host, "username": account.username,
                     "password": account.decode_password, "port": 830,
                     "hostkey_verify": False, "allow_agent": False,
                     "look_for_keys": False, "device_params": {"name": device_type},
