@@ -1,0 +1,21 @@
+Value Filldown NAME (.+?)
+Value Required PROTOCOL (tcp|udp|icmp|icmpv6|sctp)
+Value DST_PORT_MIN (\d+)
+Value DST_PORT_MAX (\d+)
+Value SRC_PORT_MIN (\d+)
+Value SRC_PORT_MAX (\d+)
+Value ICMP_TYPE (\S+)
+Value ICMP_CODE (\S+)
+
+Start
+  ^service\s+"${NAME}"\s*$$ -> Service
+
+Service
+  ^\s+description\s+".*"\s*$$
+  ^\s+${PROTOCOL}\s+dst-port\s+${DST_PORT_MIN}\s+${DST_PORT_MAX}\s+src-port\s+${SRC_PORT_MIN}\s+${SRC_PORT_MAX}(?:\s+application\s+\S+)?(?:\s+timeout\s+\d+)?\s*$$ -> Record
+  ^\s+${PROTOCOL}\s+dst-port\s+${DST_PORT_MIN}\s+${DST_PORT_MAX}\s+src-port\s+${SRC_PORT_MIN}(?:\s+application\s+\S+)?(?:\s+timeout\s+\d+)?\s*$$ -> Record
+  ^\s+${PROTOCOL}\s+dst-port\s+${DST_PORT_MIN}\s+src-port\s+${SRC_PORT_MIN}\s+${SRC_PORT_MAX}(?:\s+application\s+\S+)?(?:\s+timeout\s+\d+)?\s*$$ -> Record
+  ^\s+${PROTOCOL}\s+dst-port\s+${DST_PORT_MIN}\s+${DST_PORT_MAX}(?:\s+application\s+\S+)?(?:\s+timeout\s+\d+)?\s*$$ -> Record
+  ^\s+${PROTOCOL}\s+dst-port\s+${DST_PORT_MIN}(?:\s+application\s+\S+)?(?:\s+timeout\s+\d+)?\s*$$ -> Record
+  ^\s+${PROTOCOL}\s+type\s+${ICMP_TYPE}(?:\s+code\s+${ICMP_CODE})?(?:\s+timeout\s+\d+)?\s*$$ -> Record
+  ^\s*exit\s*$$ -> Start

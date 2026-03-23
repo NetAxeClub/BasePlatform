@@ -29,6 +29,12 @@ from apps.device_api import (
     ip_interface_mongo,
     interface_brief_mongo,
     aggre_port_mongo,
+    zone_mongo,
+    service_predefined_mongo,
+    policy_hit_count_mongo,
+    security_policy_mongo,
+    dnat_mongo,
+    snat_mongo,
     fan_status_mongo,
     power_status_mongo,
     temperature_status_mongo,
@@ -66,6 +72,12 @@ COLLECTION_TYPE_MONGO_MAP = {
     "ip_interface": ip_interface_mongo,
     "interface_brief": interface_brief_mongo,
     "aggre_port": aggre_port_mongo,
+    "zone": zone_mongo,
+    "service_predefined": service_predefined_mongo,
+    "policy_hit_count": policy_hit_count_mongo,
+    "security_policy": security_policy_mongo,
+    "dnat": dnat_mongo,
+    "snat": snat_mongo,
     "fan_status": fan_status_mongo,
     "power_status": power_status_mongo,
     "temperature_status": temperature_status_mongo,
@@ -818,6 +830,10 @@ def resolve_raw_data(plan, collection_result, collection_method):
         tuple: (status, error_message, processed_data)
     """
     try:
+        vendor_alias = plan.summary_plan.vendor
+        device_type = plan.summary_plan.device_type
+        collection_type = plan.collection_type
+
         # netmiko 采集如果 data 是字符串，说明 TextFSM 解析失败（未匹配到模板或模板与设备输出格式不符）
         if (
             collection_method.lower() == "netmiko"
@@ -838,10 +854,6 @@ def resolve_raw_data(plan, collection_result, collection_method):
         command_result = collection_result["data"]
         method = collection_method.lower()
         manage_ip = collection_result.get("device_ip", "")
-
-        vendor_alias = plan.summary_plan.vendor
-        device_type = plan.summary_plan.device_type
-        collection_type = plan.collection_type
         resolved_collection_type = COLLECTION_TYPE_ALIASES.get(
             collection_type, collection_type
         )
@@ -866,6 +878,16 @@ def resolve_raw_data(plan, collection_result, collection_method):
                     command_result = list(command_result)
                     if command_result and isinstance(command_result[0], dict):
                         command_result[0] = dict(command_result[0], _resolve_device_ip=manage_ip)
+                elif (
+                    method == "netmiko"
+                    and collection_type in RAW_NETMIKO_COLLECTION_TYPES
+                    and vendor_alias == "Hillstone"
+                    and isinstance(command_result, str)
+                ):
+                    command_result = {
+                        "raw_output": command_result,
+                        "_resolve_device_ip": manage_ip,
+                    }
                 result = normalize_processed_data(
                     collection_type, processor(command_result)
                 )

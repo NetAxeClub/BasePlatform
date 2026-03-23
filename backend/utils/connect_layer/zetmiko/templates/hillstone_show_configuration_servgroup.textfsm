@@ -1,0 +1,9 @@
+Value Filldown SERVGROUP (.+?)
+Value Required SERVICE (.+?)
+
+Start
+  ^servgroup\s+"${SERVGROUP}"\s*$$ -> Group
+
+Group
+  ^\s+service\s+"${SERVICE}"\s*$$ -> Record
+  ^\s*exit\s*$$ -> Start

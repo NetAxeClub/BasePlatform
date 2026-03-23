@@ -9,45 +9,18 @@ import time
 from pathlib import Path
 from utils.base_file_tree import BaseTree
 from netaxe.settings import BASE_DIR
-from apps.config_center.config_parse.hp_comware.ttp_parse import H3cParse
+from apps.config_center.models import ConfigBackup
+from apps.config_center.config_parse.structured.service import StructuredConfigParseService
 
 CONFIG_PATH = BASE_DIR + '/media/device_config/current-configuration/'
-
-vendor_map = {
-    'hp_comware': H3cParse,
-    'H3C': H3cParse
-}
-
-
-def sub_file_proc(host_file, _dir, host):
-    with open("{}{}/{}".format(CONFIG_PATH, _dir, host), 'r', encoding='utf8') as f:
-        vendor_host = host_file.split('_')
-        vendor = vendor_host[0]
-        if vendor not in ['H3C', 'Huawei']:
-            return
-        host = vendor_host[1]
-        data_to_parse = f.read()
-        try:
-            if vendor in vendor_map.keys():
-                _Parse = vendor_map[vendor](host, _dir)
-                _Parse.parse(data_to_parse)
-                # _Parse.get_yaml()
-                _Parse.save()
-        except Exception as e:
-            print(e)
-    return
 
 
 # 配置文件解析主调度任务，负责解析配置，并按指标拆分具体功能
 def config_file_parse():
-    dir_list = os.listdir(CONFIG_PATH)
-    for _dir in dir_list:
-        if os.path.isdir(CONFIG_PATH + _dir):
-            device_file_list = os.listdir(CONFIG_PATH + _dir)
-            for host in device_file_list:
-                if host[-4:] == '.txt':
-                    host_file = host[:-4]
-                    sub_file_proc(host_file, _dir, host)
+    service = StructuredConfigParseService()
+    queryset = ConfigBackup.objects.filter(
+        config_status='SUCCESS').order_by('manage_ip', 'config_type')
+    return service.parse_backups(queryset.iterator())
 
 
 # 生成配置文件目录树
@@ -62,7 +35,8 @@ class ConfigTree(BaseTree):
     _instance = None
 
     def __init__(self):
-        super(ConfigTree, self).__init__(BASE_DIR + '/media/device_config/', 'device_config/')
+        super(ConfigTree, self).__init__(
+            BASE_DIR + '/media/device_config/', 'device_config/')
 
     def __new__(cls):
         if not cls._instance:
@@ -75,7 +49,8 @@ class FSMTree:
     def __init__(self):
         self.tree_data = {}
         self.tree_final = []
-        self.pathname = Path(BASE_DIR + '/utils/connect_layer/zetmiko/templates/')
+        self.pathname = Path(
+            BASE_DIR + '/utils/connect_layer/zetmiko/templates/')
         self.tree_str = ''
         self.key = 0
         self.root_path = 'templates/'

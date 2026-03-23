@@ -16,7 +16,9 @@ from django.db import connections
 from apps.automation.tools.base_connection import BaseConn
 from apps.automation.tools.model_api import get_device_info_v2
 from apps.config_center.git_tools.git_proc import ConfigGit
+from apps.config_center.config_parse.structured.drift_service import StructuredConfigDriftService
 from apps.config_center.config_parse.config_parse import config_file_parse
+from apps.config_center.config_parse.structured.service import StructuredConfigParseService
 from apps.config_center.git_tools.git_proc import push_file
 # from apps.config_center.my_nornir import config_backup_nornir
 from apps.config_center.models import ConfigBackup, BackupPolicy, ConfigComplianceResult, ConfigComplianceRule
@@ -47,10 +49,12 @@ def config_compliance(**kwargs):
     # 按优先级尝试多个日期范围：先当天（昨天至今），再依次往前一天
     for days_back in range(0, 3):  # 0=昨天至今, 1=前天至昨天, 2=大前天至前天
         start_datetime = timezone.make_aware(
-            datetime.combine(today - timedelta(days=days_back + 1), datetime.min.time())
+            datetime.combine(
+                today - timedelta(days=days_back + 1), datetime.min.time())
         )
         end_datetime = timezone.make_aware(
-            datetime.combine(today - timedelta(days=days_back), datetime.max.time())
+            datetime.combine(today - timedelta(days=days_back),
+                             datetime.max.time())
         )
         config_files_qs = ConfigBackup.objects.filter(
             last_time__range=(start_datetime, end_datetime),
@@ -59,7 +63,8 @@ def config_compliance(**kwargs):
         count = config_files_qs.count()
         if count > 0:
             if days_back > 0:
-                logger.info('当天无配置备份，使用前 %s 天数据进行合规检查，共 %s 条', days_back, count)
+                logger.info('当天无配置备份，使用前 %s 天数据进行合规检查，共 %s 条',
+                            days_back, count)
             break
     else:
         logger.warning('近 3 天均无 SUCCESS 的配置备份，跳过合规检查')
@@ -68,7 +73,8 @@ def config_compliance(**kwargs):
         if config_file.vendor in vendor_map:
             if not default_storage.exists(config_file.file_path):
                 continue
-            data_to_parse = default_storage.open(config_file.file_path).read().decode('utf-8')
+            data_to_parse = default_storage.open(
+                config_file.file_path).read().decode('utf-8')
             rules = ConfigComplianceRule.objects.all().iterator()
             for rule in rules:
                 childrens = rule.children.all()
@@ -82,9 +88,11 @@ def config_compliance(**kwargs):
                     vendor_compliance_list = {}
                     for compliance in compliances:
                         if compliance['vendor'] in vendor_compliance_list.keys():
-                            vendor_compliance_list[compliance['vendor']].append(compliance)
+                            vendor_compliance_list[compliance['vendor']].append(
+                                compliance)
                         else:
-                            vendor_compliance_list[compliance['vendor']] = [compliance]
+                            vendor_compliance_list[compliance['vendor']] = [
+                                compliance]
                     # 根据厂商分类
                     for vendor_compliance in vendor_compliance_list.keys():
                         final_res = []
@@ -92,14 +100,16 @@ def config_compliance(**kwargs):
                         match_detail_list = []
                         if vendor_compliance == config_file.vendor:
                             for sub_compliance in vendor_compliance_list[vendor_compliance]:
-                                _pattern = sub_compliance['pattern']  # match-compliance  mismatch-compliance
+                                # match-compliance  mismatch-compliance
+                                _pattern = sub_compliance['pattern']
                                 _regex = sub_compliance.get('regex', '')
                                 res = compliance_proc(
                                     data_to_parse=data_to_parse,
                                     compliance=sub_compliance,
                                 )
                                 # 收集规则摘要（便于前端展示“检查规则”）
-                                rule_regex_lines.append(f"{_pattern}: {_regex}")
+                                rule_regex_lines.append(
+                                    f"{_pattern}: {_regex}")
                                 # 收集匹配详情：匹配到的内容列表，便于展示“为什么合规/不合规”
                                 match_detail_list.append({
                                     'pattern': _pattern,
@@ -151,7 +161,8 @@ def backup_device_config_sub(**kwargs):
         }
         if flag:
             for cmd in res.keys():
-                device_q = ConfigBackup.objects.filter(manage_ip=hostip, config_type=cmd_map[cmd])
+                device_q = ConfigBackup.objects.filter(
+                    manage_ip=hostip, config_type=cmd_map[cmd])
                 if device_q:
                     ConfigBackup.objects.filter(manage_ip=hostip, config_type=cmd_map[cmd]).update(
                         name=kwargs['name'],
@@ -185,7 +196,8 @@ def backup_device_config_sub(**kwargs):
                     name=kwargs['name'], manage_ip=hostip,
                     config_status='FAILED',
                     status=kwargs['status'], idc_name=kwargs['idc__name'], vendor=kwargs['vendor__alias'],
-                    model_name=kwargs['model__name'], last_time=today, detail=res.get('error') or ''
+                    model_name=kwargs['model__name'], last_time=today, detail=res.get(
+                        'error') or ''
                 )
     except RuntimeError as e:
         logger.error(e)
@@ -202,7 +214,8 @@ def backup_device_config_sub(**kwargs):
                 name=kwargs['name'], manage_ip=hostip,
                 config_status='FAILED',
                 status=kwargs['status'], idc_name=kwargs['idc__name'], vendor=kwargs['vendor__alias'],
-                model_name=kwargs['model__name'], last_time=today, detail=str(e)
+                model_name=kwargs['model__name'], last_time=today, detail=str(
+                    e)
             )
     return {}
 
@@ -260,9 +273,75 @@ def backup_device_config(**kwargs):
     time_use = int(int(end_time - start_time) / 60)
     # msg_gateway_runner.send_wechat(channel="netdevops",
     #                                content=f"配置备份完成，耗时:{time_use}分\n")
+    parse_config_backup_structured.apply_async(
+        kwargs=dict(today=today), queue=CELERY_QUEUE, retry=True)
     config_compliance.apply_async(kwargs={}, queue=CELERY_QUEUE, retry=True)
-    git_push_config.apply_async(kwargs=dict(today=today), queue=CELERY_QUEUE, retry=True)
+    git_push_config.apply_async(kwargs=dict(
+        today=today), queue=CELERY_QUEUE, retry=True)
     return
+
+
+@shared_task(base=AxeTask, once={'graceful': True})
+def parse_config_backup_structured(**kwargs):
+    connections.close_all()
+    queryset = ConfigBackup.objects.filter(
+        config_status='SUCCESS').order_by('manage_ip', 'config_type')
+    today = kwargs.get('today')
+    manage_ip = kwargs.get('manage_ip')
+    config_type = kwargs.get('config_type')
+    if today:
+        queryset = queryset.filter(last_time=today)
+    if manage_ip:
+        queryset = queryset.filter(manage_ip=manage_ip)
+    if config_type:
+        queryset = queryset.filter(config_type=config_type)
+    backups = list(queryset.iterator())
+    service = StructuredConfigParseService()
+    summary = service.parse_backups(backups)
+    logger.info(
+        '结构化配置解析完成 total=%s parsed=%s failed=%s skipped=%s',
+        summary['total'],
+        summary['parsed'],
+        summary['failed'],
+        summary['skipped'],
+    )
+    analyze_structured_config_drift.apply_async(
+        kwargs={
+            'today': today,
+            'manage_ip': manage_ip,
+            'config_type': config_type,
+        },
+        queue=CELERY_QUEUE,
+        retry=True,
+    )
+    return summary
+
+
+@shared_task(base=AxeTask, once={'graceful': True})
+def analyze_structured_config_drift(**kwargs):
+    connections.close_all()
+    queryset = ConfigBackup.objects.filter(
+        config_status='SUCCESS').order_by('manage_ip', 'config_type')
+    today = kwargs.get('today')
+    manage_ip = kwargs.get('manage_ip')
+    config_type = kwargs.get('config_type')
+    if today:
+        queryset = queryset.filter(last_time=today)
+    if manage_ip:
+        queryset = queryset.filter(manage_ip=manage_ip)
+    if config_type:
+        queryset = queryset.filter(config_type=config_type)
+    backups = list(queryset.iterator())
+    service = StructuredConfigDriftService()
+    summary = service.analyze_backups(backups)
+    logger.info(
+        '结构化漂移分析完成 total=%s analyzed=%s failed=%s skipped=%s',
+        summary['total'],
+        summary['analyzed'],
+        summary['failed'],
+        summary['skipped'],
+    )
+    return summary
 
 
 @shared_task(base=AxeTask, once={'graceful': True})
@@ -273,7 +352,8 @@ def git_push_config(**kwargs):
     for commit_hexsha in commit_results:
         commit_info = _ConfigGit.get_commit_detail(commit_hexsha)
         for commit in commit_info:
-            ConfigBackup.objects.filter(last_time=today, file_path=commit['value']).update(config_status='SUCCESS')
+            ConfigBackup.objects.filter(
+                last_time=today, file_path=commit['value']).update(config_status='SUCCESS')
     config_mongo.insert({
         'name': 'config_backup_git_status',
         'data': {

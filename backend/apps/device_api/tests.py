@@ -15,6 +15,7 @@ from textfsm import TextFSM
 from apps.asset.models import Category, Model, NetworkDevice, Vendor
 from apps.device_api.fields_mapping import (
     DEFAULT_COLLECTION_TYPES,
+    RAW_NETMIKO_COLLECTION_TYPES,
     get_collection_output_fields,
 )
 from apps.device_api.connection_manager import DeviceConnectionManager
@@ -1662,6 +1663,159 @@ class DeviceApiP3GoldenSampleTests(SimpleTestCase):
                 self._assert_vendor_golden_sample(vendor, "arp", list(sample), tool_class)
 
 
+class DeviceApiHillstoneGoldenSampleTests(SimpleTestCase):
+    def _build_plan(self, collection_type):
+        return SimpleNamespace(
+            name=f"Hillstone-{collection_type}-plan",
+            collection_type=collection_type,
+            summary_plan=SimpleNamespace(vendor="Hillstone", device_type="firewall"),
+        )
+
+    def _resolve(self, collection_type, data):
+        return resolve_raw_data(
+            self._build_plan(collection_type),
+            {"data": data, "device_ip": "10.0.0.1"},
+            "netmiko",
+        )
+
+    def test_hillstone_golden_sample_device_identity(self):
+        status, error, processed = self._resolve(
+            "device_identity",
+            [{"version": "5.5R10", "product": "SG-6000-E3960", "sn": "HS123456"}],
+        )
+
+        self.assertTrue(status)
+        self.assertEqual(error, "")
+        self.assertEqual(processed[0]["soft_version"], "5.5R10")
+        self.assertEqual(processed[0]["model_name"], "SG-6000-E3960")
+        self.assertEqual(processed[0]["serial_num"], "HS123456")
+        self.assertEqual(processed[0]["manage_ip"], "10.0.0.1")
+
+    def test_hillstone_golden_sample_zone(self):
+        status, error, processed = self._resolve(
+            "zone",
+            [{"name": "trust", "type": "layer3", "vswitch": "root", "ifcount": "2", "shared": "N"}],
+        )
+
+        self.assertTrue(status)
+        self.assertEqual(error, "")
+        self.assertEqual(processed[0]["name"], "trust")
+        self.assertEqual(processed[0]["type"], "layer3")
+        self.assertEqual(processed[0]["ifcount"], "2")
+
+    def test_hillstone_golden_sample_service_predefined(self):
+        status, error, processed = self._resolve(
+            "service_predefined",
+            [
+                {"name": "HTTP", "protocol": "TCP", "dstport": "80", "srcport": "Any", "timeout": "1800"},
+                {"name": "NTP", "protocol": "UDP", "dstport": "123", "srcport": "Any", "timeout": "300"},
+            ],
+        )
+
+        self.assertTrue(status)
+        self.assertEqual(error, "")
+        self.assertEqual(processed[0]["name"], "HTTP")
+        self.assertEqual(processed[0]["dst_port_min"], 80)
+        self.assertEqual(processed[0]["dst_port_max"], 80)
+        self.assertEqual(processed[0]["src_port_min"], 0)
+        self.assertEqual(processed[1]["protocol"], "udp")
+
+    def test_hillstone_golden_sample_policy_hit_count(self):
+        status, error, processed = self._resolve(
+            "policy_hit_count",
+            [{"id": "100", "name": "allow-web", "count": "25"}],
+        )
+
+        self.assertTrue(status)
+        self.assertEqual(error, "")
+        self.assertEqual(processed[0]["id"], "100")
+        self.assertEqual(processed[0]["count"], 25)
+
+    def test_hillstone_golden_sample_security_policy_from_raw_config(self):
+        raw_config = """
+address "inside-net"
+ ip 10.10.10.0/24
+exit
+service "tcp 80"
+ tcp dst-port 80
+exit
+policy-global
+ rule id 100
+  action permit
+  src-zone "trust"
+  dst-zone "untrust"
+  src-addr "inside-net"
+  dst-ip 203.0.113.10
+  service "tcp 80"
+  description "allow-web"
+ exit
+exit
+""".strip()
+
+        status, error, processed = self._resolve("security_policy", raw_config)
+
+        self.assertTrue(status)
+        self.assertEqual(error, "")
+        self.assertEqual(processed[0]["rule_id"], "100")
+        self.assertEqual(processed[0]["action"], "permit")
+        self.assertEqual(processed[0]["src_zone"], "trust")
+        self.assertEqual(processed[0]["dst_zone"], "untrust")
+        self.assertEqual(processed[0]["src_addr"][0]["name"], "inside-net")
+        self.assertEqual(processed[0]["service"][0]["items"][0]["result"], "80")
+
+    def test_hillstone_golden_sample_dnat_from_raw_config(self):
+        raw_config = """
+address "公网对象"
+ ip 203.0.113.10/32
+exit
+address "内网主机"
+ host 10.0.0.10
+exit
+ip vrouter "trust-vr"
+ dnatrule id 10 from address-book "Any" to address-book "公网对象" service "tcp 8443" trans-to address-book "内网主机" port 443 description "web-dnat"
+exit
+""".strip()
+
+        status, error, processed = self._resolve("dnat", raw_config)
+
+        self.assertTrue(status)
+        self.assertEqual(error, "")
+        self.assertEqual(processed[0]["rule_id"], "10")
+        self.assertEqual(processed[0]["global_ip"][0]["result"], "203.0.113.10/32")
+        self.assertEqual(processed[0]["local_ip"][0]["result"], "10.0.0.10/32")
+        self.assertEqual(processed[0]["local_port"][0]["result"], "443")
+
+    def test_hillstone_golden_sample_snat_from_raw_config(self):
+        raw_config = """
+address "源地址"
+ ip 10.0.0.0/24
+ exclude ip 10.0.0.254/32
+exit
+address "目的地址"
+ ip 198.51.100.10/32
+exit
+address "转换地址"
+ ip 203.0.113.20/32
+exit
+service "tcp 80"
+ tcp dst-port 80
+exit
+ip vrouter "trust-vr"
+ snatrule id 20 from-zone "trust" to-zone "untrust" from address-book "源地址" to address-book "目的地址" service "tcp 80" trans-to address-book "转换地址" mode dynamicport description "web-snat"
+exit
+""".strip()
+
+        status, error, processed = self._resolve("snat", raw_config)
+
+        self.assertTrue(status)
+        self.assertEqual(error, "")
+        self.assertEqual(processed[0]["rule_id"], "20")
+        self.assertEqual(processed[0]["mode"], "dynamicport")
+        self.assertEqual(processed[0]["source_zone"], "trust")
+        self.assertEqual(processed[0]["trans_ip"][0]["result"], "203.0.113.20/32")
+        self.assertEqual(processed[0]["local_exclude_ip"][0]["result"], "10.0.0.254/32")
+
+
 class DeviceApiConnectionManagerTests(SimpleTestCase):
     def test_get_netmiko_connection_requires_ssh_account(self):
         manager = DeviceConnectionManager(
@@ -1669,8 +1823,25 @@ class DeviceApiConnectionManagerTests(SimpleTestCase):
             {"vendor__alias": "Huawei"},
         )
 
-        with self.assertRaisesRegex(ValueError, "SSH账号信息不存在"):
+        with self.assertRaisesRegex(ValueError, "SSH/Telnet账号信息不存在"):
             manager.get_netmiko_connection()
+
+    @patch("apps.device_api.connection_manager.ZetmikoConnectHandler")
+    def test_get_netmiko_connection_uses_telnet_account_when_present(self, mock_handler):
+        mock_handler.return_value = Mock()
+        manager = DeviceConnectionManager(
+            "10.0.0.1",
+            {
+                "vendor__alias": "Hillstone",
+                "telnet": {"username": "ops", "password": "secret", "port": 23},
+            },
+        )
+
+        manager.get_netmiko_connection()
+
+        self.assertEqual(mock_handler.call_args.kwargs["device_type"], "hillstone_telnet")
+        self.assertEqual(mock_handler.call_args.kwargs["username"], "ops")
+        self.assertEqual(mock_handler.call_args.kwargs["port"], 23)
 
     @patch("apps.device_api.connection_manager.snmp_get_oid")
     def test_execute_snmp_get_uses_v3_username_and_collects_failures(
@@ -4164,9 +4335,12 @@ class DeviceApiProtocolExtensionTests(SimpleTestCase):
             for collection_type, item in mapping.items():
                 with self.subTest(profile=profile_code, collection_type=collection_type):
                     self.assertTrue(item.get("command"))
-                    self.assertTrue(item.get("template"))
-                    self.assertTrue((TEMPLATE_BASE_DIR / item["template"]).exists())
-                    self.assertIn(item["template"], index_content)
+                    if collection_type in RAW_NETMIKO_COLLECTION_TYPES:
+                        self.assertEqual(item.get("template", ""), "")
+                    else:
+                        self.assertTrue(item.get("template"))
+                        self.assertTrue((TEMPLATE_BASE_DIR / item["template"]).exists())
+                        self.assertIn(item["template"], index_content)
 
     def test_huawei_ospf_peer_brief_template_parses_cli_rows(self):
         rows = self._parse_textfsm_rows(

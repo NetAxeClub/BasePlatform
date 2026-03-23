@@ -1,0 +1,23 @@
+Value ID (\d+)
+Value INGRESS_INTERFACE (.+?)
+Value EGRESS_INTERFACE (.+?)
+Value FROMZONE (.+?)
+Value TOZONE (.+?)
+Value FROM (.+?)
+Value FROM_IP (\S+)
+Value TO (.+?)
+Value TO_IP (\S+)
+Value SERVICE (.+?)
+Value TRANSTO (.+?)
+Value TRANSTO_IP (\S+)
+Value TRANSTO_EIP (eif-ip)
+Value MODE (dynamicport(?:\s+sticky)?|static|dynamicip)
+Value DESC (.+?)
+Value LOG (log)
+Value TRACK (track-\S+(?:\s+\d+)?)
+Value DISABLE (disable)
+
+Start
+  ^\s+snatrule\s+id\s+${ID}\s+from-zone\s+"${FROMZONE}"\s+to-zone\s+"${TOZONE}"\s+(?:ingress-interface\s+"${INGRESS_INTERFACE}"\s+)?from\s+(?:address-book\s+"${FROM}"|ip\s+${FROM_IP})\s+to\s+(?:address-book\s+"${TO}"|ip\s+${TO_IP})\s+service\s+"${SERVICE}"(?:\s+eif\s+${EGRESS_INTERFACE})?(?:\s+trans-to\s+(?:address-book\s+"${TRANSTO}"|ip\s+${TRANSTO_IP}|${TRANSTO_EIP}))?(?:\s+mode\s+${MODE})?(?:\s+${LOG})?(?:\s+${DISABLE})?(?:\s+${TRACK})?(?:\s+description\s+"${DESC}")?\s*$$ -> Record
+  ^\s+snatrule\s+id\s+${ID}\s+(?:ingress-interface\s+"${INGRESS_INTERFACE}"\s+)?from\s+(?:address-book\s+"${FROM}"|ip\s+${FROM_IP})\s+to\s+(?:address-book\s+"${TO}"|ip\s+${TO_IP})\s+service\s+"${SERVICE}"(?:\s+eif\s+${EGRESS_INTERFACE})?(?:\s+trans-to\s+(?:address-book\s+"${TRANSTO}"|ip\s+${TRANSTO_IP}|${TRANSTO_EIP}))?(?:\s+mode\s+${MODE})?(?:\s+${LOG})?(?:\s+${DISABLE})?(?:\s+${TRACK})?(?:\s+description\s+"${DESC}")?\s*$$ -> Record
+  ^\s+snatrule\s+id\s+${ID}\s+from\s+"${FROM}"\s+to\s+"${TO}"(?:\s+service\s+"${SERVICE}")?(?:\s+eif\s+${EGRESS_INTERFACE})?(?:\s+trans-to\s+"${TRANSTO}"|(?:\s+trans-to\s+${TRANSTO_EIP})|(?:\s+trans-to\s+ip\s+${TRANSTO_IP}))?(?:\s+mode\s+${MODE})?(?:\s+${LOG})?(?:\s+${DISABLE})?(?:\s+${TRACK})?(?:\s+description\s+"${DESC}")?\s*$$ -> Record

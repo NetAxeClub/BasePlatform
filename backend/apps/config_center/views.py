@@ -12,7 +12,7 @@ from datetime import date, datetime, timedelta
 from django.http import JsonResponse, StreamingHttpResponse
 from django.core.files.storage import default_storage
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters
+from rest_framework import filters, viewsets
 from rest_framework.decorators import action
 from rest_framework.views import APIView
 from ttp import ttp
@@ -21,12 +21,29 @@ from apps.api.tools.custom_pagination import LargeResultsSetPagination
 from apps.api.tools.custom_viewset_base import CustomViewBase
 from utils.connect_layer.auto_main import BatManMain
 from apps.config_center.config_parse.config_parse import ConfigTree, FSMTree
+from apps.config_center.config_parse.structured.diffing import build_structured_config_diff
+from apps.config_center.config_parse.structured.drift_repository import StructuredDriftRepository
+from apps.config_center.config_parse.structured.drifting import assess_structured_drift_risk
+from apps.config_center.config_parse.structured.policy import (
+    LOCAL_POLICY_OVERRIDE_PATH,
+    build_policy_context,
+    build_policy_diff_summary,
+    clear_drift_policy_caches,
+    load_effective_drift_policy,
+    load_active_db_drift_policy_override,
+    load_local_drift_policy_override,
+    preview_merged_drift_policy,
+    validate_drift_policy,
+)
+from apps.config_center.config_parse.structured.repository import StructuredConfigRepository
 from apps.config_center.git_tools.git_proc import ConfigGit
-from utils.db.mongo_ops import MongoNetOps
+from utils.db.mongo_ops import MongoNetOps, get_mongo_json_res
 from .serializers import *
-from .models import ConfigCompliance, ConfigComplianceResult
+from .models import ConfigCompliance, ConfigComplianceResult, StructuredDriftPolicy, StructuredDriftPolicyAudit
 
 _ConfigGit = ConfigGit()
+_StructuredConfigRepository = StructuredConfigRepository()
+_StructuredDriftRepository = StructuredDriftRepository()
 
 
 def build_security_baseline_payload(compliances, root_rule_name):
@@ -224,6 +241,105 @@ def build_backup_compare_payload(backup, from_commit, to_commit, diff_result):
     }
 
 
+def _mongo_document_to_jsonable(document):
+    if document is None:
+        return None
+    return json.loads(get_mongo_json_res(document))
+
+
+def build_structured_snapshot_payload(document):
+    jsonable_document = _mongo_document_to_jsonable(document) or {}
+    device = jsonable_document.get('device') or {}
+    backup = jsonable_document.get('backup') or {}
+    parser = jsonable_document.get('parser') or {}
+    return {
+        'config_backup_id': jsonable_document.get('config_backup_id'),
+        'manage_ip': device.get('manage_ip'),
+        'device_name': device.get('name'),
+        'vendor': device.get('vendor'),
+        'vendor_family': device.get('vendor_family'),
+        'model_name': device.get('model_name'),
+        'idc_name': device.get('idc_name'),
+        'config_type': backup.get('config_type'),
+        'backup_time': backup.get('backup_time'),
+        'file_path': backup.get('file_path'),
+        'content_sha1': backup.get('content_sha1'),
+        'parser_status': parser.get('status'),
+        'parser_profile': parser.get('profile'),
+        'schema_version': jsonable_document.get('schema_version'),
+        'summary': jsonable_document.get('summary') or {},
+        'document': jsonable_document,
+    }
+
+
+def build_structured_timeline_payload(documents):
+    items = []
+    for document in documents:
+        snapshot = build_structured_snapshot_payload(document)
+        items.append({
+            'config_backup_id': snapshot.get('config_backup_id'),
+            'manage_ip': snapshot.get('manage_ip'),
+            'device_name': snapshot.get('device_name'),
+            'vendor': snapshot.get('vendor'),
+            'vendor_family': snapshot.get('vendor_family'),
+            'config_type': snapshot.get('config_type'),
+            'backup_time': snapshot.get('backup_time'),
+            'parser_status': snapshot.get('parser_status'),
+            'parser_profile': snapshot.get('parser_profile'),
+            'summary': snapshot.get('summary') or {},
+        })
+    return items
+
+
+def build_structured_compare_payload(from_document, to_document):
+    diff = build_structured_config_diff(
+        _mongo_document_to_jsonable(from_document) or {},
+        _mongo_document_to_jsonable(to_document) or {},
+    )
+    risk_assessment = assess_structured_drift_risk(
+        diff,
+        policy_context=build_policy_context(
+            _mongo_document_to_jsonable(from_document) or {},
+            _mongo_document_to_jsonable(to_document) or {},
+        ),
+    )
+    return {
+        'from_snapshot': build_structured_snapshot_payload(from_document),
+        'to_snapshot': build_structured_snapshot_payload(to_document),
+        'diff': diff,
+        'risk_assessment': risk_assessment,
+    }
+
+
+def build_structured_drift_payload(document):
+    jsonable_document = _mongo_document_to_jsonable(document) or {}
+    device = jsonable_document.get('device') or {}
+    backup = jsonable_document.get('backup') or {}
+    return {
+        'from_config_backup_id': jsonable_document.get('from_config_backup_id'),
+        'to_config_backup_id': jsonable_document.get('to_config_backup_id'),
+        'manage_ip': device.get('manage_ip'),
+        'device_name': device.get('name'),
+        'vendor': device.get('vendor'),
+        'vendor_family': device.get('vendor_family'),
+        'config_type': backup.get('config_type'),
+        'from_backup_time': backup.get('from_backup_time'),
+        'to_backup_time': backup.get('to_backup_time'),
+        'diff_summary': jsonable_document.get('diff_summary') or {},
+        'risk_assessment': jsonable_document.get('risk_assessment') or {},
+        'policy': jsonable_document.get('policy') or {},
+        'document': jsonable_document,
+    }
+
+
+def build_structured_drift_policy_payload(policy, validation, source):
+    return {
+        'policy': policy,
+        'validation': validation,
+        'source': source,
+    }
+
+
 def jinja_render(data, template):
     """ Render a jinja template
     """
@@ -414,6 +530,172 @@ class ConfigBackupViewSet(CustomViewBase):
         )
         return JsonResponse({'code': 200, 'message': '获取配置版本对比成功', 'data': data})
 
+    @action(detail=False, methods=['get'])
+    def latest_structured(self, request):
+        config_backup_id = request.query_params.get('config_backup_id')
+        manage_ip = request.query_params.get('manage_ip')
+        config_type = request.query_params.get('config_type', 'running')
+
+        if config_backup_id:
+            try:
+                parsed_backup_id = int(config_backup_id)
+            except (TypeError, ValueError):
+                return JsonResponse({'code': 400, 'message': 'config_backup_id 必须为整数', 'data': None})
+            document = _StructuredConfigRepository.find_by_backup_id(parsed_backup_id)
+        else:
+            if not manage_ip:
+                return JsonResponse({'code': 400, 'message': '缺少必要参数: manage_ip 或 config_backup_id', 'data': None})
+            document = _StructuredConfigRepository.find_latest_by_device(manage_ip=manage_ip, config_type=config_type)
+
+        if not document:
+            return JsonResponse({'code': 404, 'message': '未找到结构化配置结果', 'data': None})
+
+        data = build_structured_snapshot_payload(document)
+        return JsonResponse({'code': 200, 'message': '获取结构化配置快照成功', 'data': data})
+
+    @action(detail=False, methods=['get'])
+    def structured_timeline(self, request):
+        manage_ip = request.query_params.get('manage_ip')
+        config_type = request.query_params.get('config_type')
+        limit = int(request.query_params.get('limit', 20))
+        limit = min(max(limit, 1), 100)
+
+        if not manage_ip:
+            return JsonResponse({'code': 400, 'message': '缺少必要参数: manage_ip', 'data': None})
+
+        documents = _StructuredConfigRepository.find_history(
+            manage_ip=manage_ip,
+            config_type=config_type,
+            limit=limit,
+        )
+        data = {
+            'manage_ip': manage_ip,
+            'config_type': config_type or 'all',
+            'count': len(documents),
+            'items': build_structured_timeline_payload(documents),
+        }
+        return JsonResponse({'code': 200, 'message': '获取结构化配置时间线成功', 'data': data})
+
+    @action(detail=False, methods=['get'])
+    def structured_compare(self, request):
+        from_backup_id = request.query_params.get('from_config_backup_id')
+        to_backup_id = request.query_params.get('to_config_backup_id')
+        config_backup_id = request.query_params.get('config_backup_id')
+        manage_ip = request.query_params.get('manage_ip')
+        config_type = request.query_params.get('config_type', 'running')
+
+        if bool(from_backup_id) ^ bool(to_backup_id):
+            return JsonResponse({'code': 400, 'message': 'from_config_backup_id 和 to_config_backup_id 需要同时传入', 'data': None})
+
+        from_document = None
+        to_document = None
+
+        if from_backup_id and to_backup_id:
+            try:
+                parsed_from_id = int(from_backup_id)
+                parsed_to_id = int(to_backup_id)
+            except (TypeError, ValueError):
+                return JsonResponse({'code': 400, 'message': '结构化对比参数必须为整数', 'data': None})
+            from_document = _StructuredConfigRepository.find_by_backup_id(parsed_from_id)
+            to_document = _StructuredConfigRepository.find_by_backup_id(parsed_to_id)
+        elif config_backup_id:
+            try:
+                parsed_backup_id = int(config_backup_id)
+            except (TypeError, ValueError):
+                return JsonResponse({'code': 400, 'message': 'config_backup_id 必须为整数', 'data': None})
+            to_document = _StructuredConfigRepository.find_by_backup_id(parsed_backup_id)
+            if to_document:
+                device = (to_document.get('device') or {})
+                backup = (to_document.get('backup') or {})
+                history = _StructuredConfigRepository.find_history(
+                    manage_ip=device.get('manage_ip'),
+                    config_type=backup.get('config_type'),
+                    limit=100,
+                )
+                current_index = next(
+                    (index for index, item in enumerate(history) if item.get('config_backup_id') == parsed_backup_id),
+                    None,
+                )
+                if current_index is not None and current_index + 1 < len(history):
+                    from_document = history[current_index + 1]
+        else:
+            if not manage_ip:
+                return JsonResponse({'code': 400, 'message': '缺少必要参数: manage_ip、config_backup_id 或 from/to_config_backup_id', 'data': None})
+            history = _StructuredConfigRepository.find_history(
+                manage_ip=manage_ip,
+                config_type=config_type,
+                limit=2,
+            )
+            if len(history) >= 2:
+                to_document = history[0]
+                from_document = history[1]
+
+        if not from_document or not to_document:
+            return JsonResponse({'code': 404, 'message': '缺少足够的结构化配置版本用于对比', 'data': None})
+
+        data = build_structured_compare_payload(from_document, to_document)
+        return JsonResponse({'code': 200, 'message': '获取结构化配置对比成功', 'data': data})
+
+    @action(detail=False, methods=['get'])
+    def latest_structured_drift(self, request):
+        config_backup_id = request.query_params.get('config_backup_id')
+        manage_ip = request.query_params.get('manage_ip')
+        config_type = request.query_params.get('config_type', 'running')
+
+        if config_backup_id:
+            try:
+                parsed_backup_id = int(config_backup_id)
+            except (TypeError, ValueError):
+                return JsonResponse({'code': 400, 'message': 'config_backup_id 必须为整数', 'data': None})
+            document = _StructuredDriftRepository.find_by_to_backup_id(parsed_backup_id)
+        else:
+            if not manage_ip:
+                return JsonResponse({'code': 400, 'message': '缺少必要参数: manage_ip 或 config_backup_id', 'data': None})
+            document = _StructuredDriftRepository.find_latest_by_device(manage_ip=manage_ip, config_type=config_type)
+
+        if not document:
+            return JsonResponse({'code': 404, 'message': '未找到结构化漂移分析结果', 'data': None})
+
+        data = build_structured_drift_payload(document)
+        return JsonResponse({'code': 200, 'message': '获取结构化漂移分析成功', 'data': data})
+
+    @action(detail=False, methods=['get'])
+    def structured_drift_policy(self, request):
+        policy = load_effective_drift_policy()
+        local_override = load_local_drift_policy_override()
+        active_db_override = load_active_db_drift_policy_override()
+        data = build_structured_drift_policy_payload(
+            policy=policy,
+            validation=validate_drift_policy(policy),
+            source={
+                'default_policy': 'backend/apps/config_center/config_parse/structured/policies/default_drift_policy.json',
+                'local_override_path': str(LOCAL_POLICY_OVERRIDE_PATH),
+                'local_override_loaded': bool(local_override),
+                'local_override_keys': sorted(local_override.keys()) if isinstance(local_override, dict) else [],
+                'active_db_override_loaded': bool(active_db_override),
+                'active_db_override_keys': sorted(active_db_override.keys()) if isinstance(active_db_override, dict) else [],
+            },
+        )
+        return JsonResponse({'code': 200, 'message': '获取结构化漂移策略成功', 'data': data})
+
+    @action(detail=False, methods=['post'])
+    def validate_structured_drift_policy(self, request):
+        policy_override = request.data if isinstance(request.data, dict) else {}
+        if not policy_override:
+            return JsonResponse({'code': 400, 'message': '请求体必须为非空 JSON object', 'data': None})
+        preview = preview_merged_drift_policy(policy_override)
+        data = build_structured_drift_policy_payload(
+            policy=preview['policy'],
+            validation=preview['validation'],
+            source={
+                'mode': 'preview',
+                'default_policy': 'backend/apps/config_center/config_parse/structured/policies/default_drift_policy.json',
+                'local_override_path': str(LOCAL_POLICY_OVERRIDE_PATH),
+                'merged_with_default': True,
+            },
+        )
+        return JsonResponse({'code': 200, 'message': '结构化漂移策略预览完成', 'data': data})
+
 
 class ConfigComplianceRuleViewSet(CustomViewBase):
     # queryset = ConfigComplianceRule.objects.filter(parent__isnull=True).order_by('-id')
@@ -445,6 +727,156 @@ class ConfigBackupPolicyViewSet(CustomViewBase):
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filter_fields = ('vendor',)
     search_fields = ('vendor',)
+
+
+class StructuredDriftPolicyViewSet(CustomViewBase):
+    queryset = StructuredDriftPolicy.objects.all().order_by('-updated_at', '-id')
+    serializer_class = StructuredDriftPolicySerializer
+    pagination_class = LargeResultsSetPagination
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    filter_fields = ('name', 'version', 'is_active')
+    search_fields = ('name', 'version')
+
+    def _get_actor(self):
+        user = getattr(getattr(self, 'request', None), 'user', None)
+        if user is not None and getattr(user, 'is_authenticated', False):
+            return getattr(user, 'username', '') or 'authenticated_user'
+        return 'system'
+
+    def _record_policy_audit(self, action, policy=None, previous_policy=None, note='',
+                             before_effective=None, after_effective=None):
+        StructuredDriftPolicyAudit.objects.create(
+            policy=policy,
+            previous_policy=previous_policy,
+            action=action,
+            actor=self._get_actor(),
+            note=note,
+            effective_policy_before=before_effective or {},
+            effective_policy_after=after_effective or {},
+            effective_policy_diff=build_policy_diff_summary(before_effective or {}, after_effective or {}),
+        )
+
+    def _sync_active_state(self, instance):
+        if not getattr(instance, 'is_active', False):
+            return
+        StructuredDriftPolicy.objects.exclude(pk=instance.pk).filter(is_active=True).update(is_active=False)
+
+    def perform_create(self, serializer):
+        before_effective = load_effective_drift_policy()
+        instance = serializer.save()
+        self._sync_active_state(instance)
+        clear_drift_policy_caches()
+        after_effective = load_effective_drift_policy()
+        self._record_policy_audit(
+            action='CREATE',
+            policy=instance,
+            previous_policy=None,
+            note='create structured drift policy',
+            before_effective=before_effective,
+            after_effective=after_effective,
+        )
+        if instance.is_active:
+            self._record_policy_audit(
+                action='ACTIVATE',
+                policy=instance,
+                previous_policy=None,
+                note='policy created as active',
+                before_effective=before_effective,
+                after_effective=after_effective,
+            )
+
+    def perform_update(self, serializer):
+        before_effective = load_effective_drift_policy()
+        previous_active = StructuredDriftPolicy.objects.filter(is_active=True).exclude(pk=serializer.instance.pk).order_by('-updated_at', '-id').first()
+        instance = serializer.save()
+        self._sync_active_state(instance)
+        clear_drift_policy_caches()
+        after_effective = load_effective_drift_policy()
+        self._record_policy_audit(
+            action='UPDATE',
+            policy=instance,
+            previous_policy=previous_active,
+            note='update structured drift policy',
+            before_effective=before_effective,
+            after_effective=after_effective,
+        )
+
+    def perform_destroy(self, instance):
+        before_effective = load_effective_drift_policy()
+        super().perform_destroy(instance)
+        clear_drift_policy_caches()
+        after_effective = load_effective_drift_policy()
+        self._record_policy_audit(
+            action='DELETE',
+            policy=None,
+            previous_policy=instance,
+            note='delete structured drift policy',
+            before_effective=before_effective,
+            after_effective=after_effective,
+        )
+
+    @action(detail=True, methods=['post'])
+    def activate(self, request, pk=None):
+        instance = self.get_object()
+        before_effective = load_effective_drift_policy()
+        previous_active = StructuredDriftPolicy.objects.filter(is_active=True).exclude(pk=instance.pk).order_by('-updated_at', '-id').first()
+        StructuredDriftPolicy.objects.exclude(pk=instance.pk).filter(is_active=True).update(is_active=False)
+        instance.is_active = True
+        instance.save(update_fields=['is_active', 'updated_at'])
+        clear_drift_policy_caches()
+        after_effective = load_effective_drift_policy()
+        self._record_policy_audit(
+            action='ACTIVATE',
+            policy=instance,
+            previous_policy=previous_active,
+            note='activate structured drift policy',
+            before_effective=before_effective,
+            after_effective=after_effective,
+        )
+        data = self.get_serializer(instance).data
+        return JsonResponse({'code': 200, 'message': '结构化漂移策略已激活', 'data': data})
+
+    @action(detail=True, methods=['post'])
+    def rollback_to_previous(self, request, pk=None):
+        instance = self.get_object()
+        if not instance.is_active:
+            return JsonResponse({'code': 400, 'message': '仅激活中的策略允许回滚到上一版本', 'data': None})
+        latest_transition = (
+            StructuredDriftPolicyAudit.objects
+            .filter(policy=instance, action__in=['ACTIVATE', 'ROLLBACK'], previous_policy__isnull=False)
+            .order_by('-created_at', '-id')
+            .first()
+        )
+        target = getattr(latest_transition, 'previous_policy', None)
+        if target is None:
+            return JsonResponse({'code': 404, 'message': '未找到可回滚的上一激活版本', 'data': None})
+
+        before_effective = load_effective_drift_policy()
+        StructuredDriftPolicy.objects.filter(pk=instance.pk).update(is_active=False)
+        StructuredDriftPolicy.objects.exclude(pk=target.pk).filter(is_active=True).update(is_active=False)
+        target.is_active = True
+        target.save(update_fields=['is_active', 'updated_at'])
+        clear_drift_policy_caches()
+        after_effective = load_effective_drift_policy()
+        self._record_policy_audit(
+            action='ROLLBACK',
+            policy=target,
+            previous_policy=instance,
+            note='rollback structured drift policy to previous active version',
+            before_effective=before_effective,
+            after_effective=after_effective,
+        )
+        data = self.get_serializer(target).data
+        return JsonResponse({'code': 200, 'message': '结构化漂移策略已回滚到上一激活版本', 'data': data})
+
+
+class StructuredDriftPolicyAuditViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = StructuredDriftPolicyAudit.objects.select_related('policy', 'previous_policy').order_by('-created_at', '-id')
+    serializer_class = StructuredDriftPolicyAuditSerializer
+    pagination_class = LargeResultsSetPagination
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    filterset_fields = ('action', 'policy', 'previous_policy')
+    search_fields = ('actor', 'note')
 
 
 # 配置合规表

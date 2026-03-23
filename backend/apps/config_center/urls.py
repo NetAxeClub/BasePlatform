@@ -27,6 +27,8 @@ router.register(r'config_backup', views.ConfigBackupViewSet)
 router.register(r'config_compliance_result', views.ConfigComplianceResultViewSet)
 router.register(r'config_compliance_rule', views.ConfigComplianceRuleViewSet)
 router.register(r'config_backup_policy', views.ConfigBackupPolicyViewSet)
+router.register(r'structured_drift_policy_profile', views.StructuredDriftPolicyViewSet)
+router.register(r'structured_drift_policy_audit', views.StructuredDriftPolicyAuditViewSet)
 
 
 urlpatterns = [

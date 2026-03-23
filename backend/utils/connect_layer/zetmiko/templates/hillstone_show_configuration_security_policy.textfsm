@@ -1,0 +1,33 @@
+Value Filldown ID (\d+)
+Value ACTION (\S+)
+Value SRC_ZONE (.+?)
+Value DST_ZONE (.+?)
+Value DESCRIPTION (.*)
+Value DISABLED (disable)
+Value List SRC_IP (\S+)
+Value List SRC_RANGE (\S+\s+\S+)
+Value List SRC_OBJECT (.+?)
+Value List DST_IP (\S+)
+Value List DST_RANGE (\S+\s+\S+)
+Value List DST_OBJECT (.+?)
+Value List SERVICE_OBJECT (.+?)
+Value List LOG (\S+)
+
+Start
+  ^\s*rule\s+id\s+${ID}\s*$$ -> Rule
+
+Rule
+  ^\s+${DISABLED}\s*$$
+  ^\s+action\s+${ACTION}\s*$$
+  ^\s+src-zone\s+"${SRC_ZONE}"\s*$$
+  ^\s+dst-zone\s+"${DST_ZONE}"\s*$$
+  ^\s+src-ip\s+${SRC_IP}\s*$$
+  ^\s+src-range\s+${SRC_RANGE}\s*$$
+  ^\s+src-addr\s+"${SRC_OBJECT}"\s*$$
+  ^\s+dst-ip\s+${DST_IP}\s*$$
+  ^\s+dst-range\s+${DST_RANGE}\s*$$
+  ^\s+dst-addr\s+"${DST_OBJECT}"\s*$$
+  ^\s+service\s+"${SERVICE_OBJECT}"\s*$$
+  ^\s+log\s+${LOG}\s*$$
+  ^\s+description\s+"${DESCRIPTION}"\s*$$
+  ^\s*exit\s*$$ -> Record Start

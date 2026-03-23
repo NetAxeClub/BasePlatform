@@ -4,8 +4,35 @@
 COMMON_METADATA_FIELDS = ("hostip", "hostname", "idc_name", "log_time")
 
 # 默认按 list 类型存储的字段（用于缺省值补齐）
-LIST_VALUE_FIELDS = {"memberports", "location", "bd_ids", "vnis", "vrfs", "nve_ids", "evidence", "schema_samples"}
-RAW_NETMIKO_COLLECTION_TYPES = {"cli_output_capability"}
+LIST_VALUE_FIELDS = {
+    "memberports",
+    "location",
+    "bd_ids",
+    "vnis",
+    "vrfs",
+    "nve_ids",
+    "evidence",
+    "schema_samples",
+    "items",
+    "src_addr",
+    "dst_addr",
+    "service",
+    "logs",
+    "global_ip",
+    "global_port",
+    "local_ip",
+    "local_port",
+    "local_exclude_ip",
+    "trans_ip",
+    "destination_ip",
+    "destination_port",
+}
+RAW_NETMIKO_COLLECTION_TYPES = {
+    "cli_output_capability",
+    "security_policy",
+    "dnat",
+    "snat",
+}
 
 
 DEV_MAPPING = [
@@ -241,6 +268,95 @@ AGGRE_PORT_MAPPING = [
     {"label": "成员端口: memberports", "value": "memberports"},
     {"label": "状态: status", "value": "status"},
     {"label": "模型: mode", "value": "mode"},
+]
+
+ZONE_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "安全域: name", "value": "name"},
+    {"label": "类型: type", "value": "type"},
+    {"label": "虚拟交换: vswitch", "value": "vswitch"},
+    {"label": "接口数量: ifcount", "value": "ifcount"},
+    {"label": "共享: shared", "value": "shared"},
+]
+
+SERVICE_PREDEFINED_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "名称: name", "value": "name"},
+    {"label": "协议: protocol", "value": "protocol"},
+    {"label": "目的端口起始: dst_port_min", "value": "dst_port_min"},
+    {"label": "目的端口结束: dst_port_max", "value": "dst_port_max"},
+    {"label": "源端口起始: src_port_min", "value": "src_port_min"},
+    {"label": "源端口结束: src_port_max", "value": "src_port_max"},
+    {"label": "超时: timeout", "value": "timeout"},
+    {"label": "原始目的端口: raw_dst_port", "value": "raw_dst_port"},
+    {"label": "原始源端口: raw_src_port", "value": "raw_src_port"},
+]
+
+POLICY_HIT_COUNT_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "规则ID: id", "value": "id"},
+    {"label": "规则名: name", "value": "name"},
+    {"label": "命中次数: count", "value": "count"},
+]
+
+SECURITY_POLICY_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "规则ID: rule_id", "value": "rule_id"},
+    {"label": "规则名: name", "value": "name"},
+    {"label": "动作: action", "value": "action"},
+    {"label": "源安全域: src_zone", "value": "src_zone"},
+    {"label": "目的安全域: dst_zone", "value": "dst_zone"},
+    {"label": "源地址: src_addr", "value": "src_addr"},
+    {"label": "目的地址: dst_addr", "value": "dst_addr"},
+    {"label": "服务: service", "value": "service"},
+    {"label": "日志配置: logs", "value": "logs"},
+    {"label": "描述: description", "value": "description"},
+    {"label": "命中次数: count", "value": "count"},
+    {"label": "是否禁用: disabled", "value": "disabled"},
+]
+
+DNAT_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "规则ID: rule_id", "value": "rule_id"},
+    {"label": "公网地址: global_ip", "value": "global_ip"},
+    {"label": "公网端口: global_port", "value": "global_port"},
+    {"label": "内网地址: local_ip", "value": "local_ip"},
+    {"label": "内网端口: local_port", "value": "local_port"},
+    {"label": "入口接口: ingress_interface", "value": "ingress_interface"},
+    {"label": "源安全域: from_zone", "value": "from_zone"},
+    {"label": "目的安全域: to_zone", "value": "to_zone"},
+    {"label": "描述: description", "value": "description"},
+    {"label": "是否禁用: disabled", "value": "disabled"},
+    {"label": "跟踪方式: track", "value": "track"},
+]
+
+SNAT_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "规则ID: rule_id", "value": "rule_id"},
+    {"label": "转换地址: trans_ip", "value": "trans_ip"},
+    {"label": "源地址: local_ip", "value": "local_ip"},
+    {"label": "源排除地址: local_exclude_ip", "value": "local_exclude_ip"},
+    {"label": "目的地址: destination_ip", "value": "destination_ip"},
+    {"label": "目的端口: destination_port", "value": "destination_port"},
+    {"label": "模式: mode", "value": "mode"},
+    {"label": "源安全域: source_zone", "value": "source_zone"},
+    {"label": "目的安全域: destination_zone", "value": "destination_zone"},
+    {"label": "出口接口: egress_interface", "value": "egress_interface"},
+    {"label": "描述: description", "value": "description"},
+    {"label": "是否禁用: disabled", "value": "disabled"},
+    {"label": "跟踪方式: track", "value": "track"},
 ]
 
 FAN_STATUS_MAPPING = [
@@ -490,6 +606,42 @@ field_mapping = {
         "value": "aggre_port",
         "icon": "aggregation-port",
         "mapping_fields": AGGRE_PORT_MAPPING,
+    },
+    "zone": {
+        "label": "安全域",
+        "value": "zone",
+        "icon": "zone",
+        "mapping_fields": ZONE_MAPPING,
+    },
+    "service_predefined": {
+        "label": "预定义服务",
+        "value": "service_predefined",
+        "icon": "service",
+        "mapping_fields": SERVICE_PREDEFINED_MAPPING,
+    },
+    "policy_hit_count": {
+        "label": "策略命中",
+        "value": "policy_hit_count",
+        "icon": "policy-hit",
+        "mapping_fields": POLICY_HIT_COUNT_MAPPING,
+    },
+    "security_policy": {
+        "label": "安全策略",
+        "value": "security_policy",
+        "icon": "security-policy",
+        "mapping_fields": SECURITY_POLICY_MAPPING,
+    },
+    "dnat": {
+        "label": "DNAT",
+        "value": "dnat",
+        "icon": "dnat",
+        "mapping_fields": DNAT_MAPPING,
+    },
+    "snat": {
+        "label": "SNAT",
+        "value": "snat",
+        "icon": "snat",
+        "mapping_fields": SNAT_MAPPING,
     },
     "fan_status": {
         "label": "风扇状态",
