@@ -415,6 +415,429 @@ def _dedupe_strings(values):
     return ordered
 
 
+def _usg_port_range_dict(protocol: str, port_value) -> dict:
+    text = str(port_value or "").strip()
+    if not text:
+        return {}
+    normalized = text.replace(" to ", "-").replace(" ", "")
+    parts = [part for part in normalized.split("-") if part]
+    start = parts[0] if parts else text
+    end = parts[-1] if len(parts) > 1 else start
+    try:
+        start_int = int(start)
+        end_int = int(end)
+    except (TypeError, ValueError):
+        start_int = 0
+        end_int = 0
+    return {
+        "start": start_int,
+        "end": end_int,
+        "protocol": protocol,
+        "result": text,
+    }
+
+
+def _usg_address_items(container):
+    items = []
+    if not isinstance(container, dict):
+        return items
+
+    for value in _safe_list(container.get("address-ipv4")):
+        if value:
+            items.append({"ip": value})
+
+    for value in _safe_list(container.get("address-set")):
+        if value:
+            items.append({"object": value})
+
+    for range_item in _safe_list(container.get("address-ipv4-range")):
+        if not isinstance(range_item, dict):
+            continue
+        start_ip = _pick_first(range_item, "start-ipv4")
+        end_ip = _pick_first(range_item, "end-ipv4")
+        if start_ip or end_ip:
+            items.append({"range": f"{start_ip}-{end_ip}".strip("-")})
+
+    for value in _safe_list(container.get("address-ipv4-exclude")):
+        if value:
+            items.append({"exclude_ip": value})
+
+    for value in _safe_list(container.get("address-set-exclude")):
+        if value:
+            items.append({"exclude_object": value})
+
+    for range_item in _safe_list(container.get("address-ipv4-range-exclude")):
+        if not isinstance(range_item, dict):
+            continue
+        start_ip = _pick_first(range_item, "start-ipv4")
+        end_ip = _pick_first(range_item, "end-ipv4")
+        if start_ip or end_ip:
+            items.append({"exclude_range": f"{start_ip}-{end_ip}".strip("-")})
+
+    return items
+
+
+def _usg_service_items(container):
+    items = []
+    if not isinstance(container, dict):
+        return items
+
+    for value in _safe_list(container.get("service-object")):
+        if value:
+            items.append({"object": value})
+
+    service_items = container.get("service-items") or container.get("items") or {}
+    if not isinstance(service_items, dict):
+        return items
+
+    for protocol in ("tcp", "udp"):
+        for item in _safe_list(service_items.get(protocol)):
+            if not isinstance(item, dict):
+                continue
+            items.append(
+                {
+                    "protocol": protocol,
+                    "source_port": str(_pick_first(item, "source-port")),
+                    "dest_port": str(_pick_first(item, "dest-port")),
+                }
+            )
+
+    for item in _safe_list(service_items.get("icmp-item")):
+        if isinstance(item, dict):
+            items.append(
+                {
+                    "protocol": "icmp",
+                    "icmp_type": _pick_first(item, "type"),
+                    "icmp_code": _pick_first(item, "code"),
+                }
+            )
+        else:
+            items.append({"protocol": "icmp"})
+
+    return items
+
+
+def _usg_flatten_address_object_items(entry):
+    elements = _safe_list(entry.get("elements"))
+    items = []
+    for element in elements:
+        if not isinstance(element, dict):
+            continue
+        items.extend(_usg_address_items(element))
+    return items
+
+
+def _usg_flatten_nat_address_sections(entry):
+    sections = _safe_list(entry.get("section"))
+    items = []
+    for section in sections:
+        if not isinstance(section, dict):
+            continue
+        start_ip = _pick_first(section, "start-ip")
+        end_ip = _pick_first(section, "end-ip")
+        if start_ip or end_ip:
+            items.append(f"{start_ip}-{end_ip}".strip("-"))
+    return items
+
+
+def _usg_make_ip_entry(value):
+    value = str(value or "").strip()
+    if not value:
+        return dict(start="", end="", result="")
+    try:
+        if "/" in value:
+            ip_net = IPNetwork(value)
+            return dict(
+                start=value,
+                end=value,
+                start_int=ip_net.first if ip_net.version == 4 else 0,
+                end_int=ip_net.last if ip_net.version == 4 else 0,
+                result=value,
+            )
+        ip_addr = IPAddress(value)
+        return dict(
+            start=value,
+            end=value,
+            start_int=ip_addr.value if len(str(ip_addr.value)) < 12 else 0,
+            end_int=ip_addr.value if len(str(ip_addr.value)) < 12 else 0,
+            result=value,
+        )
+    except Exception:
+        return dict(start=value, end=value, result=value)
+
+
+def _usg_make_range_entry(start, end):
+    start = str(start or "").strip()
+    end = str(end or "").strip()
+    if not start or not end:
+        return dict(start=start, end=end, result=f"{start}-{end}".strip("-"))
+    try:
+        return dict(
+            start=start,
+            end=end,
+            start_int=IPAddress(start).value,
+            end_int=IPAddress(end).value,
+            result=f"{start}-{end}",
+        )
+    except Exception:
+        return dict(start=start, end=end, result=f"{start}-{end}")
+
+
+def _usg_build_address_object(entry, object_type):
+    record = dict(
+        vsys=_pick_first(entry, "vsys"),
+        name=_pick_first(entry, "name"),
+        description=_pick_first(entry, "desc", "description"),
+        object_type=object_type,
+        ip=[],
+        range=[],
+        exclude_ip=[],
+        exclude_range=[],
+        member=[],
+        resolved=[],
+        items=[],
+    )
+    containers = _safe_list(entry.get("elements")) or [entry]
+    for container in containers:
+        if not isinstance(container, dict):
+            continue
+        for value in _safe_list(container.get("address-ipv4")):
+            if value:
+                record["ip"].append({"ip": value})
+                record["items"].append({"ip": value})
+        for value in _safe_list(container.get("address-set")):
+            if value:
+                record["member"].append({"name": value})
+                record["items"].append({"object": value})
+        for range_item in _safe_list(container.get("address-ipv4-range")):
+            if not isinstance(range_item, dict):
+                continue
+            start_ip = _pick_first(range_item, "start-ipv4")
+            end_ip = _pick_first(range_item, "end-ipv4")
+            if start_ip or end_ip:
+                record["range"].append({"start": start_ip, "end": end_ip})
+                record["items"].append({"range": f"{start_ip}-{end_ip}".strip("-")})
+        for value in _safe_list(container.get("address-ipv4-exclude")):
+            if value:
+                record["exclude_ip"].append({"ip": value})
+                record["items"].append({"exclude_ip": value})
+        for value in _safe_list(container.get("address-set-exclude")):
+            if value:
+                record["exclude_range"].append({"start": value, "end": value})
+                record["items"].append({"exclude_object": value})
+        for range_item in _safe_list(container.get("address-ipv4-range-exclude")):
+            if not isinstance(range_item, dict):
+                continue
+            start_ip = _pick_first(range_item, "start-ipv4")
+            end_ip = _pick_first(range_item, "end-ipv4")
+            if start_ip or end_ip:
+                record["exclude_range"].append({"start": start_ip, "end": end_ip})
+                record["items"].append({"exclude_range": f"{start_ip}-{end_ip}".strip("-")})
+    return record
+
+
+def _usg_address_object_to_entries(address_obj, address_map, seen=None):
+    seen = seen or set()
+    name = address_obj.get("name", "")
+    if name in seen:
+        return []
+    seen = set(seen)
+    if name:
+        seen.add(name)
+    results = []
+    for item in address_obj.get("ip", []):
+        ip_value = item.get("ip", "")
+        if ip_value:
+            results.append(_usg_make_ip_entry(ip_value))
+    for item in address_obj.get("range", []):
+        start = item.get("start", "")
+        end = item.get("end", "")
+        if start or end:
+            results.append(_usg_make_range_entry(start, end))
+    for item in address_obj.get("member", []):
+        member_name = item.get("name", "")
+        member_obj = address_map.get(member_name)
+        if member_obj:
+            results.extend(_usg_address_object_to_entries(member_obj, address_map, seen=seen))
+    return results
+
+
+def _usg_resolve_policy_address_items(container, address_map=None):
+    address_map = address_map or {}
+    resolved = []
+    for item in _usg_address_items(container):
+        if not isinstance(item, dict):
+            continue
+        if item.get("object"):
+            name = str(item.get("object") or "")
+            address_obj = address_map.get(name)
+            if address_obj:
+                resolved.append(
+                    dict(
+                        name=name,
+                        ip=list(address_obj.get("ip", [])),
+                        range=list(address_obj.get("range", [])),
+                        exclude_ip=list(address_obj.get("exclude_ip", [])),
+                        exclude_range=list(address_obj.get("exclude_range", [])),
+                        member=list(address_obj.get("member", [])),
+                        resolved=_usg_address_object_to_entries(address_obj, address_map),
+                    )
+                )
+            else:
+                resolved.append(dict(name=name, raw=name, resolved=[dict(start=name, end=name, result=name)]))
+        elif item.get("ip"):
+            ip_value = str(item.get("ip") or "")
+            resolved.append(dict(name="", raw=ip_value, resolved=[_usg_make_ip_entry(ip_value)]))
+        elif item.get("range"):
+            range_value = str(item.get("range") or "")
+            start, _, end = range_value.partition("-")
+            resolved.append(dict(name="", raw=range_value, resolved=[_usg_make_range_entry(start, end)]))
+        elif item.get("exclude_ip"):
+            ip_value = str(item.get("exclude_ip") or "")
+            resolved.append(dict(name="", raw=ip_value, resolved=[_usg_make_ip_entry(ip_value)]))
+        elif item.get("exclude_range"):
+            range_value = str(item.get("exclude_range") or "")
+            start, _, end = range_value.partition("-")
+            resolved.append(dict(name="", raw=range_value, resolved=[_usg_make_range_entry(start, end)]))
+    return resolved
+
+
+def _usg_normalize_service_items(container):
+    normalized = []
+    service_items = (container.get("service-items") or container.get("items") or {}) if isinstance(container, dict) else {}
+    if not isinstance(service_items, dict):
+        return normalized
+    for protocol in ("tcp", "udp"):
+        for item in _safe_list(service_items.get(protocol)):
+            if not isinstance(item, dict):
+                continue
+            service_item = {"protocol": protocol}
+            source_port = str(_pick_first(item, "source-port") or "")
+            dest_port = str(_pick_first(item, "dest-port") or "")
+            if source_port:
+                source_range = _usg_port_range_dict(protocol, source_port)
+                service_item["src-port-min"] = source_range.get("start", 0)
+                service_item["src-port-max"] = source_range.get("end", 0)
+            if dest_port:
+                dest_range = _usg_port_range_dict(protocol, dest_port)
+                service_item["dst-port-min"] = dest_range.get("start", 0)
+                service_item["dst-port-max"] = dest_range.get("end", 0)
+            normalized.append(service_item)
+    for item in _safe_list(service_items.get("icmp-item")):
+        if isinstance(item, dict):
+            normalized.append(
+                {
+                    "protocol": "icmp",
+                    "type": _pick_first(item, "type"),
+                    "code": _pick_first(item, "code"),
+                }
+            )
+        else:
+            normalized.append({"protocol": "icmp"})
+    return normalized
+
+
+def _usg_resolve_policy_service_items(container):
+    resolved = []
+    if not isinstance(container, dict):
+        return resolved
+    for value in _safe_list(container.get("service-object")):
+        if value:
+            token = str(value)
+            resolved.append(
+                {
+                    "name": token,
+                    "items": [{"start": token, "end": token, "protocol": token.lower(), "result": token}],
+                }
+            )
+    for item in _usg_normalize_service_items(container):
+        protocol = str(item.get("protocol") or "any").lower()
+        if "dst-port-min" in item:
+            start = item.get("dst-port-min", 0)
+            end = item.get("dst-port-max", start)
+            resolved.append(
+                {
+                    "name": "",
+                    "items": [
+                        {
+                            "start": start,
+                            "end": end,
+                            "protocol": protocol,
+                            "result": f"{start}-{end}" if start != end else str(start),
+                        }
+                    ],
+                }
+            )
+        elif "type" in item:
+            type_value = str(item.get("type") or "")
+            code_value = str(item.get("code") or "").strip()
+            result = f"type:{type_value}" if type_value else "Any"
+            if code_value:
+                result = f"{result} code:{code_value}"
+            resolved.append(
+                {
+                    "name": "",
+                    "items": [{"start": 0, "end": 65535, "protocol": protocol, "result": result}],
+                }
+            )
+        else:
+            resolved.append(
+                {"name": "", "items": [{"start": 0, "end": 65535, "protocol": protocol, "result": "Any"}]}
+            )
+    return resolved
+
+
+def _usg_service_summary(service_items):
+    protocol = ""
+    src_port_min = ""
+    src_port_max = ""
+    dst_port_min = ""
+    dst_port_max = ""
+    for item in service_items:
+        if not isinstance(item, dict):
+            continue
+        protocol = protocol or str(item.get("protocol") or "")
+        if "src-port-min" in item:
+            src_port_min = src_port_min or item.get("src-port-min", "")
+            src_port_max = src_port_max or item.get("src-port-max", "")
+        if "dst-port-min" in item:
+            dst_port_min = dst_port_min or item.get("dst-port-min", "")
+            dst_port_max = dst_port_max or item.get("dst-port-max", "")
+    return protocol, src_port_min, src_port_max, dst_port_min, dst_port_max
+
+
+def _extract_usg_security_policy_rules(data):
+    sec_policy = data.get("sec-policy", {}) or {}
+    vsys_items = _safe_list(sec_policy.get("vsys"))
+    rules = []
+    for vsys in vsys_items:
+        if not isinstance(vsys, dict):
+            continue
+        static_policy = vsys.get("static-policy", {}) or {}
+        for rule in _safe_list(static_policy.get("rule")):
+            if isinstance(rule, dict):
+                rules.append((vsys, rule))
+    return rules
+
+
+def _extract_usg_nat_policy_rules(data):
+    nat_policy = data.get("nat-policy", {}) or {}
+    vsys_items = _safe_list(nat_policy.get("vsys"))
+    rules = []
+    for vsys in vsys_items:
+        if not isinstance(vsys, dict):
+            continue
+        for rule in _safe_list(vsys.get("rule")):
+            if isinstance(rule, dict):
+                rules.append((vsys, rule))
+    return rules
+
+
+def _extract_usg_nat_server_rules(data):
+    nat_server = data.get("nat-server", {}) or {}
+    return [item for item in _safe_list(nat_server.get("server-mapping")) if isinstance(item, dict)]
+
+
 # ────────────────────────────────────────────────────────────
 # Netmiko (TextFSM) 处理器
 # 注册时省略 device_type，通过 base.py 的兜底逻辑对所有设备类型生效
@@ -1708,3 +2131,279 @@ def process_aggre_port_netconf(data):
             )
         )
     return results
+
+
+@register_processor(vendor="Huawei", device_type="", collection_type="hrp_state", method="netconf")
+def process_hrp_state_netconf(data):
+    hrp_state = data.get("hrp-state", {}) or {}
+    if not isinstance(hrp_state, dict) or not hrp_state:
+        return []
+    switch_info = hrp_state.get("hrp-switch-info", {}) or {}
+    return [
+        dict(
+            ha_state=_pick_first(hrp_state, "hrp-status"),
+            peer_status=_pick_first(hrp_state, "peer-status"),
+            heartbeat_status=_pick_first(hrp_state, "heartbeat-status"),
+            config_master=_pick_first(hrp_state, "config-master"),
+            switch_id=_pick_first(switch_info, "id"),
+            switch_time=_pick_first(switch_info, "time"),
+            switch_reason=_pick_first(switch_info, "reason", "description"),
+        )
+    ]
+
+
+@register_processor(vendor="Huawei", device_type="", collection_type="address_set", method="netconf")
+def process_address_set_netconf(data):
+    address_set = data.get("address-set", {}) or {}
+    records = []
+    address_map = {}
+    for key_name, object_type in (("addr-object", "address_object"), ("addr-group", "address_group")):
+        for entry in _safe_list(address_set.get(key_name)):
+            if not isinstance(entry, dict):
+                continue
+            record = _usg_build_address_object(entry, object_type)
+            address_map[record.get("name")] = record
+            records.append(record)
+    for record in records:
+        record["resolved"] = _usg_address_object_to_entries(record, address_map)
+        record["element_count"] = len(record["resolved"])
+    return records
+
+
+@register_processor(vendor="Huawei", device_type="", collection_type="nat_address", method="netconf")
+def process_nat_address_netconf(data):
+    nat_address_group = data.get("nat-address-group", {}) or {}
+    records = []
+    for entry in _safe_list(nat_address_group.get("nat-address-group")):
+        if not isinstance(entry, dict):
+            continue
+        items = _usg_flatten_nat_address_sections(entry)
+        records.append(
+            dict(
+                name=_pick_first(entry, "name"),
+                vsys=_pick_first(entry, "vsys"),
+                address_type=_pick_first(entry, "address-type", "type"),
+                section_count=len(items),
+                items=items,
+            )
+        )
+    return records
+
+
+@register_processor(vendor="Huawei", device_type="", collection_type="service_set", method="netconf")
+def process_service_set_netconf(data):
+    service_set = data.get("service-set", {}) or {}
+    records = []
+    for key_name in ("service-object", "pre-defined-service"):
+        for entry in _safe_list(service_set.get(key_name)):
+            if not isinstance(entry, dict):
+                continue
+            items = _usg_normalize_service_items(entry)
+            protocol, src_port_min, src_port_max, dst_port_min, dst_port_max = _usg_service_summary(items)
+            records.append(
+                dict(
+                    vsys=_pick_first(entry, "vsys"),
+                    name=_pick_first(entry, "name"),
+                    description=_pick_first(entry, "desc", "description"),
+                    protocol=protocol,
+                    src_port_min=src_port_min,
+                    src_port_max=src_port_max,
+                    dst_port_min=dst_port_min,
+                    dst_port_max=dst_port_max,
+                    items=items,
+                )
+            )
+    return records
+
+
+@register_processor(vendor="Huawei", device_type="", collection_type="slb_info", method="netconf")
+def process_slb_info_netconf(data):
+    slb = data.get("slb", {}) or {}
+    records = []
+    for entry in _safe_list(slb.get("slb-pool")):
+        if not isinstance(entry, dict):
+            continue
+        members = []
+        for member in _safe_list(entry.get("real-server")):
+            if isinstance(member, dict):
+                members.append(_pick_first(member, "name", "ip", "address"))
+        records.append(
+            dict(
+                name=_pick_first(entry, "name"),
+                slb_type="pool",
+                vip="",
+                protocol=_pick_first(entry, "protocol"),
+                port=_pick_first(entry, "port"),
+                description=_pick_first(entry, "desc", "description"),
+                items=_dedupe_strings(members),
+            )
+        )
+
+    for entry in _safe_list(slb.get("slb-loadbalancer")):
+        if not isinstance(entry, dict):
+            continue
+        refs = []
+        for ref in _safe_list(entry.get("bind-pool")):
+            if isinstance(ref, dict):
+                refs.append(_pick_first(ref, "name"))
+            elif ref:
+                refs.append(str(ref))
+        records.append(
+            dict(
+                name=_pick_first(entry, "name"),
+                slb_type="virtual_server",
+                vip=_pick_first(entry, "virtual-ip", "ip", "address"),
+                protocol=_pick_first(entry, "protocol"),
+                port=_pick_first(entry, "port"),
+                description=_pick_first(entry, "desc", "description"),
+                items=_dedupe_strings(refs),
+            )
+        )
+    return records
+
+
+@register_processor(vendor="Huawei", device_type="", collection_type="vrrp_info", method="netconf")
+def process_vrrp_info_netconf(data):
+    vrrp = data.get("vrrp", {}) or {}
+    result = []
+    for entry in _safe_list(vrrp.get("vrrp-instance")):
+        if not isinstance(entry, dict):
+            continue
+        vrrp4 = entry.get("vrrp4", {}) or {}
+        virtual_ip_raw = _pick_first(vrrp4, "virtual-ip")
+        virtual_ip = virtual_ip_raw
+        ipmask = "255.255.255.255"
+        if isinstance(virtual_ip_raw, str) and " " in virtual_ip_raw:
+            parts = [part for part in virtual_ip_raw.split() if part]
+            virtual_ip = parts[0]
+            if len(parts) > 1:
+                ipmask = parts[1]
+        result.append(
+            dict(
+                interface=_normalize_huawei_interface(_pick_first(entry, "interface-name")),
+                vrid=_pick_first(entry, "vrid", "id"),
+                virtual_ip=virtual_ip,
+                ipmask=ipmask,
+                priority=_pick_first(vrrp4, "priority"),
+                preempt_mode=_pick_first(vrrp4, "preempt-mode"),
+                admin_state=_pick_first(vrrp4, "admin-state"),
+                config_state=_pick_first(vrrp4, "config-state"),
+            )
+        )
+    return result
+
+
+@register_processor(vendor="Huawei", device_type="", collection_type="security_policy", method="netconf")
+def process_security_policy_netconf(data):
+    result = []
+    for _vsys, rule in _extract_usg_security_policy_rules(data):
+        source_items = _usg_resolve_policy_address_items(rule.get("source-ip", {}) or {})
+        destination_items = _usg_resolve_policy_address_items(rule.get("destination-ip", {}) or {})
+        service_items = _usg_resolve_policy_service_items(rule.get("service", {}) or {})
+        result.append(
+            dict(
+                rule_id=_pick_first(rule, "name", "id"),
+                name=_pick_first(rule, "name"),
+                action="permit" if _normalize_truthy(_pick_first(rule, "action")) else "deny",
+                src_zone=_pick_first(rule, "source-zone"),
+                dst_zone=_pick_first(rule, "destination-zone"),
+                src_addr=source_items,
+                dst_addr=destination_items,
+                service=service_items,
+                logs=_dedupe_strings(
+                    [
+                        _pick_first(rule, "log", "log-flag"),
+                        _pick_first(rule, "session-log"),
+                    ]
+                ),
+                description=_pick_first(rule, "desc", "description"),
+                count=_pick_first(rule, "hit-times"),
+                disabled=not _normalize_truthy(_pick_first(rule, "enable", default="true")),
+            )
+        )
+    return result
+
+
+@register_processor(vendor="Huawei", device_type="", collection_type="snat", method="netconf")
+def process_snat_netconf(data):
+    result = []
+    for _vsys, rule in _extract_usg_nat_policy_rules(data):
+        trans_ip = []
+        nat_group = _pick_first(rule, "nat-address-group")
+        if nat_group:
+            trans_ip.append({"object": nat_group})
+        if _pick_first(rule, "action") == "easyip":
+            trans_ip.append({"object": "easyip"})
+
+        destination_port = []
+        for item in _usg_service_items(rule.get("service", {}) or {}):
+            if not isinstance(item, dict):
+                continue
+            protocol = str(item.get("protocol") or item.get("object") or "")
+            if item.get("dest_port"):
+                destination_port.append(_usg_port_range_dict(protocol or "tcp", item["dest_port"]))
+            elif item.get("object"):
+                destination_port.append({"start": 0, "end": 0, "protocol": protocol, "result": item["object"]})
+
+        result.append(
+            dict(
+                rule_id=_pick_first(rule, "name", "id"),
+                trans_ip=trans_ip,
+                local_ip=_usg_address_items(rule.get("source-ip", {}) or {}),
+                local_exclude_ip=[],
+                destination_ip=_usg_address_items(rule.get("destination-ip", {}) or {}),
+                destination_port=[item for item in destination_port if item],
+                mode=_pick_first(rule, "action"),
+                source_zone=_pick_first(rule, "source-zone"),
+                destination_zone=_pick_first(rule, "destination-zone"),
+                egress_interface=_pick_first(rule, "egress-interface"),
+                description=_pick_first(rule, "description", "desc"),
+                disabled=not _normalize_truthy(_pick_first(rule, "enable", default="true")),
+                track=_pick_first(rule, "no-reverse"),
+            )
+        )
+    return result
+
+
+@register_processor(vendor="Huawei", device_type="", collection_type="dnat", method="netconf")
+def process_dnat_netconf(data):
+    protocol_map = {
+        "1": "icmp",
+        "6": "tcp",
+        "17": "udp",
+    }
+    result = []
+    for rule in _extract_usg_nat_server_rules(data):
+        protocol = protocol_map.get(str(_pick_first(rule, "protocol")), str(_pick_first(rule, "protocol") or "any"))
+        global_info = rule.get("global", {}) or {}
+        inside_info = rule.get("inside", {}) or {}
+        global_ip = _pick_first(global_info, "start-ip")
+        local_ip = _pick_first(inside_info, "start-ip")
+        global_port = _pick_first(rule.get("global-port", {}) or {}, "start-port")
+        local_port = _pick_first(rule.get("inside-port", {}) or {}, "start-port")
+        global_port_item = (
+            _usg_port_range_dict(protocol, global_port)
+            if global_port
+            else {"start": 0, "end": 65535, "protocol": protocol, "result": "0-65535"}
+        )
+        local_port_item = (
+            _usg_port_range_dict(protocol, local_port)
+            if local_port
+            else {"start": 0, "end": 65535, "protocol": protocol, "result": "0-65535"}
+        )
+        result.append(
+            dict(
+                rule_id=_pick_first(rule, "name", "id"),
+                global_ip=[{"start": global_ip, "end": global_ip, "result": global_ip}] if global_ip else [],
+                global_port=[global_port_item],
+                local_ip=[{"start": local_ip, "end": local_ip, "result": local_ip}] if local_ip else [],
+                local_port=[local_port_item],
+                ingress_interface=_pick_first(global_info, "if-type", "interface-name"),
+                from_zone="",
+                to_zone="",
+                description=_pick_first(rule, "description", "desc"),
+                disabled=not _normalize_truthy(_pick_first(rule, "enable", default="true")),
+                track=_pick_first(rule, "no-reverse"),
+            )
+        )
+    return result

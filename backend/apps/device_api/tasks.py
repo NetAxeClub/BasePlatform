@@ -95,6 +95,7 @@ from apps.device_api.models_api import (
     inject_metadata,
     inject_collection_context,
     COLLECTION_TYPE_MONGO_MAP,
+    save_local_collection_result,
 )
 from apps.device_api.tools.collect_device import get_auto_device
 from apps.device_api.platform_profiles import DeviceFactService
@@ -103,7 +104,7 @@ from apps.device_api.analysis_hooks import (
     count_expected_interface_devices,
     schedule_batch_network_analysis,
 )
-from apps.device_api import COLLECTION_PLAN, COLLECTION_SUB_PLAN
+from apps.device_api import COLLECTION_EXECUTION_LOG, COLLECTION_PLAN, COLLECTION_SUB_PLAN
 from apps.device_api import arp_mongo, mac_mongo, lldp_mongo, aggre_port_mongo
 from netaxe.settings import DEBUG
 from utils.db.mongo_ops import MongoOps, MongoNetOps
@@ -201,6 +202,7 @@ def dedupe_batch_hosts(hosts):
     """按设备去重，避免同一批次对同一台设备重复下发采集任务。"""
     deduped_hosts = {}
     duplicate_count = 0
+    duplicate_details = []
     for host in hosts or []:
         identity = _host_identity(host)
         if not identity:
@@ -209,10 +211,128 @@ def dedupe_batch_hosts(hosts):
         if existing is None or _host_preference_key(host) < _host_preference_key(existing):
             if existing is not None:
                 duplicate_count += 1
+                duplicate_details.append(
+                    {
+                        "identity": identity,
+                        "kept_manage_ip": host.get("manage_ip"),
+                        "kept_plan_id": host.get("plan_id"),
+                        "kept_binding_source": host.get("binding_source"),
+                        "dropped_manage_ip": existing.get("manage_ip"),
+                        "dropped_plan_id": existing.get("plan_id"),
+                        "dropped_binding_source": existing.get("binding_source"),
+                    }
+                )
             deduped_hosts[identity] = host
         else:
             duplicate_count += 1
-    return list(deduped_hosts.values()), duplicate_count
+            duplicate_details.append(
+                {
+                    "identity": identity,
+                    "kept_manage_ip": existing.get("manage_ip"),
+                    "kept_plan_id": existing.get("plan_id"),
+                    "kept_binding_source": existing.get("binding_source"),
+                    "dropped_manage_ip": host.get("manage_ip"),
+                    "dropped_plan_id": host.get("plan_id"),
+                    "dropped_binding_source": host.get("binding_source"),
+                }
+            )
+    return list(deduped_hosts.values()), duplicate_count, duplicate_details
+
+
+def _truncate_preview(value, max_length=1200):
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        text = value
+    else:
+        try:
+            text = json.dumps(value, ensure_ascii=False, default=str)
+        except Exception:
+            text = repr(value)
+    if len(text) > max_length:
+        return text[:max_length] + "...(truncated)"
+    return text
+
+
+def _compact_details(data):
+    if not isinstance(data, dict):
+        return {}
+    return {
+        key: value
+        for key, value in data.items()
+        if value not in (None, "", [], {}, ())
+    }
+
+
+def _build_local_device_stub(device_info):
+    return type(
+        "Device",
+        (),
+        {
+            "manage_ip": device_info.get("manage_ip"),
+            "name": device_info.get("name", "") or device_info.get("device_name", ""),
+            "idc": type("Idc", (), {"name": device_info.get("idc__name", "") or device_info.get("idc_name", "")})()
+            if (device_info.get("idc__name", "") or device_info.get("idc_name", ""))
+            else None,
+        },
+    )()
+
+
+def _get_collection_method_name(plan, collection_method):
+    return DeviceCollectionService._get_local_result_method_name(plan, collection_method)
+
+
+def _record_execution_event(
+    *,
+    event_scope,
+    event_type,
+    status="",
+    severity="info",
+    execute_time="",
+    device_info=None,
+    plan=None,
+    collection_method="",
+    reason="",
+    error="",
+    details=None,
+):
+    device_info = device_info or {}
+    plan = plan or {}
+    doc = {
+        "event_scope": event_scope,
+        "event_type": event_type,
+        "status": status,
+        "severity": severity,
+        "execute_time": execute_time or device_info.get("execute_time", ""),
+        "device_ip": device_info.get("manage_ip") or device_info.get("device_ip", ""),
+        "device_name": device_info.get("name") or device_info.get("device_name", ""),
+        "idc_name": device_info.get("idc__name") or device_info.get("idc_name", ""),
+        "summary_plan_id": plan.get("summary_plan"),
+        "summary_plan_name": plan.get("summary_plan_name", ""),
+        "plan_id": plan.get("id"),
+        "plan_name": plan.get("name", ""),
+        "collection_type": normalize_collection_type_for_storage(plan.get("collection_type", "")),
+        "collection_method": collection_method,
+        "profile_code": device_info.get("profile_code", ""),
+        "binding_source": device_info.get("binding_source", ""),
+        "reason": reason,
+        "error": error,
+        "details": _compact_details(details or {}),
+        "created_at": datetime.now().isoformat(),
+        "log_time": time.time(),
+    }
+    try:
+        COLLECTION_EXECUTION_LOG.insert_one(doc)
+    except Exception as exc:
+        logger.warning(
+            "写入执行日志失败: scope=%s event=%s device=%s plan=%s execute_time=%s error=%s",
+            event_scope,
+            event_type,
+            doc["device_ip"],
+            doc["plan_id"],
+            doc["execute_time"],
+            exc,
+        )
 
 
 def datas_to_cache():
@@ -421,8 +541,10 @@ def plan_collect_device(**kwargs):
         "successful_sub_plans": 0,
         "failed_sub_plans": 0,
         "skipped_sub_plans": 0,
+        "coverage_issue_sub_plans": 0,
         "failed_details": [],
         "skipped_details": [],
+        "coverage_details": [],
     }
     parent_record_created = False
 
@@ -434,9 +556,37 @@ def plan_collect_device(**kwargs):
             logger.warning(
                 f"设备 {host_ip} 关联的采集方案不存在、已禁用或没有子采集方案: plan_id={plan_id}"
             )
+            _record_execution_event(
+                event_scope="device",
+                event_type="device_skipped",
+                status="skipped",
+                severity="warning",
+                execute_time=execute_time,
+                device_info=kwargs,
+                reason="missing_sub_plans",
+                details={"plan_id": plan_id},
+            )
             return {}
 
         logger.info(f"开始采集设备 {host_ip}, 子方案数量: {len(sub_plans_list)}")
+        _record_execution_event(
+            event_scope="device",
+            event_type="device_started",
+            status="running",
+            execute_time=execute_time,
+            device_info=kwargs,
+            details={
+                "plan_id": plan_id,
+                "sub_plans_count": len(sub_plans_list),
+                "protocol_breakdown": {
+                    "netmiko": len([p for p in sub_plans_list if p.get("netmiko_enabled")]),
+                    "netconf": len([p for p in sub_plans_list if p.get("netconf_enabled")]),
+                    "snmp": len([p for p in sub_plans_list if p.get("snmp_enabled")]),
+                    "restconf": len([p for p in sub_plans_list if p.get("restconf_enabled")]),
+                    "telemetry": len([p for p in sub_plans_list if p.get("telemetry_enabled")]),
+                },
+            },
+        )
 
         # 在执行采集之前，插入主采集方案记录
         parent_insert_result = DeviceCollectionService.insert_parent_plan_data(
@@ -464,6 +614,18 @@ def plan_collect_device(**kwargs):
             with DeviceConnectionManager(host_ip, kwargs) as conn_mgr:
                 # 执行所有Netmiko采集（复用同一连接）
                 for sub_plan in netmiko_plans:
+                    sub_plan_started_at = time.time()
+                    method_name = _get_collection_method_name(sub_plan, "netmiko")
+                    _record_execution_event(
+                        event_scope="sub_plan",
+                        event_type="sub_plan_started",
+                        status="running",
+                        execute_time=execute_time,
+                        device_info=kwargs,
+                        plan=sub_plan,
+                        collection_method="netmiko",
+                        details={"method_name": method_name},
+                    )
                     try:
                         logger.info(
                             f"执行Netmiko采集: {sub_plan['name']} (设备: {host_ip})"
@@ -494,8 +656,34 @@ def plan_collect_device(**kwargs):
                             process_reason = "processing_failed"
                         if process_success:
                             task_summary["successful_sub_plans"] += 1
+                            if process_result.get("coverage_issue"):
+                                task_summary["coverage_issue_sub_plans"] += 1
+                                task_summary["coverage_details"].append(
+                                    {
+                                        "plan_id": sub_plan.get("id"),
+                                        "collection_method": "netmiko",
+                                        "reason": process_result.get("reason", "coverage_issue"),
+                                    }
+                                )
                             logger.info(
                                 f"Netmiko采集完成: {sub_plan['name']} (设备: {host_ip})"
+                            )
+                            _record_execution_event(
+                                event_scope="sub_plan",
+                                event_type="sub_plan_finished",
+                                status="success",
+                                severity="warning" if process_result.get("coverage_issue") else "info",
+                                execute_time=execute_time,
+                                device_info=kwargs,
+                                plan=sub_plan,
+                                collection_method="netmiko",
+                                reason=process_result.get("reason", ""),
+                                details={
+                                    "method_name": method_name,
+                                    "duration_ms": int((time.time() - sub_plan_started_at) * 1000),
+                                    "data_count": process_result.get("data_count", 0),
+                                    "coverage_issue": bool(process_result.get("coverage_issue")),
+                                },
                             )
                         else:
                             task_summary["failed_sub_plans"] += 1
@@ -505,6 +693,22 @@ def plan_collect_device(**kwargs):
                                     "collection_method": "netmiko",
                                     "reason": process_reason,
                                 }
+                            )
+                            _record_execution_event(
+                                event_scope="sub_plan",
+                                event_type="sub_plan_finished",
+                                status="failed",
+                                severity="error",
+                                execute_time=execute_time,
+                                device_info=kwargs,
+                                plan=sub_plan,
+                                collection_method="netmiko",
+                                reason=process_reason,
+                                error=process_reason,
+                                details={
+                                    "method_name": method_name,
+                                    "duration_ms": int((time.time() - sub_plan_started_at) * 1000),
+                                },
                             )
                     except Exception as e:
                         task_summary["failed_sub_plans"] += 1
@@ -519,9 +723,37 @@ def plan_collect_device(**kwargs):
                             f"Netmiko采集异常: {sub_plan['name']} (设备: {host_ip}), {str(e)}",
                             exc_info=True,
                         )
+                        _record_execution_event(
+                            event_scope="sub_plan",
+                            event_type="sub_plan_exception",
+                            status="failed",
+                            severity="error",
+                            execute_time=execute_time,
+                            device_info=kwargs,
+                            plan=sub_plan,
+                            collection_method="netmiko",
+                            reason="collection_exception",
+                            error=str(e),
+                            details={
+                                "method_name": method_name,
+                                "duration_ms": int((time.time() - sub_plan_started_at) * 1000),
+                            },
+                        )
 
                 # 执行所有NETCONF采集（复用同一连接）
                 for sub_plan in netconf_plans:
+                    sub_plan_started_at = time.time()
+                    method_name = _get_collection_method_name(sub_plan, "netconf")
+                    _record_execution_event(
+                        event_scope="sub_plan",
+                        event_type="sub_plan_started",
+                        status="running",
+                        execute_time=execute_time,
+                        device_info=kwargs,
+                        plan=sub_plan,
+                        collection_method="netconf",
+                        details={"method_name": method_name},
+                    )
                     try:
                         logger.info(
                             f"执行NETCONF采集: {sub_plan['name']} (设备: {host_ip})"
@@ -560,8 +792,34 @@ def plan_collect_device(**kwargs):
                                 process_reason = "processing_failed"
                             if process_success:
                                 task_summary["successful_sub_plans"] += 1
+                                if process_result.get("coverage_issue"):
+                                    task_summary["coverage_issue_sub_plans"] += 1
+                                    task_summary["coverage_details"].append(
+                                        {
+                                            "plan_id": sub_plan.get("id"),
+                                            "collection_method": "netconf",
+                                            "reason": process_result.get("reason", "coverage_issue"),
+                                        }
+                                    )
                                 logger.info(
                                     f"NETCONF采集完成: {sub_plan['name']} (设备: {host_ip})"
+                                )
+                                _record_execution_event(
+                                    event_scope="sub_plan",
+                                    event_type="sub_plan_finished",
+                                    status="success",
+                                    severity="warning" if process_result.get("coverage_issue") else "info",
+                                    execute_time=execute_time,
+                                    device_info=kwargs,
+                                    plan=sub_plan,
+                                    collection_method="netconf",
+                                    reason=process_result.get("reason", ""),
+                                    details={
+                                        "method_name": method_name,
+                                        "duration_ms": int((time.time() - sub_plan_started_at) * 1000),
+                                        "data_count": process_result.get("data_count", 0),
+                                        "coverage_issue": bool(process_result.get("coverage_issue")),
+                                    },
                                 )
                             else:
                                 task_summary["failed_sub_plans"] += 1
@@ -572,6 +830,22 @@ def plan_collect_device(**kwargs):
                                         "reason": process_reason,
                                     }
                                 )
+                                _record_execution_event(
+                                    event_scope="sub_plan",
+                                    event_type="sub_plan_finished",
+                                    status="failed",
+                                    severity="error",
+                                    execute_time=execute_time,
+                                    device_info=kwargs,
+                                    plan=sub_plan,
+                                    collection_method="netconf",
+                                    reason=process_reason,
+                                    error=process_reason,
+                                    details={
+                                        "method_name": method_name,
+                                        "duration_ms": int((time.time() - sub_plan_started_at) * 1000),
+                                    },
+                                )
                         else:
                             task_summary["skipped_sub_plans"] += 1
                             task_summary["skipped_details"].append(
@@ -580,6 +854,18 @@ def plan_collect_device(**kwargs):
                                     "collection_method": "netconf",
                                     "reason": "missing_xml_template",
                                 }
+                            )
+                            _record_execution_event(
+                                event_scope="sub_plan",
+                                event_type="sub_plan_skipped",
+                                status="skipped",
+                                severity="warning",
+                                execute_time=execute_time,
+                                device_info=kwargs,
+                                plan=sub_plan,
+                                collection_method="netconf",
+                                reason="missing_xml_template",
+                                details={"method_name": method_name},
                             )
                     except Exception as e:
                         task_summary["failed_sub_plans"] += 1
@@ -594,9 +880,37 @@ def plan_collect_device(**kwargs):
                             f"NETCONF采集异常: {sub_plan['name']} (设备: {host_ip}), {str(e)}",
                             exc_info=True,
                         )
+                        _record_execution_event(
+                            event_scope="sub_plan",
+                            event_type="sub_plan_exception",
+                            status="failed",
+                            severity="error",
+                            execute_time=execute_time,
+                            device_info=kwargs,
+                            plan=sub_plan,
+                            collection_method="netconf",
+                            reason="collection_exception",
+                            error=str(e),
+                            details={
+                                "method_name": method_name,
+                                "duration_ms": int((time.time() - sub_plan_started_at) * 1000),
+                            },
+                        )
 
                 # 执行所有SNMP采集（复用同一会话）
                 for sub_plan in snmp_plans:
+                    sub_plan_started_at = time.time()
+                    method_name = _get_collection_method_name(sub_plan, "snmp")
+                    _record_execution_event(
+                        event_scope="sub_plan",
+                        event_type="sub_plan_started",
+                        status="running",
+                        execute_time=execute_time,
+                        device_info=kwargs,
+                        plan=sub_plan,
+                        collection_method="snmp",
+                        details={"method_name": method_name},
+                    )
                     try:
                         logger.info(
                             f"执行SNMP采集: {sub_plan['name']} (设备: {host_ip})"
@@ -620,8 +934,34 @@ def plan_collect_device(**kwargs):
                                 process_reason = "processing_failed"
                             if process_success:
                                 task_summary["successful_sub_plans"] += 1
+                                if process_result.get("coverage_issue"):
+                                    task_summary["coverage_issue_sub_plans"] += 1
+                                    task_summary["coverage_details"].append(
+                                        {
+                                            "plan_id": sub_plan.get("id"),
+                                            "collection_method": "snmp",
+                                            "reason": process_result.get("reason", "coverage_issue"),
+                                        }
+                                    )
                                 logger.info(
                                     f"SNMP采集完成: {sub_plan['name']} (设备: {host_ip})"
+                                )
+                                _record_execution_event(
+                                    event_scope="sub_plan",
+                                    event_type="sub_plan_finished",
+                                    status="success",
+                                    severity="warning" if process_result.get("coverage_issue") else "info",
+                                    execute_time=execute_time,
+                                    device_info=kwargs,
+                                    plan=sub_plan,
+                                    collection_method="snmp",
+                                    reason=process_result.get("reason", ""),
+                                    details={
+                                        "method_name": method_name,
+                                        "duration_ms": int((time.time() - sub_plan_started_at) * 1000),
+                                        "data_count": process_result.get("data_count", 0),
+                                        "coverage_issue": bool(process_result.get("coverage_issue")),
+                                    },
                                 )
                             else:
                                 task_summary["failed_sub_plans"] += 1
@@ -632,6 +972,22 @@ def plan_collect_device(**kwargs):
                                         "reason": process_reason,
                                     }
                                 )
+                                _record_execution_event(
+                                    event_scope="sub_plan",
+                                    event_type="sub_plan_finished",
+                                    status="failed",
+                                    severity="error",
+                                    execute_time=execute_time,
+                                    device_info=kwargs,
+                                    plan=sub_plan,
+                                    collection_method="snmp",
+                                    reason=process_reason,
+                                    error=process_reason,
+                                    details={
+                                        "method_name": method_name,
+                                        "duration_ms": int((time.time() - sub_plan_started_at) * 1000),
+                                    },
+                                )
                         else:
                             task_summary["skipped_sub_plans"] += 1
                             task_summary["skipped_details"].append(
@@ -640,6 +996,18 @@ def plan_collect_device(**kwargs):
                                     "collection_method": "snmp",
                                     "reason": "missing_snmp_oids",
                                 }
+                            )
+                            _record_execution_event(
+                                event_scope="sub_plan",
+                                event_type="sub_plan_skipped",
+                                status="skipped",
+                                severity="warning",
+                                execute_time=execute_time,
+                                device_info=kwargs,
+                                plan=sub_plan,
+                                collection_method="snmp",
+                                reason="missing_snmp_oids",
+                                details={"method_name": method_name},
                             )
                     except Exception as e:
                         task_summary["failed_sub_plans"] += 1
@@ -654,9 +1022,37 @@ def plan_collect_device(**kwargs):
                             f"SNMP采集异常: {sub_plan['name']} (设备: {host_ip}), {str(e)}",
                             exc_info=True,
                         )
+                        _record_execution_event(
+                            event_scope="sub_plan",
+                            event_type="sub_plan_exception",
+                            status="failed",
+                            severity="error",
+                            execute_time=execute_time,
+                            device_info=kwargs,
+                            plan=sub_plan,
+                            collection_method="snmp",
+                            reason="collection_exception",
+                            error=str(e),
+                            details={
+                                "method_name": method_name,
+                                "duration_ms": int((time.time() - sub_plan_started_at) * 1000),
+                            },
+                        )
 
                 # 执行所有RESTCONF采集（复用同一会话）
                 for sub_plan in restconf_plans:
+                    sub_plan_started_at = time.time()
+                    method_name = _get_collection_method_name(sub_plan, "restconf")
+                    _record_execution_event(
+                        event_scope="sub_plan",
+                        event_type="sub_plan_started",
+                        status="running",
+                        execute_time=execute_time,
+                        device_info=kwargs,
+                        plan=sub_plan,
+                        collection_method="restconf",
+                        details={"method_name": method_name},
+                    )
                     try:
                         logger.info(
                             f"执行RESTCONF采集: {sub_plan['name']} (设备: {host_ip})"
@@ -680,8 +1076,34 @@ def plan_collect_device(**kwargs):
                                 process_reason = "processing_failed"
                             if process_success:
                                 task_summary["successful_sub_plans"] += 1
+                                if process_result.get("coverage_issue"):
+                                    task_summary["coverage_issue_sub_plans"] += 1
+                                    task_summary["coverage_details"].append(
+                                        {
+                                            "plan_id": sub_plan.get("id"),
+                                            "collection_method": "restconf",
+                                            "reason": process_result.get("reason", "coverage_issue"),
+                                        }
+                                    )
                                 logger.info(
                                     f"RESTCONF采集完成: {sub_plan['name']} (设备: {host_ip})"
+                                )
+                                _record_execution_event(
+                                    event_scope="sub_plan",
+                                    event_type="sub_plan_finished",
+                                    status="success",
+                                    severity="warning" if process_result.get("coverage_issue") else "info",
+                                    execute_time=execute_time,
+                                    device_info=kwargs,
+                                    plan=sub_plan,
+                                    collection_method="restconf",
+                                    reason=process_result.get("reason", ""),
+                                    details={
+                                        "method_name": method_name,
+                                        "duration_ms": int((time.time() - sub_plan_started_at) * 1000),
+                                        "data_count": process_result.get("data_count", 0),
+                                        "coverage_issue": bool(process_result.get("coverage_issue")),
+                                    },
                                 )
                             else:
                                 task_summary["failed_sub_plans"] += 1
@@ -692,6 +1114,22 @@ def plan_collect_device(**kwargs):
                                         "reason": process_reason,
                                     }
                                 )
+                                _record_execution_event(
+                                    event_scope="sub_plan",
+                                    event_type="sub_plan_finished",
+                                    status="failed",
+                                    severity="error",
+                                    execute_time=execute_time,
+                                    device_info=kwargs,
+                                    plan=sub_plan,
+                                    collection_method="restconf",
+                                    reason=process_reason,
+                                    error=process_reason,
+                                    details={
+                                        "method_name": method_name,
+                                        "duration_ms": int((time.time() - sub_plan_started_at) * 1000),
+                                    },
+                                )
                         else:
                             task_summary["skipped_sub_plans"] += 1
                             task_summary["skipped_details"].append(
@@ -700,6 +1138,18 @@ def plan_collect_device(**kwargs):
                                     "collection_method": "restconf",
                                     "reason": "missing_restconf_endpoint",
                                 }
+                            )
+                            _record_execution_event(
+                                event_scope="sub_plan",
+                                event_type="sub_plan_skipped",
+                                status="skipped",
+                                severity="warning",
+                                execute_time=execute_time,
+                                device_info=kwargs,
+                                plan=sub_plan,
+                                collection_method="restconf",
+                                reason="missing_restconf_endpoint",
+                                details={"method_name": method_name},
                             )
                     except Exception as e:
                         task_summary["failed_sub_plans"] += 1
@@ -714,9 +1164,26 @@ def plan_collect_device(**kwargs):
                             f"RESTCONF采集异常: {sub_plan['name']} (设备: {host_ip}), {str(e)}",
                             exc_info=True,
                         )
+                        _record_execution_event(
+                            event_scope="sub_plan",
+                            event_type="sub_plan_exception",
+                            status="failed",
+                            severity="error",
+                            execute_time=execute_time,
+                            device_info=kwargs,
+                            plan=sub_plan,
+                            collection_method="restconf",
+                            reason="collection_exception",
+                            error=str(e),
+                            details={
+                                "method_name": method_name,
+                                "duration_ms": int((time.time() - sub_plan_started_at) * 1000),
+                            },
+                        )
 
                 # 执行所有Telemetry采集（复用同一通道）
                 for sub_plan in telemetry_plans:
+                    method_name = _get_collection_method_name(sub_plan, "telemetry")
                     try:
                         logger.info(
                             f"执行Telemetry采集: {sub_plan['name']} (设备: {host_ip})"
@@ -734,6 +1201,18 @@ def plan_collect_device(**kwargs):
                                 "reason": "telemetry_deferred",
                             }
                         )
+                        _record_execution_event(
+                            event_scope="sub_plan",
+                            event_type="sub_plan_skipped",
+                            status="skipped",
+                            severity="warning",
+                            execute_time=execute_time,
+                            device_info=kwargs,
+                            plan=sub_plan,
+                            collection_method="telemetry",
+                            reason="telemetry_deferred",
+                            details={"method_name": method_name},
+                        )
                     except Exception as e:
                         task_summary["failed_sub_plans"] += 1
                         task_summary["failed_details"].append(
@@ -746,6 +1225,19 @@ def plan_collect_device(**kwargs):
                         logger.error(
                             f"Telemetry采集异常: {sub_plan['name']} (设备: {host_ip}), {str(e)}",
                             exc_info=True,
+                        )
+                        _record_execution_event(
+                            event_scope="sub_plan",
+                            event_type="sub_plan_exception",
+                            status="failed",
+                            severity="error",
+                            execute_time=execute_time,
+                            device_info=kwargs,
+                            plan=sub_plan,
+                            collection_method="telemetry",
+                            reason="collection_exception",
+                            error=str(e),
+                            details={"method_name": method_name},
                         )
 
             # 连接自动关闭（通过上下文管理器）
@@ -776,8 +1268,10 @@ def plan_collect_device(**kwargs):
                         "successful_sub_plans": task_summary["successful_sub_plans"],
                         "failed_sub_plans": task_summary["failed_sub_plans"],
                         "skipped_sub_plans": task_summary["skipped_sub_plans"],
+                        "coverage_issue_sub_plans": task_summary["coverage_issue_sub_plans"],
                         "failed_details": task_summary["failed_details"][:20],
                         "skipped_details": task_summary["skipped_details"][:20],
+                        "coverage_details": task_summary["coverage_details"][:20],
                         "updated_at": datetime.now().isoformat(),
                     }
                 },
@@ -792,6 +1286,21 @@ def plan_collect_device(**kwargs):
             )
 
         logger.info(f"设备 {host_ip} 采集完成, 总计: {len(sub_plans_list)}")
+        _record_execution_event(
+            event_scope="device",
+            event_type="device_finished",
+            status=parent_task_status,
+            severity="warning" if task_summary["failed_sub_plans"] or task_summary["coverage_issue_sub_plans"] else "info",
+            execute_time=execute_time,
+            device_info=kwargs,
+            details={
+                "total_sub_plans": len(sub_plans_list),
+                "successful_sub_plans": task_summary["successful_sub_plans"],
+                "failed_sub_plans": task_summary["failed_sub_plans"],
+                "skipped_sub_plans": task_summary["skipped_sub_plans"],
+                "coverage_issue_sub_plans": task_summary["coverage_issue_sub_plans"],
+            },
+        )
 
         return {
             "host_ip": host_ip,
@@ -802,6 +1311,17 @@ def plan_collect_device(**kwargs):
         }
     except Exception as e:
         logger.error(f"设备 {host_ip} 采集任务异常: {str(e)}", exc_info=True)
+        _record_execution_event(
+            event_scope="device",
+            event_type="device_exception",
+            status="failed",
+            severity="error",
+            execute_time=execute_time,
+            device_info=kwargs,
+            reason="device_task_exception",
+            error=str(e),
+            details={"total_sub_plans": task_summary["total_sub_plans"]},
+        )
         if parent_record_created and summary_plan_id is not None:
             try:
                 COLLECTION_PLAN.update_one(
@@ -814,6 +1334,7 @@ def plan_collect_device(**kwargs):
                         "$set": {
                             "task_status": "failed",
                             "failed_sub_plans": max(task_summary["failed_sub_plans"], 1),
+                            "coverage_issue_sub_plans": task_summary["coverage_issue_sub_plans"],
                             "failed_details": (
                                 task_summary["failed_details"][:20]
                                 + [
@@ -824,6 +1345,7 @@ def plan_collect_device(**kwargs):
                                     }
                                 ]
                             )[:20],
+                            "coverage_details": task_summary["coverage_details"][:20],
                             "updated_at": datetime.now().isoformat(),
                         }
                     },
@@ -860,6 +1382,8 @@ def _process_and_save_result(
     try:
         manage_ip = device_info.get("manage_ip")
         execute_time = device_info.get("execute_time", datetime.now().isoformat())
+        method_name = _get_collection_method_name(plan, collection_method)
+        device_stub = _build_local_device_stub(device_info)
 
         # 构建 plan ORM 对象（用于 resolve_raw_data）
         from apps.device_api.models import DeviceSubCollectionPlan
@@ -883,6 +1407,16 @@ def _process_and_save_result(
                 f"数据处理失败: {manage_ip}, method={collection_method}, error={resolve_error}"
             )
             DeviceFactService.mark_discovery_failure(device_info, resolve_error)
+            save_local_collection_result(
+                plan_obj,
+                device_stub,
+                collection_method,
+                method_name,
+                raw_result,
+                [],
+                "error",
+                resolve_error,
+            )
             return {"success": False, "reason": resolve_error or "resolve_failed"}
 
         # ── Layer 3：元数据注入 ──────────────────────────────────────────
@@ -908,6 +1442,9 @@ def _process_and_save_result(
         )
 
         # ── 写入类型专属 MongoDB 集合 ─────────────────────────────────────
+        data_count = len(processed_data) if isinstance(processed_data, list) else 0
+        coverage_issue = False
+        coverage_reason = ""
         if isinstance(processed_data, list) and processed_data and storage_collection_type:
             collection_name = build_plan_collection_name(storage_collection_type)
             collection_db = COLLECTION_TYPE_MONGO_MAP.get(storage_collection_type)
@@ -929,12 +1466,27 @@ def _process_and_save_result(
                     f"保存采集数据到 MongoDB 失败: {manage_ip}, type={storage_collection_type}, {str(e)}",
                     exc_info=True,
                 )
+                save_local_collection_result(
+                    plan_obj,
+                    device_stub,
+                    collection_method,
+                    method_name,
+                    raw_result,
+                    processed_data,
+                    "error",
+                    str(e),
+                )
                 return {"success": False, "reason": str(e)}
         else:
             logger.warning(
                 f"采集结果为空或无法保存: {manage_ip}, type={storage_collection_type}, "
                 f"method={collection_method}"
             )
+            coverage_issue = True
+            if not storage_collection_type:
+                coverage_reason = "missing_storage_collection_type"
+            else:
+                coverage_reason = "empty_processed_data"
 
         DeviceFactService.update_from_processed_data(
             collection_type=storage_collection_type,
@@ -953,14 +1505,29 @@ def _process_and_save_result(
             "task_status": "finished",
             "collection_type": storage_collection_type,
             "collection_method": collection_method,
+            "method_name": method_name,
             "vendor": plan.get("summary_plan_vendor"),
             "device_type": plan.get("summary_plan_device_type"),
             "execute_time": execute_time,
+            "data_count": data_count,
+            "coverage_issue": coverage_issue,
+            "coverage_reason": coverage_reason,
+            "raw_result_preview": _truncate_preview(raw_result),
             "created_at": datetime.now().isoformat(),
             "task_errors": [],
             "log_time": time.time(),
         }
         COLLECTION_SUB_PLAN.insert_one(task_record)
+        save_local_collection_result(
+            plan_obj,
+            device_stub,
+            collection_method,
+            method_name,
+            raw_result,
+            processed_data,
+            "success",
+            coverage_reason if coverage_issue else None,
+        )
 
     except Exception as e:
         logger.error(
@@ -969,9 +1536,28 @@ def _process_and_save_result(
             exc_info=True,
         )
         DeviceFactService.mark_discovery_failure(device_info, str(e))
+        if "plan_obj" in locals():
+            try:
+                save_local_collection_result(
+                    plan_obj,
+                    device_stub,
+                    collection_method,
+                    method_name,
+                    raw_result,
+                    [],
+                    "error",
+                    str(e),
+                )
+            except Exception:
+                pass
         return {"success": False, "reason": str(e)}
 
-    return {"success": True, "reason": ""}
+    return {
+        "success": True,
+        "reason": coverage_reason,
+        "coverage_issue": coverage_issue,
+        "data_count": data_count,
+    }
 
 
 # 通用信息采集主调度任务
@@ -998,10 +1584,33 @@ def plan_collect_device_main(**kwargs):
         hosts = get_auto_device()
 
     logger.info(f"获取所有设备信息结束，获取到 {len(hosts)} 个设备信息")
+    batch_execute_time = hosts[0].get("execute_time") if hosts else ""
+    _record_execution_event(
+        event_scope="batch",
+        event_type="batch_hosts_loaded",
+        status="running",
+        execute_time=batch_execute_time,
+        details={
+            "requested_filters": device_filters,
+            "runtime_options": runtime_options,
+            "fetched_devices": len(hosts),
+        },
+    )
 
-    deduped_hosts, duplicate_count = dedupe_batch_hosts(hosts)
+    deduped_hosts, duplicate_count, duplicate_details = dedupe_batch_hosts(hosts)
     if duplicate_count:
         logger.warning("批次调度已去重重复设备绑定: duplicates=%s", duplicate_count)
+        for duplicate in duplicate_details[:100]:
+            _record_execution_event(
+                event_scope="device",
+                event_type="device_deduplicated",
+                status="skipped",
+                severity="warning",
+                execute_time=batch_execute_time,
+                device_info={"manage_ip": duplicate.get("dropped_manage_ip", "")},
+                reason="duplicate_binding_deduped",
+                details=duplicate,
+            )
 
     skipped_hosts_without_sub_plans = [
         host for host in deduped_hosts if not (host.get("sub_plans") or [])
@@ -1011,14 +1620,30 @@ def plan_collect_device_main(**kwargs):
             "批次调度跳过无可执行子方案设备: count=%s",
             len(skipped_hosts_without_sub_plans),
         )
+        for host in skipped_hosts_without_sub_plans[:100]:
+            _record_execution_event(
+                event_scope="device",
+                event_type="device_skipped",
+                status="skipped",
+                severity="warning",
+                execute_time=host.get("execute_time", batch_execute_time),
+                device_info=host,
+                reason="missing_sub_plans",
+                details={
+                    "plan_id": host.get("plan_id"),
+                    "profile_code": host.get("profile_code", ""),
+                    "binding_source": host.get("binding_source", ""),
+                },
+            )
 
     valid_hosts = [host for host in deduped_hosts if host.get("sub_plans")]
 
     # 参数初始化
     net_tower_tasks = []  # 采集任务id集合
+    dispatch_failures = []
     total_expected_subtasks = sum(len(host.get("sub_plans", [])) for host in valid_hosts)
     total_expected_interface_devices = count_expected_interface_devices(valid_hosts)
-    batch_execute_time = deduped_hosts[0].get("execute_time") if deduped_hosts else ""
+    batch_execute_time = deduped_hosts[0].get("execute_time") if deduped_hosts else batch_execute_time
 
     clear_history = should_clear_history_before_batch(runtime_options)
 
@@ -1028,22 +1653,93 @@ def plan_collect_device_main(**kwargs):
             if batch_execute_time:
                 clear_his_collect_res(execute_time=batch_execute_time)
                 logger.info("历史采集数据已按批次清空: execute_time=%s", batch_execute_time)
+                _record_execution_event(
+                    event_scope="batch",
+                    event_type="batch_history_cleared",
+                    status="success",
+                    execute_time=batch_execute_time,
+                    details={"clear_history": True},
+                )
             else:
                 logger.info("当前批次无 execute_time，跳过历史采集数据清理")
+                _record_execution_event(
+                    event_scope="batch",
+                    event_type="batch_history_clear_skipped",
+                    status="skipped",
+                    severity="warning",
+                    execute_time=batch_execute_time,
+                    reason="missing_execute_time",
+                )
         except Exception as e:
             logger.warning(f"清空历史采集数据失败: {str(e)}")
+            _record_execution_event(
+                event_scope="batch",
+                event_type="batch_history_clear_failed",
+                status="failed",
+                severity="error",
+                execute_time=batch_execute_time,
+                reason="clear_history_failed",
+                error=str(e),
+            )
             raise RuntimeError(f"清空历史采集数据失败: {str(e)}") from e
     else:
         logger.info("本批次保留历史采集数据: clear_history=False")
+        _record_execution_event(
+            event_scope="batch",
+            event_type="batch_history_retained",
+            status="skipped",
+            execute_time=batch_execute_time,
+            reason="clear_history_disabled",
+        )
 
     start_time = time.time()
+    dispatched_hosts = []
 
     # 批量下发任务
     for host in valid_hosts:
         host_ip = host.get("manage_ip")
-        task = plan_collect_device.apply_async(kwargs=host, queue=CELERY_QUEUE, retry=True)
-        net_tower_tasks.append(task)
-        logger.debug(f"已下发采集任务: {host_ip}, task_id: {task.id}")
+        try:
+            task = plan_collect_device.apply_async(kwargs=host, queue=CELERY_QUEUE, retry=True)
+            net_tower_tasks.append(task)
+            dispatched_hosts.append(host)
+            logger.debug(f"已下发采集任务: {host_ip}, task_id: {task.id}")
+            _record_execution_event(
+                event_scope="device",
+                event_type="device_dispatched",
+                status="queued",
+                execute_time=host.get("execute_time", batch_execute_time),
+                device_info=host,
+                details={
+                    "celery_task_id": task.id,
+                    "plan_id": host.get("plan_id"),
+                    "sub_plans_count": len(host.get("sub_plans", [])),
+                    "queue": CELERY_QUEUE,
+                },
+            )
+        except Exception as exc:
+            dispatch_failures.append(
+                {
+                    "manage_ip": host_ip,
+                    "plan_id": host.get("plan_id"),
+                    "error": str(exc),
+                }
+            )
+            logger.error("下发采集任务失败: device=%s error=%s", host_ip, exc, exc_info=True)
+            _record_execution_event(
+                event_scope="device",
+                event_type="device_dispatch_failed",
+                status="failed",
+                severity="error",
+                execute_time=host.get("execute_time", batch_execute_time),
+                device_info=host,
+                reason="dispatch_failed",
+                error=str(exc),
+                details={
+                    "plan_id": host.get("plan_id"),
+                    "sub_plans_count": len(host.get("sub_plans", [])),
+                    "queue": CELERY_QUEUE,
+                },
+            )
 
     logger.info("批量下发任务结束")
     total_time = (time.time() - start_time) / 60
@@ -1055,22 +1751,49 @@ def plan_collect_device_main(**kwargs):
         "scheduled": False,
         "reason": "missing_execute_time",
     }
-    if batch_execute_time:
+    if batch_execute_time and dispatched_hosts:
+        dispatched_subtasks = sum(len(host.get("sub_plans", [])) for host in dispatched_hosts)
+        dispatched_interface_devices = count_expected_interface_devices(dispatched_hosts)
         analysis_trigger = schedule_batch_network_analysis(
             execute_time=batch_execute_time,
-            expected_devices=len(valid_hosts),
-            expected_subtasks=total_expected_subtasks,
-            expected_interface_devices=total_expected_interface_devices,
+            expected_devices=len(dispatched_hosts),
+            expected_subtasks=dispatched_subtasks,
+            expected_interface_devices=dispatched_interface_devices,
             triggered_by="device_api-plan_collect_device_main",
         )
+    elif batch_execute_time:
+        analysis_trigger = {
+            "scheduled": False,
+            "reason": "no_dispatched_tasks",
+        }
+    _record_execution_event(
+        event_scope="batch",
+        event_type="batch_finished",
+        status="partial_success" if dispatch_failures else "success",
+        severity="warning" if (duplicate_count or skipped_hosts_without_sub_plans or dispatch_failures) else "info",
+        execute_time=batch_execute_time,
+        details={
+            "fetched_devices": len(hosts),
+            "deduplicated_devices": duplicate_count,
+            "valid_devices": len(valid_hosts),
+            "dispatched_devices": len(dispatched_hosts),
+            "dispatch_failed_devices": len(dispatch_failures),
+            "skipped_without_sub_plans": len(skipped_hosts_without_sub_plans),
+            "expected_subtasks_before_dispatch": total_expected_subtasks,
+            "expected_interface_devices_before_dispatch": total_expected_interface_devices,
+            "analysis_trigger": analysis_trigger,
+            "time_cost_minutes": round(total_time, 2),
+        },
+    )
 
     return {
-        "total": len(valid_hosts),
+        "total": len(dispatched_hosts),
         "tasks": len(net_tower_tasks),
         "time_cost": f"{total_time:.2f}分钟",
         "clear_history": clear_history,
         "deduplicated_devices": duplicate_count,
         "skipped_without_sub_plans": len(skipped_hosts_without_sub_plans),
+        "dispatch_failed_devices": len(dispatch_failures),
         "analysis_trigger": analysis_trigger,
     }
 

@@ -1,0 +1,22 @@
+Value Required LOCAL_INTERFACE (\S+)
+Value CHASSIS_ID (\S+)
+Value NEIGHBOR_PORT (.*)
+Value PORTDESCRIPTION (.*)
+Value NEIGHBORSYSNAME (.*)
+Value MANAGEMENT_IP (\S+)
+Value MANAGEMENT_TYPE (\S+)
+
+Start
+  ^Local\s+Interface:?\s+${LOCAL_INTERFACE}\s*$$
+  ^Local\s+Intf:?\s+${LOCAL_INTERFACE}\s*$$
+  ^Chassis\s+ID:?\s+${CHASSIS_ID}\s*$$
+  ^Chassis\s+id:?\s+${CHASSIS_ID}\s*$$
+  ^Port\s+ID:?\s+${NEIGHBOR_PORT}\s*$$
+  ^Port\s+id:?\s+${NEIGHBOR_PORT}\s*$$
+  ^Port\s+Description:?\s+${PORTDESCRIPTION}\s*$$
+  ^System\s+Name:?\s+${NEIGHBORSYSNAME}\s*$$
+  ^Management\s+Address\s+Type:?\s+${MANAGEMENT_TYPE}\s*$$
+  ^Management\s+Address:?\s+${MANAGEMENT_IP}\s*$$ -> Record
+  ^Management\s+IP:?\s+${MANAGEMENT_IP}\s*$$ -> Record
+  ^-+\s*$$ -> Record
+  ^\s*$$

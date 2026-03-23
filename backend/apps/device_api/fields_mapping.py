@@ -270,6 +270,88 @@ AGGRE_PORT_MAPPING = [
     {"label": "模型: mode", "value": "mode"},
 ]
 
+HRP_STATE_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "HA状态: ha_state", "value": "ha_state"},
+    {"label": "对端状态: peer_status", "value": "peer_status"},
+    {"label": "心跳状态: heartbeat_status", "value": "heartbeat_status"},
+    {"label": "配置主: config_master", "value": "config_master"},
+    {"label": "切换ID: switch_id", "value": "switch_id"},
+    {"label": "切换时间: switch_time", "value": "switch_time"},
+    {"label": "切换原因: switch_reason", "value": "switch_reason"},
+]
+
+ADDRESS_SET_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "虚拟系统: vsys", "value": "vsys"},
+    {"label": "名称: name", "value": "name"},
+    {"label": "描述: description", "value": "description"},
+    {"label": "对象类型: object_type", "value": "object_type"},
+    {"label": "IP条目: ip", "value": "ip"},
+    {"label": "范围条目: range", "value": "range"},
+    {"label": "排除IP: exclude_ip", "value": "exclude_ip"},
+    {"label": "排除范围: exclude_range", "value": "exclude_range"},
+    {"label": "成员对象: member", "value": "member"},
+    {"label": "解析结果: resolved", "value": "resolved"},
+]
+
+NAT_ADDRESS_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "地址池名: name", "value": "name"},
+    {"label": "虚拟系统: vsys", "value": "vsys"},
+    {"label": "地址池类型: address_type", "value": "address_type"},
+    {"label": "分段数量: section_count", "value": "section_count"},
+    {"label": "分段明细: items", "value": "items"},
+]
+
+SERVICE_SET_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "虚拟系统: vsys", "value": "vsys"},
+    {"label": "名称: name", "value": "name"},
+    {"label": "描述: description", "value": "description"},
+    {"label": "协议: protocol", "value": "protocol"},
+    {"label": "目的端口起始: dst_port_min", "value": "dst_port_min"},
+    {"label": "目的端口结束: dst_port_max", "value": "dst_port_max"},
+    {"label": "源端口起始: src_port_min", "value": "src_port_min"},
+    {"label": "源端口结束: src_port_max", "value": "src_port_max"},
+    {"label": "服务明细: items", "value": "items"},
+]
+
+SLB_INFO_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "名称: name", "value": "name"},
+    {"label": "类型: slb_type", "value": "slb_type"},
+    {"label": "虚拟IP: vip", "value": "vip"},
+    {"label": "协议: protocol", "value": "protocol"},
+    {"label": "端口: port", "value": "port"},
+    {"label": "描述: description", "value": "description"},
+    {"label": "成员明细: items", "value": "items"},
+]
+
+VRRP_INFO_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "接口: interface", "value": "interface"},
+    {"label": "VRID: vrid", "value": "vrid"},
+    {"label": "虚拟IP: virtual_ip", "value": "virtual_ip"},
+    {"label": "掩码: ipmask", "value": "ipmask"},
+    {"label": "优先级: priority", "value": "priority"},
+    {"label": "抢占模式: preempt_mode", "value": "preempt_mode"},
+    {"label": "管理状态: admin_state", "value": "admin_state"},
+    {"label": "配置状态: config_state", "value": "config_state"},
+]
+
 ZONE_MAPPING = [
     {"label": "主机IP: hostip", "value": "hostip"},
     {"label": "主机名称: hostname", "value": "hostname"},
@@ -606,6 +688,42 @@ field_mapping = {
         "value": "aggre_port",
         "icon": "aggregation-port",
         "mapping_fields": AGGRE_PORT_MAPPING,
+    },
+    "hrp_state": {
+        "label": "双机热备状态",
+        "value": "hrp_state",
+        "icon": "ha-status",
+        "mapping_fields": HRP_STATE_MAPPING,
+    },
+    "address_set": {
+        "label": "地址对象",
+        "value": "address_set",
+        "icon": "address-object",
+        "mapping_fields": ADDRESS_SET_MAPPING,
+    },
+    "nat_address": {
+        "label": "NAT地址池",
+        "value": "nat_address",
+        "icon": "nat-address",
+        "mapping_fields": NAT_ADDRESS_MAPPING,
+    },
+    "service_set": {
+        "label": "服务对象",
+        "value": "service_set",
+        "icon": "service",
+        "mapping_fields": SERVICE_SET_MAPPING,
+    },
+    "slb_info": {
+        "label": "SLB信息",
+        "value": "slb_info",
+        "icon": "slb",
+        "mapping_fields": SLB_INFO_MAPPING,
+    },
+    "vrrp_info": {
+        "label": "VRRP信息",
+        "value": "vrrp_info",
+        "icon": "vrrp",
+        "mapping_fields": VRRP_INFO_MAPPING,
     },
     "zone": {
         "label": "安全域",
