@@ -14,7 +14,11 @@ from apps.device_api.contract import (
     build_plan_collection_name,
     normalize_collection_type_for_storage,
 )
-from apps.device_api.fields_mapping import DEFAULT_COLLECTION_TYPES, get_collection_output_fields
+from apps.device_api.fields_mapping import (
+    DEFAULT_COLLECTION_TYPES,
+    RAW_NETMIKO_COLLECTION_TYPES,
+    get_collection_output_fields,
+)
 from apps.device_api.models import (
     DeviceCollectionPlans,
     DeviceSubCollectionPlan,
@@ -68,7 +72,11 @@ class DeviceCollectionService:
         }
 
     @staticmethod
-    def _build_sub_plan_name(summary_plan_name: str, collection_type: str) -> str:
+    def _build_sub_plan_name(
+        summary_plan_name: str,
+        collection_type: str,
+        summary_plan_id: Optional[int] = None,
+    ) -> str:
         """为默认子方案生成全局唯一且长度受控的名称。"""
         name_max_len = DeviceSubCollectionPlan._meta.get_field("name").max_length or 50
         suffix = f"-{collection_type}"
@@ -85,6 +93,22 @@ class DeviceCollectionService:
             candidate = f"{truncated_parent}-{index}{suffix}"[:name_max_len]
             if not DeviceSubCollectionPlan.objects.filter(name=candidate).exists():
                 return candidate
+
+        if summary_plan_id is not None:
+            reserve = len(f"-{summary_plan_id}")
+            truncated_parent = parent_part[: max(1, max_parent_len - reserve)]
+            candidate = f"{truncated_parent}-{summary_plan_id}{suffix}"[:name_max_len]
+            if not DeviceSubCollectionPlan.objects.filter(name=candidate).exists():
+                return candidate
+
+        unique_token = int(time.time() * 1000)
+        for _ in range(10):
+            reserve = len(f"-{unique_token}")
+            truncated_parent = parent_part[: max(1, max_parent_len - reserve)]
+            candidate = f"{truncated_parent}-{unique_token}{suffix}"[:name_max_len]
+            if not DeviceSubCollectionPlan.objects.filter(name=candidate).exists():
+                return candidate
+            unique_token += 1
 
         raise ValueError(f"无法为 collection_type={collection_type} 生成唯一子方案名称")
 
@@ -103,7 +127,9 @@ class DeviceCollectionService:
             DeviceSubCollectionPlan.objects.create(
                 summary_plan=summary_plan,
                 name=DeviceCollectionService._build_sub_plan_name(
-                    summary_plan.name, collection_type
+                    summary_plan.name,
+                    collection_type,
+                    getattr(summary_plan, "id", None),
                 ),
                 collection_type=collection_type,
                 description="",
@@ -141,7 +167,9 @@ class DeviceCollectionService:
                 sub_plan = DeviceSubCollectionPlan.objects.create(
                     summary_plan=summary_plan,
                     name=DeviceCollectionService._build_sub_plan_name(
-                        summary_plan.name, collection_type
+                        summary_plan.name,
+                        collection_type,
+                        getattr(summary_plan, "id", None),
                     ),
                     collection_type=collection_type,
                     description="",
@@ -332,11 +360,13 @@ class DeviceCollectionService:
                         logger.info(f"执行Netmiko采集: {manage_ip}")
                         command = plan.get('netmiko_method', '')
                         textfsm_template = plan.get('textfsm_template')
+                        collection_type = plan.get('collection_type', '')
+                        use_textfsm = collection_type not in RAW_NETMIKO_COLLECTION_TYPES
                         
                         result = conn_mgr.execute_netmiko_command(
                             command=command,
-                            use_textfsm=True,
-                            textfsm_template=textfsm_template
+                            use_textfsm=use_textfsm,
+                            textfsm_template=textfsm_template if use_textfsm else None
                         )
                         
                         # 处理采集结果
@@ -371,8 +401,9 @@ class DeviceCollectionService:
                             elif collect_method == 'get_config':
                                 result = conn_mgr.execute_netconf_get_config(xml_template)
                             else:
-                                # RPC方法
-                                result = conn_mgr.execute_netconf_get(xml_template)
+                                raise ValueError(
+                                    f"不支持的 NETCONF collect_method: {collect_method}，仅允许 get/get_config"
+                                )
                             
                             # 处理采集结果
                             processed_result = DeviceCollectionService._process_collection_result(
@@ -662,9 +693,14 @@ class DeviceCollectionService:
                 collection_db.insert_many(processed_data)
 
                 try:
-                    from apps.device_api.platform_profiles import DeviceFactService
+                    from apps.device_api.platform_profiles import DeviceFactService, PlatformProfileService
 
                     DeviceFactService.update_from_processed_data(
+                        collection_type=storage_collection_type,
+                        device_info=device_info,
+                        processed_data=processed_data,
+                    )
+                    PlatformProfileService.update_capability_facts(
                         collection_type=storage_collection_type,
                         device_info=device_info,
                         processed_data=processed_data,
@@ -763,7 +799,6 @@ class DeviceCollectionService:
             summary_plan_id = plan.get('summary_plan')
             execute_time = device_info.get("execute_time", datetime.now().isoformat())
 
-            # 直接插入新的父任务记录
             task_record = {
                 "summary_plan_id": summary_plan_id,
                 "summary_plan_name": plan.get('summary_plan_name', ''),
@@ -785,14 +820,33 @@ class DeviceCollectionService:
                 "log_time": time.time(),  # 用于排序和查询
             }
 
-            # 主采集方案记录
-            COLLECTION_PLAN.insert_one(task_record)
-            logger.info(f"主采集方案记录已创建: device_ip={device_ip}, summary_plan_id={summary_plan_id}, "
-                      f"sub_plans_count={sub_plans_count}, execute_time={execute_time}")
+            result = COLLECTION_PLAN.coll.update_one(
+                filter={
+                    "summary_plan_id": summary_plan_id,
+                    "device_ip": device_ip,
+                    "execute_time": execute_time,
+                },
+                update={
+                    "$set": task_record,
+                    "$setOnInsert": {
+                        "created_at": datetime.now().isoformat(),
+                    },
+                },
+                upsert=True,
+            )
+            action = "inserted" if getattr(result, "upserted_id", None) is not None else "updated"
+            logger.info(
+                "主采集方案记录已写入: device_ip=%s summary_plan_id=%s sub_plans_count=%s execute_time=%s action=%s",
+                device_ip,
+                summary_plan_id,
+                sub_plans_count,
+                execute_time,
+                action,
+            )
 
             return {
                 "success": True,
-                "action": "inserted"
+                "action": action,
             }
 
         except Exception as e:
@@ -806,7 +860,10 @@ class DeviceCollectionService:
     # ── 以下方法迁移自 services.py（本地直连采集路径）──────────────────────────
 
     @staticmethod
-    def _build_device_info_for_local(device) -> Dict[str, Any]:
+    def _build_device_info_for_local(
+        device,
+        connection_policy: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """从设备 ORM 对象构建 DeviceConnectionManager 所需的 device_info 字典（本地执行用）"""
         device_info = {
             "manage_ip": device.manage_ip,
@@ -826,6 +883,7 @@ class DeviceCollectionService:
             "telemetry_config": {},
             "ssh": None,
             "netconf": None,
+            "connection_policy": dict(connection_policy or {}),
         }
         if hasattr(device, "ssh_account") and device.ssh_account:
             device_info["ssh"] = {
@@ -912,14 +970,21 @@ class DeviceCollectionService:
             logger.debug("从 prompt 回填设备名称跳过: %s", e)
 
     @staticmethod
-    def execute_both_collection_local(plan, device) -> Dict[str, Any]:
+    def execute_both_collection_local(
+        plan,
+        device,
+        connection_policy: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """使用程序自身连接执行已启用的采集方式（不走南向驱动）。"""
         try:
             logger.info(
                 f"开始执行本地采集: 方案={plan.name}, 设备={device.manage_ip}"
             )
             plan_payload = DeviceCollectionService._build_plan_payload_for_local(plan)
-            device_info = DeviceCollectionService._build_device_info_for_local(device)
+            device_info = DeviceCollectionService._build_device_info_for_local(
+                device,
+                connection_policy=connection_policy,
+            )
             result = DeviceCollectionService.collect_with_connection_manager(plan_payload, device_info)
             method_results = result.get("results", {})
             response = {
@@ -1123,12 +1188,17 @@ class DeviceCollectionService:
                 "queue_strategy": "fifo",
             }
             collect_method = xml_templates.collect_method
-            if collect_method in ("get", "rpc"):
+            if collect_method == "get":
                 netpalm_info["args"][collect_method] = True
                 url_prefix = "/getconfig/ncclient/get"
-            else:
+            elif collect_method == "get_config":
                 netpalm_info["args"]["source"] = "running"
                 url_prefix = "/getconfig/ncclient"
+            else:
+                return {
+                    "success": False,
+                    "error": f"不支持的 NETCONF collect_method: {collect_method}，仅允许 get/get_config",
+                }
             return south_driver_runner.get_device_config(
                 url_prefix=url_prefix, host_info=host_info, netpalm_info=netpalm_info
             )

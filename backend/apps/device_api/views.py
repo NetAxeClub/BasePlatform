@@ -451,6 +451,7 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
         """按父方案聚合执行所有启用子方案的验证，并按 collection_type 分组返回结果。"""
         summary_plan = self.get_object()
         device_ip = (request.data.get('device_ip') or '').strip()
+        serial_num = (request.data.get('serial_num') or '').strip()
         south_driver = request.data.get('south_driver')
         use_local = request.data.get('use_local', False)
 
@@ -462,10 +463,10 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
                     'data': None,
                 })
 
-            if not device_ip:
+            if not device_ip and not serial_num:
                 return JsonResponse({
                     'code': 400,
-                    'message': '缺少必要参数: device_ip',
+                    'message': '缺少必要参数: serial_num 或 device_ip',
                     'data': None,
                 })
 
@@ -495,7 +496,7 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
             for plan in enabled_plans:
                 try:
                     is_valid, error_msg, device = DeviceSubCollectionPlanViewSet.validate_execution_params(
-                        plan, device_ip, 'both', use_local=use_local
+                        plan, device_ip, 'both', use_local=use_local, serial_num=serial_num
                     )
                     if not is_valid:
                         results.append(
@@ -566,6 +567,7 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
                     'summary_plan_id': summary_plan.id,
                     'summary_plan_name': summary_plan.name,
                     'device_ip': device_ip,
+                    'serial_num': serial_num,
                     'total_plans': total_plans,
                     'success_count': success_count,
                     'failed_count': failed_count,
@@ -586,6 +588,7 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
         """执行当前汇总采集方案下所有的子采集方案"""
         summary_plan = self.get_object()
         device_ip = request.data.get('device_ip')
+        serial_num = (request.data.get('serial_num') or '').strip()
         south_driver = request.data.get('south_driver')
         use_local = request.data.get('use_local', False)
 
@@ -598,19 +601,20 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
                 })
 
             # 验证设备IP参数
-            if not device_ip:
+            if not device_ip and not serial_num:
                 return JsonResponse({
                     "code": 400,
-                    "message": "缺少必要参数: device_ip"
+                    "message": "缺少必要参数: serial_num 或 device_ip"
                 })
 
-            # 获取设备信息
-            try:
-                device = NetworkDevice.objects.get(manage_ip=device_ip)
-            except NetworkDevice.DoesNotExist:
+            ok, message, device = DeviceSubCollectionPlanViewSet._resolve_execution_device(
+                device_ip=device_ip,
+                serial_num=serial_num,
+            )
+            if not ok:
                 return JsonResponse({
                     "code": 400,
-                    "message": f"设备 {device_ip} 不存在"
+                    "message": message
                 })
 
             # 获取所有启用的采集方案
@@ -715,6 +719,7 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
                     "summary_plan_id": summary_plan.id,
                     "summary_plan_name": summary_plan.name,
                     "device_ip": device_ip,
+                    "serial_num": serial_num,
                     "total_plans": total_plans,
                     "success_count": success_count,
                     "failed_count": failed_count,
@@ -757,6 +762,33 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
     ordering_fields = ['id', 'name', 'summary_plan__vendor', 'summary_plan__device_type', 'created_at', 'updated_at']
     ordering = ['-created_at']
     pagination_class = LargeResultsSetPagination
+
+    @staticmethod
+    def _resolve_execution_device(device_ip="", serial_num=""):
+        serial_num = (serial_num or "").strip()
+        device_ip = (device_ip or "").strip()
+
+        queryset = NetworkDevice.objects.select_related('idc')
+        if serial_num:
+            queryset = queryset.filter(serial_num=serial_num)
+            if device_ip:
+                queryset = queryset.filter(manage_ip=device_ip)
+        elif device_ip:
+            queryset = queryset.filter(manage_ip=device_ip)
+        else:
+            return False, "缺少必要参数: serial_num 或 device_ip", None
+
+        if not queryset.exists():
+            if serial_num and device_ip:
+                return False, f"设备 serial_num={serial_num} / manage_ip={device_ip} 不存在", None
+            if serial_num:
+                return False, f"设备 {serial_num} 不存在", None
+            return False, f"设备 {device_ip} 不存在", None
+
+        if not serial_num and queryset.count() > 1:
+            return False, f"设备 {device_ip} 命中多条资产，请补充 serial_num", None
+
+        return True, "验证通过", queryset.first()
     
     def get_serializer_class(self):
         """根据操作类型返回不同的序列化器"""
@@ -844,7 +876,7 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
             })
 
     @staticmethod
-    def validate_execution_params(plan, device_ip, collection_type, use_local=False):
+    def validate_execution_params(plan, device_ip, collection_type, use_local=False, serial_num=None):
         """验证采集执行参数
         
         Args:
@@ -856,16 +888,12 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
             tuple: (is_valid, error_message, device)
         """
         try:
-            # 1. 验证设备IP
-            if not device_ip:
-                return False, "缺少必要参数: device_ip", None
-            
-            # 2. 查询设备信息
-            devices = NetworkDevice.objects.select_related('idc').filter(manage_ip=device_ip)
-            
-            if not devices.exists():
-                return False, f"设备 {device_ip} 不存在", None
-            device = devices.first()
+            ok, message, device = DeviceSubCollectionPlanViewSet._resolve_execution_device(
+                device_ip=device_ip,
+                serial_num=serial_num,
+            )
+            if not ok:
+                return False, message, None
 
             # 3. 根据采集类型进行特定验证
             if collection_type == 'netmiko':
@@ -940,13 +968,14 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
         """执行子采集方案 NETCONF 和 NETMIKO。支持两种方式：南向驱动 / 本机直连。"""
         plan = self.get_object()
         device_ip = request.data.get('device_ip')           # 设备IP
+        serial_num = (request.data.get('serial_num') or '').strip()
         south_driver = request.data.get('south_driver')      # 南向驱动（可选）
         use_local = request.data.get('use_local', False)     # 是否使用本机直连（不走南向驱动）
 
         try:
             # 使用统一的参数验证方法
             is_valid, error_msg, device = self.validate_execution_params(
-                plan, device_ip, 'both', use_local=use_local
+                plan, device_ip, 'both', use_local=use_local, serial_num=serial_num
             )
             if not is_valid:
                 return JsonResponse({

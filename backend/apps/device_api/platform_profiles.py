@@ -5,14 +5,17 @@ from typing import Dict, List, Optional
 from django.utils import timezone
 
 from apps.asset.models import Category, Model, NetworkDevice, Vendor
-from apps.device_api.fields_mapping import DEFAULT_COLLECTION_TYPES
+from apps.device_api.contract import build_plan_collection_name
+from apps.device_api.fields_mapping import DEFAULT_COLLECTION_TYPES, RAW_NETMIKO_COLLECTION_TYPES
 from apps.device_api.models import (
     DeviceCollectionPlans,
     DeviceDiscoveryState,
+    NetconfXMLTemplate,
     PlatformProfile,
     PlansToDevice,
 )
 from apps.device_api.services_new import DeviceCollectionService
+from utils.db.mongo_ops import MongoOps
 
 
 TEMPLATE_BASE_DIR = (
@@ -50,6 +53,7 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
         "version_patterns": [r".*"],
         "preferred_methods": {
             "device_identity": ["netmiko"],
+            "netconf_capability": ["netconf"],
             "arp": ["netconf", "netmiko"],
             "mac": ["netconf", "netmiko"],
             "lldp": ["netconf", "netmiko"],
@@ -65,6 +69,7 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
         },
         "supported_collection_types": _supported_types(
             "device_identity",
+            "netconf_capability",
             "arp",
             "mac",
             "lldp",
@@ -82,6 +87,160 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
         "default_plan_name": "default-huawei-s-switch",
     },
     {
+        "code": "Huawei-CE68xx-netconf",
+        "vendor_alias": "Huawei",
+        "category": "switch",
+        "series_patterns": [r"^CE68\d+"],
+        "os_family": "VRP",
+        "version_patterns": [r".*"],
+        "preferred_methods": {
+            "device_identity": ["netconf"],
+            "board_status": ["netconf"],
+            "stack_status": ["netconf"],
+            "netconf_capability": ["netconf"],
+            "arp": ["netconf"],
+            "mac": ["netconf"],
+            "mac_bd": ["netconf"],
+            "mac_vxlan": ["netconf"],
+            "mac_vxlan_control": ["netconf"],
+            "lldp": ["netconf"],
+            "interface_brief": ["netconf"],
+            "ip_interface": ["netconf"],
+            "aggre_port": ["netconf"],
+        },
+        "fallback_methods": {},
+        "supported_collection_types": _supported_types(
+            "device_identity",
+            "board_status",
+            "stack_status",
+            "netconf_capability",
+            "arp",
+            "mac",
+            "mac_bd",
+            "mac_vxlan",
+            "mac_vxlan_control",
+            "lldp",
+            "interface_brief",
+            "ip_interface",
+            "aggre_port",
+        ),
+        "default_plan_name": "default-huawei-ce68-netconf-switch",
+    },
+    {
+        "code": "Huawei-CE98xx",
+        "vendor_alias": "Huawei",
+        "category": "switch",
+        "series_patterns": [r"^CE98\d+"],
+        "os_family": "VRP",
+        "version_patterns": [r".*"],
+        "preferred_methods": {
+            "device_identity": ["netmiko"],
+            "netconf_capability": ["netconf"],
+            "arp": ["netconf", "netmiko"],
+            "mac": ["netconf", "netmiko"],
+            "mac_bd": ["netconf"],
+            "mac_vxlan": ["netconf"],
+            "mac_vxlan_control": ["netconf"],
+            "lldp": ["netconf", "netmiko"],
+            "interface_brief": ["netconf", "netmiko"],
+            "ip_interface": ["netconf", "netmiko"],
+            "route_table": ["netconf", "netmiko"],
+            "bgp_neighbors": ["netconf", "netmiko"],
+            "bgp_summary": ["netconf", "netmiko"],
+        },
+        "fallback_methods": {
+            "arp": ["netmiko"],
+            "mac": ["netmiko"],
+            "lldp": ["netmiko"],
+            "interface_brief": ["netmiko"],
+            "ip_interface": ["netmiko"],
+            "route_table": ["netmiko"],
+            "bgp_neighbors": ["netmiko"],
+            "bgp_summary": ["netmiko"],
+        },
+        "supported_collection_types": _supported_types(
+            "device_identity",
+            "netconf_capability",
+            "arp",
+            "mac",
+            "mac_bd",
+            "mac_vxlan",
+            "mac_vxlan_control",
+            "lldp",
+            "interface_brief",
+            "ip_interface",
+            "aggre_port",
+            "fan_status",
+            "power_status",
+            "temperature_status",
+            "ospf_neighbors",
+            "ospf_interfaces",
+            "isis_neighbors",
+            "board_status",
+            "route_table",
+            "bgp_neighbors",
+            "bgp_summary",
+        ),
+        "default_plan_name": "default-huawei-ce98xx-netconf-switch",
+    },
+    {
+        "code": "Huawei-CE88xx",
+        "vendor_alias": "Huawei",
+        "category": "switch",
+        "series_patterns": [r"^CE88\d+"],
+        "os_family": "VRP",
+        "version_patterns": [r".*"],
+        "preferred_methods": {
+            "device_identity": ["netmiko"],
+            "netconf_capability": ["netconf"],
+            "arp": ["netconf", "netmiko"],
+            "mac": ["netconf", "netmiko"],
+            "mac_bd": ["netconf"],
+            "mac_vxlan": ["netconf"],
+            "mac_vxlan_control": ["netconf"],
+            "lldp": ["netconf", "netmiko"],
+            "interface_brief": ["netconf", "netmiko"],
+            "ip_interface": ["netconf", "netmiko"],
+            "route_table": ["netconf", "netmiko"],
+            "bgp_neighbors": ["netconf", "netmiko"],
+            "bgp_summary": ["netconf", "netmiko"],
+        },
+        "fallback_methods": {
+            "arp": ["netmiko"],
+            "mac": ["netmiko"],
+            "lldp": ["netmiko"],
+            "interface_brief": ["netmiko"],
+            "ip_interface": ["netmiko"],
+            "route_table": ["netmiko"],
+            "bgp_neighbors": ["netmiko"],
+            "bgp_summary": ["netmiko"],
+        },
+        "supported_collection_types": _supported_types(
+            "device_identity",
+            "netconf_capability",
+            "arp",
+            "mac",
+            "mac_bd",
+            "mac_vxlan",
+            "mac_vxlan_control",
+            "lldp",
+            "interface_brief",
+            "ip_interface",
+            "aggre_port",
+            "fan_status",
+            "power_status",
+            "temperature_status",
+            "ospf_neighbors",
+            "ospf_interfaces",
+            "isis_neighbors",
+            "board_status",
+            "route_table",
+            "bgp_neighbors",
+            "bgp_summary",
+        ),
+        "default_plan_name": "default-huawei-ce88xx-netconf-switch",
+    },
+    {
         "code": "Huawei-CE",
         "vendor_alias": "Huawei",
         "category": "switch",
@@ -92,6 +251,9 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
             "device_identity": ["netmiko"],
             "arp": ["netconf", "netmiko"],
             "mac": ["netconf", "netmiko"],
+            "mac_bd": ["netconf"],
+            "mac_vxlan": ["netconf"],
+            "mac_vxlan_control": ["netconf"],
             "lldp": ["netconf", "netmiko"],
             "interface_brief": ["netconf", "netmiko"],
             "ip_interface": ["netconf", "netmiko"],
@@ -113,6 +275,9 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
             "device_identity",
             "arp",
             "mac",
+            "mac_bd",
+            "mac_vxlan",
+            "mac_vxlan_control",
             "lldp",
             "interface_brief",
             "ip_interface",
@@ -128,7 +293,7 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
             "bgp_neighbors",
             "bgp_summary",
         ),
-        "default_plan_name": "default-huawei-ce-switch",
+        "default_plan_name": "default-huawei-ce-netconf-switch",
     },
     {
         "code": "Huawei-router-cli",
@@ -212,6 +377,34 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
         "default_plan_name": "default-huawei-yunshan-switch",
     },
     {
+        "code": "H3C-S98xx-cli",
+        "vendor_alias": "H3C",
+        "category": "switch",
+        "series_patterns": [r"^S98\d+", r"^S982", r"^S985", r"^S988"],
+        "os_family": "Comware",
+        "version_patterns": [r"9\.", r"Release 9", r"Version 9\."],
+        "preferred_methods": {
+            "device_identity": ["netmiko"],
+            "netconf_capability": ["netconf"],
+            "cli_output_capability": ["netmiko"],
+            "board_status": ["netmiko"],
+            "arp": ["netmiko"],
+            "lldp": ["netmiko"],
+            "ip_interface": ["netmiko"],
+        },
+        "fallback_methods": {},
+        "supported_collection_types": _supported_types(
+            "device_identity",
+            "netconf_capability",
+            "cli_output_capability",
+            "board_status",
+            "arp",
+            "lldp",
+            "ip_interface",
+        ),
+        "default_plan_name": "default-h3c-s98xx-switch",
+    },
+    {
         "code": "H3C-legacy-cli",
         "vendor_alias": "H3C",
         "category": "switch",
@@ -220,6 +413,10 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
         "version_patterns": [r"5\.", r"Comware 5"],
         "preferred_methods": {
             "device_identity": ["netmiko"],
+            "netconf_capability": ["netconf"],
+            "cli_output_capability": ["netmiko"],
+            "board_status": ["netmiko"],
+            "irf_status": ["netmiko"],
             "arp": ["netmiko"],
             "mac": ["netmiko"],
             "lldp": ["netmiko"],
@@ -229,19 +426,16 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
         "fallback_methods": {},
         "supported_collection_types": _supported_types(
             "device_identity",
+            "netconf_capability",
+            "cli_output_capability",
+            "board_status",
+            "irf_status",
             "arp",
             "mac",
             "lldp",
             "interface_brief",
             "ip_interface",
             "aggre_port",
-            "fan_status",
-            "power_status",
-            "clock_status",
-            "ospf_neighbors",
-            "ospf_interfaces",
-            "isis_neighbors",
-            "board_status",
         ),
         "default_plan_name": "default-h3c-legacy-switch",
     },
@@ -254,6 +448,8 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
         "version_patterns": [r"7\.", r"Comware 7"],
         "preferred_methods": {
             "device_identity": ["netmiko"],
+            "netconf_capability": ["netconf"],
+            "cli_output_capability": ["netmiko"],
             "arp": ["netconf", "netmiko"],
             "mac": ["netconf", "netmiko"],
             "lldp": ["netconf", "netmiko"],
@@ -275,6 +471,8 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
         },
         "supported_collection_types": _supported_types(
             "device_identity",
+            "netconf_capability",
+            "cli_output_capability",
             "arp",
             "mac",
             "lldp",
@@ -499,6 +697,58 @@ DEVICE_IDENTITY_NETMIKO_COMMANDS = {
     "centec": "show version",
 }
 
+PROFILE_PLAN_METHOD_DEFAULTS: Dict[str, str] = {
+    "Huawei-CE68xx-netconf": DeviceCollectionPlans.COLLECTION_METHOD_NETCONF,
+    "Huawei-CE98xx": DeviceCollectionPlans.COLLECTION_METHOD_NETCONF,
+    "Huawei-CE88xx": DeviceCollectionPlans.COLLECTION_METHOD_NETCONF,
+    "Huawei-CE": DeviceCollectionPlans.COLLECTION_METHOD_NETCONF,
+    "H3C-S98xx-cli": DeviceCollectionPlans.COLLECTION_METHOD_BOTH,
+    "H3C-legacy-cli": DeviceCollectionPlans.COLLECTION_METHOD_BOTH,
+    "H3C-modern-netconf": DeviceCollectionPlans.COLLECTION_METHOD_BOTH,
+}
+
+PROFILE_LEGACY_PLAN_NAME_ALIASES: Dict[str, List[str]] = {
+    "Huawei-CE": ["default-huawei-ce-switch"],
+    "Huawei-CE88xx": ["default-huawei-ce88xx-switch"],
+    "Huawei-CE98xx": ["default-huawei-ce98xx-switch"],
+}
+
+PROFILE_CAPABILITY_REQUIREMENTS: Dict[str, Dict[str, object]] = {
+    "Huawei-CE68xx-netconf": {
+        "preferred_successful_probes": ["netconf_capability"],
+        "required_protocols": {"netconf": True},
+    },
+    "Huawei-CE88xx": {
+        "preferred_successful_probes": ["netconf_capability"],
+        "required_protocols": {"netconf": True},
+    },
+    "H3C-modern-netconf": {
+        "preferred_successful_probes": ["netconf_capability"],
+        "required_protocols": {"netconf": True},
+        "preferred_probe_flags": {
+            "netconf_capability": ["has_l2vpn_schema"],
+        },
+    },
+    "H3C-S98xx-cli": {
+        "preferred_successful_probes": ["netconf_capability", "cli_output_capability"],
+        "required_protocols": {"ssh": True},
+        "preferred_probe_flags": {
+            "netconf_capability": ["has_telemetry_schema"],
+            "cli_output_capability": ["command_unrecognized"],
+        },
+        "preferred_probe_min_values": {
+            "netconf_capability": {"schema_count": 200},
+        },
+    },
+    "H3C-legacy-cli": {
+        "preferred_successful_probes": ["cli_output_capability"],
+        "required_protocols": {"ssh": True},
+        "preferred_probe_flags": {
+            "cli_output_capability": ["supports_irf_cli", "has_irf_members"],
+        },
+    },
+}
+
 PROFILE_NETMIKO_SUB_PLAN_DEFAULTS: Dict[str, Dict[str, Dict[str, str]]] = {
     "Huawei-S": {
         "device_identity": {
@@ -553,6 +803,140 @@ PROFILE_NETMIKO_SUB_PLAN_DEFAULTS: Dict[str, Dict[str, Dict[str, str]]] = {
         "board_status": {
             "command": "display device manufacture-info",
             "template": "huawei_vrp_display_device_manufacture-info.textfsm",
+        },
+    },
+    "Huawei-CE98xx": {
+        "device_identity": {
+            "command": "display version",
+            "template": "huawei_vrp_display_version.textfsm",
+        },
+        "arp": {"command": "display arp", "template": "huawei_vrp_display_arp.textfsm"},
+        "mac": {
+            "command": "display mac-address",
+            "template": "huawei_vrp_display_mac-address.textfsm",
+        },
+        "lldp": {
+            "command": "display lldp neighbor",
+            "template": "huawei_vrp_display_lldp_neighbor.textfsm",
+        },
+        "interface_brief": {
+            "command": "display interface brief",
+            "template": "huawei_vrp_display_interface_brief.textfsm",
+        },
+        "ip_interface": {
+            "command": "display interface",
+            "template": "huawei_vrp_display_interface.textfsm",
+        },
+        "aggre_port": {
+            "command": "display eth-trunk",
+            "template": "huawei_vrp_display_eth-trunk.textfsm",
+        },
+        "fan_status": {
+            "command": "display fan",
+            "template": "huawei_vrp_display_fan.textfsm",
+        },
+        "power_status": {
+            "command": "display device power",
+            "template": "huawei_ce_display_device_power.textfsm",
+        },
+        "temperature_status": {
+            "command": "display temperature",
+            "template": "huawei_vrp_display_temperature.textfsm",
+        },
+        "ospf_neighbors": {
+            "command": "display ospf peer brief",
+            "template": "huawei_vrp_display_ospf_peer_brief.textfsm",
+        },
+        "ospf_interfaces": {
+            "command": "display ospf interface",
+            "template": "huawei_vrp_display_ospf_interface.textfsm",
+        },
+        "isis_neighbors": {
+            "command": "display isis peer verbose",
+            "template": "huawei_vrp_display_isis_peer_verbose.textfsm",
+        },
+        "board_status": {
+            "command": "display device manufacture-info",
+            "template": "huawei_vrp_display_device_manufacture-info.textfsm",
+        },
+        "route_table": {
+            "command": "display ip routing-table",
+            "template": "huawei_vrp_display_ip_routing-table.textfsm",
+        },
+        "bgp_neighbors": {
+            "command": "display bgp peer verbose",
+            "template": "huawei_vrp_display_bgp_peer_verbose.textfsm",
+        },
+        "bgp_summary": {
+            "command": "display bgp peer",
+            "template": "huawei_vrp_display_bgp_peer.textfsm",
+        },
+    },
+    "Huawei-CE88xx": {
+        "device_identity": {
+            "command": "display version",
+            "template": "huawei_vrp_display_version.textfsm",
+        },
+        "arp": {"command": "display arp", "template": "huawei_vrp_display_arp.textfsm"},
+        "mac": {
+            "command": "display mac-address",
+            "template": "huawei_vrp_display_mac-address.textfsm",
+        },
+        "lldp": {
+            "command": "display lldp neighbor",
+            "template": "huawei_vrp_display_lldp_neighbor.textfsm",
+        },
+        "interface_brief": {
+            "command": "display interface brief",
+            "template": "huawei_vrp_display_interface_brief.textfsm",
+        },
+        "ip_interface": {
+            "command": "display interface",
+            "template": "huawei_vrp_display_interface.textfsm",
+        },
+        "aggre_port": {
+            "command": "display eth-trunk",
+            "template": "huawei_vrp_display_eth-trunk.textfsm",
+        },
+        "fan_status": {
+            "command": "display fan",
+            "template": "huawei_vrp_display_fan.textfsm",
+        },
+        "power_status": {
+            "command": "display device power",
+            "template": "huawei_ce_display_device_power.textfsm",
+        },
+        "temperature_status": {
+            "command": "display temperature",
+            "template": "huawei_vrp_display_temperature.textfsm",
+        },
+        "ospf_neighbors": {
+            "command": "display ospf peer brief",
+            "template": "huawei_vrp_display_ospf_peer_brief.textfsm",
+        },
+        "ospf_interfaces": {
+            "command": "display ospf interface",
+            "template": "huawei_vrp_display_ospf_interface.textfsm",
+        },
+        "isis_neighbors": {
+            "command": "display isis peer verbose",
+            "template": "huawei_vrp_display_isis_peer_verbose.textfsm",
+        },
+        "board_status": {
+            "command": "display device manufacture-info",
+            "template": "huawei_vrp_display_device_manufacture-info.textfsm",
+        },
+        "route_table": {
+            "command": "display ip routing-table",
+            "template": "huawei_vrp_display_ip_routing-table.textfsm",
+        },
+        "bgp_neighbors": {
+            "command": "display bgp peer verbose",
+            "template": "huawei_vrp_display_bgp_peer_verbose.textfsm",
+        },
+        "bgp_summary": {
+            "command": "display bgp peer",
+            "template": "huawei_vrp_display_bgp_peer.textfsm",
         },
     },
     "Huawei-CE": {
@@ -648,6 +1032,9 @@ PROFILE_NETMIKO_SUB_PLAN_DEFAULTS: Dict[str, Dict[str, Dict[str, str]]] = {
     },
     "H3C-legacy-cli": {
         "device_identity": {"command": "display version", "template": "hp_comware_display_version.textfsm"},
+        "cli_output_capability": {"command": "display irf", "template": ""},
+        "board_status": {"command": "display device manuinfo", "template": "hp_comware_display_device_manuinfo.textfsm"},
+        "irf_status": {"command": "display irf", "template": "hp_comware_display_irf.textfsm"},
         "arp": {"command": "display arp", "template": "hp_comware_display_arp.textfsm"},
         "mac": {"command": "display mac-address", "template": "hp_comware_display_mac-address.textfsm"},
         "lldp": {
@@ -660,16 +1047,21 @@ PROFILE_NETMIKO_SUB_PLAN_DEFAULTS: Dict[str, Dict[str, Dict[str, str]]] = {
             "command": "display link-aggregation verbose",
             "template": "hp_comware_display_link-aggregation_verbose.textfsm",
         },
-        "fan_status": {"command": "display fan", "template": "hp_comware_display_fan.textfsm"},
-        "power_status": {"command": "display power", "template": "hp_comware_display_power.textfsm"},
-        "clock_status": {"command": "display clock", "template": "hp_comware_display_clock.textfsm"},
-        "ospf_neighbors": {"command": "display ospf peer verbose", "template": "hp_comware_display_ospf_peer.textfsm"},
-        "ospf_interfaces": {"command": "display ospf interface", "template": "hp_comware_display_ospf_interface.textfsm"},
-        "isis_neighbors": {"command": "display isis peer verbose", "template": "hp_comware_display_isis_peer_verbose.textfsm"},
+    },
+    "H3C-S98xx-cli": {
+        "device_identity": {"command": "display version", "template": "hp_comware_display_version.textfsm"},
+        "cli_output_capability": {"command": "display irf", "template": ""},
         "board_status": {"command": "display device manuinfo", "template": "hp_comware_display_device_manuinfo.textfsm"},
+        "arp": {"command": "display arp", "template": "hp_comware_display_arp.textfsm"},
+        "lldp": {
+            "command": "display lldp neighbor-information verbose",
+            "template": "hp_comware_display_lldp_neighbor-information_verbose.textfsm",
+        },
+        "ip_interface": {"command": "display ip interface", "template": "hp_comware_display_ip_interface.textfsm"},
     },
     "H3C-modern-netconf": {
         "device_identity": {"command": "display version", "template": "hp_comware_display_version.textfsm"},
+        "cli_output_capability": {"command": "display irf", "template": ""},
         "arp": {"command": "display arp", "template": "hp_comware_display_arp.textfsm"},
         "mac": {"command": "display mac-address", "template": "hp_comware_display_mac-address.textfsm"},
         "lldp": {
@@ -742,9 +1134,412 @@ PROFILE_NETMIKO_SUB_PLAN_DEFAULTS: Dict[str, Dict[str, Dict[str, str]]] = {
     },
 }
 
+PROFILE_NETCONF_XML_TEMPLATE_DEFAULTS: Dict[str, Dict[str, Dict[str, str]]] = {
+    "H3C-modern-netconf": {
+        "netconf_capability": {
+            "collect_method": "get",
+            "legacy_method": "collection_yang_info",
+            "xml_template": """
+<netconf-state xmlns="urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring">
+  <schemas/>
+</netconf-state>
+""".strip(),
+            "description": "H3CNetconf.collection_yang_info",
+        },
+    },
+    "Huawei-CE68xx-netconf": {
+        "device_identity": {
+            "collect_method": "get",
+            "legacy_method": "collection_system_info",
+            "xml_template": """
+<system xmlns="http://www.huawei.com/netconf/vrp/huawei-system">
+  <systemInfo>
+  </systemInfo>
+</system>
+""".strip(),
+            "description": "HuaweiCollection.collection_system_info",
+        },
+        "board_status": {
+            "collect_method": "get",
+            "legacy_method": "collection_moduleinfo",
+            "xml_template": """
+<devm xmlns="http://www.huawei.com/netconf/vrp/huawei-devm">
+  <rUModuleInfos>
+    <rUModuleInfo>
+      <entClass>mpuModule</entClass>
+      <position></position>
+      <entSerialNo></entSerialNo>
+      <entSerialNum></entSerialNum>
+    </rUModuleInfo>
+  </rUModuleInfos>
+</devm>
+""".strip(),
+            "description": "HuaweiCollection.collection_moduleinfo",
+        },
+        "stack_status": {
+            "collect_method": "get",
+            "legacy_method": "collection_stack",
+            "xml_template": """
+<stack xmlns="http://www.huawei.com/netconf/vrp/huawei-stack">
+  <stackMemberInfos>
+    <stackMemberInfo>
+      <memberID></memberID>
+      <nextMemberID></nextMemberID>
+      <deviceType></deviceType>
+      <sysoid></sysoid>
+      <role></role>
+      <mac></mac>
+      <priority></priority>
+      <nextPriority></nextPriority>
+      <domain></domain>
+      <nextDomain></nextDomain>
+      <stackPort1State></stackPort1State>
+    </stackMemberInfo>
+  </stackMemberInfos>
+</stack>
+""".strip(),
+            "description": "HuaweiCollection.collection_stack",
+        },
+        "vxlan_capability": {
+            "collect_method": "get_config",
+            "legacy_method": "collection_vxlan_capability",
+            "xml_template": """
+<filter type="subtree">
+<feil3bd xmlns="http://www.huawei.com/netconf/vrp/huawei-feil3bd">
+</feil3bd>
+<vxlan xmlns="http://www.huawei.com/netconf/vrp/huawei-vxlan">
+</vxlan>
+<bgp xmlns="http://www.huawei.com/netconf/vrp/huawei-bgp">
+  <bgpcomm>
+    <bgpVrfs>
+      <bgpVrf>
+        <vrfName></vrfName>
+        <bgpVrfAFs>
+          <bgpVrfAF>
+            <afType></afType>
+          </bgpVrfAF>
+        </bgpVrfAFs>
+      </bgpVrf>
+    </bgpVrfs>
+  </bgpcomm>
+</bgp>
+</filter>
+""".strip(),
+            "description": "Huawei CE VXLAN/BD/EVPN capability probe via get_config",
+        },
+        "arp": {
+            "collect_method": "get",
+            "legacy_method": "collection_arp_list",
+            "xml_template": """
+<arp xmlns="http://www.huawei.com/netconf/vrp/huawei-arp">
+  <arpTables>
+    <arpTable>
+      <vrfName></vrfName>
+      <ipAddr></ipAddr>
+      <macAddr></macAddr>
+      <styleType></styleType>
+      <ifName></ifName>
+      <expireTime></expireTime>
+      <peVid></peVid>
+      <ceVid></ceVid>
+      <pvc></pvc>
+      <peerAddr></peerAddr>
+    </arpTable>
+  </arpTables>
+</arp>
+""".strip(),
+            "description": "HuaweiCollection.collection_arp_list",
+        },
+        "mac": {
+            "collect_method": "get",
+            "legacy_method": "collection_mac_table",
+            "xml_template": """
+<mac xmlns="http://www.huawei.com/netconf/vrp/huawei-mac">
+  <vlanFdbDynamics>
+    <vlanFdbDynamic>
+      <slotId></slotId>
+      <vlanId></vlanId>
+      <macAddress></macAddress>
+      <macType></macType>
+      <outIfName></outIfName>
+    </vlanFdbDynamic>
+  </vlanFdbDynamics>
+  <vlanFdbs>
+    <vlanFdb>
+      <slotId></slotId>
+      <vlanId></vlanId>
+      <macAddress></macAddress>
+      <macType></macType>
+      <outIfName></outIfName>
+    </vlanFdb>
+  </vlanFdbs>
+</mac>
+""".strip(),
+            "description": "HuaweiCollection.collection_mac_table",
+        },
+        "mac_bd": {
+            "collect_method": "get",
+            "legacy_method": "collection_mac_bd",
+            "xml_template": """
+<mac xmlns="http://www.huawei.com/netconf/vrp/huawei-mac">
+  <bdFdbs>
+    <bdFdb>
+      <slotId></slotId>
+      <macAddress></macAddress>
+      <macType></macType>
+      <outIfName></outIfName>
+      <bdId></bdId>
+      <vid></vid>
+    </bdFdb>
+  </bdFdbs>
+</mac>
+""".strip(),
+            "description": "HuaweiCollection.collection_mac_bd",
+        },
+        "mac_vxlan": {
+            "collect_method": "get",
+            "legacy_method": "collection_mac_vxlan",
+            "xml_template": """
+<mac xmlns="http://www.huawei.com/netconf/vrp/huawei-mac">
+  <vxlanFdbs>
+    <vxlanFdb>
+      <slotId></slotId>
+      <macAddress></macAddress>
+      <bdId></bdId>
+      <macType></macType>
+      <sourceIP></sourceIP>
+      <peerIP></peerIP>
+      <vnId></vnId>
+      <tunnelType></tunnelType>
+    </vxlanFdb>
+  </vxlanFdbs>
+</mac>
+""".strip(),
+            "description": "HuaweiCollection.collection_mac_vxlan",
+        },
+        "mac_vxlan_control": {
+            "collect_method": "get",
+            "legacy_method": "collection_mac_vxlan_control",
+            "xml_template": """
+<mac xmlns="http://www.huawei.com/netconf/vrp/huawei-mac">
+  <vxlanControls>
+    <vxlanControl>
+      <slotId></slotId>
+      <macAddress></macAddress>
+      <bdId></bdId>
+      <macType></macType>
+      <tunnelType></tunnelType>
+      <sourceIpv6></sourceIpv6>
+      <peerIpv6></peerIpv6>
+      <vnId></vnId>
+    </vxlanControl>
+  </vxlanControls>
+</mac>
+""".strip(),
+            "description": "HuaweiCollection.collection_mac_vxlan_control",
+        },
+        "lldp": {
+            "collect_method": "get",
+            "legacy_method": "collection_lldp_ip",
+            "xml_template": """
+<lldp xmlns="http://www.huawei.com/netconf/vrp/huawei-lldp">
+  <lldpInterfaces>
+    <lldpInterface>
+      <ifName></ifName>
+      <lldpNeighbors>
+        <lldpNeighbor>
+          <nbIndex></nbIndex>
+          <managementAddresss>
+            <managementAddress>
+              <manAddrSubtype></manAddrSubtype>
+              <manAddr></manAddr>
+              <manAddrLen></manAddrLen>
+            </managementAddress>
+          </managementAddresss>
+          <chassisIdSubtype></chassisIdSubtype>
+          <chassisId></chassisId>
+          <portIdSubtype></portIdSubtype>
+          <portId></portId>
+          <portDescription></portDescription>
+          <systemName></systemName>
+        </lldpNeighbor>
+      </lldpNeighbors>
+    </lldpInterface>
+  </lldpInterfaces>
+</lldp>
+""".strip(),
+            "description": "HuaweiCollection.collection_lldp_ip",
+        },
+        "interface_brief": {
+            "collect_method": "get",
+            "legacy_method": "collection_intf_ipv4v6",
+            "xml_template": """
+<ifm xmlns="http://www.huawei.com/netconf/vrp/huawei-ifm">
+  <interfaces>
+    <interface>
+      <ifName></ifName>
+      <ipv6Oper>
+        <ipv6Addrs>
+          <ipv6Addr>
+            <ifIp6Addr></ifIp6Addr>
+            <addrType6></addrType6>
+          </ipv6Addr>
+        </ipv6Addrs>
+      </ipv6Oper>
+      <ipv4Oper>
+        <ipv4Addrs>
+          <ipv4Addr>
+            <ifIpAddr/>
+            <subnetMask/>
+            <addrType/>
+          </ipv4Addr>
+        </ipv4Addrs>
+      </ipv4Oper>
+      <ifDynamicInfo>
+        <ifOperStatus></ifOperStatus>
+        <ifPhyStatus></ifPhyStatus>
+        <ifLinkStatus></ifLinkStatus>
+        <ifOpertMTU></ifOpertMTU>
+        <ifOperSpeed></ifOperSpeed>
+        <ifV4State></ifV4State>
+        <ifV6State></ifV6State>
+        <ifCtrlFlapDamp></ifCtrlFlapDamp>
+        <ifOperMac></ifOperMac>
+      </ifDynamicInfo>
+    </interface>
+  </interfaces>
+</ifm>
+""".strip(),
+            "description": "HuaweiCollection.collection_intf_ipv4v6 shared with ip_interface",
+        },
+        "ip_interface": {
+            "collect_method": "get",
+            "legacy_method": "collection_intf_ipv4v6",
+            "xml_template": """
+<ifm xmlns="http://www.huawei.com/netconf/vrp/huawei-ifm">
+  <interfaces>
+    <interface>
+      <ifName></ifName>
+      <ipv6Oper>
+        <ipv6Addrs>
+          <ipv6Addr>
+            <ifIp6Addr></ifIp6Addr>
+            <addrType6></addrType6>
+          </ipv6Addr>
+        </ipv6Addrs>
+      </ipv6Oper>
+      <ipv4Oper>
+        <ipv4Addrs>
+          <ipv4Addr>
+            <ifIpAddr/>
+            <subnetMask/>
+            <addrType/>
+          </ipv4Addr>
+        </ipv4Addrs>
+      </ipv4Oper>
+      <ifDynamicInfo>
+        <ifOperStatus></ifOperStatus>
+        <ifPhyStatus></ifPhyStatus>
+        <ifLinkStatus></ifLinkStatus>
+        <ifOpertMTU></ifOpertMTU>
+        <ifOperSpeed></ifOperSpeed>
+        <ifV4State></ifV4State>
+        <ifV6State></ifV6State>
+        <ifCtrlFlapDamp></ifCtrlFlapDamp>
+        <ifOperMac></ifOperMac>
+      </ifDynamicInfo>
+    </interface>
+  </interfaces>
+</ifm>
+""".strip(),
+            "description": "HuaweiCollection.collection_intf_ipv4v6 shared with interface_brief",
+        },
+        "aggre_port": {
+            "collect_method": "get",
+            "legacy_method": "collection_trunk_lacp",
+            "xml_template": """
+<ifmtrunk xmlns="http://www.huawei.com/netconf/vrp/huawei-ifmtrunk">
+  <TrunkIfs>
+    <TrunkIf>
+      <ifName></ifName>
+      <TrunkMemberIfs>
+        <TrunkMemberIf>
+          <memberIfName></memberIfName>
+          <weight></weight>
+          <memberIfState></memberIfState>
+        </TrunkMemberIf>
+      </TrunkMemberIfs>
+    </TrunkIf>
+  </TrunkIfs>
+</ifmtrunk>
+""".strip(),
+            "description": "HuaweiCollection.collection_trunk_lacp; placeholder for collection_aggregation",
+        },
+    }
+}
+
+for _h3c_cli_cap_profile_code in ("H3C-S98xx-cli", "H3C-legacy-cli"):
+    PROFILE_NETCONF_XML_TEMPLATE_DEFAULTS[_h3c_cli_cap_profile_code] = {
+        "netconf_capability": dict(
+            PROFILE_NETCONF_XML_TEMPLATE_DEFAULTS["H3C-modern-netconf"]["netconf_capability"]
+        )
+    }
+
+for _huawei_netconf_profile_code in ("Huawei-CE98xx", "Huawei-CE88xx", "Huawei-CE"):
+    PROFILE_NETCONF_XML_TEMPLATE_DEFAULTS[_huawei_netconf_profile_code] = {
+        key: dict(value)
+        for key, value in PROFILE_NETCONF_XML_TEMPLATE_DEFAULTS["Huawei-CE68xx-netconf"].items()
+    }
+
+for _huawei_vxlan_no_bd_profile_code in ("Huawei-CE98xx", "Huawei-CE"):
+    PROFILE_NETCONF_XML_TEMPLATE_DEFAULTS[_huawei_vxlan_no_bd_profile_code]["vxlan_capability"] = {
+        "collect_method": "get_config",
+        "legacy_method": "collection_vxlan_capability",
+        "xml_template": """
+<filter type="subtree">
+<vxlan xmlns="http://www.huawei.com/netconf/vrp/huawei-vxlan">
+</vxlan>
+<bgp xmlns="http://www.huawei.com/netconf/vrp/huawei-bgp">
+  <bgpcomm>
+    <bgpVrfs>
+      <bgpVrf>
+        <vrfName></vrfName>
+        <bgpVrfAFs>
+          <bgpVrfAF>
+            <afType></afType>
+          </bgpVrfAF>
+        </bgpVrfAFs>
+      </bgpVrf>
+    </bgpVrfs>
+  </bgpcomm>
+</bgp>
+</filter>
+""".strip(),
+        "description": "Huawei CE VXLAN/EVPN capability probe via get_config (no feil3bd support)",
+    }
+
 
 class PlatformProfileService:
     _template_placeholder_cache: Dict[str, bool] = {}
+    _capability_collection_cache: Dict[str, MongoOps] = {}
+
+    @classmethod
+    def _retire_stale_auto_bindings(
+        cls,
+        device: NetworkDevice,
+        target_plan: DeviceCollectionPlans,
+    ) -> int:
+        queryset = PlansToDevice.objects.filter(
+            binding_source=PlansToDevice.BINDING_SOURCE_AUTO,
+            is_active=True,
+        ).exclude(plan=target_plan)
+
+        if getattr(device, "serial_num", ""):
+            queryset = queryset.filter(device_serial_num=device.serial_num)
+        else:
+            queryset = queryset.filter(manage_ip=device.manage_ip)
+
+        return queryset.update(is_active=False)
 
     @staticmethod
     def template_exists(template_name: str) -> bool:
@@ -773,9 +1568,10 @@ class PlatformProfileService:
 
     @staticmethod
     def resolve_plan_collection_method(profile: PlatformProfile) -> str:
-        # 默认模板方案只走 CLI/Netmiko 兜底。
-        # 是否启用双栈或纯 NETCONF 由用户在方案层显式决定，不从画像自动放大。
-        return DeviceCollectionPlans.COLLECTION_METHOD_NETMIKO
+        return PROFILE_PLAN_METHOD_DEFAULTS.get(
+            profile.code,
+            DeviceCollectionPlans.COLLECTION_METHOD_NETMIKO,
+        )
 
     @staticmethod
     def ensure_builtin_profiles() -> List[PlatformProfile]:
@@ -821,6 +1617,235 @@ class PlatformProfileService:
         text = (value or "").strip()
         return DEVICE_CATEGORY_ALIASES.get(text.lower(), text.lower())
 
+    @classmethod
+    def _get_capability_collection(cls, collection_type: str) -> MongoOps:
+        if collection_type not in cls._capability_collection_cache:
+            cls._capability_collection_cache[collection_type] = MongoOps(
+                db="Automation",
+                coll=build_plan_collection_name(collection_type),
+            )
+        return cls._capability_collection_cache[collection_type]
+
+    @classmethod
+    def load_device_capability_facts(cls, device: NetworkDevice) -> Dict[str, object]:
+        state = None
+        if getattr(device, "serial_num", ""):
+            state = DeviceDiscoveryState.objects.filter(device_serial_num=device.serial_num).first()
+        if state is None and getattr(device, "manage_ip", ""):
+            state = DeviceDiscoveryState.objects.filter(manage_ip=device.manage_ip).first()
+
+        if state and isinstance(getattr(state, "capability_facts", None), dict) and state.capability_facts:
+            return state.capability_facts
+
+        protocol_facts = {
+            "netconf": bool(getattr(device, "netconf_account_id", None) or getattr(device, "netconf_account", None)),
+            "ssh": bool(getattr(device, "ssh_account_id", None) or getattr(device, "ssh_account", None)),
+        }
+        probes: Dict[str, Dict[str, object]] = {}
+
+        try:
+            vxlan_row = (
+                cls._get_capability_collection("vxlan_capability")
+                .coll.find_one(
+                    {"hostip": getattr(device, "manage_ip", "")},
+                    sort=[("execute_time", -1)],
+                )
+            ) or {}
+        except Exception:
+            vxlan_row = {}
+
+        if vxlan_row:
+            probes["vxlan_capability"] = {
+                "ran_success": True,
+                "has_bd": bool(vxlan_row.get("has_bd")),
+                "has_vxlan_vni": bool(vxlan_row.get("has_vxlan_vni")),
+                "has_nve": bool(vxlan_row.get("has_nve")),
+                "has_evpn_bgp": bool(vxlan_row.get("has_evpn_bgp")),
+                "evidence": list(vxlan_row.get("evidence") or []),
+                "vrfs": list(vxlan_row.get("vrfs") or []),
+                "execute_time": vxlan_row.get("execute_time", ""),
+            }
+
+        try:
+            netconf_row = (
+                cls._get_capability_collection("netconf_capability")
+                .coll.find_one(
+                    {"hostip": getattr(device, "manage_ip", "")},
+                    sort=[("execute_time", -1)],
+                )
+            ) or {}
+        except Exception:
+            netconf_row = {}
+
+        if netconf_row:
+            probes["netconf_capability"] = {
+                "ran_success": True,
+                "schema_count": int(netconf_row.get("schema_count") or 0),
+                "openconfig_schema_count": int(netconf_row.get("openconfig_schema_count") or 0),
+                "has_bgp_schema": bool(netconf_row.get("has_bgp_schema")),
+                "has_l2vpn_schema": bool(netconf_row.get("has_l2vpn_schema")),
+                "has_ifmgr_schema": bool(netconf_row.get("has_ifmgr_schema")),
+                "has_telemetry_schema": bool(netconf_row.get("has_telemetry_schema")),
+                "schema_samples": list(netconf_row.get("schema_samples") or []),
+                "execute_time": netconf_row.get("execute_time", ""),
+            }
+
+        try:
+            cli_row = (
+                cls._get_capability_collection("cli_output_capability")
+                .coll.find_one(
+                    {"hostip": getattr(device, "manage_ip", "")},
+                    sort=[("execute_time", -1)],
+                )
+            ) or {}
+        except Exception:
+            cli_row = {}
+
+        if cli_row:
+            probes["cli_output_capability"] = {
+                "ran_success": True,
+                "supports_irf_cli": bool(cli_row.get("supports_irf_cli")),
+                "command_unrecognized": bool(cli_row.get("command_unrecognized")),
+                "has_irf_members": bool(cli_row.get("has_irf_members")),
+                "evidence": list(cli_row.get("evidence") or []),
+                "execute_time": cli_row.get("execute_time", ""),
+            }
+
+        facts = {
+            "protocols": protocol_facts,
+            "probes": probes,
+        }
+        cls.update_capability_facts(
+            device_info={
+                "manage_ip": getattr(device, "manage_ip", ""),
+                "serial_num": getattr(device, "serial_num", ""),
+                "vendor__alias": getattr(getattr(device, "vendor", None), "alias", ""),
+            },
+            capability_facts=facts,
+            resolve_profile=False,
+        )
+        return facts
+
+    @classmethod
+    def _normalize_capability_record(cls, record: Dict[str, object]) -> Dict[str, object]:
+        normalized = {}
+        for key, value in (record or {}).items():
+            if key in {"_id"}:
+                continue
+            if hasattr(value, "isoformat"):
+                normalized[key] = value.isoformat()
+            else:
+                normalized[key] = value
+        return normalized
+
+    @classmethod
+    def update_capability_facts(
+        cls,
+        device_info: Dict[str, object],
+        collection_type: str = "",
+        processed_data: Optional[List[Dict[str, object]]] = None,
+        capability_facts: Optional[Dict[str, object]] = None,
+        resolve_profile: bool = True,
+    ) -> None:
+        manage_ip = str(device_info.get("manage_ip") or "")
+        serial_num = str(device_info.get("serial_num") or "")
+        device = None
+        if serial_num:
+            device = NetworkDevice.objects.filter(serial_num=serial_num).first()
+        if device is None and manage_ip:
+            device = NetworkDevice.objects.filter(manage_ip=manage_ip).first()
+        if device is None:
+            return
+
+        if capability_facts is None:
+            if collection_type not in {"vxlan_capability", "netconf_capability", "cli_output_capability"}:
+                return
+            record = cls._normalize_capability_record((processed_data or [{}])[0] or {})
+            capability_facts = {
+                "protocols": {
+                    "netconf": bool(getattr(device, "netconf_account_id", None) or getattr(device, "netconf_account", None)),
+                    "ssh": bool(getattr(device, "ssh_account_id", None) or getattr(device, "ssh_account", None)),
+                },
+                "probes": {
+                    collection_type: {
+                        "ran_success": True,
+                        **record,
+                    }
+                },
+            }
+        else:
+            capability_facts = dict(capability_facts or {})
+
+        existing_state = None
+        if device.serial_num:
+            existing_state = DeviceDiscoveryState.objects.filter(device_serial_num=device.serial_num).first()
+
+        profile_code = (
+            getattr(existing_state, "profile_code", "")
+            or str(device_info.get("platform_profile_code") or "")
+        )
+        if not profile_code and resolve_profile:
+            profile = cls.match_profile_for_device(device)
+            profile_code = profile.code if profile else ""
+
+        state_defaults = {
+            "manage_ip": device.manage_ip,
+            "profile_code": profile_code,
+            "capability_facts": capability_facts,
+            "last_discovered_at": timezone.now(),
+            "last_discovery_status": "success",
+            "last_discovery_error": "",
+        }
+        if device.serial_num:
+            DeviceDiscoveryState.objects.update_or_create(
+                device_serial_num=device.serial_num,
+                defaults=state_defaults,
+            )
+
+    @classmethod
+    def _score_profile_by_capabilities(
+        cls,
+        profile: PlatformProfile,
+        capability_facts: Dict[str, object],
+    ) -> tuple:
+        requirements = PROFILE_CAPABILITY_REQUIREMENTS.get(profile.code, {})
+        protocol_facts = (capability_facts or {}).get("protocols", {}) or {}
+        probes = (capability_facts or {}).get("probes", {}) or {}
+        required_protocols = requirements.get("required_protocols", {}) or {}
+        preferred_probes = requirements.get("preferred_successful_probes", []) or []
+        preferred_probe_flags = requirements.get("preferred_probe_flags", {}) or {}
+        preferred_probe_min_values = requirements.get("preferred_probe_min_values", {}) or {}
+        protocol_match_count = sum(
+            1 for key, required in required_protocols.items()
+            if bool(protocol_facts.get(key)) == bool(required)
+        )
+        successful_probe_count = 0
+        feature_hit_count = 0
+        threshold_hit_count = 0
+
+        for probe_name in preferred_probes:
+            probe_payload = probes.get(probe_name, {}) or {}
+            if probe_payload.get("ran_success"):
+                successful_probe_count += 1
+                feature_hit_count += sum(
+                    1
+                    for key in preferred_probe_flags.get(probe_name, [])
+                    if probe_payload.get(key)
+                )
+                threshold_hit_count += sum(
+                    1
+                    for key, min_value in preferred_probe_min_values.get(probe_name, {}).items()
+                    if float(probe_payload.get(key) or 0) >= float(min_value)
+                )
+
+        return (
+            protocol_match_count,
+            1 if successful_probe_count else 0,
+            successful_probe_count,
+            feature_hit_count,
+            threshold_hit_count,
+        )
+
     @staticmethod
     def _match_patterns(value: str, patterns: List[str]) -> bool:
         if not patterns:
@@ -840,30 +1865,41 @@ class PlatformProfileService:
         soft_version = cls._string_value(getattr(device, "soft_version", ""))
         device_name = cls._string_value(getattr(device, "name", ""))
         haystack = " ".join(filter(None, [model_name, device_name]))
-
-        for profile in profiles:
+        capability_facts = cls.load_device_capability_facts(device)
+        candidates = []
+        for index, profile in enumerate(profiles):
             if profile.vendor_alias != vendor_alias:
                 continue
             if profile.category and cls.normalize_device_category(profile.category) != category_name:
                 continue
-            if not cls._match_patterns(haystack, profile.series_patterns):
-                continue
-            if not cls._match_patterns(soft_version, profile.version_patterns):
-                continue
-            return profile
+            series_match = cls._match_patterns(haystack, profile.series_patterns)
+            version_match = cls._match_patterns(soft_version, profile.version_patterns)
+            capability_score = cls._score_profile_by_capabilities(profile, capability_facts)
+            score = (
+                capability_score[0],
+                1 if series_match and version_match else 0,
+                1 if series_match else 0,
+                1 if version_match else 0,
+                capability_score[1],
+                capability_score[2],
+                capability_score[3],
+                capability_score[4],
+                -index,
+            )
+            candidates.append((score, profile))
 
-        for profile in profiles:
-            if profile.vendor_alias == vendor_alias and (
-                not profile.category or cls.normalize_device_category(profile.category) == category_name
-            ):
-                return profile
-        return None
+        if not candidates:
+            return None
+
+        candidates.sort(key=lambda item: item[0], reverse=True)
+        return candidates[0][1]
 
     @classmethod
     def ensure_default_plan_for_profile(
         cls, profile: PlatformProfile
     ) -> DeviceCollectionPlans:
         expected_collection_method = cls.resolve_plan_collection_method(profile)
+        cls._adopt_legacy_default_plan_alias(profile)
         plan, _ = DeviceCollectionPlans.objects.get_or_create(
             name=profile.default_plan_name,
             defaults={
@@ -906,7 +1942,54 @@ class PlatformProfileService:
 
         DeviceCollectionService.ensure_default_sub_plans(plan)
         cls.apply_profile_defaults(plan, profile)
+        cls._retire_legacy_default_plan_aliases(profile, plan)
         return plan
+
+    @classmethod
+    def _adopt_legacy_default_plan_alias(cls, profile: PlatformProfile) -> Optional[DeviceCollectionPlans]:
+        alias_names = PROFILE_LEGACY_PLAN_NAME_ALIASES.get(profile.code, [])
+        if not alias_names:
+            return None
+
+        if DeviceCollectionPlans.objects.filter(name=profile.default_plan_name).exists():
+            return None
+
+        alias_plan = (
+            DeviceCollectionPlans.objects.filter(name__in=alias_names)
+            .order_by("id")
+            .first()
+        )
+        if alias_plan is None:
+            return None
+
+        alias_plan.name = profile.default_plan_name
+        alias_plan.save(update_fields=["name", "updated_at"])
+        return alias_plan
+
+    @classmethod
+    def _retire_legacy_default_plan_aliases(
+        cls, profile: PlatformProfile, active_plan: DeviceCollectionPlans
+    ) -> None:
+        alias_names = PROFILE_LEGACY_PLAN_NAME_ALIASES.get(profile.code, [])
+        if not alias_names:
+            return
+
+        alias_plans = DeviceCollectionPlans.objects.filter(name__in=alias_names).exclude(
+            id=getattr(active_plan, "id", None)
+        )
+        for alias_plan in alias_plans:
+            if PlansToDevice.objects.filter(plan=alias_plan, is_active=True).exists():
+                continue
+
+            updated_fields = []
+            if alias_plan.is_active:
+                alias_plan.is_active = False
+                updated_fields.append("is_active")
+            if alias_plan.is_default:
+                alias_plan.is_default = False
+                updated_fields.append("is_default")
+            if updated_fields:
+                alias_plan.save(update_fields=updated_fields + ["updated_at"])
 
     @staticmethod
     def audit_plan_readiness(plan: DeviceCollectionPlans) -> List[Dict[str, str]]:
@@ -948,6 +2031,8 @@ class PlatformProfileService:
                 )
             if getattr(sub_plan, "netmiko_enabled", False):
                 template_name = getattr(sub_plan, "textfsm_template", "")
+                if sub_plan.collection_type in RAW_NETMIKO_COLLECTION_TYPES:
+                    template_name = template_name or "__raw_netmiko__"
                 if not template_name:
                     blockers.append(
                         {
@@ -1163,6 +2248,11 @@ class PlatformProfileService:
         profile_defaults = PROFILE_NETMIKO_SUB_PLAN_DEFAULTS.get(profile.code, {})
         return profile_defaults.get(collection_type, {})
 
+    @staticmethod
+    def _get_netconf_defaults(profile: PlatformProfile, collection_type: str) -> Dict[str, str]:
+        profile_defaults = PROFILE_NETCONF_XML_TEMPLATE_DEFAULTS.get(profile.code, {})
+        return profile_defaults.get(collection_type, {})
+
     @classmethod
     def apply_profile_defaults(
         cls, plan: DeviceCollectionPlans, profile: PlatformProfile
@@ -1174,10 +2264,15 @@ class PlatformProfileService:
             DeviceCollectionPlans.COLLECTION_METHOD_NETMIKO,
             DeviceCollectionPlans.COLLECTION_METHOD_BOTH,
         }
+        plan_allows_netconf = plan_method in {
+            DeviceCollectionPlans.COLLECTION_METHOD_NETCONF,
+            DeviceCollectionPlans.COLLECTION_METHOD_BOTH,
+        }
         for sub_plan in plan.collect_plans.all():
             preferred = (profile.preferred_methods or {}).get(sub_plan.collection_type, [])
             supported = sub_plan.collection_type in (profile.supported_collection_types or [])
             cli_defaults = cls._get_cli_defaults(profile, sub_plan.collection_type)
+            netconf_defaults = cls._get_netconf_defaults(profile, sub_plan.collection_type)
             updated_fields = []
             profile_summary = (
                 f"profile={profile.code}; supported={supported}; "
@@ -1216,8 +2311,49 @@ class PlatformProfileService:
                 sub_plan.netmiko_enabled = desired_netmiko_enabled
                 updated_fields.append("netmiko_enabled")
 
+            desired_netconf_enabled = (
+                supported
+                and "netconf" in preferred
+                and bool(netconf_defaults.get("xml_template"))
+            )
+            if sub_plan.collection_type not in enabled_collection_types or not plan_allows_netconf:
+                desired_netconf_enabled = False
+
+            if sub_plan.netconf_enabled != desired_netconf_enabled:
+                sub_plan.netconf_enabled = desired_netconf_enabled
+                updated_fields.append("netconf_enabled")
+
+            legacy_method = netconf_defaults.get("legacy_method", "")
+            if legacy_method and sub_plan.netconf_path != legacy_method:
+                sub_plan.netconf_path = legacy_method
+                updated_fields.append("netconf_path")
+
             if updated_fields:
                 sub_plan.save(update_fields=updated_fields + ["updated_at"])
+
+            if desired_netconf_enabled and netconf_defaults:
+                collect_method = netconf_defaults.get("collect_method", "get")
+                xml_template = netconf_defaults.get("xml_template", "")
+                description = netconf_defaults.get("description", "")
+                if xml_template:
+                    template_obj = sub_plan.xml_templates.filter(collect_method=collect_method).first()
+                    if template_obj is None:
+                        NetconfXMLTemplate.objects.create(
+                            collect_method=collect_method,
+                            xml_template=xml_template,
+                            description=description,
+                            collection_plan=sub_plan,
+                        )
+                    else:
+                        template_updates = []
+                        if template_obj.xml_template != xml_template:
+                            template_obj.xml_template = xml_template
+                            template_updates.append("xml_template")
+                        if template_obj.description != description:
+                            template_obj.description = description
+                            template_updates.append("description")
+                        if template_updates:
+                            template_obj.save(update_fields=template_updates + ["updated_at"])
 
     @classmethod
     def auto_bind_devices(
@@ -1227,6 +2363,7 @@ class PlatformProfileService:
         created = 0
         updated = 0
         skipped = 0
+        retired = 0
         results = []
 
         for device in devices:
@@ -1278,6 +2415,14 @@ class PlatformProfileService:
                     skipped += 1
                     status = "skipped"
 
+            retired_count = 0
+            if binding_source == PlansToDevice.BINDING_SOURCE_AUTO:
+                retired_count = cls._retire_stale_auto_bindings(
+                    device=device,
+                    target_plan=plan,
+                )
+                retired += retired_count
+
             results.append(
                 {
                     "manage_ip": device.manage_ip,
@@ -1286,6 +2431,7 @@ class PlatformProfileService:
                     "plan_id": plan.id,
                     "plan_name": plan.name,
                     "status": status,
+                    "retired_auto_bindings": retired_count,
                 }
             )
 
@@ -1293,6 +2439,7 @@ class PlatformProfileService:
             "created": created,
             "updated": updated,
             "skipped": skipped,
+            "retired": retired,
             "results": results,
         }
 
@@ -1323,6 +2470,7 @@ class PlatformProfileService:
                 "profile_code",
             )
         )
+        capability_facts = cls.load_device_capability_facts(device)
         return {
             "serial_num": device.serial_num,
             "manage_ip": device.manage_ip,
@@ -1330,6 +2478,7 @@ class PlatformProfileService:
             "supported_collection_types": profile.supported_collection_types,
             "preferred_methods": profile.preferred_methods,
             "fallback_methods": profile.fallback_methods,
+            "capability_facts": capability_facts,
             "bindings": [
                 {
                     "id": item["id"],
@@ -1346,6 +2495,27 @@ class PlatformProfileService:
 
 
 class DeviceFactService:
+    @staticmethod
+    def _resolve_device(device_info: Dict[str, object]) -> Optional[NetworkDevice]:
+        manage_ip = str(device_info.get("manage_ip") or "")
+        serial_num = str(device_info.get("serial_num") or "")
+        device = None
+        if serial_num:
+            device = NetworkDevice.objects.filter(serial_num=serial_num).first()
+        if device is None and manage_ip:
+            device = NetworkDevice.objects.filter(manage_ip=manage_ip).first()
+        return device
+
+    @staticmethod
+    def _normalize_positive_int(value) -> Optional[int]:
+        try:
+            text = str(value).strip()
+            if not text:
+                return None
+            return int(text)
+        except (TypeError, ValueError):
+            return None
+
     @staticmethod
     def _ensure_vendor(vendor_alias: str) -> Optional[Vendor]:
         if not vendor_alias:
@@ -1376,19 +2546,79 @@ class DeviceFactService:
         device_info: Dict[str, object],
         processed_data: List[Dict[str, object]],
     ) -> None:
-        if collection_type not in ("device_identity", "version"):
+        if collection_type not in ("device_identity", "version", "board_status", "irf_status", "stack_status"):
             return
         if not processed_data:
             return
 
-        manage_ip = str(device_info.get("manage_ip") or "")
-        serial_num = str(device_info.get("serial_num") or "")
-        device = None
-        if serial_num:
-            device = NetworkDevice.objects.filter(serial_num=serial_num).first()
-        if device is None and manage_ip:
-            device = NetworkDevice.objects.filter(manage_ip=manage_ip).first()
+        device = cls._resolve_device(device_info)
         if device is None:
+            return
+
+        if collection_type == "board_status":
+            update_fields = []
+            preferred_record = None
+            for slot_type in ("slot", "chassis"):
+                preferred_record = next(
+                    (
+                        item for item in processed_data
+                        if str(item.get("slot_type") or "").lower() == slot_type
+                    ),
+                    None,
+                )
+                if preferred_record:
+                    break
+            preferred_record = preferred_record or (processed_data[0] or {})
+
+            serial_num = str(preferred_record.get("serial_num") or "").strip()
+            slot_num = cls._normalize_positive_int(preferred_record.get("slot"))
+
+            if serial_num and device.serial_num != serial_num:
+                device.serial_num = serial_num
+                update_fields.append("serial_num")
+            if slot_num is not None and device.slot != slot_num:
+                device.slot = slot_num
+                update_fields.append("slot")
+
+            if update_fields:
+                device.save(update_fields=list(dict.fromkeys(update_fields)))
+            return
+
+        if collection_type in ("irf_status", "stack_status"):
+            records = processed_data or []
+            desired_ha_status = None
+            if len(records) <= 1:
+                desired_ha_status = 0
+            else:
+                current_slot = cls._normalize_positive_int(device.slot)
+                current_chassis = cls._normalize_positive_int(device.chassis)
+                match = None
+                if current_slot is not None:
+                    match = next(
+                        (
+                            item for item in records
+                            if cls._normalize_positive_int(item.get("member_id")) == current_slot
+                        ),
+                        None,
+                    )
+                if match is None and current_chassis is not None:
+                    match = next(
+                        (
+                            item for item in records
+                            if cls._normalize_positive_int(item.get("chassis_id")) == current_chassis
+                        ),
+                        None,
+                    )
+                if match:
+                    role = str(match.get("role") or "").strip().lower()
+                    if role == "master":
+                        desired_ha_status = 1
+                    elif role in ("standby", "slave"):
+                        desired_ha_status = 2
+
+            if desired_ha_status is not None and device.ha_status != desired_ha_status:
+                device.ha_status = desired_ha_status
+                device.save(update_fields=["ha_status"])
             return
 
         record = processed_data[0] or {}

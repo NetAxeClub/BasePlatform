@@ -53,6 +53,24 @@ def _find_records(value, required_keys):
     return records
 
 
+def _collect_values(value, key_name):
+    values = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if key == key_name:
+                if isinstance(child, list):
+                    values.extend(
+                        item for item in child if not isinstance(item, (dict, list))
+                    )
+                elif not isinstance(child, (dict, list)):
+                    values.append(child)
+            values.extend(_collect_values(child, key_name))
+    elif isinstance(value, list):
+        for item in value:
+            values.extend(_collect_values(item, key_name))
+    return values
+
+
 def _normalize_huawei_interface(interface: str) -> str:
     if not interface:
         return ""
@@ -63,6 +81,20 @@ def _normalize_huawei_interface(interface: str) -> str:
 
 def _normalize_huawei_mac(mac_address: str) -> str:
     return (mac_address or "").lower()
+
+
+def _build_huawei_mac_record(entry, *, vlan="", bd_id="", interface="", tunnel_type="", source_ip="", peer_ip="", vn_id=""):
+    return dict(
+        macaddress=_normalize_huawei_mac(entry.get("macAddress", "")),
+        vlan=vlan,
+        bd_id=bd_id,
+        interface=_normalize_huawei_interface(interface),
+        type=entry.get("macType", ""),
+        tunnel_type=tunnel_type,
+        source_ip=source_ip,
+        peer_ip=peer_ip,
+        vn_id=vn_id,
+    )
 
 
 def _build_ipv4_location(ip_address: str, ip_mask: str):
@@ -86,6 +118,15 @@ def _build_ipv4_location(ip_address: str, ip_mask: str):
 def _is_established(state: str) -> bool:
     text = str(state or "").strip().lower()
     return text in {"established", "estab", "up"} or "established" in text
+
+
+def _dedupe_strings(values):
+    ordered = []
+    for value in values:
+        text = str(value or "").strip()
+        if text and text not in ordered:
+            ordered.append(text)
+    return ordered
 
 
 # ────────────────────────────────────────────────────────────
@@ -169,6 +210,27 @@ def process_version_netmiko(data):
             pass  # 回填失败不影响采集结果返回
 
     return data
+
+
+@register_processor(
+    vendor="Huawei", device_type="", collection_type="version", method="netconf"
+)
+def process_version_netconf(data):
+    """Huawei collection_system_info 处理 (NETCONF)。"""
+    records = _find_records(data, {"sysName", "platformVer", "productName"})
+    if not records:
+        return []
+    record = records[0]
+    return [
+        dict(
+            hostname=record.get("sysName", ""),
+            vendor_alias="Huawei",
+            model_name=record.get("productName", ""),
+            soft_version=record.get("platformVer", ""),
+            patch_version=record.get("patchVer", ""),
+            serial_num=record.get("esn", ""),
+        )
+    ]
 
 
 @register_processor(
@@ -375,6 +437,48 @@ def process_temperature_status_netmiko(data):
             )
         )
     return result
+
+
+@register_processor(
+    vendor="Huawei", device_type="", collection_type="board_status", method="netconf"
+)
+def process_board_status_netconf(data):
+    """Huawei collection_moduleinfo 处理 (NETCONF)。"""
+    entries = _find_records(data, {"position", "entSerialNum"})
+    results = []
+    for entry in entries:
+        ent_class = str(entry.get("entClass", "")).strip()
+        results.append(
+            dict(
+                slot=entry.get("position", ""),
+                board_name=ent_class or "module",
+                board_model=ent_class or "module",
+                serial_num=entry.get("entSerialNum", ""),
+                status=ent_class,
+                slot_type=ent_class.lower(),
+            )
+        )
+    return results
+
+
+@register_processor(
+    vendor="Huawei", device_type="", collection_type="stack_status", method="netconf"
+)
+def process_stack_status_netconf(data):
+    """Huawei collection_stack 处理 (NETCONF)。"""
+    entries = _find_records(data, {"memberID", "role"})
+    results = []
+    for entry in entries:
+        results.append(
+            dict(
+                member_id=entry.get("memberID", ""),
+                slot=entry.get("memberID", ""),
+                role=entry.get("role", ""),
+                priority=entry.get("priority", ""),
+                mac=entry.get("mac", ""),
+            )
+        )
+    return results
 
 
 @register_processor(
@@ -642,17 +746,141 @@ def process_mac_netconf(data):
     entries = _find_records(data, {"macAddress"})
     results = []
     for entry in entries:
-        if not any(entry.get(key) for key in ("vlanId", "bdId", "outIfName", "macType")):
+        if entry.get("vnId"):
+            continue
+        if not any(entry.get(key) for key in ("vlanId", "outIfName", "macType")):
             continue
         results.append(
-            dict(
-                macaddress=_normalize_huawei_mac(entry.get("macAddress", "")),
-                vlan=entry.get("vlanId", "") or entry.get("bdId", "") or "-",
-                interface=_normalize_huawei_interface(entry.get("outIfName", "")),
-                type=entry.get("macType", ""),
+            _build_huawei_mac_record(
+                entry,
+                vlan=entry.get("vlanId", "") or "-",
+                interface=entry.get("outIfName", ""),
             )
         )
     return results
+
+
+@register_processor(
+    vendor="Huawei", device_type="", collection_type="mac_bd", method="netconf"
+)
+def process_mac_bd_netconf(data):
+    """Huawei BD MAC 地址表处理 (NETCONF)。"""
+    entries = _find_records(data, {"macAddress", "bdId"})
+    results = []
+    for entry in entries:
+        if entry.get("vnId"):
+            continue
+        if not any(entry.get(key) for key in ("bdId", "outIfName", "macType", "vid")):
+            continue
+        results.append(
+            _build_huawei_mac_record(
+                entry,
+                vlan=entry.get("vid", "") or "-",
+                bd_id=entry.get("bdId", ""),
+                interface=entry.get("outIfName", ""),
+            )
+        )
+    return results
+
+
+@register_processor(
+    vendor="Huawei", device_type="", collection_type="mac_vxlan", method="netconf"
+)
+def process_mac_vxlan_netconf(data):
+    """Huawei VXLAN 数据面 MAC 地址表处理 (NETCONF)。"""
+    entries = _find_records(data, {"macAddress", "bdId", "vnId"})
+    results = []
+    for entry in entries:
+        if not any(entry.get(key) for key in ("sourceIP", "peerIP", "vnId", "tunnelType")):
+            continue
+        results.append(
+            _build_huawei_mac_record(
+                entry,
+                bd_id=entry.get("bdId", ""),
+                tunnel_type=entry.get("tunnelType", ""),
+                source_ip=entry.get("sourceIP", ""),
+                peer_ip=entry.get("peerIP", ""),
+                vn_id=entry.get("vnId", ""),
+            )
+        )
+    return results
+
+
+@register_processor(
+    vendor="Huawei", device_type="", collection_type="mac_vxlan_control", method="netconf"
+)
+def process_mac_vxlan_control_netconf(data):
+    """Huawei VXLAN 控制面 MAC 地址表处理 (NETCONF)。"""
+    entries = _find_records(data, {"macAddress", "bdId", "vnId"})
+    results = []
+    for entry in entries:
+        if not any(entry.get(key) for key in ("sourceIpv6", "peerIpv6", "vnId", "tunnelType")):
+            continue
+        results.append(
+            _build_huawei_mac_record(
+                entry,
+                bd_id=entry.get("bdId", ""),
+                tunnel_type=entry.get("tunnelType", ""),
+                source_ip=entry.get("sourceIpv6", "") or entry.get("sourceIP", ""),
+                peer_ip=entry.get("peerIpv6", "") or entry.get("peerIP", ""),
+                vn_id=entry.get("vnId", ""),
+            )
+        )
+    return results
+
+
+@register_processor(
+    vendor="Huawei", device_type="", collection_type="vxlan_capability", method="netconf"
+)
+def process_vxlan_capability_netconf(data):
+    """Huawei VXLAN/BD/EVPN 配置能力探测 (NETCONF get_config)。"""
+    bd_ids = _dedupe_strings(_collect_values(data, "bdId"))
+    if not bd_ids and isinstance(data, dict):
+        feil3bd = data.get("feil3bd", {}) or {}
+        bd_ids = _dedupe_strings(_collect_values(feil3bd, "bdId") + _collect_values(feil3bd, "id"))
+    vnis = [
+        item
+        for item in _dedupe_strings(
+            _collect_values(data, "vni") + _collect_values(data, "vnId") + _collect_values(data, "vniId")
+        )
+        if item not in {"0"}
+    ]
+    vxlan_section = data.get("vxlan", {}) if isinstance(data, dict) else {}
+    nve_ids = [
+        item
+        for item in _dedupe_strings(_collect_values(vxlan_section, "nveIfName") + _collect_values(vxlan_section, "ifName"))
+        if item.upper() != "NULL0"
+    ]
+    af_types = _dedupe_strings(_collect_values(data, "afType"))
+    evpn_afs = [item for item in af_types if "evpn" in item.lower()]
+    vrfs = _dedupe_strings(_collect_values(data, "vrfName"))
+
+    evidence = []
+    if bd_ids:
+        evidence.append("bridge-domain")
+    if vnis:
+        evidence.append("vxlan-vni")
+    if nve_ids:
+        evidence.append("nve")
+    if evpn_afs:
+        evidence.append("bgp-evpn")
+
+    return [
+        dict(
+            has_bd=bool(bd_ids),
+            bd_count=len(bd_ids),
+            bd_ids=bd_ids,
+            has_vxlan_vni=bool(vnis),
+            vni_count=len(vnis),
+            vnis=vnis,
+            has_nve=bool(nve_ids),
+            nve_ids=nve_ids,
+            has_evpn_bgp=bool(evpn_afs),
+            evpn_af_count=len(evpn_afs),
+            vrfs=vrfs,
+            evidence=evidence,
+        )
+    ]
 
 
 @register_processor(
@@ -719,6 +947,40 @@ def process_ip_interface_netconf(data):
                     location=location_payload["location"],
                 )
             )
+    return results
+
+
+@register_processor(
+    vendor="Huawei", device_type="", collection_type="interface_brief", method="netconf"
+)
+def process_interface_brief_netconf(data):
+    """Huawei collection_intf_ipv4v6 处理二层接口 (NETCONF)。"""
+    interface_entries = _find_records(data, {"ifName"})
+    results = []
+    for entry in interface_entries:
+        if_name = entry.get("ifName", "")
+        if (
+            if_name.startswith("Tunnel")
+            or if_name.startswith("Stack-Port")
+            or if_name.startswith("MEth")
+            or if_name.startswith("Vbdif")
+            or if_name.startswith("Vlanif")
+            or if_name.startswith("Eth-Trunk")
+        ):
+            continue
+        dynamic = entry.get("ifDynamicInfo", {}) or {}
+        speed = dynamic.get("ifOperSpeed", "")
+        if not speed:
+            continue
+        results.append(
+            dict(
+                interface=_normalize_huawei_interface(if_name),
+                status=dynamic.get("ifOperStatus", ""),
+                speed=InterfaceFormat.mathintspeed(speed),
+                duplex="",
+                description="",
+            )
+        )
     return results
 
 

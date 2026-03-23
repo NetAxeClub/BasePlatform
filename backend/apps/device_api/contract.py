@@ -8,6 +8,7 @@ STANDARD_PLAN_COLLECTION_PREFIX = "plan_"
 # version 仅作为 device_identity 的兼容处理别名保留，不单独占用标准结果集合。
 STORAGE_COLLECTION_TYPE_ALIASES = {
     "version": "device_identity",
+    "vxlan_capability": "netconf_capability",
 }
 
 

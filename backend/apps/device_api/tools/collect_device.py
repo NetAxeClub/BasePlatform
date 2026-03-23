@@ -168,6 +168,9 @@ def get_auto_device(**kwargs):
             dev['execute_node'] = getattr(relation, "execute_node", "")
             dev['profile_code'] = getattr(relation, "profile_code", "")
             dev['binding_source'] = getattr(relation, "binding_source", "")
+            dev['last_bound_at'] = getattr(relation, "last_bound_at", None)
+            dev['binding_created_at'] = getattr(relation, "created_at", None)
+            dev['binding_updated_at'] = getattr(relation, "updated_at", None)
             if plan_id and plan_id in plan_sub_plans_map:
                 dev['sub_plans'] = plan_sub_plans_map[plan_id]
             else:

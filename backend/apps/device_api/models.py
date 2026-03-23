@@ -48,6 +48,7 @@ class DeviceDiscoveryState(models.Model):
     device_serial_num = models.CharField(max_length=200, unique=True, verbose_name="设备序列号")
     manage_ip = models.GenericIPAddressField(verbose_name="管理IP", null=True, blank=True)
     profile_code = models.CharField(max_length=64, blank=True, default="", verbose_name="画像编码")
+    capability_facts = models.JSONField(blank=True, default=dict, verbose_name="能力画像事实")
     last_discovered_at = models.DateTimeField(null=True, blank=True, verbose_name="最近发现时间")
     last_discovery_status = models.CharField(max_length=20, blank=True, default="pending", verbose_name="最近发现状态")
     last_discovery_error = models.TextField(blank=True, default="", verbose_name="最近发现错误")
@@ -332,7 +333,6 @@ class DeviceSubCollectionPlan(models.Model):
 class NetconfXMLTemplate(models.Model):
     """NETCONF XML模板模型"""
     COLLECT_METHOD_CHOICES = [
-        ('rpc', 'RPC'),
         ('get', 'GET'),
         ('get_config', 'GET_CONFIG'),
     ]
@@ -366,6 +366,11 @@ class NetconfXMLTemplate(models.Model):
 
     def __str__(self):
         return f"{self.collect_method} ({self.collection_plan.name})"
+
+    def save(self, *args, **kwargs):
+        if self.collect_method not in {"get", "get_config"}:
+            raise ValueError("NETCONF 模板 collect_method 仅支持 get / get_config")
+        super().save(*args, **kwargs)
 
 
 class PlansToDevice(models.Model):

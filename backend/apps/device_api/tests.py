@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import requests
 from bson import ObjectId
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 from rest_framework.test import APIRequestFactory
 from textfsm import TextFSM
 
@@ -18,7 +18,12 @@ from apps.device_api.fields_mapping import (
     get_collection_output_fields,
 )
 from apps.device_api.connection_manager import DeviceConnectionManager
-from apps.device_api.models import DeviceCollectionPlans, DeviceDiscoveryState, DeviceSubCollectionPlan
+from apps.device_api.models import (
+    DeviceCollectionPlans,
+    DeviceDiscoveryState,
+    DeviceSubCollectionPlan,
+    PlansToDevice,
+)
 from apps.device_api.models_api import (
     COLLECTION_TYPE_MONGO_MAP,
     apply_field_mappings,
@@ -29,13 +34,16 @@ from apps.device_api.processors.base import get_processor, normalize_processed_d
 from apps.device_api.processors.h3c import (
     process_aggre_port_netconf as process_h3c_aggre_port_netconf,
     process_bgp_summary_netconf as process_h3c_bgp_summary_netconf,
+    process_cli_output_capability_netmiko as process_h3c_cli_output_capability_netmiko,
     process_clock_status_netmiko as process_h3c_clock_status_netmiko,
     process_fan_status_netmiko as process_h3c_fan_status_netmiko,
     process_ip_interface_netconf as process_h3c_ip_interface_netconf,
     process_lldp_netconf as process_h3c_lldp_netconf,
     process_mac_netconf as process_h3c_mac_netconf,
+    process_netconf_capability_netconf as process_h3c_netconf_capability_netconf,
     process_power_status_netmiko as process_h3c_power_status_netmiko,
     process_route_table_netconf as process_h3c_route_table_netconf,
+    process_version_netmiko as process_h3c_version_netmiko,
 )
 from apps.device_api.processors.huawei import (
     process_aggre_port_netconf as process_huawei_aggre_port_netconf,
@@ -43,7 +51,10 @@ from apps.device_api.processors.huawei import (
     process_ip_interface_netconf as process_huawei_ip_interface_netconf,
     process_isis_neighbors_netmiko as process_huawei_isis_neighbors_netmiko,
     process_lldp_netconf as process_huawei_lldp_netconf,
+    process_mac_bd_netconf as process_huawei_mac_bd_netconf,
     process_mac_netconf as process_huawei_mac_netconf,
+    process_mac_vxlan_control_netconf as process_huawei_mac_vxlan_control_netconf,
+    process_mac_vxlan_netconf as process_huawei_mac_vxlan_netconf,
     process_power_status_netmiko as process_huawei_power_status_netmiko,
     process_route_table_netconf as process_huawei_route_table_netconf,
     process_temperature_status_netmiko as process_huawei_temperature_status_netmiko,
@@ -58,11 +69,15 @@ from apps.device_api.serializers import (
     DeviceSubCollectionPlanCreateSerializer,
     DeviceSubCollectionPlanSerializer,
     DeviceSubCollectionPlanUpdateSerializer,
+    NetconfXMLTemplateSerializer,
 )
 from apps.device_api.management.commands.sync_legacy_plan_bindings import Command as SyncLegacyPlanBindingsCommand
 from apps.device_api.management.commands.ensure_device_api_indexes import Command as EnsureDeviceApiIndexesCommand
 from apps.device_api.management.commands.audit_device_api_coverage import (
     Command as AuditDeviceApiCoverageCommand,
+)
+from apps.device_api.management.commands.refresh_capability_discovery import (
+    Command as RefreshCapabilityDiscoveryCommand,
 )
 from apps.device_api.apps import DeviceApiConfig
 from apps.device_api.indexes import (
@@ -72,6 +87,7 @@ from apps.device_api.indexes import (
 )
 from apps.device_api.platform_profiles import (
     BUILTIN_PLATFORM_PROFILES,
+    DeviceFactService,
     PROFILE_NETMIKO_SUB_PLAN_DEFAULTS,
     TEMPLATE_BASE_DIR,
     PlatformProfileService,
@@ -79,6 +95,7 @@ from apps.device_api.platform_profiles import (
 from apps.device_api.tasks import (
     _process_and_save_result,
     plan_collect_device,
+    plan_collect_device_main,
     split_runtime_control_kwargs,
     should_clear_history_before_batch,
 )
@@ -360,6 +377,69 @@ class DeviceApiViewTests(SimpleTestCase):
         self.assertFalse(is_valid)
         self.assertIn("Telemetry 仍在延期范围", message)
         self.assertIsNone(result_device)
+
+    @patch("apps.device_api.views.NetworkDevice.objects")
+    def test_validate_execution_params_rejects_ambiguous_manage_ip_without_serial_num(
+        self,
+        mock_device_objects,
+    ):
+        queryset = Mock()
+        queryset.exists.return_value = True
+        queryset.count.return_value = 2
+        mock_device_objects.select_related.return_value.filter.return_value = queryset
+        plan = SimpleNamespace(
+            netmiko_enabled=True,
+            netconf_enabled=False,
+            snmp_enabled=False,
+            restconf_enabled=False,
+            telemetry_enabled=False,
+        )
+
+        is_valid, message, result_device = DeviceSubCollectionPlanViewSet.validate_execution_params(
+            plan,
+            "10.0.0.1",
+            "both",
+            use_local=True,
+        )
+
+        self.assertFalse(is_valid)
+        self.assertIn("命中多条资产", message)
+        self.assertIsNone(result_device)
+
+    @patch("apps.device_api.views.NetworkDevice.objects")
+    def test_validate_execution_params_allows_serial_num_to_disambiguate_manage_ip(
+        self,
+        mock_device_objects,
+    ):
+        device = SimpleNamespace(
+            manage_ip="10.0.0.1",
+            ssh_account=SimpleNamespace(id=1),
+            netconf_account=None,
+            snmp_community="public",
+        )
+        queryset = Mock()
+        queryset.exists.return_value = True
+        queryset.first.return_value = device
+        mock_device_objects.select_related.return_value.filter.return_value = queryset
+        plan = SimpleNamespace(
+            netmiko_enabled=True,
+            netconf_enabled=False,
+            snmp_enabled=False,
+            restconf_enabled=False,
+            telemetry_enabled=False,
+        )
+
+        is_valid, message, result_device = DeviceSubCollectionPlanViewSet.validate_execution_params(
+            plan,
+            "10.0.0.1",
+            "both",
+            use_local=True,
+            serial_num="SER-1",
+        )
+
+        self.assertTrue(is_valid)
+        self.assertEqual(message, "验证通过")
+        self.assertIs(result_device, device)
 
     @patch("apps.device_api.views.DeviceCollectionService.execute_both_collection_local")
     @patch("apps.device_api.views.DeviceSubCollectionPlanViewSet.validate_execution_params")
@@ -1816,6 +1896,66 @@ class DeviceApiCollectDeviceTests(SimpleTestCase):
 
         self.assertEqual(result, [])
 
+    @patch("apps.device_api.tools.collect_device.DeviceSubCollectionPlanSerializer")
+    @patch("apps.device_api.tools.collect_device.DeviceSubCollectionPlan.objects")
+    @patch("apps.device_api.tools.collect_device.AssetAccount.objects")
+    @patch("apps.device_api.tools.collect_device.PlansToDevice.objects")
+    @patch("apps.device_api.tools.collect_device.NetworkDevice.objects")
+    def test_get_auto_device_exposes_binding_metadata_for_batch_dedupe(
+        self,
+        mock_device_objects,
+        mock_relation_objects,
+        mock_account_objects,
+        mock_sub_plan_objects,
+        mock_sub_plan_serializer,
+    ):
+        device_row = {
+            "id": 1,
+            "serial_num": "SER-1",
+            "manage_ip": "10.0.0.1",
+            "name": "switch-a",
+            "soft_version": "v1",
+            "vendor__name": "Huawei",
+            "vendor__alias": "Huawei",
+            "category__name": "switch",
+            "model__name": "CE8850",
+            "ssh_enable": "0",
+            "ssh_account": None,
+            "netconf_enable": "0",
+            "netconf_account": None,
+            "patch_version": "p1",
+            "status": 0,
+            "idc__name": "IDC-A",
+            "auto_enable": True,
+            "ha_status": 0,
+            "chassis": 1,
+            "slot": 1,
+        }
+        mock_device_objects.filter.return_value.select_related.return_value.values.return_value = [device_row]
+        relation = SimpleNamespace(
+            manage_ip="10.0.0.1",
+            plan_id=201,
+            use_local=True,
+            execute_node="",
+            device_serial_num="SER-1",
+            profile_code="Huawei-CE",
+            binding_source="manual",
+            last_bound_at=datetime(2026, 3, 20, 10, 0, 0),
+            created_at=datetime(2026, 3, 18, 10, 0, 0),
+            updated_at=datetime(2026, 3, 21, 10, 0, 0),
+        )
+        mock_relation_objects.select_related.return_value.filter.return_value = [relation]
+        mock_account_objects.filter.return_value.values.return_value = []
+        mock_sub_plan_objects.filter.return_value.select_related.return_value.order_by.return_value = []
+        mock_sub_plan_serializer.return_value.data = []
+
+        result = get_auto_device(manage_ip="10.0.0.1")
+
+        self.assertEqual(result[0]["binding_source"], "manual")
+        self.assertEqual(result[0]["last_bound_at"], relation.last_bound_at)
+        self.assertEqual(result[0]["binding_created_at"], relation.created_at)
+        self.assertEqual(result[0]["binding_updated_at"], relation.updated_at)
+
 
 class DeviceApiBridgeCommandTests(SimpleTestCase):
     @patch("apps.device_api.management.commands.sync_legacy_plan_bindings.PlansToDevice.objects")
@@ -1977,6 +2117,126 @@ class DeviceApiBridgeCommandTests(SimpleTestCase):
         self.assertIn("schema blockers:", written)
         self.assertIn("skip sync_default_plans: schema blockers detected", written)
         self.assertIn("skip auto_bind: schema blockers detected", written)
+
+
+class RefreshCapabilityDiscoveryCommandTests(SimpleTestCase):
+    class _FakeCollectPlans:
+        def __init__(self, mapping):
+            self.mapping = mapping
+
+        def filter(self, collection_type=None):
+            return SimpleNamespace(first=lambda: self.mapping.get(collection_type))
+
+    @patch("apps.device_api.management.commands.refresh_capability_discovery.PlatformProfileService.auto_bind_devices")
+    @patch("apps.device_api.management.commands.refresh_capability_discovery.DeviceCollectionService.execute_both_collection_local")
+    @patch("apps.device_api.management.commands.refresh_capability_discovery.PlatformProfileService.ensure_default_plan_for_profile")
+    @patch("apps.device_api.management.commands.refresh_capability_discovery.PlatformProfileService.match_profile_for_device")
+    @patch("apps.device_api.management.commands.refresh_capability_discovery.PlatformProfileService.ensure_builtin_profiles")
+    @patch("apps.device_api.management.commands.refresh_capability_discovery.NetworkDevice.objects")
+    def test_refresh_capability_discovery_outputs_vendor_heartbeat_and_auto_bind_summary(
+        self,
+        mock_network_device_objects,
+        mock_ensure_builtin_profiles,
+        mock_match_profile_for_device,
+        mock_ensure_default_plan_for_profile,
+        mock_execute_collection_local,
+        mock_auto_bind_devices,
+    ):
+        huawei_profile = SimpleNamespace(code="hua", vendor_alias="Huawei")
+        h3c_profile = SimpleNamespace(code="h3c", vendor_alias="H3C")
+        devices = [
+            SimpleNamespace(
+                manage_ip="10.0.0.1",
+                serial_num="SER-HW-1",
+                vendor=SimpleNamespace(alias="Huawei"),
+                netconf_enable="account",
+                netconf_account=object(),
+                ssh_enable="disable",
+                ssh_account=None,
+            ),
+            SimpleNamespace(
+                manage_ip="10.0.0.2",
+                serial_num="SER-H3C-1",
+                vendor=SimpleNamespace(alias="H3C"),
+                netconf_enable="account",
+                netconf_account=object(),
+                ssh_enable="account",
+                ssh_account=object(),
+            ),
+            SimpleNamespace(
+                manage_ip="10.0.0.3",
+                serial_num="SER-H3C-2",
+                vendor=SimpleNamespace(alias="H3C"),
+                netconf_enable="disable",
+                netconf_account=None,
+                ssh_enable="disable",
+                ssh_account=None,
+            ),
+        ]
+
+        queryset = mock_network_device_objects.filter.return_value.select_related.return_value
+        queryset.__iter__ = Mock(return_value=iter(devices))
+        mock_ensure_builtin_profiles.return_value = [huawei_profile, h3c_profile]
+
+        def match_profile(device, profiles=None):
+            if device.serial_num == "SER-HW-1":
+                return huawei_profile
+            if device.serial_num == "SER-H3C-1":
+                return h3c_profile
+            return None
+
+        mock_match_profile_for_device.side_effect = match_profile
+
+        def build_plan(profile):
+            netconf_sub_plan = SimpleNamespace(collection_type="netconf_capability")
+            cli_sub_plan = SimpleNamespace(collection_type="cli_output_capability")
+            mapping = {"netconf_capability": netconf_sub_plan}
+            if profile.vendor_alias == "H3C":
+                mapping["cli_output_capability"] = cli_sub_plan
+            return SimpleNamespace(
+                name=f"{profile.vendor_alias}-plan",
+                collect_plans=self._FakeCollectPlans(mapping),
+            )
+
+        mock_ensure_default_plan_for_profile.side_effect = build_plan
+
+        def execute_collection(sub_plan, device, connection_policy=None):
+            self.assertIsNotNone(connection_policy)
+            self.assertEqual(connection_policy["netconf_retry_times"], 0)
+            if device.serial_num == "SER-HW-1":
+                return {"success": True}
+            if sub_plan.collection_type == "netconf_capability":
+                return {"success": False, "error": "schema timeout"}
+            return {"success": True}
+
+        mock_execute_collection_local.side_effect = execute_collection
+        mock_auto_bind_devices.return_value = {
+            "created": 1,
+            "updated": 2,
+            "skipped": 0,
+            "retired": 1,
+            "results": [],
+        }
+
+        command = RefreshCapabilityDiscoveryCommand()
+        with patch.object(command.stdout, "write") as mock_write:
+            command.handle(
+                vendor_aliases=[],
+                manage_ip=None,
+                serial_num=None,
+                limit=0,
+                heartbeat_every=2,
+                skip_rebind=False,
+            )
+
+        written = "\n".join(str(call.args[0]) for call in mock_write.call_args_list)
+        self.assertIn("phase=discovery heartbeat progress=2/3 total=3", written)
+        self.assertIn("phase=discovery heartbeat progress=2/3 vendor=Huawei total=1", written)
+        self.assertIn("phase=discovery heartbeat progress=2/3 vendor=H3C total=1", written)
+        self.assertIn("phase=discovery summary vendor=Huawei total=1", written)
+        self.assertIn("phase=discovery summary vendor=H3C total=2", written)
+        self.assertIn("phase=auto_bind summary created=1 updated=2 retired=1", written)
+        self.assertIn("phase=auto_bind skipped=0", written)
 
 
 class DeviceApiP5RolloutCommandTests(SimpleTestCase):
@@ -2444,6 +2704,121 @@ class DeviceApiTaskTests(SimpleTestCase):
     @patch("apps.device_api.tasks._process_and_save_result")
     @patch("apps.device_api.tasks.DeviceCollectionService.insert_parent_plan_data")
     @patch("apps.device_api.tasks.DeviceConnectionManager")
+    def test_plan_collect_device_marks_failed_when_processing_result_is_not_saved(
+        self,
+        mock_connection_manager_cls,
+        mock_insert_parent,
+        mock_process_result,
+        mock_collection_plan,
+    ):
+        conn_mgr = Mock()
+        conn_mgr.execute_netmiko_command.return_value = [{"raw": "data"}]
+        mock_connection_manager_cls.return_value.__enter__.return_value = conn_mgr
+        mock_connection_manager_cls.return_value.__exit__.return_value = False
+        mock_insert_parent.return_value = {"success": True, "action": "inserted"}
+        mock_process_result.return_value = {"success": False, "reason": "resolve_failed"}
+
+        result = plan_collect_device(
+            manage_ip="10.0.0.1",
+            plan_id=100,
+            execute_time="2026-03-17T11:00:00",
+            sub_plans=[
+                {
+                    "id": 1,
+                    "name": "arp-netmiko",
+                    "summary_plan": 100,
+                    "netmiko_enabled": True,
+                    "netmiko_method": "display arp",
+                }
+            ],
+        )
+
+        self.assertEqual(result["task_status"], "failed")
+        self.assertEqual(result["successful_sub_plans"], 0)
+        self.assertEqual(result["failed_sub_plans"], 1)
+        self.assertEqual(result["failed_details"][0]["reason"], "resolve_failed")
+        mock_collection_plan.update_one.assert_called_once()
+
+    @patch("apps.device_api.tasks.COLLECTION_PLAN")
+    @patch("apps.device_api.tasks.DeviceCollectionService.insert_parent_plan_data")
+    @patch("apps.device_api.tasks.DeviceConnectionManager")
+    def test_plan_collect_device_marks_parent_failed_when_device_level_exception_occurs(
+        self,
+        mock_connection_manager_cls,
+        mock_insert_parent,
+        mock_collection_plan,
+    ):
+        mock_connection_manager_cls.return_value.__enter__.side_effect = RuntimeError("connect failed")
+        mock_insert_parent.return_value = {"success": True, "action": "inserted"}
+
+        result = plan_collect_device(
+            manage_ip="10.0.0.1",
+            plan_id=100,
+            execute_time="2026-03-17T11:00:00",
+            sub_plans=[
+                {
+                    "id": 1,
+                    "name": "arp-netmiko",
+                    "summary_plan": 100,
+                    "netmiko_enabled": True,
+                    "netmiko_method": "display arp",
+                }
+            ],
+        )
+
+        self.assertEqual(result["task_status"], "failed")
+        mock_collection_plan.update_one.assert_called_once()
+        update_kwargs = mock_collection_plan.update_one.call_args.kwargs
+        self.assertEqual(update_kwargs["update"]["$set"]["task_status"], "failed")
+        self.assertEqual(
+            update_kwargs["update"]["$set"]["failed_details"][0]["collection_method"],
+            "device",
+        )
+
+    @patch("apps.device_api.tasks.COLLECTION_PLAN")
+    @patch("apps.device_api.tasks.DeviceCollectionService.insert_parent_plan_data")
+    @patch("apps.device_api.tasks.DeviceConnectionManager")
+    def test_plan_collect_device_rejects_invalid_netconf_collect_method(
+        self,
+        mock_connection_manager_cls,
+        mock_insert_parent,
+        mock_collection_plan,
+    ):
+        conn_mgr = Mock()
+        mock_connection_manager_cls.return_value.__enter__.return_value = conn_mgr
+        mock_connection_manager_cls.return_value.__exit__.return_value = False
+        mock_insert_parent.return_value = {"success": True, "action": "inserted"}
+
+        result = plan_collect_device(
+            manage_ip="10.0.0.1",
+            plan_id=100,
+            execute_time="2026-03-17T11:00:00",
+            sub_plans=[
+                {
+                    "id": 1,
+                    "name": "arp-netconf",
+                    "summary_plan": 100,
+                    "netconf_enabled": True,
+                    "xml_templates": [
+                        {
+                            "collect_method": "rpc",
+                            "xml_template": "<top />",
+                        }
+                    ],
+                }
+            ],
+        )
+
+        self.assertEqual(result["task_status"], "failed")
+        self.assertEqual(result["failed_sub_plans"], 1)
+        self.assertIn("仅允许 get/get_config", result["failed_details"][0]["reason"])
+        conn_mgr.execute_netconf_get.assert_not_called()
+        mock_collection_plan.update_one.assert_called_once()
+
+    @patch("apps.device_api.tasks.COLLECTION_PLAN")
+    @patch("apps.device_api.tasks._process_and_save_result")
+    @patch("apps.device_api.tasks.DeviceCollectionService.insert_parent_plan_data")
+    @patch("apps.device_api.tasks.DeviceConnectionManager")
     def test_plan_collect_device_updates_parent_status_with_partial_success(
         self,
         mock_connection_manager_cls,
@@ -2562,6 +2937,7 @@ class DeviceApiTaskTests(SimpleTestCase):
         result = plan_collect_device_main()
 
         self.assertEqual(result["total"], 2)
+        mock_clear_his_collect_res.assert_called_once_with(execute_time="2026-03-15 10:00:00")
         mock_schedule_batch_network_analysis.assert_called_once_with(
             execute_time="2026-03-15 10:00:00",
             expected_devices=2,
@@ -2612,6 +2988,94 @@ class DeviceApiTaskTests(SimpleTestCase):
         mock_clear_his_collect_res.assert_not_called()
         self.assertFalse(result["clear_history"])
         self.assertEqual(result["tasks"], 1)
+
+    @patch("apps.device_api.tasks.schedule_batch_network_analysis")
+    @patch("apps.device_api.tasks.plan_collect_device.apply_async")
+    @patch("apps.device_api.tasks.clear_his_collect_res")
+    @patch("apps.device_api.tasks.MainIn.cmdb_to_mongo")
+    @patch("apps.device_api.tasks.datas_to_cache")
+    @patch("apps.device_api.tasks.get_auto_device")
+    def test_plan_collect_device_main_deduplicates_devices_and_skips_empty_sub_plans(
+        self,
+        mock_get_auto_device,
+        mock_datas_to_cache,
+        mock_cmdb_to_mongo,
+        mock_clear_his_collect_res,
+        mock_plan_collect_apply_async,
+        mock_schedule_batch_network_analysis,
+    ):
+        mock_get_auto_device.return_value = [
+            {
+                "manage_ip": "10.0.0.1",
+                "device_serial_num": "SER-1",
+                "plan_id": 101,
+                "binding_source": "auto",
+                "use_local": True,
+                "last_bound_at": datetime(2026, 3, 20, 10, 0, 0),
+                "execute_time": "2026-03-15 10:00:00",
+                "sub_plans": [{"id": 1, "collection_type": "arp"}],
+            },
+            {
+                "manage_ip": "10.0.0.1",
+                "device_serial_num": "SER-1",
+                "plan_id": 102,
+                "binding_source": "manual",
+                "use_local": True,
+                "last_bound_at": datetime(2026, 3, 21, 10, 0, 0),
+                "execute_time": "2026-03-15 10:00:00",
+                "sub_plans": [{"id": 2, "collection_type": "interface_brief"}],
+            },
+            {
+                "manage_ip": "10.0.0.2",
+                "device_serial_num": "SER-2",
+                "plan_id": 103,
+                "binding_source": "manual",
+                "use_local": True,
+                "last_bound_at": datetime(2026, 3, 21, 10, 0, 0),
+                "execute_time": "2026-03-15 10:00:00",
+                "sub_plans": [],
+            },
+        ]
+        mock_plan_collect_apply_async.return_value = SimpleNamespace(id="task-1")
+        mock_schedule_batch_network_analysis.return_value = {"scheduled": True, "reason": "scheduled"}
+
+        result = plan_collect_device_main(clear_history=False)
+
+        self.assertEqual(result["total"], 1)
+        self.assertEqual(result["tasks"], 1)
+        self.assertEqual(result["deduplicated_devices"], 1)
+        self.assertEqual(result["skipped_without_sub_plans"], 1)
+        dispatched_host = mock_plan_collect_apply_async.call_args.kwargs["kwargs"]
+        self.assertEqual(dispatched_host["plan_id"], 102)
+        mock_schedule_batch_network_analysis.assert_called_once_with(
+            execute_time="2026-03-15 10:00:00",
+            expected_devices=1,
+            expected_subtasks=1,
+            expected_interface_devices=1,
+            triggered_by="device_api-plan_collect_device_main",
+        )
+
+    @patch("apps.device_api.tasks.clear_his_collect_res", side_effect=RuntimeError("mongo down"))
+    @patch("apps.device_api.tasks.MainIn.cmdb_to_mongo")
+    @patch("apps.device_api.tasks.datas_to_cache")
+    @patch("apps.device_api.tasks.get_auto_device")
+    def test_plan_collect_device_main_raises_when_clear_history_fails(
+        self,
+        mock_get_auto_device,
+        mock_datas_to_cache,
+        mock_cmdb_to_mongo,
+        mock_clear_his_collect_res,
+    ):
+        mock_get_auto_device.return_value = [
+            {
+                "manage_ip": "10.0.0.1",
+                "execute_time": "2026-03-15 10:00:00",
+                "sub_plans": [{"id": 1, "collection_type": "arp"}],
+            }
+        ]
+
+        with self.assertRaises(RuntimeError):
+            plan_collect_device_main()
 
     @patch("apps.device_api.tasks.schedule_batch_network_analysis")
     @patch("apps.device_api.tasks.plan_collect_device.apply_async")
@@ -2714,7 +3178,283 @@ class DeviceApiTaskTests(SimpleTestCase):
         self.assertEqual(result["total"], 1)
 
 
+class DeviceApiProcessorOnlyTests(SimpleTestCase):
+    def test_resolve_raw_data_requires_registered_processor(self):
+        plan = SimpleNamespace(
+            name="h3c-board-status-plan",
+            collection_type="board_status",
+            summary_plan=SimpleNamespace(vendor="H3C", device_type="switch"),
+        )
+
+        status, error, processed = resolve_raw_data(
+            plan,
+            {"data": [{"BOARD_TYPE": "S6860-54HF"}], "device_ip": "10.0.0.1"},
+            "netmiko",
+        )
+
+        self.assertFalse(status)
+        self.assertEqual(error, "processor_not_found: H3C:board_status:netmiko")
+        self.assertEqual(processed, [])
+
+
+class DeviceApiH3CIdentityTests(TestCase):
+    def setUp(self):
+        self.vendor = Vendor.objects.create(name="华三", alias="H3C")
+        self.category = Category.objects.create(name="switch")
+        self.old_model = Model.objects.create(name="OLD-MODEL", vendor=self.vendor)
+        self.device = NetworkDevice.objects.create(
+            name="old-name",
+            manage_ip="10.254.22.173",
+            serial_num="SER-H3C-001",
+            vendor=self.vendor,
+            category=self.category,
+            model=self.old_model,
+            soft_version="old-version",
+            patch_version="old-patch",
+        )
+
+    def test_h3c_version_processor_extracts_identity_fields(self):
+        result = process_h3c_version_netmiko(
+            [
+                {
+                    "Slot": "1",
+                    "BOARD_TYPE": "S6860-54HF",
+                    "Version": "7.1.070, Feature 2707",
+                    "Patch_Ver": "Feature 2707H17",
+                }
+            ]
+        )
+
+        self.assertEqual(
+            result,
+            [
+                {
+                    "vendor_alias": "H3C",
+                    "model_name": "S6860-54HF",
+                    "soft_version": "7.1.070 Feature 2707",
+                    "patch_version": "Feature 2707H17",
+                }
+            ],
+        )
+
+    def test_h3c_device_identity_updates_network_device(self):
+        plan = SimpleNamespace(
+            name="h3c-device-identity-plan",
+            collection_type="device_identity",
+            summary_plan=SimpleNamespace(vendor="H3C", device_type="switch"),
+        )
+        status, error, processed = resolve_raw_data(
+            plan,
+            {
+                "data": [
+                    {
+                        "Slot": "1",
+                        "BOARD_TYPE": "S6860-54HF",
+                        "Version": "7.1.070, Feature 2707",
+                        "Patch_Ver": "Feature 2707H17",
+                    }
+                ],
+                "device_ip": self.device.manage_ip,
+            },
+            "netmiko",
+        )
+
+        self.assertTrue(status)
+        self.assertEqual(error, "")
+        self.assertEqual(processed[0]["model_name"], "S6860-54HF")
+        self.assertEqual(processed[0]["soft_version"], "7.1.070 Feature 2707")
+
+        DeviceFactService.update_from_processed_data(
+            collection_type="device_identity",
+            device_info={
+                "manage_ip": self.device.manage_ip,
+                "serial_num": self.device.serial_num,
+                "vendor__alias": "H3C",
+                "platform_profile_code": "H3C-legacy-cli",
+            },
+            processed_data=processed,
+        )
+
+        self.device.refresh_from_db()
+        self.assertEqual(self.device.model.name, "S6860-54HF")
+        self.assertEqual(self.device.soft_version, "7.1.070 Feature 2707")
+        self.assertEqual(self.device.patch_version, "Feature 2707H17")
+
+
+class DeviceApiAutoBindingCutoverTests(TestCase):
+    def setUp(self):
+        self.vendor = Vendor.objects.create(name="华三", alias="H3C")
+        self.category = Category.objects.create(name="switch")
+        self.model = Model.objects.create(name="S9825-64D", vendor=self.vendor)
+        self.device = NetworkDevice.objects.create(
+            name="s98-core-a",
+            manage_ip="10.254.11.101",
+            serial_num="SER-S98-001",
+            vendor=self.vendor,
+            category=self.category,
+            model=self.model,
+            soft_version="9.1.043 Release 9131",
+            patch_version="-",
+        )
+        self.legacy_plan = DeviceCollectionPlans.objects.create(
+            name="default-h3c-legacy-switch",
+            vendor="H3C",
+            device_type="switch",
+            profile_code="H3C-legacy-cli",
+            plan_kind=DeviceCollectionPlans.PLAN_KIND_TEMPLATE,
+            generated_by_system=True,
+            is_default=True,
+            enabled_collection_types=["device_identity"],
+            collection_method=DeviceCollectionPlans.COLLECTION_METHOD_NETMIKO,
+            is_active=True,
+        )
+        PlansToDevice.objects.create(
+            device_serial_num=self.device.serial_num,
+            manage_ip=self.device.manage_ip,
+            plan=self.legacy_plan,
+            profile_code="H3C-legacy-cli",
+            binding_source=PlansToDevice.BINDING_SOURCE_AUTO,
+            is_active=True,
+            use_local=True,
+        )
+
+    def test_auto_bind_devices_retires_stale_auto_binding_for_new_profile(self):
+        PlatformProfileService.ensure_builtin_profiles()
+
+        result = PlatformProfileService.auto_bind_devices([self.device])
+
+        active_relations = list(
+            PlansToDevice.objects.filter(
+                device_serial_num=self.device.serial_num,
+                is_active=True,
+            ).values_list("profile_code", flat=True)
+        )
+        inactive_relations = list(
+            PlansToDevice.objects.filter(
+                device_serial_num=self.device.serial_num,
+                is_active=False,
+            ).values_list("profile_code", flat=True)
+        )
+
+        self.assertIn("H3C-S98xx-cli", active_relations)
+        self.assertIn("H3C-legacy-cli", inactive_relations)
+        self.assertEqual(result["retired"], 1)
+        self.assertEqual(result["results"][0]["retired_auto_bindings"], 1)
+
+
+class DeviceApiDefaultPlanAliasTests(TestCase):
+    def test_ensure_default_plan_for_profile_renames_huawei_ce_legacy_alias(self):
+        legacy_plan = DeviceCollectionPlans.objects.create(
+            name="default-huawei-ce-switch",
+            vendor="Huawei",
+            device_type="switch",
+            profile_code="Huawei-CE",
+            plan_kind=DeviceCollectionPlans.PLAN_KIND_TEMPLATE,
+            generated_by_system=True,
+            is_default=True,
+            enabled_collection_types=["device_identity"],
+            collection_method=DeviceCollectionPlans.COLLECTION_METHOD_NETMIKO,
+            is_active=True,
+        )
+
+        profile = next(
+            item
+            for item in PlatformProfileService.ensure_builtin_profiles()
+            if item.code == "Huawei-CE"
+        )
+        plan = PlatformProfileService.ensure_default_plan_for_profile(profile)
+
+        legacy_plan.refresh_from_db()
+        self.assertEqual(plan.id, legacy_plan.id)
+        self.assertEqual(plan.name, "default-huawei-ce-netconf-switch")
+        self.assertEqual(plan.collection_method, DeviceCollectionPlans.COLLECTION_METHOD_NETCONF)
+        self.assertFalse(DeviceCollectionPlans.objects.filter(name="default-huawei-ce-switch").exists())
+
+    def test_ensure_default_plan_for_profile_retires_unused_huawei_ce88_alias(self):
+        legacy_plan = DeviceCollectionPlans.objects.create(
+            name="default-huawei-ce88xx-switch",
+            vendor="Huawei",
+            device_type="switch",
+            profile_code="Huawei-CE88xx",
+            plan_kind=DeviceCollectionPlans.PLAN_KIND_TEMPLATE,
+            generated_by_system=True,
+            is_default=True,
+            enabled_collection_types=["device_identity"],
+            collection_method=DeviceCollectionPlans.COLLECTION_METHOD_NETMIKO,
+            is_active=True,
+        )
+        DeviceCollectionPlans.objects.create(
+            name="default-huawei-ce88xx-netconf-switch",
+            vendor="Huawei",
+            device_type="switch",
+            profile_code="Huawei-CE88xx",
+            plan_kind=DeviceCollectionPlans.PLAN_KIND_TEMPLATE,
+            generated_by_system=True,
+            is_default=True,
+            enabled_collection_types=["device_identity"],
+            collection_method=DeviceCollectionPlans.COLLECTION_METHOD_NETCONF,
+            is_active=True,
+        )
+
+        profile = next(
+            item
+            for item in PlatformProfileService.ensure_builtin_profiles()
+            if item.code == "Huawei-CE88xx"
+        )
+        PlatformProfileService.ensure_default_plan_for_profile(profile)
+
+        legacy_plan.refresh_from_db()
+        self.assertFalse(legacy_plan.is_active)
+        self.assertFalse(legacy_plan.is_default)
+
+
+class DeviceApiCapabilityDiscoveryStateTests(TestCase):
+    def test_update_capability_facts_persists_into_discovery_state(self):
+        vendor, _ = Vendor.objects.get_or_create(name="华三", defaults={"alias": "H3C"})
+        category, _ = Category.objects.get_or_create(name="switch")
+        model, _ = Model.objects.get_or_create(name="S6860-54HF", vendor=vendor)
+        device = NetworkDevice.objects.create(
+            name="h3c-cap-a",
+            manage_ip="10.0.0.88",
+            serial_num="SER-H3C-CAP-001",
+            vendor=vendor,
+            category=category,
+            model=model,
+            soft_version="7.1.070 Feature 2707",
+        )
+
+        PlatformProfileService.update_capability_facts(
+            collection_type="netconf_capability",
+            device_info={
+                "manage_ip": device.manage_ip,
+                "serial_num": device.serial_num,
+                "vendor__alias": "H3C",
+            },
+            processed_data=[
+                {
+                    "schema_count": 99,
+                    "openconfig_schema_count": 49,
+                    "has_bgp_schema": True,
+                    "has_l2vpn_schema": True,
+                    "has_ifmgr_schema": True,
+                    "has_telemetry_schema": False,
+                    "schema_samples": ["openconfig-bgp", "h3c-l2vpn"],
+                }
+            ],
+        )
+
+        state = DeviceDiscoveryState.objects.get(device_serial_num=device.serial_num)
+
+        self.assertIn("netconf_capability", state.capability_facts["probes"])
+        self.assertEqual(
+            state.capability_facts["probes"]["netconf_capability"]["schema_count"],
+            99,
+        )
+        self.assertTrue(state.capability_facts["protocols"]["netconf"] is False)
+
+
 class DeviceApiProtocolExtensionTests(SimpleTestCase):
+    databases = {"default"}
     @staticmethod
     def _parse_textfsm_rows(template_name, raw_text):
         template_path = TEMPLATE_BASE_DIR / template_name
@@ -2767,6 +3507,23 @@ class DeviceApiProtocolExtensionTests(SimpleTestCase):
         self.assertIn("neighbor_router_id", get_collection_output_fields("ospf_neighbors"))
         self.assertIn("system_id", get_collection_output_fields("isis_neighbors"))
 
+    def test_default_collection_types_include_overlay_mac_types(self):
+        expected_types = {
+            "mac_bd",
+            "mac_vxlan",
+            "mac_vxlan_control",
+        }
+
+        self.assertTrue(expected_types.issubset(set(DEFAULT_COLLECTION_TYPES)))
+        self.assertIn("bd_id", get_collection_output_fields("mac_bd"))
+        self.assertIn("vn_id", get_collection_output_fields("mac_vxlan"))
+        self.assertIn("tunnel_type", get_collection_output_fields("mac_vxlan_control"))
+
+    def test_default_collection_types_include_vxlan_capability(self):
+        self.assertIn("vxlan_capability", DEFAULT_COLLECTION_TYPES)
+        self.assertIn("has_vxlan_vni", get_collection_output_fields("vxlan_capability"))
+        self.assertIn("has_evpn_bgp", get_collection_output_fields("vxlan_capability"))
+
     def test_collection_type_mongo_map_contains_routing_protocol_collections(self):
         expected_types = {
             "route_table",
@@ -2778,6 +3535,30 @@ class DeviceApiProtocolExtensionTests(SimpleTestCase):
         }
 
         self.assertTrue(expected_types.issubset(set(COLLECTION_TYPE_MONGO_MAP.keys())))
+
+    def test_collection_type_mongo_map_contains_overlay_mac_collections(self):
+        expected_types = {
+            "mac_bd",
+            "mac_vxlan",
+            "mac_vxlan_control",
+        }
+
+        self.assertTrue(expected_types.issubset(set(COLLECTION_TYPE_MONGO_MAP.keys())))
+
+    def test_collection_type_mongo_map_contains_vxlan_capability(self):
+        self.assertIn("vxlan_capability", COLLECTION_TYPE_MONGO_MAP.keys())
+
+    def test_netconf_template_serializer_rejects_rpc_collect_method(self):
+        serializer = NetconfXMLTemplateSerializer(
+            data={
+                "collect_method": "rpc",
+                "xml_template": "<top></top>",
+                "collection_plan": 1,
+            }
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("collect_method", serializer.errors)
 
     def test_h3c_route_table_netconf_processor_maps_route_fields(self):
         result = process_h3c_route_table_netconf(
@@ -3032,6 +3813,130 @@ class DeviceApiProtocolExtensionTests(SimpleTestCase):
         self.assertEqual(result[0]["interface"], "Eth-Trunk227")
         self.assertEqual(result[0]["type"], "dynamic")
 
+    def test_huawei_mac_bd_netconf_processor_maps_bd_fields(self):
+        result = process_huawei_mac_bd_netconf(
+            {
+                "mac": {
+                    "bdFdbs": {
+                        "bdFdb": {
+                            "slotId": "0",
+                            "macAddress": "00e0-ed73-81e0",
+                            "bdId": "11003",
+                            "vid": "100",
+                            "macType": "dynamic",
+                            "outIfName": "Eth-Trunk24.1",
+                        }
+                    }
+                }
+            }
+        )
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["macaddress"], "00e0-ed73-81e0")
+        self.assertEqual(result[0]["bd_id"], "11003")
+        self.assertEqual(result[0]["vlan"], "100")
+        self.assertEqual(result[0]["interface"], "Eth-Trunk24")
+        self.assertEqual(result[0]["type"], "dynamic")
+
+    def test_huawei_mac_vxlan_netconf_processor_maps_overlay_fields(self):
+        result = process_huawei_mac_vxlan_netconf(
+            {
+                "mac": {
+                    "vxlanFdbs": {
+                        "vxlanFdb": {
+                            "slotId": "0",
+                            "macAddress": "00e0-ed7a-5f38",
+                            "bdId": "11003",
+                            "macType": "evn",
+                            "sourceIP": "10.1.1.1",
+                            "peerIP": "10.1.1.2",
+                            "vnId": "501001",
+                            "tunnelType": "IPv4",
+                        }
+                    }
+                }
+            }
+        )
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["bd_id"], "11003")
+        self.assertEqual(result[0]["vn_id"], "501001")
+        self.assertEqual(result[0]["source_ip"], "10.1.1.1")
+        self.assertEqual(result[0]["peer_ip"], "10.1.1.2")
+        self.assertEqual(result[0]["tunnel_type"], "IPv4")
+
+    def test_huawei_mac_vxlan_control_netconf_processor_maps_ipv6_overlay_fields(self):
+        result = process_huawei_mac_vxlan_control_netconf(
+            {
+                "mac": {
+                    "vxlanControls": {
+                        "vxlanControl": {
+                            "slotId": "0",
+                            "macAddress": "00e0-ed7a-5f38",
+                            "bdId": "11003",
+                            "macType": "evn",
+                            "tunnelType": "IPv6",
+                            "sourceIpv6": "2001:db8::1",
+                            "peerIpv6": "2001:db8::2",
+                            "vnId": "501001",
+                        }
+                    }
+                }
+            }
+        )
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["bd_id"], "11003")
+        self.assertEqual(result[0]["vn_id"], "501001")
+        self.assertEqual(result[0]["source_ip"], "2001:db8::1")
+        self.assertEqual(result[0]["peer_ip"], "2001:db8::2")
+        self.assertEqual(result[0]["tunnel_type"], "IPv6")
+
+    def test_huawei_vxlan_capability_netconf_processor_maps_capability_flags(self):
+        from apps.device_api.processors.huawei import process_vxlan_capability_netconf
+
+        result = process_vxlan_capability_netconf(
+            {
+                "bridge-domains": {
+                    "bridge-domain": [
+                        {"id": "11003"},
+                        {"id": "11004"},
+                    ]
+                },
+                "vxlan": {
+                    "vni": [
+                        {"vni": "501001"},
+                        {"vni": "501002"},
+                    ],
+                    "nveIfName": "Nve1",
+                },
+                "bgp": {
+                    "bgpcomm": {
+                        "bgpVrfs": {
+                            "bgpVrf": {
+                                "vrfName": "_public_",
+                                "bgpVrfAFs": {
+                                    "bgpVrfAF": [
+                                        {"afType": "l2vpn-evpn"},
+                                        {"afType": "ipv4-unicast"},
+                                    ]
+                                },
+                            }
+                        }
+                    }
+                },
+            }
+        )
+
+        self.assertEqual(len(result), 1)
+        self.assertTrue(result[0]["has_bd"])
+        self.assertEqual(result[0]["bd_count"], 2)
+        self.assertTrue(result[0]["has_vxlan_vni"])
+        self.assertEqual(result[0]["vni_count"], 2)
+        self.assertTrue(result[0]["has_nve"])
+        self.assertTrue(result[0]["has_evpn_bgp"])
+        self.assertEqual(result[0]["evpn_af_count"], 1)
+
     def test_huawei_ip_interface_netconf_processor_extracts_ipv4_oper(self):
         result = process_huawei_ip_interface_netconf(
             {
@@ -3153,6 +4058,63 @@ class DeviceApiProtocolExtensionTests(SimpleTestCase):
         self.assertEqual(result[0]["established_peers"], 2)
         self.assertEqual(result[0]["non_established_peers"], 1)
         self.assertEqual(result[0]["dominant_state"], "Established")
+
+    def test_h3c_netconf_capability_processor_maps_schema_features(self):
+        result = process_h3c_netconf_capability_netconf(
+            {
+                "netconf-state": {
+                    "schemas": {
+                        "schema": [
+                            {
+                                "identifier": "openconfig-bgp",
+                                "namespace": "http://openconfig.net/yang/bgp",
+                            },
+                            {
+                                "identifier": "h3c-bgp",
+                                "namespace": "http://www.h3c.com/netconf/data:1.0/bgp",
+                            },
+                            {
+                                "identifier": "h3c-l2vpn",
+                                "namespace": "http://www.h3c.com/netconf/data:1.0/l2vpn",
+                            },
+                            {
+                                "identifier": "h3c-ifmgr",
+                                "namespace": "http://www.h3c.com/netconf/data:1.0/ifmgr",
+                            },
+                            {
+                                "identifier": "openconfig-telemetry",
+                                "namespace": "http://openconfig.net/yang/telemetry",
+                            },
+                        ]
+                    }
+                }
+            }
+        )
+
+        self.assertEqual(result[0]["schema_count"], 5)
+        self.assertEqual(result[0]["openconfig_schema_count"], 2)
+        self.assertTrue(result[0]["has_bgp_schema"])
+        self.assertTrue(result[0]["has_l2vpn_schema"])
+        self.assertTrue(result[0]["has_ifmgr_schema"])
+        self.assertTrue(result[0]["has_telemetry_schema"])
+
+    def test_h3c_cli_output_capability_processor_detects_unrecognized_irf(self):
+        result = process_h3c_cli_output_capability_netmiko(
+            "% Unrecognized command found at '^' position."
+        )
+
+        self.assertFalse(result[0]["supports_irf_cli"])
+        self.assertTrue(result[0]["command_unrecognized"])
+        self.assertFalse(result[0]["has_irf_members"])
+
+    def test_h3c_cli_output_capability_processor_detects_irf_members(self):
+        result = process_h3c_cli_output_capability_netmiko(
+            "MemberID  Role      Priority  CPU-Mac\n1         Master    1         0011-2233-4455"
+        )
+
+        self.assertTrue(result[0]["supports_irf_cli"])
+        self.assertFalse(result[0]["command_unrecognized"])
+        self.assertTrue(result[0]["has_irf_members"])
 
     def test_huawei_isis_neighbors_netmiko_processor_normalizes_peer_ip(self):
         result = process_huawei_isis_neighbors_netmiko(
@@ -3290,8 +4252,49 @@ class DeviceApiProtocolExtensionTests(SimpleTestCase):
         self.assertEqual(rows[0]["NEIGHBOR_TYPE"], "L2")
         self.assertEqual(rows[0]["UPTIME"], "2d03h")
 
+    def test_h3c_version_template_parses_feature_patch(self):
+        rows = self._parse_textfsm_rows(
+            "hp_comware_display_version.textfsm",
+            (
+                "H3C Comware Software, Version 7.1.070, Feature 2707\n"
+                "\n"
+                "Slot 1:\n"
+                "BOARD TYPE:         S6860-54HF\n"
+                "Release Version:    H3C S6860-54HF-2707\n"
+                "Patch Version:      Feature 2707H17\n"
+                "\n"
+            ),
+        )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["BOARD_TYPE"], "S6860-54HF")
+        self.assertEqual(rows[0]["Version"], "7.1.070, Feature 2707")
+        self.assertEqual(rows[0]["Patch_Ver"], "Feature 2707H17")
+
+    def test_h3c_link_aggregation_template_parses_local_members(self):
+        rows = self._parse_textfsm_rows(
+            "hp_comware_display_link-aggregation_verbose.textfsm",
+            (
+                "Aggregate Interface: Bridge-Aggregation53\n"
+                "Aggregation Mode: Dynamic\n"
+                "Local: \n"
+                "  Port                Status   Priority Index    Oper-Key               Flag\n"
+                "  FGE1/0/53           S        32768    1        1                      {ACDEF}\n"
+                "  FGE1/0/54           S        32768    5        1                      {ACDEF}\n"
+                "Remote: \n"
+            ),
+        )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["AGGNAME"], "Bridge-Aggregation53")
+        self.assertEqual(rows[0]["MODE"], "Dynamic")
+        self.assertEqual(rows[0]["MEMBERPORTS"], ["FGE1/0/53", "FGE1/0/54"])
+        self.assertEqual(rows[0]["STATUS"], ["S", "S"])
+
 
 class DeviceApiHealthExtensionTests(SimpleTestCase):
+    databases = {"default"}
+
     def test_default_collection_types_include_health_types(self):
         expected_types = {
             "fan_status",
@@ -3570,6 +4573,29 @@ class DeviceApiHealthExtensionTests(SimpleTestCase):
         self.assertEqual(router_profile.code, "H3C-router-cli")
         self.assertEqual(firewall_profile.code, "H3C-firewall-cli")
 
+    def test_match_profile_for_h3c_s98xx_switch_device(self):
+        profiles = [
+            SimpleNamespace(
+                code=item["code"],
+                vendor_alias=item["vendor_alias"],
+                category=item["category"],
+                series_patterns=item["series_patterns"],
+                version_patterns=item["version_patterns"],
+            )
+            for item in BUILTIN_PLATFORM_PROFILES
+        ]
+        switch = SimpleNamespace(
+            vendor=SimpleNamespace(alias="H3C"),
+            category=SimpleNamespace(name="交换机"),
+            model=SimpleNamespace(name="S9825-64D"),
+            soft_version="9.1.043 Release 9131",
+            name="s98-core-a",
+        )
+
+        profile = PlatformProfileService.match_profile_for_device(switch, profiles=profiles)
+
+        self.assertEqual(profile.code, "H3C-S98xx-cli")
+
     def test_match_profile_for_huawei_router_device(self):
         profiles = [
             SimpleNamespace(
@@ -3592,6 +4618,161 @@ class DeviceApiHealthExtensionTests(SimpleTestCase):
         router_profile = PlatformProfileService.match_profile_for_device(router, profiles=profiles)
 
         self.assertEqual(router_profile.code, "Huawei-router-cli")
+
+    def test_match_profile_for_huawei_ce98xx_device(self):
+        profiles = [
+            SimpleNamespace(
+                code=item["code"],
+                vendor_alias=item["vendor_alias"],
+                category=item["category"],
+                series_patterns=item["series_patterns"],
+                version_patterns=item["version_patterns"],
+            )
+            for item in BUILTIN_PLATFORM_PROFILES
+        ]
+        switch = SimpleNamespace(
+            vendor=SimpleNamespace(alias="Huawei"),
+            category=SimpleNamespace(name="交换机"),
+            model=SimpleNamespace(name="CE9860EI"),
+            soft_version="V800R023C05SPC200",
+            name="ce9860-a",
+        )
+
+        profile = PlatformProfileService.match_profile_for_device(switch, profiles=profiles)
+
+        self.assertEqual(profile.code, "Huawei-CE98xx")
+
+    def test_match_profile_for_huawei_ce88xx_device(self):
+        profiles = [
+            SimpleNamespace(
+                code=item["code"],
+                vendor_alias=item["vendor_alias"],
+                category=item["category"],
+                series_patterns=item["series_patterns"],
+                version_patterns=item["version_patterns"],
+            )
+            for item in BUILTIN_PLATFORM_PROFILES
+        ]
+        switch = SimpleNamespace(
+            vendor=SimpleNamespace(alias="Huawei"),
+            category=SimpleNamespace(name="交换机"),
+            model=SimpleNamespace(name="CE8850EI"),
+            soft_version="V800R023C05SPC200",
+            name="ce8850-a",
+        )
+
+        profile = PlatformProfileService.match_profile_for_device(switch, profiles=profiles)
+
+        self.assertEqual(profile.code, "Huawei-CE88xx")
+
+    @patch("apps.device_api.platform_profiles.PlatformProfileService.load_device_capability_facts")
+    def test_match_profile_prefers_capability_profile_when_probe_succeeds(self, mock_load_capability_facts):
+        profiles = [
+            SimpleNamespace(
+                code="Huawei-CE",
+                vendor_alias="Huawei",
+                category="switch",
+                series_patterns=[r"^CE6\d+"],
+                version_patterns=[r".*"],
+            ),
+            SimpleNamespace(
+                code="Huawei-CE68xx-netconf",
+                vendor_alias="Huawei",
+                category="switch",
+                series_patterns=[r"^CE6\d+"],
+                version_patterns=[r".*"],
+            ),
+        ]
+        switch = SimpleNamespace(
+            vendor=SimpleNamespace(alias="Huawei"),
+            category=SimpleNamespace(name="交换机"),
+            model=SimpleNamespace(name="CE6857F"),
+            soft_version="V800R022C05SPC500",
+            name="ce6857-a",
+        )
+        mock_load_capability_facts.return_value = {
+            "protocols": {"netconf": True, "ssh": True},
+            "probes": {
+                "netconf_capability": {
+                    "ran_success": True,
+                    "has_bd": False,
+                    "has_vxlan_vni": False,
+                    "has_nve": False,
+                    "has_evpn_bgp": True,
+                }
+            },
+        }
+
+        profile = PlatformProfileService.match_profile_for_device(switch, profiles=profiles)
+
+        self.assertEqual(profile.code, "Huawei-CE68xx-netconf")
+
+    @patch("apps.device_api.platform_profiles.PlatformProfileService.load_device_capability_facts")
+    def test_match_profile_prefers_h3c_s98xx_when_netconf_capability_is_richer(self, mock_load_capability_facts):
+        profiles = [
+            SimpleNamespace(
+                code="H3C-modern-netconf",
+                vendor_alias="H3C",
+                category="switch",
+                series_patterns=[r"^S\d+"],
+                version_patterns=[r".*"],
+            ),
+            SimpleNamespace(
+                code="H3C-S98xx-cli",
+                vendor_alias="H3C",
+                category="switch",
+                series_patterns=[r"^S\d+"],
+                version_patterns=[r".*"],
+            ),
+        ]
+        switch = SimpleNamespace(
+            vendor=SimpleNamespace(alias="H3C"),
+            category=SimpleNamespace(name="交换机"),
+            model=SimpleNamespace(name="S9825-64D"),
+            soft_version="9.1.0439131",
+            name="s98-core-a",
+        )
+        mock_load_capability_facts.return_value = {
+            "protocols": {"netconf": True, "ssh": True},
+            "probes": {
+                "netconf_capability": {
+                    "ran_success": True,
+                    "schema_count": 425,
+                    "has_l2vpn_schema": True,
+                    "has_telemetry_schema": True,
+                }
+            },
+        }
+
+        profile = PlatformProfileService.match_profile_for_device(switch, profiles=profiles)
+
+        self.assertEqual(profile.code, "H3C-S98xx-cli")
+
+    @patch("apps.device_api.platform_profiles.PlatformProfileService.load_device_capability_facts")
+    def test_build_capabilities_includes_capability_facts(self, mock_load_capability_facts):
+        vendor, _ = Vendor.objects.get_or_create(name="华为", defaults={"alias": "Huawei"})
+        category, _ = Category.objects.get_or_create(name="switch")
+        model, _ = Model.objects.get_or_create(name="CE6857F", vendor=vendor)
+        device, _ = NetworkDevice.objects.update_or_create(
+            serial_num="SER-CAP-001",
+            defaults={
+                "name": "ce6857-a",
+                "manage_ip": "10.0.0.9",
+                "vendor": vendor,
+                "category": category,
+                "model": model,
+                "soft_version": "V800R022C05SPC500",
+            },
+        )
+        mock_load_capability_facts.return_value = {
+            "protocols": {"netconf": True, "ssh": False},
+            "probes": {"netconf_capability": {"ran_success": True, "has_evpn_bgp": True}},
+        }
+
+        payload = PlatformProfileService.build_capabilities(device)
+
+        self.assertIn("capability_facts", payload)
+        self.assertTrue(payload["capability_facts"]["probes"]["netconf_capability"]["has_evpn_bgp"])
 
     def test_audit_plan_readiness_flags_missing_templates(self):
         sub_plan = SimpleNamespace(
@@ -3683,10 +4864,10 @@ class DeviceApiHealthExtensionTests(SimpleTestCase):
             netconf_enable="account",
             netconf_account=102,
         )
-        profile = SimpleNamespace(code="Huawei-CE", default_plan_name="default-huawei-ce-switch")
+        profile = SimpleNamespace(code="Huawei-CE", default_plan_name="default-huawei-ce-netconf-switch")
         plan = SimpleNamespace(
             id=201,
-            name="default-huawei-ce-switch",
+            name="default-huawei-ce-netconf-switch",
             collect_plans=SimpleNamespace(all=lambda: []),
         )
 
@@ -3834,6 +5015,26 @@ class DeviceCollectionServiceExecutionTests(SimpleTestCase):
         self.assertEqual(info["snmp_auth_key"], "auth-secret")
         self.assertEqual(info["snmp_priv_key"], "priv-secret")
         self.assertEqual(info["snmp_port"], 162)
+
+    def test_build_device_info_for_local_keeps_connection_policy_override(self):
+        device = SimpleNamespace(
+            manage_ip="10.0.0.1",
+            name="sw-a",
+            idc=None,
+            vendor=SimpleNamespace(alias="H3C"),
+            ssh_account=None,
+            netconf_account=None,
+        )
+
+        info = DeviceCollectionService._build_device_info_for_local(
+            device,
+            connection_policy={"netconf_timeout_seconds": 5, "netconf_retry_times": 0},
+        )
+
+        self.assertEqual(
+            info["connection_policy"],
+            {"netconf_timeout_seconds": 5, "netconf_retry_times": 0},
+        )
 
     @patch("apps.device_api.platform_profiles.DeviceFactService.update_from_processed_data")
     @patch("apps.device_api.services_new.save_local_collection_result")
@@ -4123,6 +5324,53 @@ class DeviceCollectionServiceExecutionTests(SimpleTestCase):
             payload["connection_args"]["device_params"],
             {"name": "nexus"},
         )
+
+    def test_execute_netconf_south_rejects_rpc_collect_method(self):
+        runner = Mock()
+        config = SimpleNamespace(south_http_port="18080")
+        xml_template = SimpleNamespace(
+            xml_template="<rpc></rpc>",
+            collect_method="rpc",
+        )
+        plan = SimpleNamespace(
+            id=15,
+            collection_type="arp",
+            xml_templates=SimpleNamespace(first=lambda: xml_template),
+        )
+        device = SimpleNamespace(
+            manage_ip="10.0.0.5",
+            name="sw-e",
+            vendor=SimpleNamespace(alias="Huawei"),
+            idc=SimpleNamespace(name="IDC-E"),
+            netconf_account=SimpleNamespace(username="netconf", decode_password="secret"),
+        )
+
+        result = DeviceCollectionService._execute_netconf_south(
+            plan,
+            device,
+            "10.0.0.200",
+            runner,
+            config,
+        )
+
+        self.assertFalse(result["success"])
+        self.assertIn("仅允许 get/get_config", result["error"])
+        runner.get_device_config.assert_not_called()
+
+    @patch("apps.device_api.services_new.DeviceSubCollectionPlan.objects.filter")
+    def test_build_sub_plan_name_falls_back_to_summary_plan_id_after_collision_limit(
+        self,
+        mock_filter,
+    ):
+        mock_filter.return_value.exists.side_effect = [True] * 1000 + [False]
+
+        name = DeviceCollectionService._build_sub_plan_name(
+            "default-h3c-s98xx-switch",
+            "cli_output_capability",
+            summary_plan_id=148,
+        )
+
+        self.assertEqual(name, "default-h3c-s98xx-switch-148-cli_output_capability")
 
     def test_execute_netconf_south_returns_explicit_error_when_template_missing(self):
         plan = SimpleNamespace(
