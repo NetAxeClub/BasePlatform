@@ -333,19 +333,32 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
         "os_family": "VRP",
         "version_patterns": [r".*"],
         "preferred_methods": {
-            "device_identity": ["netmiko"],
-            "arp": ["restconf", "netmiko"],
-            "interface_brief": ["netmiko"],
-            "ip_interface": ["netmiko"],
+            "device_identity": ["netconf", "netmiko"],
+            "arp": ["netmiko"],
+            "mac": ["netmiko"],
+            "lldp": ["netmiko"],
+            "interface_brief": ["netconf", "netmiko"],
+            "ip_interface": ["netconf", "netmiko"],
+            "aggre_port": ["netconf"],
+            "route_table": ["netconf"],
         },
         "fallback_methods": {
+            "device_identity": ["netmiko"],
             "arp": ["netmiko"],
+            "mac": ["netmiko"],
+            "lldp": ["netmiko"],
+            "interface_brief": ["netmiko"],
+            "ip_interface": ["netmiko"],
         },
         "supported_collection_types": _supported_types(
             "device_identity",
             "arp",
             "mac",
             "lldp",
+            "interface_brief",
+            "ip_interface",
+            "aggre_port",
+            "route_table",
         ),
         "default_plan_name": "default-huawei-usg-firewall",
     },
@@ -353,26 +366,50 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
         "code": "Huawei-YunShan",
         "vendor_alias": "Huawei",
         "category": "switch",
-        "series_patterns": [r"YunShan", r"CloudEngine.*AI"],
+        "series_patterns": [r"YunShan", r"CloudEngine.*AI", r"^CE16800-X\d+", r"^CE168\d+", r"CHASSIS-X"],
         "os_family": "YunShan OS",
         "version_patterns": [r".*"],
         "preferred_methods": {
-            "device_identity": ["netmiko"],
+            "device_identity": ["netconf", "netmiko"],
+            "netconf_capability": ["netconf"],
+            "board_status": ["netconf"],
+            "arp": ["netconf"],
+            "mac": ["netconf", "netmiko"],
+            "lldp": ["netconf", "netmiko"],
             "cpu_status": ["telemetry", "restconf"],
             "memory_status": ["telemetry", "restconf"],
-            "interface_brief": ["restconf", "netmiko"],
-            "ip_interface": ["restconf", "netmiko"],
+            "interface_brief": ["netconf", "restconf", "netmiko"],
+            "ip_interface": ["netconf", "restconf", "netmiko"],
+            "aggre_port": ["netconf", "netmiko"],
+            "route_table": ["netconf"],
+            "bgp_neighbors": ["netconf", "netmiko"],
+            "bgp_summary": ["netconf", "netmiko"],
         },
         "fallback_methods": {
+            "device_identity": ["netmiko"],
+            "mac": ["netmiko"],
+            "lldp": ["netmiko"],
             "cpu_status": ["netmiko"],
             "memory_status": ["netmiko"],
             "interface_brief": ["netmiko"],
             "ip_interface": ["netmiko"],
+            "aggre_port": ["netmiko"],
+            "bgp_neighbors": ["netmiko"],
+            "bgp_summary": ["netmiko"],
         },
         "supported_collection_types": _supported_types(
             "device_identity",
+            "netconf_capability",
+            "board_status",
+            "arp",
+            "mac",
+            "lldp",
             "interface_brief",
             "ip_interface",
+            "aggre_port",
+            "route_table",
+            "bgp_neighbors",
+            "bgp_summary",
         ),
         "default_plan_name": "default-huawei-yunshan-switch",
     },
@@ -718,6 +755,8 @@ PROFILE_PLAN_METHOD_DEFAULTS: Dict[str, str] = {
     "Huawei-CE98xx": DeviceCollectionPlans.COLLECTION_METHOD_NETCONF,
     "Huawei-CE88xx": DeviceCollectionPlans.COLLECTION_METHOD_NETCONF,
     "Huawei-CE": DeviceCollectionPlans.COLLECTION_METHOD_NETCONF,
+    "Huawei-USG": DeviceCollectionPlans.COLLECTION_METHOD_BOTH,
+    "Huawei-YunShan": DeviceCollectionPlans.COLLECTION_METHOD_BOTH,
     "H3C-S98xx-cli": DeviceCollectionPlans.COLLECTION_METHOD_BOTH,
     "H3C-legacy-cli": DeviceCollectionPlans.COLLECTION_METHOD_BOTH,
     "H3C-modern-netconf": DeviceCollectionPlans.COLLECTION_METHOD_BOTH,
@@ -733,10 +772,25 @@ PROFILE_CAPABILITY_REQUIREMENTS: Dict[str, Dict[str, object]] = {
     "Huawei-CE68xx-netconf": {
         "preferred_successful_probes": ["netconf_capability"],
         "required_protocols": {"netconf": True},
+        "preferred_identity_patterns": {
+            "model_name": [r"^CE68\d+"],
+        },
     },
     "Huawei-CE88xx": {
         "preferred_successful_probes": ["netconf_capability"],
         "required_protocols": {"netconf": True},
+        "preferred_identity_patterns": {
+            "model_name": [r"^CE88\d+"],
+        },
+    },
+    "Huawei-YunShan": {
+        "preferred_successful_probes": ["netconf_capability"],
+        "required_protocols": {"netconf": True},
+        "preferred_identity_patterns": {
+            "platform_name": [r"YunShan"],
+            "model_name": [r"^CE168\d+"],
+            "product_name": [r"CloudEngine"],
+        },
     },
     "H3C-modern-netconf": {
         "preferred_successful_probes": ["netconf_capability"],
@@ -1043,8 +1097,19 @@ PROFILE_NETMIKO_SUB_PLAN_DEFAULTS: Dict[str, Dict[str, Dict[str, str]]] = {
     },
     "Huawei-YunShan": {
         "device_identity": {"command": "display version", "template": "huawei_vrp_display_version.textfsm"},
+        "mac": {"command": "display mac-address", "template": "huawei_vrp_display_mac-address.textfsm"},
+        "lldp": {"command": "display lldp neighbor", "template": "huawei_vrp_display_lldp_neighbor.textfsm"},
         "interface_brief": {"command": "display interface brief", "template": "huawei_vrp_display_interface_brief.textfsm"},
         "ip_interface": {"command": "display interface", "template": "huawei_vrp_display_interface.textfsm"},
+        "aggre_port": {"command": "display eth-trunk", "template": "huawei_vrp_display_eth-trunk.textfsm"},
+        "bgp_neighbors": {
+            "command": "display bgp peer verbose",
+            "template": "huawei_vrp_display_bgp_peer_verbose.textfsm",
+        },
+        "bgp_summary": {
+            "command": "display bgp peer",
+            "template": "huawei_vrp_display_bgp_peer.textfsm",
+        },
     },
     "H3C-legacy-cli": {
         "device_identity": {"command": "display version", "template": "hp_comware_display_version.textfsm"},
@@ -1509,6 +1574,320 @@ PROFILE_NETCONF_XML_TEMPLATE_DEFAULTS: Dict[str, Dict[str, Dict[str, str]]] = {
     }
 }
 
+PROFILE_NETCONF_XML_TEMPLATE_DEFAULTS["Huawei-USG"] = {
+    "device_identity": {
+        "collect_method": "get",
+        "legacy_method": "get_system_info",
+        "xml_template": """
+<device-state xmlns="urn:huawei:params:xml:ns:yang:huawei-device">
+</device-state>
+""".strip(),
+        "description": "HuaweiUSG.get_system_info",
+    },
+    "interface_brief": {
+        "collect_method": "get_config",
+        "legacy_method": "get_interface_list",
+        "xml_template": """
+<filter type="subtree">
+  <interfaces xmlns="urn:ietf:params:xml:ns:yang:ietf-interfaces"
+      xmlns:ip="urn:ietf:params:xml:ns:yang:ietf-ip"
+      xmlns:hw-if="urn:huawei:params:xml:ns:yang:huawei-interface"
+      xmlns:hw-zone="urn:huawei:params:xml:ns:yang:huawei-security-zone"
+      xmlns:hw-trunk="urn:huawei:params:xml:ns:yang:huawei-eth-trunk">
+  </interfaces>
+</filter>
+""".strip(),
+        "description": "HuaweiUSG.get_interface_list shared with ip_interface",
+    },
+    "ip_interface": {
+        "collect_method": "get_config",
+        "legacy_method": "get_interface_list",
+        "xml_template": """
+<filter type="subtree">
+  <interfaces xmlns="urn:ietf:params:xml:ns:yang:ietf-interfaces"
+      xmlns:ip="urn:ietf:params:xml:ns:yang:ietf-ip"
+      xmlns:hw-if="urn:huawei:params:xml:ns:yang:huawei-interface"
+      xmlns:hw-zone="urn:huawei:params:xml:ns:yang:huawei-security-zone"
+      xmlns:hw-trunk="urn:huawei:params:xml:ns:yang:huawei-eth-trunk">
+  </interfaces>
+</filter>
+""".strip(),
+        "description": "HuaweiUSG.get_interface_list shared with interface_brief",
+    },
+    "aggre_port": {
+        "collect_method": "get_config",
+        "legacy_method": "get_trunk_lacp",
+        "xml_template": """
+<filter type="subtree">
+  <interfaces xmlns="urn:ietf:params:xml:ns:yang:ietf-interfaces"
+      xmlns:hw-trunk="urn:huawei:params:xml:ns:yang:huawei-eth-trunk">
+  </interfaces>
+</filter>
+""".strip(),
+        "description": "HuaweiUSG.get_trunk_lacp",
+    },
+    "route_table": {
+        "collect_method": "get_config",
+        "legacy_method": "get_device_route",
+        "xml_template": """
+<filter type="subtree">
+  <routing xmlns="urn:ietf:params:xml:ns:yang:ietf-routing">
+  </routing>
+</filter>
+""".strip(),
+        "description": "HuaweiUSG.get_device_route",
+    },
+}
+
+PROFILE_NETCONF_XML_TEMPLATE_DEFAULTS["Huawei-YunShan"] = {
+    "device_identity": {
+        "collect_method": "get",
+        "legacy_method": "collection_system_info",
+        "xml_template": """
+<system xmlns="urn:huawei:yang:huawei-system">
+  <system-info/>
+</system>
+""".strip(),
+        "description": "Huawei YunShan system-info via huawei-system YANG",
+    },
+    "netconf_capability": {
+        "collect_method": "get",
+        "legacy_method": "collection_yang_info",
+        "xml_template": """
+<netconf-state xmlns="urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring">
+  <schemas/>
+</netconf-state>
+""".strip(),
+        "description": "Huawei YunShan NETCONF schema probe via ietf-netconf-monitoring",
+    },
+    "board_status": {
+        "collect_method": "get",
+        "legacy_method": "collection_moduleinfo",
+        "xml_template": """
+<devm xmlns="urn:huawei:yang:huawei-devm">
+  <mpu-boards/>
+  <lpu-boards/>
+  <sfu-boards/>
+  <device-info/>
+</devm>
+""".strip(),
+        "description": "Huawei YunShan board inventory via huawei-devm",
+    },
+    "arp": {
+        "collect_method": "get",
+        "legacy_method": "collection_arp_list",
+        "xml_template": """
+<arp:arp xmlns:arp="urn:huawei:yang:huawei-arp">
+  <arp:query-entries>
+    <arp:query-entry>
+      <arp:ip-addr/>
+      <arp:if-name/>
+      <arp:mac-addr/>
+    </arp:query-entry>
+  </arp:query-entries>
+</arp:arp>
+""".strip(),
+        "description": "HuaweiYunShanCollection.collection_arp_list",
+    },
+    "mac": {
+        "collect_method": "get",
+        "legacy_method": "collection_mac_table",
+        "xml_template": """
+<mac:mac xmlns:mac="urn:huawei:yang:huawei-mac">
+  <mac:vlan-dynamic-macs>
+    <mac:vlan-dynamic-mac>
+      <mac:slot-id/>
+      <mac:vlan-id/>
+      <mac:address/>
+      <mac:type/>
+      <mac:out-interface-name/>
+      <mac:last-change-time/>
+    </mac:vlan-dynamic-mac>
+  </mac:vlan-dynamic-macs>
+</mac:mac>
+""".strip(),
+        "description": "Huawei YunShan VLAN dynamic MAC state path from huawei-mac schema",
+    },
+    "lldp": {
+        "collect_method": "get",
+        "legacy_method": "collection_lldp_ip",
+        "xml_template": """
+<ifm:ifm xmlns:ifm="urn:huawei:yang:huawei-ifm" xmlns:lldp="urn:huawei:yang:huawei-lldp">
+  <ifm:interfaces>
+    <ifm:interface>
+      <ifm:name/>
+      <lldp:lldp>
+        <lldp:session>
+          <lldp:neighbors/>
+        </lldp:session>
+      </lldp:lldp>
+    </ifm:interface>
+  </ifm:interfaces>
+</ifm:ifm>
+""".strip(),
+        "description": "Huawei YunShan LLDP neighbors via huawei-lldp augment on huawei-ifm",
+    },
+    "interface_brief": {
+        "collect_method": "get",
+        "legacy_method": "collection_arp_list_test",
+        "xml_template": """
+<ifm:ifm xmlns:ifm="urn:huawei:yang:huawei-ifm" xmlns:ip="urn:huawei:yang:huawei-ip">
+  <ifm:interfaces>
+    <ifm:interface>
+      <ifm:name/>
+      <ifm:admin-status/>
+      <ifm:oper-status/>
+      <ifm:speed/>
+      <ifm:description/>
+      <ip:ipv4/>
+    </ifm:interface>
+  </ifm:interfaces>
+</ifm:ifm>
+""".strip(),
+        "description": "HuaweiYunShanCollection.collection_arp_list_test shared with ip_interface",
+    },
+    "ip_interface": {
+        "collect_method": "get",
+        "legacy_method": "collection_arp_list_test",
+        "xml_template": """
+<ifm:ifm xmlns:ifm="urn:huawei:yang:huawei-ifm" xmlns:ip="urn:huawei:yang:huawei-ip">
+  <ifm:interfaces>
+    <ifm:interface>
+      <ifm:name/>
+      <ifm:admin-status/>
+      <ifm:oper-status/>
+      <ifm:speed/>
+      <ifm:description/>
+      <ip:ipv4/>
+    </ifm:interface>
+  </ifm:interfaces>
+</ifm:ifm>
+""".strip(),
+        "description": "HuaweiYunShanCollection.collection_arp_list_test shared with interface_brief",
+    },
+    "aggre_port": {
+        "collect_method": "get",
+        "legacy_method": "collection_trunk_lacp",
+        "xml_template": """
+<ifm:ifm xmlns:ifm="urn:huawei:yang:huawei-ifm" xmlns:trunk="urn:huawei:yang:huawei-ifm-trunk">
+  <ifm:interfaces>
+    <ifm:interface>
+      <ifm:name/>
+      <ifm:type/>
+      <trunk:trunk>
+        <trunk:work-mode/>
+        <trunk:members/>
+      </trunk:trunk>
+    </ifm:interface>
+  </ifm:interfaces>
+</ifm:ifm>
+""".strip(),
+        "description": "Huawei YunShan trunk members via huawei-ifm-trunk augment on huawei-ifm",
+    },
+    "route_table": {
+        "collect_method": "get",
+        "legacy_method": "collection_route_table",
+        "xml_template": """
+<network-instance xmlns="urn:huawei:yang:huawei-network-instance" xmlns:l3vpn="urn:huawei:yang:huawei-l3vpn" xmlns:rt="urn:huawei:yang:huawei-routing">
+  <instances>
+    <instance>
+      <name/>
+      <l3vpn:afs>
+        <l3vpn:af>
+          <l3vpn:type/>
+          <rt:routing>
+            <rt:routing-manage>
+              <rt:topologys>
+                <rt:topology>
+                  <rt:name/>
+                  <rt:routes>
+                    <rt:ipv4-unicast-routes/>
+                  </rt:routes>
+                </rt:topology>
+              </rt:topologys>
+            </rt:routing-manage>
+          </rt:routing>
+        </l3vpn:af>
+      </l3vpn:afs>
+    </instance>
+  </instances>
+</network-instance>
+""".strip(),
+        "description": "Huawei YunShan IPv4 unicast routes via huawei-network-instance + huawei-routing",
+    },
+    "bgp_neighbors": {
+        "collect_method": "get",
+        "legacy_method": "collection_bgp_peer",
+        "xml_template": """
+<network-instance xmlns="urn:huawei:yang:huawei-network-instance" xmlns:bgp="urn:huawei:yang:huawei-bgp">
+  <instances>
+    <instance>
+      <name/>
+      <bgp:bgp>
+        <bgp:base-process>
+          <bgp:peer-states>
+            <bgp:peer-state>
+              <bgp:address/>
+              <bgp:af-type/>
+              <bgp:establish-mode/>
+              <bgp:remote-as/>
+              <bgp:peer-state/>
+              <bgp:remote-router-id/>
+              <bgp:group-name/>
+            </bgp:peer-state>
+          </bgp:peer-states>
+          <bgp:peer-total-numbers>
+            <bgp:peer-total-number>
+              <bgp:af-type/>
+              <bgp:static-peer-number/>
+              <bgp:static-peer-established-number/>
+              <bgp:dynamic-peer-number/>
+            </bgp:peer-total-number>
+          </bgp:peer-total-numbers>
+          <bgp:peers>
+            <bgp:peer>
+              <bgp:address/>
+              <bgp:remote-as/>
+              <bgp:group-name/>
+              <bgp:description/>
+            </bgp:peer>
+          </bgp:peers>
+        </bgp:base-process>
+      </bgp:bgp>
+    </instance>
+  </instances>
+</network-instance>
+""".strip(),
+        "description": "Huawei YunShan BGP peers via huawei-network-instance + huawei-bgp (peer-states if present, peers config fallback)",
+    },
+    "bgp_summary": {
+        "collect_method": "get",
+        "legacy_method": "collection_bgp_peer",
+        "xml_template": """
+<network-instance xmlns="urn:huawei:yang:huawei-network-instance" xmlns:bgp="urn:huawei:yang:huawei-bgp">
+  <instances>
+    <instance>
+      <name/>
+      <bgp:bgp>
+        <bgp:base-process>
+          <bgp:peer-total-numbers>
+            <bgp:peer-total-number>
+              <bgp:af-type/>
+              <bgp:static-peer-number/>
+              <bgp:static-peer-established-number/>
+              <bgp:dynamic-peer-number/>
+            </bgp:peer-total-number>
+          </bgp:peer-total-numbers>
+        </bgp:base-process>
+      </bgp:bgp>
+    </instance>
+  </instances>
+</network-instance>
+""".strip(),
+        "description": "Huawei YunShan BGP peer totals via huawei-network-instance + huawei-bgp",
+    },
+}
+
 for _h3c_cli_cap_profile_code in ("H3C-S98xx-cli", "H3C-legacy-cli"):
     PROFILE_NETCONF_XML_TEMPLATE_DEFAULTS[_h3c_cli_cap_profile_code] = {
         "netconf_capability": dict(
@@ -1810,6 +2189,13 @@ class PlatformProfileService:
         existing_state = None
         if device.serial_num:
             existing_state = DeviceDiscoveryState.objects.filter(device_serial_num=device.serial_num).first()
+        if existing_state is None and device.manage_ip:
+            existing_state = DeviceDiscoveryState.objects.filter(manage_ip=device.manage_ip).first()
+
+        capability_facts = cls._merge_capability_facts(
+            getattr(existing_state, "capability_facts", {}) or {},
+            capability_facts,
+        )
 
         profile_code = (
             getattr(existing_state, "profile_code", "")
@@ -1833,6 +2219,27 @@ class PlatformProfileService:
                 defaults=state_defaults,
             )
 
+    @staticmethod
+    def _merge_capability_facts(
+        existing_facts: Optional[Dict[str, object]],
+        incoming_facts: Optional[Dict[str, object]],
+    ) -> Dict[str, object]:
+        merged = dict(existing_facts or {})
+        for top_level_key, top_level_value in (incoming_facts or {}).items():
+            if isinstance(top_level_value, dict) and isinstance(merged.get(top_level_key), dict):
+                section = dict(merged.get(top_level_key) or {})
+                for nested_key, nested_value in top_level_value.items():
+                    if isinstance(nested_value, dict) and isinstance(section.get(nested_key), dict):
+                        nested_section = dict(section.get(nested_key) or {})
+                        nested_section.update(nested_value)
+                        section[nested_key] = nested_section
+                    else:
+                        section[nested_key] = nested_value
+                merged[top_level_key] = section
+            else:
+                merged[top_level_key] = top_level_value
+        return merged
+
     @classmethod
     def _score_profile_by_capabilities(
         cls,
@@ -1846,6 +2253,8 @@ class PlatformProfileService:
         preferred_probes = requirements.get("preferred_successful_probes", []) or []
         preferred_probe_flags = requirements.get("preferred_probe_flags", {}) or {}
         preferred_probe_min_values = requirements.get("preferred_probe_min_values", {}) or {}
+        preferred_identity_patterns = requirements.get("preferred_identity_patterns", {}) or {}
+        identity_facts = (capability_facts or {}).get("identity", {}) or {}
         protocol_match_count = sum(
             1 for key, required in required_protocols.items()
             if bool(protocol_facts.get(key)) == bool(required)
@@ -1853,6 +2262,7 @@ class PlatformProfileService:
         successful_probe_count = 0
         feature_hit_count = 0
         threshold_hit_count = 0
+        identity_hit_count = 0
 
         for probe_name in preferred_probes:
             probe_payload = probes.get(probe_name, {}) or {}
@@ -1869,10 +2279,15 @@ class PlatformProfileService:
                     if float(probe_payload.get(key) or 0) >= float(min_value)
                 )
 
+        for identity_key, patterns in preferred_identity_patterns.items():
+            if cls._match_patterns(str(identity_facts.get(identity_key) or ""), patterns):
+                identity_hit_count += 1
+
         return (
             protocol_match_count,
             1 if successful_probe_count else 0,
             successful_probe_count,
+            identity_hit_count,
             feature_hit_count,
             threshold_hit_count,
         )
@@ -1907,14 +2322,15 @@ class PlatformProfileService:
             version_match = cls._match_patterns(soft_version, profile.version_patterns)
             capability_score = cls._score_profile_by_capabilities(profile, capability_facts)
             score = (
-                capability_score[0],
                 1 if series_match and version_match else 0,
                 1 if series_match else 0,
                 1 if version_match else 0,
+                capability_score[0],
                 capability_score[1],
                 capability_score[2],
                 capability_score[3],
                 capability_score[4],
+                capability_score[5],
                 -index,
             )
             candidates.append((score, profile))
@@ -2391,6 +2807,7 @@ class PlatformProfileService:
         cls, devices, binding_source: str = PlansToDevice.BINDING_SOURCE_AUTO
     ) -> Dict[str, object]:
         profiles = cls.ensure_builtin_profiles()
+        plan_cache: Dict[str, DeviceCollectionPlans] = {}
         created = 0
         updated = 0
         skipped = 0
@@ -2411,7 +2828,9 @@ class PlatformProfileService:
                 )
                 continue
 
-            plan = cls.ensure_default_plan_for_profile(profile)
+            if profile.code not in plan_cache:
+                plan_cache[profile.code] = cls.ensure_default_plan_for_profile(profile)
+            plan = plan_cache[profile.code]
             defaults = {
                 "manage_ip": device.manage_ip,
                 "profile_code": profile.code,
@@ -2710,6 +3129,42 @@ class DeviceFactService:
 
         if update_fields:
             device.save(update_fields=list(dict.fromkeys(update_fields)))
+
+        identity_facts = {
+            "hostname": str(discovered_name or "").strip(),
+            "platform_name": str(
+                record.get("platform_name")
+                or record.get("platform-name")
+                or ""
+            ).strip(),
+            "product_name": str(
+                record.get("product_name")
+                or record.get("product-name")
+                or ""
+            ).strip(),
+            "model_name": str(
+                model_name
+                or getattr(getattr(device, "model", None), "name", "")
+                or ""
+            ).strip(),
+            "soft_version": str(soft_version or getattr(device, "soft_version", "") or "").strip(),
+            "patch_version": str(patch_version or getattr(device, "patch_version", "") or "").strip(),
+        }
+        identity_facts = {
+            key: value for key, value in identity_facts.items()
+            if value
+        }
+        if identity_facts:
+            PlatformProfileService.update_capability_facts(
+                device_info={
+                    "manage_ip": device.manage_ip,
+                    "serial_num": device.serial_num,
+                    "vendor__alias": getattr(getattr(device, "vendor", None), "alias", ""),
+                    "platform_profile_code": profile_code,
+                },
+                capability_facts={"identity": identity_facts},
+                resolve_profile=False,
+            )
 
         now = timezone.now()
         DeviceDiscoveryState.objects.update_or_create(

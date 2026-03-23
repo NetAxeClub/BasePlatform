@@ -874,10 +874,13 @@ def resolve_raw_data(plan, collection_result, collection_method):
         if processor:
             try:
                 # version 类采集需回填 NetworkDevice，向处理器传入 manage_ip
-                if resolved_collection_type == "version" and command_result and isinstance(command_result, list):
-                    command_result = list(command_result)
-                    if command_result and isinstance(command_result[0], dict):
-                        command_result[0] = dict(command_result[0], _resolve_device_ip=manage_ip)
+                if resolved_collection_type == "version" and command_result:
+                    if isinstance(command_result, list):
+                        command_result = list(command_result)
+                        if command_result and isinstance(command_result[0], dict):
+                            command_result[0] = dict(command_result[0], _resolve_device_ip=manage_ip)
+                    elif isinstance(command_result, dict):
+                        command_result = dict(command_result, _resolve_device_ip=manage_ip)
                 elif (
                     method == "netmiko"
                     and collection_type in RAW_NETMIKO_COLLECTION_TYPES
