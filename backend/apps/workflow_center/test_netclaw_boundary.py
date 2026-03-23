@@ -11,6 +11,7 @@ from apps.device_api.views import (
 from apps.network_analysis.views import (
     AddressTraceSnapshotViewSet,
     AnalysisRunViewSet,
+    InterfaceUtilizationLegacyViewSet,
     InterfaceUtilizationSnapshotViewSet,
 )
 from apps.workflow_center.views import (
@@ -209,6 +210,12 @@ class NetClawBoundaryUrlTests(SimpleTestCase):
             AnalysisRunViewSet,
             "post",
             "rebuild_all",
+        )
+        self.assert_viewset_route(
+            "/base_platform/network_analysis/interfaceused/",
+            InterfaceUtilizationLegacyViewSet,
+            "get",
+            "list",
         )
         self.assert_viewset_route(
             "/base_platform/network_analysis/interface-utilization/",

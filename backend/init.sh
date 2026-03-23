@@ -11,6 +11,8 @@ python3 manage.py makemigrations automation
 python3 manage.py migrate automation
 python3 manage.py makemigrations int_utilization
 python3 manage.py migrate int_utilization
+python3 manage.py makemigrations network_analysis
+python3 manage.py migrate network_analysis
 python3 manage.py makemigrations topology
 python3 manage.py migrate topology
 # open_ipam app 不存在，已注释

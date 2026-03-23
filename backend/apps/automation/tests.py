@@ -14,6 +14,7 @@ from apps.automation.inspection import (
     inspection_task_result,
     inspection_type,
 )
+from apps.automation.interface_utilization_sync import build_speed_counts, sync_interface_utilization_snapshot
 from apps.automation.views import AutoFlowViewSet
 
 
@@ -173,3 +174,41 @@ class AutomationInspectionTests(SimpleTestCase):
 
         self.assertEqual(payload["count"], 1)
         self.assertEqual(payload["data"][0]["task_id"], "new")
+
+
+class InterfaceUtilizationSyncTests(SimpleTestCase):
+    def test_build_speed_counts_collects_nonzero_values(self):
+        post_data = {
+            "int_used_1g": 4,
+            "int_used_10g": 0,
+            "int_unused_100g": 2,
+        }
+
+        self.assertEqual(build_speed_counts(post_data, "int_used_"), {"1G": 4})
+        self.assertEqual(build_speed_counts(post_data, "int_unused_"), {"100G": 2})
+
+    @patch("apps.automation.interface_utilization_sync.InterfaceUtilizationSnapshot.objects.update_or_create")
+    def test_sync_interface_utilization_snapshot_upserts_network_analysis_row(self, mock_update_or_create):
+        sync_interface_utilization_snapshot(
+            post_data={
+                "host": "sw-a",
+                "host_ip": "10.0.0.1",
+                "host_type": "100G",
+                "int_total": 8,
+                "int_used": 6,
+                "int_unused": 2,
+                "utilization": 75.0,
+                "int_used_100g": 6,
+                "int_unused_100g": 2,
+            },
+            device_serial_num="SER-1",
+            device_name="sw-a",
+            snapshot_time=timezone.now(),
+        )
+
+        mock_update_or_create.assert_called_once()
+        kwargs = mock_update_or_create.call_args.kwargs
+        self.assertEqual(kwargs["device_serial_num"], "SER-1")
+        self.assertEqual(kwargs["component_scope"], "device")
+        self.assertEqual(kwargs["defaults"]["used_speed_counts"], {"100G": 6})
+        self.assertEqual(kwargs["defaults"]["unused_speed_counts"], {"100G": 2})

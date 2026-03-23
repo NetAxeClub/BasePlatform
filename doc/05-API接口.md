@@ -661,10 +661,12 @@ NetAxe平台提供RESTful API接口，基于Django REST Framework实现。所有
 ### 6.7.1 接口利用率兼容入口
 
 #### 获取接口利用率列表
-- **URL**: `/base_platform/int_utilization/interfaceused/`
+- **推荐 URL**: `/base_platform/network_analysis/interfaceused/`
+- **兼容 URL**: `/base_platform/int_utilization/interfaceused/`
 - **方法**: GET
 - **说明**:
-  - 该接口为兼容入口，当前底层已切换为 `network_analysis.InterfaceUtilizationSnapshot`
+  - 推荐改用 `network_analysis` 命名空间，旧 `int_utilization` 入口保留为兼容路径
+  - 两个入口当前都读取 `network_analysis.InterfaceUtilizationSnapshot`
   - 返回结构尽量保持 legacy 兼容，但真实数据来源为新分析快照
 
 #### 获取设备接口视图

@@ -31,6 +31,10 @@ from datetime import datetime, date, timedelta
 from confload.confload import config
 from apps.asset.models import NetworkDevice
 from apps.asset.serializers import NetworkDeviceSerializer
+from apps.automation.interface_utilization_sync import (
+    INTERFACE_SPEED_FIELD_MAP,
+    sync_interface_utilization_snapshot,
+)
 from apps.automation.models import CollectionRule, CollectionMatchRule
 from apps.int_utilization.models import InterfaceUsed
 from apps.automation.tools.h3c import H3cProc
@@ -214,17 +218,17 @@ def interface_used(device_ip=None):
             if 'chassis' in data.keys():
                 dev_obj = NetworkDevice.objects.filter(
                     manage_ip=data['hostip'], chassis=data['chassis'], status=0).values(
-                    'id', 'manage_ip', 'name').first()
+                    'id', 'serial_num', 'manage_ip', 'name').first()
                 data.pop('chassis')
             elif 'slot' in data.keys():
                 dev_obj = NetworkDevice.objects.filter(
                     manage_ip=data['hostip'], slot=data['slot'], status=0).values(
-                    'id', 'manage_ip', 'name').first()
+                    'id', 'serial_num', 'manage_ip', 'name').first()
                 data.pop('slot')
             else:
                 dev_obj = NetworkDevice.objects.filter(
                     manage_ip=data['hostip'], status=0).values(
-                    'id', 'manage_ip', 'name').first()
+                    'id', 'serial_num', 'manage_ip', 'name').first()
             if dev_obj:
                 post_data = dict()
                 post_data['host'] = dev_obj['name']
@@ -243,29 +247,11 @@ def interface_used(device_ip=None):
                     post_data[k.lower()] = data[k]
                 # 计算设备类型，千兆还是万兆25G 100G 200G
                 key_list = []
-                speed_map = {
-                    'int_used_1g': '1G',
-                    'int_unused_1g': '1G',
-                    'int_used_10g': '10G',
-                    'int_unused_10g': '10G',
-                    'int_used_20g': '20G',
-                    'int_unused_20g': '20G',
-                    'int_used_25g': '25G',
-                    'int_unused_25g': '25G',
-                    'int_used_40g': '40G',
-                    'int_unused_40g': '40G',
-                    'int_used_100g': '100G',
-                    'int_unused_100g': '100G',
-                    'int_used_200g': '200G',
-                    'int_unused_200g': '200G',
-                    'int_used_400g': '400G',
-                    'int_unused_400g': '400G',
-                }
                 for k, v in data.items():
-                    if k.lower() in speed_map.keys():
+                    if k.lower() in INTERFACE_SPEED_FIELD_MAP:
                         key_list.append(
                             {
-                                "type": speed_map[k.lower()],
+                                "type": INTERFACE_SPEED_FIELD_MAP[k.lower()],
                                 "sum": v
                             }
                         )
@@ -321,6 +307,12 @@ def interface_used(device_ip=None):
                         InterfaceUsed.objects.filter(host=post_data['host']).update(**post_data)
                     else:
                         InterfaceUsed.objects.create(**post_data)
+                    sync_interface_utilization_snapshot(
+                        post_data=post_data,
+                        device_serial_num=dev_obj.get('serial_num'),
+                        device_name=dev_obj.get('name'),
+                        snapshot_time=data_time,
+                    )
                     # cache.set("interface_used_" + str(post_data['host_id']),
                     #           json.dumps(post_data, cls=JsonEncoder), 3600 * 5)
                 except Exception as e:
@@ -4483,4 +4475,3 @@ class DiagnoseProc(object):
 #             if account.protocol == 'ssh':
 #                 device.ssh_account = AssetAccount.objects.get(id=account.id)
 #         device.save()
-
