@@ -1,0 +1,11 @@
+Value Filldown POOLNAME (.+?)
+Value ADDRTYPE (ip|ip-range)
+Value Required SERVERIP (\S+(?:\s+\S+)?)
+Value PORT (\d+)
+
+Start
+  ^slb-server-pool\s+"${POOLNAME}"\s*$$ -> Pool
+
+Pool
+  ^\s+server\s+${ADDRTYPE}\s+${SERVERIP}(?:\s+port\s+${PORT})?\s*$$ -> Record
+  ^\s*exit\s*$$ -> Start

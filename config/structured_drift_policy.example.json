@@ -1,0 +1,15 @@
+{
+  "version": "local-example",
+  "whitelist": [
+    {
+      "name": "lab-telnet-waiver",
+      "reason": "Allow Telnet on lab devices only",
+      "match": {
+        "section": "features",
+        "manage_ip": "10.255.*",
+        "path_suffix": "telnet_enabled",
+        "config_type": "running"
+      }
+    }
+  ]
+}

@@ -406,6 +406,7 @@ hillstone_slb-server-pool.textfsm, .*, hillstone, slb-server-pool
 hillstone_aggregate.textfsm, .*, hillstone, aggregate
 hillstone_show_service_predefined.textfsm, .*, hillstone, show service predefined
 hillstone_show_zone.textfsm, .*, hillstone, show zone
+hillstone_show_policy_hit-count_top_50.textfsm, .*, hillstone, show policy hit-count top 50
 hillstone_show_version.textfsm, .*, hillstone, show version
 
 maipu_show_arp.textfsm, .*, maipu, show arp

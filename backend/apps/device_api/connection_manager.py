@@ -160,11 +160,17 @@ class DeviceConnectionManager:
         if self._netmiko_conn is None:
             try:
                 account = self.device_info.get("ssh")
+                access_protocol = "ssh"
                 if not account:
-                    raise ValueError("SSH账号信息不存在")
+                    account = self.device_info.get("telnet")
+                    access_protocol = "telnet"
+                if not account:
+                    raise ValueError("SSH/Telnet账号信息不存在")
 
                 vendor_alias = self.device_info.get("vendor__alias", "Huawei")
                 device_type = device_type_map.get(vendor_alias, "huawei")
+                if access_protocol == "telnet" and not device_type.endswith("_telnet"):
+                    device_type = f"{device_type}_telnet"
 
                 # 使用自定义的 ConnectHandler（支持更多设备类型）
                 self._netmiko_conn = ZetmikoConnectHandler(

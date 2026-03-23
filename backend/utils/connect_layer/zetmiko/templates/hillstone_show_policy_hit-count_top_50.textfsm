@@ -1,0 +1,8 @@
+Value Required ID (\d+)
+Value NAME (.+?)
+Value Required COUNT (\d+)
+
+Start
+  ^\s*Rule(?:\s+ID)?\s+ -> Start
+  ^\s*${ID}\s+"${NAME}"\s+${COUNT}\s*$$ -> Record
+  ^\s*${ID}\s+${NAME}\s+${COUNT}\s*$$ -> Record

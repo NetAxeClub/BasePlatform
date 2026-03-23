@@ -1,0 +1,25 @@
+Value ID (\d+)
+Value FROM_ZONE (.+?)
+Value TO_ZONE (.+?)
+Value INGRESS_INTERFACE (.+?)
+Value FROM (.+?)
+Value FROM_IP (\S+)
+Value TO (.+?)
+Value TO_IP (\S+)
+Value SERVICE (.+?)
+Value TRANSTO (.+?)
+Value TRANSTO_IP (\S+)
+Value PORT (\d+)
+Value POOLNAME (.+?)
+Value DESC (.+?)
+Value DISABLED (disable)
+Value LOADBALANCE (load-balance)
+Value LOG (log)
+Value TRACK_TCP (\d+)
+Value TRACK_PING (track-ping)
+
+Start
+  ^\s+dnatrule\s+id\s+${ID}\s+from-zone\s+"${FROM_ZONE}"\s+(?:ingress-interface\s+"${INGRESS_INTERFACE}"\s+)?from\s+(?:address-book\s+"${FROM}"|ip\s+${FROM_IP})\s+to\s+(?:address-book\s+"${TO}"|ip\s+${TO_IP})(?:\s+service\s+"${SERVICE}")?(?:\s+trans-to\s+(?:address-book\s+"${TRANSTO}"|ip\s+${TRANSTO_IP}|slb-server-pool\s+"${POOLNAME}"))?(?:\s+port\s+${PORT})?(?:\s+${LOG})?(?:\s+${LOADBALANCE})?(?:\s+track-tcp\s+${TRACK_TCP})?(?:\s+${TRACK_PING})?(?:\s+${DISABLED})?(?:\s+description\s+"${DESC}")?\s*$$ -> Record
+  ^\s+dnatrule\s+id\s+${ID}\s+(?:ingress-interface\s+"${INGRESS_INTERFACE}"\s+)?from\s+(?:address-book\s+"${FROM}"|ip\s+${FROM_IP})\s+to\s+(?:address-book\s+"${TO}"|ip\s+${TO_IP})(?:\s+service\s+"${SERVICE}")?(?:\s+trans-to\s+(?:address-book\s+"${TRANSTO}"|ip\s+${TRANSTO_IP}|slb-server-pool\s+"${POOLNAME}"))?(?:\s+port\s+${PORT})?(?:\s+${LOG})?(?:\s+${LOADBALANCE})?(?:\s+track-tcp\s+${TRACK_TCP})?(?:\s+${TRACK_PING})?(?:\s+${DISABLED})?(?:\s+description\s+"${DESC}")?\s*$$ -> Record
+  ^\s+dnatrule\s+id\s+${ID}\s+from\s+"${FROM}"\s+to\s+"${TO}"(?:\s+service\s+"${SERVICE}")?(?:\s+trans-to\s+"${TRANSTO}")?(?:\s+port\s+${PORT})?(?:\s+${LOG})?(?:\s+${LOADBALANCE})?(?:\s+track-tcp\s+${TRACK_TCP})?(?:\s+${TRACK_PING})?(?:\s+${DISABLED})?(?:\s+description\s+"${DESC}")?\s*$$ -> Record
+  ^\s+dnatrule\s+id\s+${ID}\s+from\s+"${FROM}"\s+to\s+"${TO}"(?:\s+service\s+"${SERVICE}")?\s+trans-to\s+slb-server-pool\s+"${POOLNAME}"(?:\s+${LOG})?(?:\s+${LOADBALANCE})?(?:\s+track-tcp\s+${TRACK_TCP})?(?:\s+${TRACK_PING})?(?:\s+${DISABLED})?(?:\s+description\s+"${DESC}")?\s*$$ -> Record

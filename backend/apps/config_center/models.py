@@ -100,6 +100,73 @@ class TTPTemplate(models.Model):
         indexes = [models.Index(fields=['name', 'vendor'])]
 
 
+class StructuredDriftPolicy(models.Model):
+    name = models.CharField(verbose_name='策略名称', max_length=100, null=False, default='default')
+    version = models.CharField(verbose_name='版本标识', max_length=100, null=False, default='v1')
+    policy_content = models.JSONField(verbose_name='策略内容', null=False, blank=True, default=dict)
+    is_active = models.BooleanField(verbose_name='是否激活', null=False, default=False)
+    remark = models.TextField(verbose_name='备注', null=False, blank=True, default='')
+    created_at = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
+    updated_at = models.DateTimeField(verbose_name='更新时间', auto_now=True)
+
+    def __str__(self):
+        return '{}-{}{}'.format(self.name, self.version, ' [active]' if self.is_active else '')
+
+    class Meta:
+        verbose_name_plural = '结构化漂移策略表'
+        verbose_name = '结构化漂移策略表'
+        db_table = 'structured_drift_policy'
+        indexes = [
+            models.Index(fields=['is_active']),
+            models.Index(fields=['name', 'updated_at']),
+        ]
+
+
+class StructuredDriftPolicyAudit(models.Model):
+    ACTION_CHOICES = (
+        ('CREATE', 'CREATE'),
+        ('UPDATE', 'UPDATE'),
+        ('ACTIVATE', 'ACTIVATE'),
+        ('ROLLBACK', 'ROLLBACK'),
+        ('DELETE', 'DELETE'),
+    )
+    policy = models.ForeignKey(
+        'StructuredDriftPolicy',
+        verbose_name='目标策略',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='audit_logs',
+    )
+    previous_policy = models.ForeignKey(
+        'StructuredDriftPolicy',
+        verbose_name='前一激活策略',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='superseded_audit_logs',
+    )
+    action = models.CharField(verbose_name='动作', max_length=30, choices=ACTION_CHOICES, default='UPDATE')
+    actor = models.CharField(verbose_name='执行人', max_length=150, null=False, blank=True, default='')
+    note = models.TextField(verbose_name='备注', null=False, blank=True, default='')
+    effective_policy_before = models.JSONField(verbose_name='变更前生效策略', null=False, blank=True, default=dict)
+    effective_policy_after = models.JSONField(verbose_name='变更后生效策略', null=False, blank=True, default=dict)
+    effective_policy_diff = models.JSONField(verbose_name='生效策略差异摘要', null=False, blank=True, default=dict)
+    created_at = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
+
+    def __str__(self):
+        return '{}-{}'.format(self.action, self.created_at)
+
+    class Meta:
+        verbose_name_plural = '结构化漂移策略审计表'
+        verbose_name = '结构化漂移策略审计表'
+        db_table = 'structured_drift_policy_audit'
+        indexes = [
+            models.Index(fields=['action', 'created_at']),
+            models.Index(fields=['policy', 'created_at']),
+        ]
+
+
 # 配置备份表
 class ConfigBackup(models.Model):
     status_choices = ((0, '在线'), (1, '下线'), (2, '挂牌'), (3, '备用'))

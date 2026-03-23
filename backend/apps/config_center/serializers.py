@@ -12,10 +12,11 @@
 """
 from rest_framework import serializers
 
+from apps.config_center.config_parse.structured.policy import preview_merged_drift_policy
 from utils.custom.exception import SerializerValidateError
 from .models import (
     ConfigCompliance, ConfigTemplate, TTPTemplate, ConfigBackup, ConfigComplianceResult, ConfigComplianceRule,
-    BackupPolicy
+    BackupPolicy, StructuredDriftPolicy, StructuredDriftPolicyAudit
 )
 
 
@@ -132,3 +133,31 @@ class ConfigBackupPolicySerializer(serializers.ModelSerializer):
             if BackupPolicy.objects.filter(vendor=value).exists():
                 raise SerializerValidateError(f"Vendor '{value}' 已经存在！")
         return value
+
+
+class StructuredDriftPolicySerializer(serializers.ModelSerializer):
+    created_at = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', read_only=True)
+    updated_at = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', read_only=True)
+
+    class Meta:
+        model = StructuredDriftPolicy
+        fields = '__all__'
+
+    def validate_policy_content(self, value):
+        preview = preview_merged_drift_policy(value or {})
+        validation = preview.get('validation') or {}
+        if not validation.get('is_valid'):
+            raise SerializerValidateError('漂移策略不合法: {}'.format('; '.join(validation.get('errors') or [])))
+        return value or {}
+
+
+class StructuredDriftPolicyAuditSerializer(serializers.ModelSerializer):
+    created_at = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', read_only=True)
+    policy_name = serializers.CharField(source='policy.name', read_only=True)
+    policy_version = serializers.CharField(source='policy.version', read_only=True)
+    previous_policy_name = serializers.CharField(source='previous_policy.name', read_only=True)
+    previous_policy_version = serializers.CharField(source='previous_policy.version', read_only=True)
+
+    class Meta:
+        model = StructuredDriftPolicyAudit
+        fields = '__all__'

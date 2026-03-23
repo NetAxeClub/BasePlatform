@@ -1,0 +1,81 @@
+{
+  "version": "2026-03-23",
+  "section_rules": {
+    "system": {
+      "severity": "MEDIUM",
+      "title": "系统级配置发生变化"
+    },
+    "features": {
+      "severity": "HIGH",
+      "title": "基础能力开关发生变化"
+    },
+    "routing_instances": {
+      "severity": "HIGH",
+      "title": "VRF / 路由实例发生变化"
+    },
+    "vlans": {
+      "severity": "LOW",
+      "title": "VLAN 发生变化"
+    },
+    "zones": {
+      "severity": "MEDIUM",
+      "title": "安全域发生变化"
+    },
+    "services": {
+      "severity": "HIGH",
+      "title": "服务对象发生变化"
+    },
+    "ntp_servers": {
+      "severity": "LOW",
+      "title": "NTP 配置发生变化"
+    },
+    "log_hosts": {
+      "severity": "LOW",
+      "title": "日志主机发生变化"
+    },
+    "aaa_servers": {
+      "severity": "HIGH",
+      "title": "AAA 认证链路发生变化"
+    },
+    "interfaces": {
+      "severity": "MEDIUM",
+      "title": "接口配置发生变化"
+    },
+    "access_lists": {
+      "severity": "HIGH",
+      "title": "ACL 规则发生变化"
+    },
+    "snmp": {
+      "severity": "MEDIUM",
+      "title": "SNMP 配置发生变化"
+    },
+    "vendor_specific": {
+      "severity": "LOW",
+      "title": "厂商私有配置发生变化"
+    }
+  },
+  "signal_rules": [
+    {
+      "section": "features",
+      "path_suffix": "telnet_enabled",
+      "when_to": true,
+      "severity": "CRITICAL",
+      "title": "Telnet 管理面被启用"
+    },
+    {
+      "section": "features",
+      "path_suffix": "http_enabled",
+      "when_to": true,
+      "severity": "HIGH",
+      "title": "HTTP 管理面被启用"
+    },
+    {
+      "section": "features",
+      "path_suffix": "ssh_enabled",
+      "when_to": false,
+      "severity": "MEDIUM",
+      "title": "SSH 管理能力被关闭"
+    }
+  ],
+  "whitelist": []
+}

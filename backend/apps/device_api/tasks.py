@@ -85,6 +85,7 @@ from apps.device_api.contract import (
     normalize_collection_type_for_storage,
 )
 from apps.device_api.fields_mapping import field_mapping
+from apps.device_api.fields_mapping import RAW_NETMIKO_COLLECTION_TYPES
 from netaxe.celery import AxeTask
 from apps.asset.models import NetworkDevice
 from apps.device_api.services_new import DeviceCollectionService
@@ -464,11 +465,13 @@ def plan_collect_device(**kwargs):
                         )
                         command = sub_plan.get("netmiko_method", "")
                         textfsm_template = sub_plan.get("textfsm_template")
+                        collection_type = sub_plan.get("collection_type", "")
+                        use_textfsm = collection_type not in RAW_NETMIKO_COLLECTION_TYPES
 
                         result = conn_mgr.execute_netmiko_command(
                             command=command,
-                            use_textfsm=True,
-                            textfsm_template=textfsm_template,
+                            use_textfsm=use_textfsm,
+                            textfsm_template=textfsm_template if use_textfsm else None,
                         )
 
                         # 处理并保存结果

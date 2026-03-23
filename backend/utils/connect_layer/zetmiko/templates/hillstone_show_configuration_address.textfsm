@@ -1,0 +1,13 @@
+Value Filldown NAME (.+?)
+Value DESCRIPTION (.*)
+Value Required ENTRY_TYPE (ip|range|exclude ip|exclude range|host|member|wildcard|country)
+Value Required VALUE1 (\S+|".+?")
+Value VALUE2 (\S+)
+
+Start
+  ^address\s+(?:id\s+\d+\s+)?"${NAME}"\s*$$ -> Address
+
+Address
+  ^\s+description\s+"${DESCRIPTION}"\s*$$
+  ^\s+${ENTRY_TYPE}\s+${VALUE1}(?:\s+${VALUE2})?\s*$$ -> Record
+  ^\s*exit\s*$$ -> Start
