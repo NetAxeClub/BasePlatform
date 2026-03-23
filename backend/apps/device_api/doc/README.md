@@ -43,3 +43,11 @@
 ## 5. 证据文件
 
 验收和灰度证据保留在当前目录的 `*.json` 文件中，用于追溯，不再单独展开为 phase Markdown 文档。
+
+
+### 5. 生产排障
+可以直接查 4 处：
+Automation.DeviceApiExecutionLog：批次加载、去重、跳过、下发、子方案开始/结束/异常、设备完成、批次完成。
+Automation.SubPlanCollectionCelery：子方案状态、coverage_issue、coverage_reason、raw_result_preview。
+Automation.PlanCollectionCelery：设备级汇总，包括失败数、跳过数、覆盖缺口汇总。
+Automation.TestDeviceCollection：原始结果、处理结果、错误信息，适合做深度回放。
