@@ -1,4 +1,5 @@
 import json
+import re
 from netaddr import IPAddress, IPNetwork
 from .base import register_processor
 from apps.device_api.common import InterfaceFormat
@@ -53,6 +54,22 @@ def _find_records(value, required_keys):
     return records
 
 
+def _find_first_mapping_with_any_keys(value, key_names):
+    if isinstance(value, dict):
+        if any(key in value for key in key_names):
+            return value
+        for child in value.values():
+            found = _find_first_mapping_with_any_keys(child, key_names)
+            if isinstance(found, dict):
+                return found
+    elif isinstance(value, list):
+        for item in value:
+            found = _find_first_mapping_with_any_keys(item, key_names)
+            if isinstance(found, dict):
+                return found
+    return None
+
+
 def _collect_values(value, key_name):
     values = []
     if isinstance(value, dict):
@@ -71,6 +88,71 @@ def _collect_values(value, key_name):
     return values
 
 
+def _collect_first_value(value, *key_names):
+    for key_name in key_names:
+        values = _collect_values(value, key_name)
+        for item in values:
+            text = str(item or "").strip()
+            if text:
+                return item
+    return ""
+
+
+def _pick_first(mapping, *key_names, default=""):
+    if not isinstance(mapping, dict):
+        return default
+    for key_name in key_names:
+        if key_name not in mapping:
+            continue
+        value = mapping.get(key_name)
+        if isinstance(value, (dict, list)):
+            if value:
+                return value
+            continue
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            return value
+    return default
+
+
+def _normalize_speed_for_mathintspeed(value):
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    try:
+        numeric = int(text)
+    except (TypeError, ValueError):
+        return text
+    if numeric >= 1000000:
+        numeric = int(numeric / 1000000)
+    return str(numeric)
+
+
+def _infer_huawei_interface_speed(interface: str) -> str:
+    text = str(interface or "").strip().upper()
+    if not text:
+        return ""
+    patterns = (
+        (r"^400GE", "400000"),
+        (r"^200GE", "200000"),
+        (r"^100GE", "100000"),
+        (r"^50GE", "50000"),
+        (r"^40GE", "40000"),
+        (r"^25GE", "25000"),
+        (r"^10GE", "10000"),
+        (r"^XGE", "10000"),
+        (r"^GE", "1000"),
+        (r"^ETH-TRUNK", "0"),
+        (r"^METH", "1000"),
+    )
+    for pattern, speed in patterns:
+        if re.search(pattern, text):
+            return speed
+    return ""
+
+
 def _normalize_huawei_interface(interface: str) -> str:
     if not interface:
         return ""
@@ -81,6 +163,13 @@ def _normalize_huawei_interface(interface: str) -> str:
 
 def _normalize_huawei_mac(mac_address: str) -> str:
     return (mac_address or "").lower()
+
+
+def _normalize_truthy(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    text = str(value or "").strip().lower()
+    return text in {"true", "1", "yes", "up", "registered"}
 
 
 def _build_huawei_mac_record(entry, *, vlan="", bd_id="", interface="", tunnel_type="", source_ip="", peer_ip="", vn_id=""):
@@ -97,9 +186,11 @@ def _build_huawei_mac_record(entry, *, vlan="", bd_id="", interface="", tunnel_t
     )
 
 
-def _build_ipv4_location(ip_address: str, ip_mask: str):
+def _build_ipv4_location(ip_address: str, ip_mask: str, prefix_length: str = ""):
     if not ip_address or ip_address == "0.0.0.0":
         return None
+    if not ip_mask and prefix_length:
+        ip_mask = str(IPNetwork(f"{ip_address}/{prefix_length}").netmask)
     if ip_mask:
         network = IPNetwork(f"{ip_address}/{ip_mask}")
         return dict(
@@ -115,9 +206,204 @@ def _build_ipv4_location(ip_address: str, ip_mask: str):
     )
 
 
+def _collect_netconf_schemas(data):
+    if not isinstance(data, dict):
+        return []
+    records = _find_records(data, {"identifier", "namespace"})
+    if records:
+        return records
+    schemas = ((data.get("netconf-state", {}) or {}).get("schemas", {}) or {}).get("schema")
+    return [item for item in _as_list(schemas) if isinstance(item, dict)]
+
+
+def _backfill_huawei_device_identity(device_ip: str, *, product_version: str = "", patch_version: str = "", model_name: str = ""):
+    if not device_ip:
+        return
+    try:
+        device = (
+            NetworkDevice.objects.filter(manage_ip=device_ip)
+            .select_related("vendor")
+            .first()
+        )
+        if not device:
+            return
+
+        update_fields = []
+        if product_version:
+            device.soft_version = product_version
+            update_fields.append("soft_version")
+        if patch_version:
+            device.patch_version = patch_version
+            update_fields.append("patch_version")
+        if model_name:
+            vendor = device.vendor
+            model_obj, _ = Model.objects.get_or_create(
+                name=model_name, vendor=vendor, defaults={"vendor": vendor}
+            )
+            device.model = model_obj
+            update_fields.append("model")
+        if update_fields:
+            device.save(update_fields=update_fields)
+    except Exception:
+        pass
+
+
+def _extract_prefix_length(ipv4_entry):
+    return _pick_first(ipv4_entry, "prefix-length", "prefixLength", "ip:prefix-length")
+
+
+def _extract_huawei_ipv4_entries(entry):
+    ipv4_entries = []
+
+    ipv4_oper = entry.get("ipv4Oper", {}) or {}
+    ipv4_addrs = (ipv4_oper.get("ipv4Addrs", {}) or {}).get("ipv4Addr")
+    for addr in _as_list(ipv4_addrs):
+        if not isinstance(addr, dict):
+            continue
+        ipv4_entries.append(
+            dict(
+                ip=_pick_first(addr, "ifIpAddr", "ip", "ip-address"),
+                mask=_pick_first(addr, "subnetMask", "netmask", "mask"),
+                prefix_length=_extract_prefix_length(addr),
+                ip_type=_pick_first(addr, "addrType", "type", "ip-type", default=""),
+            )
+        )
+
+    for key_name in ("ip:ipv4", "ipv4", "ietf-ip:ipv4", "urn3:ipv4"):
+        ipv4_container = entry.get(key_name)
+        if not isinstance(ipv4_container, dict):
+            continue
+        address = (
+            ipv4_container.get("ip:address")
+            or ipv4_container.get("address")
+            or ipv4_container.get("ip-address")
+            or ((ipv4_container.get("addresses") or {}).get("address"))
+            or ((((ipv4_container.get("state") or {}).get("addresses")) or {}).get("address"))
+        )
+        for addr in _as_list(address):
+            if not isinstance(addr, dict):
+                continue
+            ipv4_entries.append(
+                dict(
+                    ip=_pick_first(addr, "ip:ip", "ip", "ip-addr", "ip-address"),
+                    mask=_pick_first(
+                        addr,
+                        "ip:netmask",
+                        "netmask",
+                        "mask",
+                        "subnet-mask",
+                    ),
+                    prefix_length=_extract_prefix_length(addr),
+                    ip_type=_pick_first(
+                        addr,
+                        "ip:type",
+                        "type",
+                        "addrType",
+                        "ip-type",
+                        default="ipv4",
+                    ),
+                )
+            )
+
+    return ipv4_entries
+
+
+def _extract_huawei_vlan_mac_records(value, current_vlan=""):
+    records = []
+    if isinstance(value, dict):
+        vlan_id = (
+            _pick_first(value, "vlanId", "vlan-id", "vid")
+            or current_vlan
+        )
+        mac_container = value.get("mac-addresss")
+        if mac_container is not None:
+            mac_items = mac_container
+            if isinstance(mac_container, dict):
+                mac_items = (
+                    mac_container.get("mac-address")
+                    or mac_container.get("mac-address-entry")
+                    or mac_container.get("item")
+                    or []
+                )
+            for item in _as_list(mac_items):
+                if isinstance(item, dict):
+                    record = dict(item)
+                else:
+                    record = {"mac-address": item}
+                if vlan_id and not any(record.get(key) for key in ("vlanId", "vlan-id", "vid")):
+                    record["vlan-id"] = vlan_id
+                records.append(record)
+
+        for child in value.values():
+            records.extend(_extract_huawei_vlan_mac_records(child, vlan_id))
+    elif isinstance(value, list):
+        for item in value:
+            records.extend(_extract_huawei_vlan_mac_records(item, current_vlan))
+    return records
+
+
 def _is_established(state: str) -> bool:
     text = str(state or "").strip().lower()
     return text in {"established", "estab", "up"} or "established" in text
+
+
+def _normalize_vrf_name(vrf_name: str) -> str:
+    value = str(vrf_name or "").strip()
+    return "" if value == "_public_" else value
+
+
+def _safe_int(value, default=0):
+    try:
+        return int(str(value).strip())
+    except (AttributeError, TypeError, ValueError):
+        return default
+
+
+def _collect_yunshan_bgp_instance_views(data):
+    network_instance = data.get("network-instance", {}) or {}
+    instances = _safe_list((network_instance.get("instances", {}) or {}).get("instance"))
+    result = []
+    for instance in instances:
+        if not isinstance(instance, dict):
+            continue
+        bgp = instance.get("bgp", {}) or {}
+        base_process = (bgp.get("base-process", {}) or {}) if isinstance(bgp, dict) else {}
+        result.append(
+            {
+                "name": _pick_first(instance, "name"),
+                "vrf": _normalize_vrf_name(_pick_first(instance, "name")),
+                "base_process": base_process if isinstance(base_process, dict) else {},
+            }
+        )
+    return result
+
+
+def _collect_yunshan_bgp_summary_rows(data):
+    rows = []
+    for instance_view in _collect_yunshan_bgp_instance_views(data):
+        base_process = instance_view["base_process"]
+        peer_totals = _safe_list((base_process.get("peer-total-numbers", {}) or {}).get("peer-total-number"))
+        for item in peer_totals:
+            if not isinstance(item, dict):
+                continue
+            static_peer_number = _safe_int(_pick_first(item, "static-peer-number"))
+            static_peer_established_number = _safe_int(
+                _pick_first(item, "static-peer-established-number")
+            )
+            dynamic_peer_number = _safe_int(_pick_first(item, "dynamic-peer-number"))
+            rows.append(
+                {
+                    "instance_name": instance_view["name"],
+                    "vrf": instance_view["vrf"],
+                    "af_type": _pick_first(item, "af-type"),
+                    "static_peer_number": static_peer_number,
+                    "static_peer_established_number": static_peer_established_number,
+                    "dynamic_peer_number": dynamic_peer_number,
+                    "total_peers": static_peer_number + dynamic_peer_number,
+                    "established_peers": static_peer_established_number,
+                }
+            )
+    return rows
 
 
 def _dedupe_strings(values):
@@ -182,32 +468,12 @@ def process_version_netmiko(data):
     patch_version = (record.get("patch_version") or "").strip()
     model_name = (record.get("model") or "").strip()
 
-    if device_ip:
-        try:
-            device = (
-                NetworkDevice.objects.filter(manage_ip=device_ip)
-                .select_related("vendor")
-                .first()
-            )
-            if device:
-                update_fields = []
-                if product_version:
-                    device.soft_version = product_version
-                    update_fields.append("soft_version")
-                if patch_version:
-                    device.patch_version = patch_version
-                    update_fields.append("patch_version")
-                if model_name:
-                    vendor = device.vendor
-                    model_obj, _ = Model.objects.get_or_create(
-                        name=model_name, vendor=vendor, defaults={"vendor": vendor}
-                    )
-                    device.model = model_obj
-                    update_fields.append("model")
-                if update_fields:
-                    device.save(update_fields=update_fields)
-        except Exception:
-            pass  # 回填失败不影响采集结果返回
+    _backfill_huawei_device_identity(
+        device_ip,
+        product_version=product_version,
+        patch_version=patch_version,
+        model_name=model_name,
+    )
 
     return data
 
@@ -217,18 +483,130 @@ def process_version_netmiko(data):
 )
 def process_version_netconf(data):
     """Huawei collection_system_info 处理 (NETCONF)。"""
+    device_ip = ""
+    if isinstance(data, dict):
+        device_ip = str(data.get("_resolve_device_ip", "") or "")
     records = _find_records(data, {"sysName", "platformVer", "productName"})
-    if not records:
+    if records:
+        record = records[0]
+    else:
+        candidate = _find_first_mapping_with_any_keys(
+            data,
+            {
+                "sysName",
+                "host-name",
+                "hostname",
+                "productName",
+                "product-name",
+                "model",
+                "platformVer",
+                "software-version",
+                "version",
+                "esn",
+                "serial-number",
+            },
+        )
+        if not isinstance(candidate, dict):
+            return []
+        record = candidate
+
+    hostname = _pick_first(record, "sysName", "host-name", "hostname", "hostName")
+    if not hostname:
+        hostname = _pick_first(record, "sys-name")
+    platform_name = _pick_first(
+        record,
+        "platform-name",
+        "platformName",
+    ) or _collect_first_value(
+        data,
+        "platform-name",
+        "platformName",
+    )
+    product_name = _pick_first(
+        record,
+        "product-name",
+        "productName",
+    ) or _collect_first_value(
+        data,
+        "product-name",
+        "productName",
+    )
+    model_name = _pick_first(
+        record,
+        "hardware-model",
+        "productName",
+        "product-name",
+        "productModel",
+        "product-model",
+        "model",
+        "device-model",
+        "deviceType",
+        "device-type",
+    ) or _collect_first_value(
+        data,
+        "hardware-model",
+        "productName",
+        "product-name",
+        "productModel",
+        "product-model",
+        "model",
+        "device-model",
+        "deviceType",
+        "device-type",
+    )
+    soft_version = _pick_first(
+        record,
+        "product-version",
+        "productVersion",
+        "platformVer",
+        "platform-version",
+        "software-version",
+        "softwareVersion",
+        "softVersion",
+        "version",
+    ) or _collect_first_value(
+        data,
+        "product-version",
+        "productVersion",
+        "platformVer",
+        "platform-version",
+        "software-version",
+        "softwareVersion",
+        "softVersion",
+        "version",
+    )
+    patch_version = _pick_first(
+        record,
+        "patchVer",
+        "patch-version",
+        "patchVersion",
+    ) or _collect_first_value(data, "patchVer", "patch-version", "patchVersion")
+    serial_num = _pick_first(
+        record,
+        "esn",
+        "serial-number",
+        "serialNumber",
+        "serialNum",
+    ) or _collect_first_value(data, "esn", "serial-number", "serialNumber", "serialNum")
+
+    if not any((hostname, model_name, soft_version, serial_num)):
         return []
-    record = records[0]
+    _backfill_huawei_device_identity(
+        device_ip,
+        product_version=soft_version,
+        patch_version=patch_version,
+        model_name=model_name,
+    )
     return [
         dict(
-            hostname=record.get("sysName", ""),
+            hostname=hostname,
             vendor_alias="Huawei",
-            model_name=record.get("productName", ""),
-            soft_version=record.get("platformVer", ""),
-            patch_version=record.get("patchVer", ""),
-            serial_num=record.get("esn", ""),
+            platform_name=platform_name,
+            product_name=product_name,
+            model_name=model_name,
+            soft_version=soft_version,
+            patch_version=patch_version,
+            serial_num=serial_num,
         )
     ]
 
@@ -444,8 +822,8 @@ def process_temperature_status_netmiko(data):
 )
 def process_board_status_netconf(data):
     """Huawei collection_moduleinfo 处理 (NETCONF)。"""
-    entries = _find_records(data, {"position", "entSerialNum"})
     results = []
+    entries = _find_records(data, {"position", "entSerialNum"})
     for entry in entries:
         ent_class = str(entry.get("entClass", "")).strip()
         results.append(
@@ -458,6 +836,30 @@ def process_board_status_netconf(data):
                 slot_type=ent_class.lower(),
             )
         )
+
+    devm = data.get("devm", {}) if isinstance(data, dict) else {}
+    yunshan_board_sets = (
+        ("mpu-boards", "mpu-board", "mpu"),
+        ("lpu-boards", "lpu-board", "lpu"),
+        ("sfu-boards", "sfu-board", "sfu"),
+    )
+    for container_name, list_name, slot_type in yunshan_board_sets:
+        boards = ((devm.get(container_name, {}) or {}).get(list_name))
+        for entry in _as_list(boards):
+            if not isinstance(entry, dict):
+                continue
+            board_type = _pick_first(entry, "board-type", "service-type", default=slot_type.upper())
+            status = "registered" if _normalize_truthy(entry.get("is-register")) else ""
+            results.append(
+                dict(
+                    slot=_pick_first(entry, "position"),
+                    board_name=board_type,
+                    board_model=board_type,
+                    serial_num=_pick_first(entry, "serial-number", "serialNumber"),
+                    status=status,
+                    slot_type=slot_type,
+                )
+            )
     return results
 
 
@@ -490,10 +892,10 @@ def process_route_table_netconf(data):
     当前优先解析 IETF routing 视图下的静态 IPv4 路由。
     若设备仅返回静态路由，也照常输出为 route_table 的一部分。
     """
-    routing = data.get("routing", {}) or {}
-    instances = _as_list(routing.get("routing-instance"))
     result = []
 
+    routing = data.get("routing", {}) or {}
+    instances = _as_list(routing.get("routing-instance"))
     for instance in instances:
         instance_name = instance.get("name", "")
         protocols = instance.get("routing-protocols", {}) or {}
@@ -526,7 +928,70 @@ def process_route_table_netconf(data):
                     )
                 )
 
+    network_instance = data.get("network-instance", {}) or {}
+    yunshan_instances = _as_list(((network_instance.get("instances", {}) or {}).get("instance")))
+    for instance in yunshan_instances:
+        instance_name = _pick_first(instance, "name")
+        afs = _as_list(((instance.get("afs", {}) or {}).get("af")))
+        for af in afs:
+            af_type = _pick_first(af, "type")
+            if af_type not in {"ipv4-unicast", ""}:
+                continue
+            routing = af.get("routing", {}) or {}
+            topologies_container = ((routing.get("routing-manage", {}) or {}).get("topologys", {}) or {})
+            topologies = _as_list(topologies_container.get("topology"))
+            for topology in topologies:
+                topology_name = _pick_first(topology, "name")
+                routes_container = ((topology.get("routes", {}) or {}).get("ipv4-unicast-routes", {}) or {})
+                routes = _as_list(routes_container.get("ipv4-unicast-route"))
+                for route in routes:
+                    prefix = _pick_first(route, "prefix")
+                    mask_length = _pick_first(route, "mask-length")
+                    route_prefix = f"{prefix}/{mask_length}" if prefix and mask_length != "" else prefix
+                    result.append(
+                        dict(
+                            prefix=route_prefix,
+                            next_hop=_pick_first(route, "nexthop", "direct-nexthop"),
+                            interface=_normalize_huawei_interface(
+                                _pick_first(route, "nexthop-interface-name", "interface-name")
+                            ),
+                            protocol=_pick_first(route, "protocol-type"),
+                            protocol_id=_pick_first(route, "protocol-type"),
+                            sub_protocol_id=_pick_first(route, "sub-protocol-type"),
+                            process_id=_pick_first(route, "process-id"),
+                            preference=_pick_first(route, "preference"),
+                            metric=_pick_first(route, "cost", default="0"),
+                            vrf="" if instance_name == "_public_" else instance_name,
+                            topology=topology_name,
+                            neighbor=_pick_first(route, "neighbour", "neighbor"),
+                            age=_pick_first(route, "age"),
+                            origin_as="",
+                            last_as="",
+                        )
+                    )
+
     return result
+
+
+@register_processor(
+    vendor="Huawei", device_type="", collection_type="netconf_capability", method="netconf"
+)
+def process_netconf_capability_netconf(data):
+    schemas = _collect_netconf_schemas(data)
+    identifiers = [str(item.get("identifier") or "") for item in schemas if isinstance(item, dict)]
+    namespaces = [str(item.get("namespace") or "") for item in schemas if isinstance(item, dict)]
+    combined = identifiers + namespaces
+    return [
+        dict(
+            schema_count=len(schemas),
+            openconfig_schema_count=sum(1 for item in identifiers if item.startswith("openconfig-")),
+            has_bgp_schema=any("bgp" in item.lower() for item in combined),
+            has_l2vpn_schema=any(any(keyword in item.lower() for keyword in ("l2vpn", "vsi", "evpn")) for item in combined),
+            has_ifmgr_schema=any(any(keyword in item.lower() for keyword in ("ifm", "interface")) for item in combined),
+            has_telemetry_schema=any("telemetry" in item.lower() for item in combined),
+            schema_samples=[item for item in identifiers[:10] if item],
+        )
+    ]
 
 
 @register_processor(
@@ -566,6 +1031,70 @@ def process_bgp_neighbors_netconf(data):
                         ebgp_max_hop="",
                     )
                 )
+
+    if result:
+        return result
+
+    summary_rows = _collect_yunshan_bgp_summary_rows(data)
+    summary_by_instance = {}
+    for row in summary_rows:
+        summary_by_instance.setdefault(row["instance_name"], []).append(row)
+
+    for instance_view in _collect_yunshan_bgp_instance_views(data):
+        base_process = instance_view["base_process"]
+        peer_states = _safe_list((base_process.get("peer-states", {}) or {}).get("peer-state"))
+        if peer_states:
+            for peer in peer_states:
+                if not isinstance(peer, dict):
+                    continue
+                result.append(
+                    dict(
+                        peer_ip=_pick_first(peer, "address"),
+                        address_family=_pick_first(peer, "af-type"),
+                        vrf=instance_view["vrf"],
+                        remote_as=_pick_first(peer, "remote-as"),
+                        state=_pick_first(peer, "peer-state", "connection-state", "session-state", "state"),
+                        peer_group=_pick_first(peer, "group-name"),
+                        remote_router_id=_pick_first(peer, "remote-router-id"),
+                        peer_type=_pick_first(peer, "establish-mode"),
+                        connect_interface="",
+                        update_interval="",
+                        ebgp_max_hop="",
+                    )
+                )
+            continue
+
+        peers = _safe_list((base_process.get("peers", {}) or {}).get("peer"))
+        if not peers:
+            continue
+
+        instance_summaries = summary_by_instance.get(instance_view["name"], [])
+        inferred_af = ""
+        inferred_state = ""
+        if len(instance_summaries) == 1:
+            summary = instance_summaries[0]
+            inferred_af = summary["af_type"]
+            if summary["static_peer_number"] > 0 and summary["static_peer_number"] == summary["static_peer_established_number"]:
+                inferred_state = "Established"
+
+        for peer in peers:
+            if not isinstance(peer, dict):
+                continue
+            result.append(
+                dict(
+                    peer_ip=_pick_first(peer, "address"),
+                    address_family=inferred_af,
+                    vrf=instance_view["vrf"],
+                    remote_as=_pick_first(peer, "remote-as"),
+                    state=inferred_state,
+                    peer_group=_pick_first(peer, "group-name"),
+                    remote_router_id="",
+                    peer_type="static",
+                    connect_interface="",
+                    update_interval="",
+                    ebgp_max_hop="",
+                )
+            )
 
     return result
 
@@ -610,6 +1139,35 @@ def process_bgp_summary_netconf(data):
                 else:
                     item["non_established_peers"] += 1
                 item["states"][state] = item["states"].get(state, 0) + 1
+
+    if not grouped:
+        for row in _collect_yunshan_bgp_summary_rows(data):
+            key = (row["vrf"], row["af_type"])
+            item = grouped.setdefault(
+                key,
+                {
+                    "address_family": row["af_type"],
+                    "vrf": row["vrf"],
+                    "total_peers": 0,
+                    "established_peers": 0,
+                    "non_established_peers": 0,
+                    "states": {},
+                },
+            )
+            total_peers = row["total_peers"]
+            established_peers = min(row["established_peers"], total_peers)
+            non_established_peers = max(total_peers - established_peers, 0)
+            item["total_peers"] += total_peers
+            item["established_peers"] += established_peers
+            item["non_established_peers"] += non_established_peers
+            if total_peers:
+                if non_established_peers == 0:
+                    dominant_state = "Established"
+                elif established_peers == 0:
+                    dominant_state = "NonEstablished"
+                else:
+                    dominant_state = "Mixed"
+                item["states"][dominant_state] = item["states"].get(dominant_state, 0) + total_peers
 
     result = []
     for item in grouped.values():
@@ -719,17 +1277,22 @@ def process_arp_netconf(data):
     优先兼容旧 Huawei NETCONF `arp_list` 结构。
     """
     entries = _find_records(data, {"ipAddr", "ifName"})
+    entries.extend(_find_records(data, {"ip-addr", "if-name"}))
     results = []
     for entry in entries:
         results.append(
             dict(
-                ipaddress=entry.get("ipAddr", ""),
-                macaddress=_normalize_huawei_mac(entry.get("macAddr", "")),
-                vlan=entry.get("peVid", ""),
-                interface=_normalize_huawei_interface(entry.get("ifName", "")),
-                type=entry.get("styleType", ""),
-                aging=entry.get("expireTime", ""),
-                vpninstance=entry.get("vrfName", ""),
+                ipaddress=_pick_first(entry, "ipAddr", "ip-addr", "ipaddress"),
+                macaddress=_normalize_huawei_mac(
+                    _pick_first(entry, "macAddr", "mac-addr", "macAddress")
+                ),
+                vlan=_pick_first(entry, "peVid", "vlanId", "vlan-id"),
+                interface=_normalize_huawei_interface(
+                    _pick_first(entry, "ifName", "if-name", "outIfName", "out-if-name")
+                ),
+                type=_pick_first(entry, "styleType", "style-type", "type"),
+                aging=_pick_first(entry, "expireTime", "age"),
+                vpninstance=_pick_first(entry, "vrfName", "vrf-name", "ni-name"),
             )
         )
     return results
@@ -744,19 +1307,67 @@ def process_mac_netconf(data):
     兼容 `mac_table` 和 `mac_bd` 两类旧 Huawei NETCONF 结构。
     """
     entries = _find_records(data, {"macAddress"})
+    entries.extend(_find_records(data, {"mac-address"}))
+    entries.extend(_find_records(data, {"address", "vlan-id"}))
+    entries.extend(_extract_huawei_vlan_mac_records(data))
     results = []
+    seen = {}
     for entry in entries:
-        if entry.get("vnId"):
+        if _pick_first(entry, "vnId", "vn-id"):
             continue
-        if not any(entry.get(key) for key in ("vlanId", "outIfName", "macType")):
-            continue
-        results.append(
-            _build_huawei_mac_record(
-                entry,
-                vlan=entry.get("vlanId", "") or "-",
-                interface=entry.get("outIfName", ""),
-            )
+        vlan = _pick_first(entry, "vlanId", "vlan-id", "vid")
+        interface = _pick_first(
+            entry,
+            "outIfName",
+            "out-if-name",
+            "out-interface-name",
+            "ifName",
+            "if-name",
         )
+        mac_type = _pick_first(entry, "macType", "mac-type", "type")
+        mac_address = _pick_first(entry, "macAddress", "mac-address", "address")
+        if isinstance(vlan, (list, dict)):
+            vlan = _collect_first_value(entry, "vlanId", "vlan-id", "vid")
+        if isinstance(interface, (list, dict)):
+            interface = _collect_first_value(
+                entry,
+                "outIfName",
+                "out-if-name",
+                "out-interface-name",
+                "ifName",
+                "if-name",
+            )
+        if isinstance(mac_type, (list, dict)):
+            mac_type = _collect_first_value(entry, "macType", "mac-type", "type")
+        if isinstance(mac_address, (list, dict)):
+            mac_address = _collect_first_value(entry, "macAddress", "mac-address", "address")
+        if not mac_address or not any((vlan, interface, mac_type)):
+            continue
+        record = _build_huawei_mac_record(
+            {
+                "macAddress": mac_address,
+                "macType": mac_type,
+            },
+            vlan=vlan or "-",
+            interface=interface,
+        )
+        dedupe_key = (
+            record["macaddress"],
+            record["interface"],
+            record["type"],
+            record["bd_id"],
+            record["vn_id"],
+            record["source_ip"],
+            record["peer_ip"],
+        )
+        existing_index = seen.get(dedupe_key)
+        if existing_index is None:
+            seen[dedupe_key] = len(results)
+            results.append(record)
+            continue
+        existing_record = results[existing_index]
+        if existing_record.get("vlan") in {"", "-"} and record.get("vlan") not in {"", "-"}:
+            results[existing_index] = record
     return results
 
 
@@ -893,45 +1504,36 @@ def process_ip_interface_netconf(data):
     """
     interface_entries = _find_records(data, {"ifName"})
     interface_entries.extend(_find_records(data, {"name", "ip:ipv4"}))
+    interface_entries.extend(_find_records(data, {"name", "ipv4"}))
+    interface_entries.extend(_find_records(data, {"name", "ietf-ip:ipv4"}))
+    interface_entries.extend(_find_records(data, {"name", "urn3:ipv4"}))
 
     results = []
     for entry in interface_entries:
-        interface_name = entry.get("ifName", "") or entry.get("name", "")
-        line_status = ((entry.get("ifDynamicInfo", {}) or {}).get("ifLinkStatus", ""))
-        protocol_status = ((entry.get("ifDynamicInfo", {}) or {}).get("ifV4State", ""))
-        mtu = ((entry.get("ifDynamicInfo", {}) or {}).get("ifOpertMTU", ""))
+        interface_name = _pick_first(entry, "ifName", "name", "if-name")
+        if not interface_name:
+            continue
+        dynamic = entry.get("ifDynamicInfo", {}) or {}
+        line_status = _pick_first(
+            dynamic,
+            "ifLinkStatus",
+            "ifOperStatus",
+            default=_pick_first(entry, "oper-status", "admin-status"),
+        )
+        protocol_status = _pick_first(
+            dynamic,
+            "ifV4State",
+            "ifOperStatus",
+            default=_pick_first(entry, "admin-status", "oper-status"),
+        )
+        mtu = _pick_first(dynamic, "ifOpertMTU", default=_pick_first(entry, "mtu", "ip-mtu"))
 
-        ipv4_entries = []
-        ipv4_oper = entry.get("ipv4Oper", {}) or {}
-        ipv4_addrs = (ipv4_oper.get("ipv4Addrs", {}) or {}).get("ipv4Addr")
-        for addr in _as_list(ipv4_addrs):
-            if not isinstance(addr, dict):
-                continue
-            ipv4_entries.append(
-                dict(
-                    ip=addr.get("ifIpAddr", ""),
-                    mask=addr.get("subnetMask", ""),
-                    ip_type=addr.get("addrType", ""),
-                )
-            )
-
-        if not ipv4_entries and entry.get("ip:ipv4"):
-            address = ((entry.get("ip:ipv4", {}) or {}).get("ip:address", {}))
-            for addr in _as_list(address):
-                if not isinstance(addr, dict):
-                    continue
-                ipv4_entries.append(
-                    dict(
-                        ip=addr.get("ip:ip", ""),
-                        mask=addr.get("ip:netmask", ""),
-                        ip_type="ipv4",
-                    )
-                )
-
+        ipv4_entries = _extract_huawei_ipv4_entries(entry)
         for ipv4_entry in ipv4_entries:
             location_payload = _build_ipv4_location(
                 ipv4_entry.get("ip", ""),
                 ipv4_entry.get("mask", ""),
+                ipv4_entry.get("prefix_length", ""),
             )
             if not location_payload:
                 continue
@@ -956,9 +1558,14 @@ def process_ip_interface_netconf(data):
 def process_interface_brief_netconf(data):
     """Huawei collection_intf_ipv4v6 处理二层接口 (NETCONF)。"""
     interface_entries = _find_records(data, {"ifName"})
+    interface_entries.extend(_find_records(data, {"name"}))
     results = []
+    seen = set()
     for entry in interface_entries:
-        if_name = entry.get("ifName", "")
+        if_name = _pick_first(entry, "ifName", "name", "if-name")
+        if not if_name or if_name in seen:
+            continue
+        seen.add(if_name)
         if (
             if_name.startswith("Tunnel")
             or if_name.startswith("Stack-Port")
@@ -969,16 +1576,18 @@ def process_interface_brief_netconf(data):
         ):
             continue
         dynamic = entry.get("ifDynamicInfo", {}) or {}
-        speed = dynamic.get("ifOperSpeed", "")
+        speed = _pick_first(dynamic, "ifOperSpeed", default=_pick_first(entry, "speed", "if-speed", "bandwidth"))
+        if not speed:
+            speed = _infer_huawei_interface_speed(if_name)
         if not speed:
             continue
         results.append(
             dict(
                 interface=_normalize_huawei_interface(if_name),
-                status=dynamic.get("ifOperStatus", ""),
-                speed=InterfaceFormat.mathintspeed(speed),
-                duplex="",
-                description="",
+                status=_pick_first(dynamic, "ifOperStatus", "ifLinkStatus", default=_pick_first(entry, "oper-status", "admin-status")),
+                speed=InterfaceFormat.mathintspeed(_normalize_speed_for_mathintspeed(speed)),
+                duplex=_pick_first(entry, "duplex"),
+                description=_pick_first(entry, "description", "desc"),
             )
         )
     return results
@@ -993,40 +1602,51 @@ def process_lldp_netconf(data):
     优先兼容旧 Huawei NETCONF `lldp` 结构。
     """
     entries = _find_records(data, {"ifName"})
+    entries.extend(_find_records(data, {"name", "lldp"}))
     results = []
     for entry in entries:
-        neighbors = entry.get("lldpNeighbors", {})
-        neighbor = (neighbors or {}).get("lldpNeighbor")
-        if not isinstance(neighbor, dict):
-            continue
-        if neighbor.get("portIdSubtype") == "macAddress":
-            continue
+        local_interface = _pick_first(entry, "ifName", "name")
+        neighbor_items = []
 
-        management_ip = ""
-        management_type = ""
-        management_addresses = ((neighbor.get("managementAddresss", {}) or {}).get("managementAddress"))
-        for address in _as_list(management_addresses):
-            if not isinstance(address, dict):
+        legacy_neighbors = entry.get("lldpNeighbors", {})
+        legacy_neighbor = (legacy_neighbors or {}).get("lldpNeighbor")
+        neighbor_items.extend([item for item in _as_list(legacy_neighbor) if isinstance(item, dict)])
+
+        session_neighbors = (((entry.get("lldp", {}) or {}).get("session", {}) or {}).get("neighbors", {}) or {}).get("neighbor")
+        neighbor_items.extend([item for item in _as_list(session_neighbors) if isinstance(item, dict)])
+
+        for neighbor in neighbor_items:
+            port_id_sub_type = _pick_first(neighbor, "portIdSubtype", "port-id-sub-type")
+            if str(port_id_sub_type).lower() == "macaddress":
                 continue
-            if address.get("manAddrSubtype") == "ipv4" or not management_ip:
-                management_ip = address.get("manAddr", "")
-                management_type = address.get("manAddrSubtype", "")
-                if management_type == "ipv4":
-                    break
 
-        neighborsysname = neighbor.get("systemName", "")
-        results.append(
-            dict(
-                local_interface=_normalize_huawei_interface(entry.get("ifName", "")),
-                chassis_id=neighbor.get("chassisId", ""),
-                neighbor_port=neighbor.get("portId", ""),
-                portdescription=neighbor.get("portDescription", ""),
-                neighborsysname=neighborsysname,
-                management_ip=management_ip,
-                management_type=management_type,
-                neighbor_ip=_lookup_neighbor_ip(neighborsysname),
+            management_ip = ""
+            management_type = ""
+            management_addresses = ((neighbor.get("managementAddresss", {}) or {}).get("managementAddress"))
+            for address in _as_list(management_addresses):
+                if not isinstance(address, dict):
+                    continue
+                address_type = _pick_first(address, "manAddrSubtype", "type")
+                address_value = _pick_first(address, "manAddr", "value")
+                if address_type == "ipv4" or not management_ip:
+                    management_ip = address_value
+                    management_type = address_type
+                    if management_type == "ipv4":
+                        break
+
+            neighborsysname = _pick_first(neighbor, "systemName", "system-name")
+            results.append(
+                dict(
+                    local_interface=_normalize_huawei_interface(local_interface),
+                    chassis_id=_pick_first(neighbor, "chassisId", "chassis-id"),
+                    neighbor_port=_pick_first(neighbor, "portId", "port-id"),
+                    portdescription=_pick_first(neighbor, "portDescription", "port-description"),
+                    neighborsysname=neighborsysname,
+                    management_ip=management_ip,
+                    management_type=management_type,
+                    neighbor_ip=_lookup_neighbor_ip(neighborsysname),
+                )
             )
-        )
     return results
 
 
@@ -1039,16 +1659,14 @@ def process_aggre_port_netconf(data):
     兼容旧 Huawei NETCONF `trunk_lacp` / `aggregation` 结构。
     """
     entries = _find_records(data, {"ifName"})
+    entries.extend(_find_records(data, {"name", "trunk"}))
     results = []
     for entry in entries:
-        if not (
-            str(entry.get("ifName", "")).startswith("Eth-Trunk")
-            or entry.get("TrunkMemberIfs") is not None
-        ):
-            continue
-
         memberports = []
         memberstatus = []
+        aggregroup = _pick_first(entry, "ifName", "name")
+        mode = _pick_first(entry, "workMode", "mode")
+
         trunk_members = ((entry.get("TrunkMemberIfs", {}) or {}).get("TrunkMemberIf"))
         for member in _as_list(trunk_members):
             if not isinstance(member, dict):
@@ -1060,12 +1678,33 @@ def process_aggre_port_netconf(data):
             if state:
                 memberstatus.append(state)
 
+        trunk = entry.get("trunk", {}) or {}
+        mode = mode or _pick_first(trunk, "work-mode")
+        if isinstance(trunk, dict):
+            members = ((trunk.get("members", {}) or {}).get("member"))
+            for member in _as_list(members):
+                if not isinstance(member, dict):
+                    continue
+                member_name = _pick_first(member, "name")
+                if member_name:
+                    memberports.append(_normalize_huawei_interface(member_name))
+                state = _pick_first(member, "status")
+                if state:
+                    memberstatus.append(state)
+
+        if not (
+            str(aggregroup).startswith("Eth-Trunk")
+            or entry.get("TrunkMemberIfs") is not None
+            or isinstance(entry.get("trunk"), dict)
+        ):
+            continue
+
         results.append(
             dict(
-                aggregroup=entry.get("ifName", ""),
-                memberports=memberports,
-                status=",".join(memberstatus),
-                mode=entry.get("workMode", "") or entry.get("mode", ""),
+                aggregroup=aggregroup,
+                memberports=_dedupe_strings(memberports),
+                status=",".join(_dedupe_strings(memberstatus)),
+                mode=mode,
             )
         )
     return results

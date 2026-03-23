@@ -177,12 +177,17 @@ def _host_identity(host: dict) -> str:
     )
 
 
+def _has_executable_sub_plans(host: dict) -> bool:
+    return bool(host.get("sub_plans") or [])
+
+
 def _host_preference_key(host: dict) -> tuple:
     try:
         plan_rank = -(int(host.get("plan_id") or 0))
     except (TypeError, ValueError):
         plan_rank = 0
     return (
+        0 if _has_executable_sub_plans(host) else 1,
         _binding_source_priority(host.get("binding_source")),
         0 if host.get("use_local", True) else 1,
         -_safe_timestamp(host.get("last_bound_at")),
