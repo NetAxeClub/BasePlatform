@@ -924,6 +924,11 @@ class DeviceSubCollectionPlanUpdateSerializer(serializers.ModelSerializer):
 class NetconfXMLTemplateSerializer(serializers.ModelSerializer):
     """NETCONF XML模板序列化器"""
 
+    def validate_collect_method(self, value):
+        if value not in {"get", "get_config"}:
+            raise serializers.ValidationError("collect_method 仅支持 get / get_config")
+        return value
+
     class Meta:
         model = NetconfXMLTemplate
         fields = "__all__"

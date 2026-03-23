@@ -414,9 +414,9 @@ class NetworkDevice(models.Model):
         null=True,
         blank=True)
     u_location_start = models.IntegerField(
-        verbose_name='机架位起始', default=0, validators=[MaxValueValidator(50), MinValueValidator(1)])
+        verbose_name='机架位起始', default=0, validators=[MaxValueValidator(60), MinValueValidator(1)])
     u_location_end = models.IntegerField(
-        verbose_name='机架位结束', default=0, validators=[MaxValueValidator(50), MinValueValidator(1)])
+        verbose_name='机架位结束', default=0, validators=[MaxValueValidator(60), MinValueValidator(1)])
     uptime = models.DateField(verbose_name='上线时间', null=True, auto_now_add=True)
     expire = models.DateField(verbose_name='维保日期', null=True, blank=True)
     memo = models.TextField(verbose_name='备注', null=True, default='-', blank=True)

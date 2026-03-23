@@ -4,7 +4,8 @@
 COMMON_METADATA_FIELDS = ("hostip", "hostname", "idc_name", "log_time")
 
 # 默认按 list 类型存储的字段（用于缺省值补齐）
-LIST_VALUE_FIELDS = {"memberports", "location"}
+LIST_VALUE_FIELDS = {"memberports", "location", "bd_ids", "vnis", "vrfs", "nve_ids", "evidence", "schema_samples"}
+RAW_NETMIKO_COLLECTION_TYPES = {"cli_output_capability"}
 
 
 DEV_MAPPING = [
@@ -47,6 +48,29 @@ BOARD_STATUS_MAPPING = [
     {"label": "板卡型号: board_model", "value": "board_model"},
     {"label": "序列号: serial_num", "value": "serial_num"},
     {"label": "状态: status", "value": "status"},
+]
+
+IRF_STATUS_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "机框编号: chassis_id", "value": "chassis_id"},
+    {"label": "成员编号: member_id", "value": "member_id"},
+    {"label": "槽位编号: slot", "value": "slot"},
+    {"label": "角色: role", "value": "role"},
+    {"label": "优先级: priority", "value": "priority"},
+    {"label": "MAC地址: mac", "value": "mac"},
+]
+
+STACK_STATUS_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "成员编号: member_id", "value": "member_id"},
+    {"label": "槽位编号: slot", "value": "slot"},
+    {"label": "角色: role", "value": "role"},
+    {"label": "优先级: priority", "value": "priority"},
+    {"label": "MAC地址: mac", "value": "mac"},
 ]
 
 TRANSCEIVER_STATUS_MAPPING = [
@@ -103,6 +127,71 @@ MAC_MAPPING = [
     {"label": "vlan地址: vlan", "value": "vlan"},
     {"label": "接口: interface", "value": "interface"},
     {"label": "类型: type", "value": "type"},
+]
+
+MAC_BD_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "mac地址: macaddress", "value": "macaddress"},
+    {"label": "BD ID: bd_id", "value": "bd_id"},
+    {"label": "VLAN: vlan", "value": "vlan"},
+    {"label": "接口: interface", "value": "interface"},
+    {"label": "类型: type", "value": "type"},
+]
+
+MAC_VXLAN_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "mac地址: macaddress", "value": "macaddress"},
+    {"label": "BD ID: bd_id", "value": "bd_id"},
+    {"label": "VNID: vn_id", "value": "vn_id"},
+    {"label": "源IP: source_ip", "value": "source_ip"},
+    {"label": "对端IP: peer_ip", "value": "peer_ip"},
+    {"label": "隧道类型: tunnel_type", "value": "tunnel_type"},
+    {"label": "类型: type", "value": "type"},
+]
+
+VXLAN_CAPABILITY_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "存在BD配置: has_bd", "value": "has_bd"},
+    {"label": "BD数量: bd_count", "value": "bd_count"},
+    {"label": "BD编号: bd_ids", "value": "bd_ids"},
+    {"label": "存在VXLAN VNI配置: has_vxlan_vni", "value": "has_vxlan_vni"},
+    {"label": "VNI数量: vni_count", "value": "vni_count"},
+    {"label": "VNI列表: vnis", "value": "vnis"},
+    {"label": "存在NVE配置: has_nve", "value": "has_nve"},
+    {"label": "NVE ID列表: nve_ids", "value": "nve_ids"},
+    {"label": "存在EVPN BGP配置: has_evpn_bgp", "value": "has_evpn_bgp"},
+    {"label": "EVPN地址族数量: evpn_af_count", "value": "evpn_af_count"},
+    {"label": "EVPN相关VRF: vrfs", "value": "vrfs"},
+    {"label": "证据: evidence", "value": "evidence"},
+]
+
+NETCONF_CAPABILITY_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "Schema数量: schema_count", "value": "schema_count"},
+    {"label": "OpenConfig数量: openconfig_schema_count", "value": "openconfig_schema_count"},
+    {"label": "存在BGP Schema: has_bgp_schema", "value": "has_bgp_schema"},
+    {"label": "存在L2VPN Schema: has_l2vpn_schema", "value": "has_l2vpn_schema"},
+    {"label": "存在IFMGR Schema: has_ifmgr_schema", "value": "has_ifmgr_schema"},
+    {"label": "存在Telemetry Schema: has_telemetry_schema", "value": "has_telemetry_schema"},
+    {"label": "Schema样本: schema_samples", "value": "schema_samples"},
+]
+
+CLI_OUTPUT_CAPABILITY_MAPPING = [
+    {"label": "主机IP: hostip", "value": "hostip"},
+    {"label": "主机名称: hostname", "value": "hostname"},
+    {"label": "机房名称: idc_name", "value": "idc_name"},
+    {"label": "支持display irf: supports_irf_cli", "value": "supports_irf_cli"},
+    {"label": "命令未识别: command_unrecognized", "value": "command_unrecognized"},
+    {"label": "存在IRF成员: has_irf_members", "value": "has_irf_members"},
+    {"label": "证据: evidence", "value": "evidence"},
 ]
 
 LLDP_MAPPING = [
@@ -342,6 +431,42 @@ field_mapping = {
         "icon": "mac",
         "mapping_fields": MAC_MAPPING,
     },
+    "mac_bd": {
+        "label": "MAC BD",
+        "value": "mac_bd",
+        "icon": "mac",
+        "mapping_fields": MAC_BD_MAPPING,
+    },
+    "mac_vxlan": {
+        "label": "MAC VXLAN",
+        "value": "mac_vxlan",
+        "icon": "mac",
+        "mapping_fields": MAC_VXLAN_MAPPING,
+    },
+    "mac_vxlan_control": {
+        "label": "MAC VXLAN CONTROL",
+        "value": "mac_vxlan_control",
+        "icon": "mac",
+        "mapping_fields": MAC_VXLAN_MAPPING,
+    },
+    "vxlan_capability": {
+        "label": "VXLAN CAPABILITY",
+        "value": "vxlan_capability",
+        "icon": "capability",
+        "mapping_fields": VXLAN_CAPABILITY_MAPPING,
+    },
+    "netconf_capability": {
+        "label": "NETCONF CAPABILITY",
+        "value": "netconf_capability",
+        "icon": "capability",
+        "mapping_fields": NETCONF_CAPABILITY_MAPPING,
+    },
+    "cli_output_capability": {
+        "label": "CLI OUTPUT CAPABILITY",
+        "value": "cli_output_capability",
+        "icon": "capability",
+        "mapping_fields": CLI_OUTPUT_CAPABILITY_MAPPING,
+    },
     "lldp": {
         "label": "LLDP",
         "value": "lldp",
@@ -401,6 +526,18 @@ field_mapping = {
         "value": "board_status",
         "icon": "board-status",
         "mapping_fields": BOARD_STATUS_MAPPING,
+    },
+    "irf_status": {
+        "label": "IRF状态",
+        "value": "irf_status",
+        "icon": "stack-status",
+        "mapping_fields": IRF_STATUS_MAPPING,
+    },
+    "stack_status": {
+        "label": "堆叠状态",
+        "value": "stack_status",
+        "icon": "stack-status",
+        "mapping_fields": STACK_STATUS_MAPPING,
     },
     "transceiver_status": {
         "label": "光模块状态",
@@ -466,12 +603,13 @@ field_mapping = {
 
 COLLECTION_TYPE_ALIASES = {
     "device_identity": "version",
+    "vxlan_capability": "netconf_capability",
 }
 
 # 所有采集类型列表，用于创建空白方案时自动生成各类型的子方案。
-# version 仅作为 device_identity 的兼容别名保留，不参与默认子方案自动生成。
+# version / vxlan_capability 仅作为兼容别名保留，不参与默认子方案自动生成。
 DEFAULT_COLLECTION_TYPES = [
-    key for key in field_mapping.keys() if key != "version"
+    key for key in field_mapping.keys() if key not in {"version", "vxlan_capability"}
 ]
 
 

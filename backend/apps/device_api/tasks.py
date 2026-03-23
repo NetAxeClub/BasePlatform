@@ -147,6 +147,68 @@ def split_runtime_control_kwargs(kwargs=None):
     return runtime_options, device_filters
 
 
+def _binding_source_priority(binding_source: str) -> int:
+    priorities = {
+        "manual": 0,
+        "auto": 1,
+        "legacy_bridge": 2,
+    }
+    return priorities.get(str(binding_source or "").strip(), 99)
+
+
+def _safe_timestamp(value) -> float:
+    if value is None:
+        return 0.0
+    if hasattr(value, "timestamp"):
+        try:
+            return float(value.timestamp())
+        except (TypeError, ValueError, OSError):
+            return 0.0
+    return 0.0
+
+
+def _host_identity(host: dict) -> str:
+    return (
+        host.get("device_serial_num")
+        or host.get("serial_num")
+        or host.get("manage_ip")
+        or ""
+    )
+
+
+def _host_preference_key(host: dict) -> tuple:
+    try:
+        plan_rank = -(int(host.get("plan_id") or 0))
+    except (TypeError, ValueError):
+        plan_rank = 0
+    return (
+        _binding_source_priority(host.get("binding_source")),
+        0 if host.get("use_local", True) else 1,
+        -_safe_timestamp(host.get("last_bound_at")),
+        -_safe_timestamp(host.get("binding_updated_at")),
+        -_safe_timestamp(host.get("binding_created_at")),
+        plan_rank,
+    )
+
+
+def dedupe_batch_hosts(hosts):
+    """按设备去重，避免同一批次对同一台设备重复下发采集任务。"""
+    deduped_hosts = {}
+    duplicate_count = 0
+    for host in hosts or []:
+        identity = _host_identity(host)
+        if not identity:
+            continue
+        existing = deduped_hosts.get(identity)
+        if existing is None or _host_preference_key(host) < _host_preference_key(existing):
+            if existing is not None:
+                duplicate_count += 1
+            deduped_hosts[identity] = host
+        else:
+            duplicate_count += 1
+    return list(deduped_hosts.values()), duplicate_count
+
+
 def datas_to_cache():
     # 获取ARP表的所有数据 tables 用来汇总查询条件
     tables = {
@@ -314,16 +376,13 @@ class MainIn:
         return
 
 
-def clear_his_collect_res():
-    # 清空主采集任务记录
-    # COLLECTION_PLAN.delete()
+def clear_his_collect_res(execute_time=None):
+    delete_filter = {"execute_time": execute_time} if execute_time else None
+    COLLECTION_PLAN.delete(delete_filter)
+    COLLECTION_SUB_PLAN.delete(delete_filter)
 
-    # 清空子采集任务数据
-    COLLECTION_SUB_PLAN.delete()
-
-    # 清空采集到的采集类型数据表
     for collect_type in field_mapping.keys():
-        MongoOps(db="Automation", coll=f"plan_{collect_type}").delete()
+        MongoOps(db="Automation", coll=f"plan_{collect_type}").delete(delete_filter)
     return
 
 
@@ -349,6 +408,18 @@ def plan_collect_device(**kwargs):
         logger.warning(f"设备 {host_ip} 未关联数据采集方案")
         return {}
 
+    summary_plan_id = None
+    execute_time = kwargs.get("execute_time", datetime.now().isoformat())
+    task_summary = {
+        "total_sub_plans": 0,
+        "successful_sub_plans": 0,
+        "failed_sub_plans": 0,
+        "skipped_sub_plans": 0,
+        "failed_details": [],
+        "skipped_details": [],
+    }
+    parent_record_created = False
+
     try:
         # 使用从get_auto_device传递过来的子采集方案列表
         sub_plans_list = kwargs.get("sub_plans", [])
@@ -362,22 +433,17 @@ def plan_collect_device(**kwargs):
         logger.info(f"开始采集设备 {host_ip}, 子方案数量: {len(sub_plans_list)}")
 
         # 在执行采集之前，插入主采集方案记录
-        DeviceCollectionService.insert_parent_plan_data(
+        parent_insert_result = DeviceCollectionService.insert_parent_plan_data(
             plan=sub_plans_list[0],
             device_info=kwargs,
             sub_plans_count=len(sub_plans_list),
         )
+        parent_record_created = bool(
+            isinstance(parent_insert_result, dict) and parent_insert_result.get("success")
+        )
 
         summary_plan_id = sub_plans_list[0].get("summary_plan")
-        execute_time = kwargs.get("execute_time", datetime.now().isoformat())
-        task_summary = {
-            "total_sub_plans": len(sub_plans_list),
-            "successful_sub_plans": 0,
-            "failed_sub_plans": 0,
-            "skipped_sub_plans": 0,
-            "failed_details": [],
-            "skipped_details": [],
-        }
+        task_summary["total_sub_plans"] = len(sub_plans_list)
 
         # 使用连接管理器执行所有子采集方案，确保单设备只建立一次连接
         try:
@@ -406,16 +472,32 @@ def plan_collect_device(**kwargs):
                         )
 
                         # 处理并保存结果
-                        _process_and_save_result(
+                        process_result = _process_and_save_result(
                             plan=sub_plan,
                             device_info=kwargs,
                             raw_result=result,
                             collection_method="netmiko",
                         )
-                        task_summary["successful_sub_plans"] += 1
-                        logger.info(
-                            f"Netmiko采集完成: {sub_plan['name']} (设备: {host_ip})"
-                        )
+                        if isinstance(process_result, dict):
+                            process_success = process_result.get("success", False)
+                            process_reason = process_result.get("reason", "processing_failed")
+                        else:
+                            process_success = bool(process_result)
+                            process_reason = "processing_failed"
+                        if process_success:
+                            task_summary["successful_sub_plans"] += 1
+                            logger.info(
+                                f"Netmiko采集完成: {sub_plan['name']} (设备: {host_ip})"
+                            )
+                        else:
+                            task_summary["failed_sub_plans"] += 1
+                            task_summary["failed_details"].append(
+                                {
+                                    "plan_id": sub_plan.get("id"),
+                                    "collection_method": "netmiko",
+                                    "reason": process_reason,
+                                }
+                            )
                     except Exception as e:
                         task_summary["failed_sub_plans"] += 1
                         task_summary["failed_details"].append(
@@ -451,19 +533,37 @@ def plan_collect_device(**kwargs):
                                     xml_template
                                 )
                             else:
-                                result = conn_mgr.execute_netconf_get(xml_template)
+                                raise ValueError(
+                                    f"不支持的 NETCONF collect_method: {collect_method}，仅允许 get/get_config"
+                                )
 
                             # 处理并保存结果
-                            _process_and_save_result(
+                            process_result = _process_and_save_result(
                                 plan=sub_plan,
                                 device_info=kwargs,
                                 raw_result=result,
                                 collection_method="netconf",
                             )
-                            task_summary["successful_sub_plans"] += 1
-                            logger.info(
-                                f"NETCONF采集完成: {sub_plan['name']} (设备: {host_ip})"
-                            )
+                            if isinstance(process_result, dict):
+                                process_success = process_result.get("success", False)
+                                process_reason = process_result.get("reason", "processing_failed")
+                            else:
+                                process_success = bool(process_result)
+                                process_reason = "processing_failed"
+                            if process_success:
+                                task_summary["successful_sub_plans"] += 1
+                                logger.info(
+                                    f"NETCONF采集完成: {sub_plan['name']} (设备: {host_ip})"
+                                )
+                            else:
+                                task_summary["failed_sub_plans"] += 1
+                                task_summary["failed_details"].append(
+                                    {
+                                        "plan_id": sub_plan.get("id"),
+                                        "collection_method": "netconf",
+                                        "reason": process_reason,
+                                    }
+                                )
                         else:
                             task_summary["skipped_sub_plans"] += 1
                             task_summary["skipped_details"].append(
@@ -498,16 +598,32 @@ def plan_collect_device(**kwargs):
                             result = conn_mgr.execute_snmp_get(oids)
 
                             # 处理并保存结果
-                            _process_and_save_result(
+                            process_result = _process_and_save_result(
                                 plan=sub_plan,
                                 device_info=kwargs,
                                 raw_result=result,
                                 collection_method="snmp",
                             )
-                            task_summary["successful_sub_plans"] += 1
-                            logger.info(
-                                f"SNMP采集完成: {sub_plan['name']} (设备: {host_ip})"
-                            )
+                            if isinstance(process_result, dict):
+                                process_success = process_result.get("success", False)
+                                process_reason = process_result.get("reason", "processing_failed")
+                            else:
+                                process_success = bool(process_result)
+                                process_reason = "processing_failed"
+                            if process_success:
+                                task_summary["successful_sub_plans"] += 1
+                                logger.info(
+                                    f"SNMP采集完成: {sub_plan['name']} (设备: {host_ip})"
+                                )
+                            else:
+                                task_summary["failed_sub_plans"] += 1
+                                task_summary["failed_details"].append(
+                                    {
+                                        "plan_id": sub_plan.get("id"),
+                                        "collection_method": "snmp",
+                                        "reason": process_reason,
+                                    }
+                                )
                         else:
                             task_summary["skipped_sub_plans"] += 1
                             task_summary["skipped_details"].append(
@@ -542,16 +658,32 @@ def plan_collect_device(**kwargs):
                             result = conn_mgr.execute_restconf_get(endpoint)
 
                             # 处理并保存结果
-                            _process_and_save_result(
+                            process_result = _process_and_save_result(
                                 plan=sub_plan,
                                 device_info=kwargs,
                                 raw_result=result,
                                 collection_method="restconf",
                             )
-                            task_summary["successful_sub_plans"] += 1
-                            logger.info(
-                                f"RESTCONF采集完成: {sub_plan['name']} (设备: {host_ip})"
-                            )
+                            if isinstance(process_result, dict):
+                                process_success = process_result.get("success", False)
+                                process_reason = process_result.get("reason", "processing_failed")
+                            else:
+                                process_success = bool(process_result)
+                                process_reason = "processing_failed"
+                            if process_success:
+                                task_summary["successful_sub_plans"] += 1
+                                logger.info(
+                                    f"RESTCONF采集完成: {sub_plan['name']} (设备: {host_ip})"
+                                )
+                            else:
+                                task_summary["failed_sub_plans"] += 1
+                                task_summary["failed_details"].append(
+                                    {
+                                        "plan_id": sub_plan.get("id"),
+                                        "collection_method": "restconf",
+                                        "reason": process_reason,
+                                    }
+                                )
                         else:
                             task_summary["skipped_sub_plans"] += 1
                             task_summary["skipped_details"].append(
@@ -662,7 +794,47 @@ def plan_collect_device(**kwargs):
         }
     except Exception as e:
         logger.error(f"设备 {host_ip} 采集任务异常: {str(e)}", exc_info=True)
-        return {}
+        if parent_record_created and summary_plan_id is not None:
+            try:
+                COLLECTION_PLAN.update_one(
+                    filter={
+                        "summary_plan_id": summary_plan_id,
+                        "device_ip": host_ip,
+                        "execute_time": execute_time,
+                    },
+                    update={
+                        "$set": {
+                            "task_status": "failed",
+                            "failed_sub_plans": max(task_summary["failed_sub_plans"], 1),
+                            "failed_details": (
+                                task_summary["failed_details"][:20]
+                                + [
+                                    {
+                                        "plan_id": None,
+                                        "collection_method": "device",
+                                        "reason": str(e),
+                                    }
+                                ]
+                            )[:20],
+                            "updated_at": datetime.now().isoformat(),
+                        }
+                    },
+                )
+            except Exception as update_error:
+                logger.warning(
+                    "设备级异常后更新主采集任务失败: device=%s summary_plan_id=%s execute_time=%s error=%s",
+                    host_ip,
+                    summary_plan_id,
+                    execute_time,
+                    update_error,
+                )
+        return {
+            "host_ip": host_ip,
+            "total": task_summary["total_sub_plans"],
+            "execute_time": execute_time,
+            "task_status": "failed",
+            **task_summary,
+        }
 
 
 def _process_and_save_result(
@@ -690,7 +862,7 @@ def _process_and_save_result(
             ).get(id=plan.get("id"))
         except DeviceSubCollectionPlan.DoesNotExist:
             logger.warning(f"采集方案不存在: plan_id={plan.get('id')}")
-            return
+            return {"success": False, "reason": "plan_not_found"}
 
         # ── Layer 1 + 2：数据解析与规范化 ────────────────────────────────
         collection_result = {"data": raw_result, "device_ip": manage_ip}
@@ -703,7 +875,7 @@ def _process_and_save_result(
                 f"数据处理失败: {manage_ip}, method={collection_method}, error={resolve_error}"
             )
             DeviceFactService.mark_discovery_failure(device_info, resolve_error)
-            return
+            return {"success": False, "reason": resolve_error or "resolve_failed"}
 
         # ── Layer 3：元数据注入 ──────────────────────────────────────────
         meta = {
@@ -749,7 +921,7 @@ def _process_and_save_result(
                     f"保存采集数据到 MongoDB 失败: {manage_ip}, type={storage_collection_type}, {str(e)}",
                     exc_info=True,
                 )
-                return
+                return {"success": False, "reason": str(e)}
         else:
             logger.warning(
                 f"采集结果为空或无法保存: {manage_ip}, type={storage_collection_type}, "
@@ -789,6 +961,9 @@ def _process_and_save_result(
             exc_info=True,
         )
         DeviceFactService.mark_discovery_failure(device_info, str(e))
+        return {"success": False, "reason": str(e)}
+
+    return {"success": True, "reason": ""}
 
 
 # 通用信息采集主调度任务
@@ -816,29 +991,47 @@ def plan_collect_device_main(**kwargs):
 
     logger.info(f"获取所有设备信息结束，获取到 {len(hosts)} 个设备信息")
 
+    deduped_hosts, duplicate_count = dedupe_batch_hosts(hosts)
+    if duplicate_count:
+        logger.warning("批次调度已去重重复设备绑定: duplicates=%s", duplicate_count)
+
+    skipped_hosts_without_sub_plans = [
+        host for host in deduped_hosts if not (host.get("sub_plans") or [])
+    ]
+    if skipped_hosts_without_sub_plans:
+        logger.warning(
+            "批次调度跳过无可执行子方案设备: count=%s",
+            len(skipped_hosts_without_sub_plans),
+        )
+
+    valid_hosts = [host for host in deduped_hosts if host.get("sub_plans")]
+
     # 参数初始化
     net_tower_tasks = []  # 采集任务id集合
-    total_expected_subtasks = sum(len(host.get("sub_plans", [])) for host in hosts)
-    total_expected_interface_devices = count_expected_interface_devices(hosts)
-    batch_execute_time = hosts[0].get("execute_time") if hosts else ""
+    total_expected_subtasks = sum(len(host.get("sub_plans", [])) for host in valid_hosts)
+    total_expected_interface_devices = count_expected_interface_devices(valid_hosts)
+    batch_execute_time = deduped_hosts[0].get("execute_time") if deduped_hosts else ""
 
     clear_history = should_clear_history_before_batch(runtime_options)
 
     # 清空历史采集数据
     if clear_history:
         try:
-            clear_his_collect_res()
-            logger.info("历史采集数据已清空")
+            if batch_execute_time:
+                clear_his_collect_res(execute_time=batch_execute_time)
+                logger.info("历史采集数据已按批次清空: execute_time=%s", batch_execute_time)
+            else:
+                logger.info("当前批次无 execute_time，跳过历史采集数据清理")
         except Exception as e:
             logger.warning(f"清空历史采集数据失败: {str(e)}")
-            return
+            raise RuntimeError(f"清空历史采集数据失败: {str(e)}") from e
     else:
         logger.info("本批次保留历史采集数据: clear_history=False")
 
     start_time = time.time()
 
     # 批量下发任务
-    for host in hosts:
+    for host in valid_hosts:
         host_ip = host.get("manage_ip")
         task = plan_collect_device.apply_async(kwargs=host, queue=CELERY_QUEUE, retry=True)
         net_tower_tasks.append(task)
@@ -857,17 +1050,19 @@ def plan_collect_device_main(**kwargs):
     if batch_execute_time:
         analysis_trigger = schedule_batch_network_analysis(
             execute_time=batch_execute_time,
-            expected_devices=len(hosts),
+            expected_devices=len(valid_hosts),
             expected_subtasks=total_expected_subtasks,
             expected_interface_devices=total_expected_interface_devices,
             triggered_by="device_api-plan_collect_device_main",
         )
 
     return {
-        "total": len(hosts),
+        "total": len(valid_hosts),
         "tasks": len(net_tower_tasks),
         "time_cost": f"{total_time:.2f}分钟",
         "clear_history": clear_history,
+        "deduplicated_devices": duplicate_count,
+        "skipped_without_sub_plans": len(skipped_hosts_without_sub_plans),
         "analysis_trigger": analysis_trigger,
     }
 

@@ -120,6 +120,23 @@ def _build_ifindex_map(top):
     return ifindex_map
 
 
+def _collect_h3c_schemas(value):
+    if isinstance(value, dict):
+        schemas = value.get('netconf-state', {}).get('schemas', {}).get('schema')
+        if schemas is not None:
+            return schemas if isinstance(schemas, list) else [schemas]
+        results = []
+        for child in value.values():
+            results.extend(_collect_h3c_schemas(child))
+        return results
+    if isinstance(value, list):
+        results = []
+        for item in value:
+            results.extend(_collect_h3c_schemas(item))
+        return results
+    return []
+
+
 def _as_list(value):
     if value is None:
         return []
@@ -146,6 +163,10 @@ def _normalize_h3c_interface(name: str) -> str:
     if not name:
         return ""
     return InterfaceFormat.h3c_interface_format(name)
+
+
+def _strip_irf_reference_suffix(name: str) -> str:
+    return re.sub(r"\(R\)$", "", str(name or "").strip())
 
 
 def _build_ipv4_location(ip_address: str, ip_mask: str):
@@ -192,6 +213,98 @@ def _index_by(items, key_name):
 def _is_established(state: str) -> bool:
     text = str(state or '').strip().lower()
     return text in {'established', 'estab', 'up'} or 'established' in text
+
+
+@register_processor(vendor='H3C', device_type='', collection_type='version', method='netmiko')
+def process_version_netmiko(data):
+    """H3C display version 处理 (Netmiko/TextFSM)。"""
+    rows = _as_list(data)
+    if not rows:
+        return []
+
+    model_name = ''
+    soft_version = ''
+    patch_version = ''
+
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if not model_name:
+            model_name = str(row.get('BOARD_TYPE') or row.get('board_type') or '').strip()
+        if not soft_version:
+            soft_version = str(
+                row.get('Version')
+                or row.get('version')
+                or row.get('Release_Ver')
+                or row.get('release_ver')
+                or ''
+            ).strip().replace(', ', ' ')
+        if not patch_version:
+            patch_version = str(row.get('Patch_Ver') or row.get('patch_ver') or '').strip()
+
+    if not any([model_name, soft_version, patch_version]):
+        return []
+
+    return [
+        dict(
+            vendor_alias='H3C',
+            model_name=model_name,
+            soft_version=soft_version,
+            patch_version=patch_version,
+        )
+    ]
+
+
+@register_processor(vendor='H3C', device_type='', collection_type='board_status', method='netmiko')
+def process_board_status_netmiko(data):
+    """H3C display device manuinfo 处理 (Netmiko/TextFSM)。"""
+    rows = []
+    for item in _as_list(data):
+        if not isinstance(item, dict):
+            continue
+        slot_type = str(item.get('SLOT_TYPE') or item.get('slot_type') or '').strip()
+        slot_id = str(item.get('SLOT_ID') or item.get('slot_id') or '').strip()
+        serial_num = str(
+            item.get('DEVICE_SERIAL_NUMBER') or item.get('device_serial_number') or ''
+        ).strip()
+        if serial_num.upper() == 'NONE':
+            serial_num = ''
+        device_name = str(item.get('DEVICE_NAME') or item.get('device_name') or '').strip()
+        chassis_id = str(item.get('CHASSIS_ID') or item.get('chassis_id') or '').strip()
+        rows.append(
+            dict(
+                slot='' if slot_id == 'self' else slot_id,
+                board_name=device_name,
+                board_model=device_name,
+                serial_num=serial_num,
+                status=slot_type,
+                slot_type=slot_type.lower(),
+                chassis_id=chassis_id,
+            )
+        )
+    return rows
+
+
+@register_processor(vendor='H3C', device_type='', collection_type='irf_status', method='netmiko')
+def process_irf_status_netmiko(data):
+    """H3C display irf 处理 (Netmiko/TextFSM)。"""
+    rows = []
+    for item in _as_list(data):
+        if not isinstance(item, dict):
+            continue
+        member_id = str(item.get('MemberID') or item.get('memberid') or item.get('member_id') or '').strip()
+        chassis_id = str(item.get('ChassisID') or item.get('chassisid') or item.get('chassis_id') or '').strip()
+        rows.append(
+            dict(
+                chassis_id=chassis_id,
+                member_id=member_id,
+                slot=member_id,
+                role=str(item.get('Role') or item.get('role') or '').strip(),
+                priority=str(item.get('Priority') or item.get('priority') or '').strip(),
+                mac=str(item.get('Mac') or item.get('mac') or '').strip(),
+            )
+        )
+    return rows
 
 
 @register_processor(vendor='H3C', device_type='', collection_type='interface_brief', method='netconf')
@@ -471,6 +584,47 @@ def process_route_table_netconf(data):
         )
 
     return results
+
+
+@register_processor(vendor='H3C', device_type='', collection_type='netconf_capability', method='netconf')
+def process_netconf_capability_netconf(data):
+    schemas = _collect_h3c_schemas(data)
+    identifiers = [str(item.get('identifier') or '') for item in schemas if isinstance(item, dict)]
+    namespaces = [str(item.get('namespace') or '') for item in schemas if isinstance(item, dict)]
+    combined = identifiers + namespaces
+    return [
+        dict(
+            schema_count=len(schemas),
+            openconfig_schema_count=sum(1 for item in identifiers if item.startswith('openconfig-')),
+            has_bgp_schema=any('bgp' in item.lower() for item in combined),
+            has_l2vpn_schema=any(any(keyword in item.lower() for keyword in ('l2vpn', 'vsi', 'evpn')) for item in combined),
+            has_ifmgr_schema=any(any(keyword in item.lower() for keyword in ('ifmgr', 'interface')) for item in combined),
+            has_telemetry_schema=any('telemetry' in item.lower() for item in combined),
+            schema_samples=[item for item in identifiers[:10] if item],
+        )
+    ]
+
+
+@register_processor(vendor='H3C', device_type='', collection_type='cli_output_capability', method='netmiko')
+def process_cli_output_capability_netmiko(data):
+    raw_text = str(data or "")
+    lowered = raw_text.lower()
+    command_unrecognized = "unrecognized command" in lowered
+    supports_irf_cli = not command_unrecognized
+    has_irf_members = any(keyword in raw_text for keyword in ("Master", "Standby", "MemberID", "IRF Port"))
+    evidence = []
+    if command_unrecognized:
+        evidence.append("irf-command-unrecognized")
+    if has_irf_members:
+        evidence.append("irf-members-visible")
+    return [
+        dict(
+            supports_irf_cli=supports_irf_cli,
+            command_unrecognized=command_unrecognized,
+            has_irf_members=has_irf_members,
+            evidence=evidence,
+        )
+    ]
 
 
 @register_processor(vendor='H3C', device_type='', collection_type='bgp_neighbors', method='netconf')
@@ -909,7 +1063,10 @@ def process_aggre_port_netmiko(data):
     for i in data:
         memberports = i.get('memberports', '')
         if isinstance(memberports, list):
-            memberports = [InterfaceFormat.h3c_interface_format(m) for m in memberports]
+            memberports = [
+                InterfaceFormat.h3c_interface_format(_strip_irf_reference_suffix(m))
+                for m in memberports
+            ]
         result.append(dict(
             aggregroup=i.get('aggname', ''),
             memberports=memberports,

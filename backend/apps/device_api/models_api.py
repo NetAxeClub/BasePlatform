@@ -10,11 +10,7 @@ from apps.device_api.contract import (
     freeze_collection_context,
     normalize_collection_type_for_storage,
 )
-from apps.device_api.fields_mapping import (
-    COLLECTION_TYPE_ALIASES,
-    vendor_mapping,
-    get_vendor_class,
-)
+from apps.device_api.fields_mapping import COLLECTION_TYPE_ALIASES, RAW_NETMIKO_COLLECTION_TYPES
 from apps.device_api.models import DeviceSubCollectionPlan
 from apps.device_api import (
     COLLECTION_RESULTS_DB,
@@ -23,6 +19,12 @@ from apps.device_api import (
     device_identity_mongo,
     arp_mongo,
     mac_mongo,
+    mac_bd_mongo,
+    mac_vxlan_mongo,
+    mac_vxlan_control_mongo,
+    vxlan_capability_mongo,
+    netconf_capability_mongo,
+    cli_output_capability_mongo,
     lldp_mongo,
     ip_interface_mongo,
     interface_brief_mongo,
@@ -33,6 +35,8 @@ from apps.device_api import (
     cpu_status_mongo,
     memory_status_mongo,
     board_status_mongo,
+    irf_status_mongo,
+    stack_status_mongo,
     transceiver_status_mongo,
     storage_status_mongo,
     environment_status_mongo,
@@ -52,6 +56,12 @@ COLLECTION_TYPE_MONGO_MAP = {
     "version": device_identity_mongo,
     "arp": arp_mongo,
     "mac": mac_mongo,
+    "mac_bd": mac_bd_mongo,
+    "mac_vxlan": mac_vxlan_mongo,
+    "mac_vxlan_control": mac_vxlan_control_mongo,
+    "vxlan_capability": vxlan_capability_mongo,
+    "netconf_capability": netconf_capability_mongo,
+    "cli_output_capability": cli_output_capability_mongo,
     "lldp": lldp_mongo,
     "ip_interface": ip_interface_mongo,
     "interface_brief": interface_brief_mongo,
@@ -62,6 +72,8 @@ COLLECTION_TYPE_MONGO_MAP = {
     "cpu_status": cpu_status_mongo,
     "memory_status": memory_status_mongo,
     "board_status": board_status_mongo,
+    "irf_status": irf_status_mongo,
+    "stack_status": stack_status_mongo,
     "transceiver_status": transceiver_status_mongo,
     "storage_status": storage_status_mongo,
     "environment_status": environment_status_mongo,
@@ -547,6 +559,24 @@ def celery_data_mongodb(**kwargs):
             logging.info(
                 f"采集结果已保存: {device_ip} - 采集类型: {storage_collection_type} - 共 {len(collection_results)} 条记录 - 集合: {collection_name}"
             )
+            try:
+                from apps.device_api.platform_profiles import PlatformProfileService
+
+                PlatformProfileService.update_capability_facts(
+                    collection_type=storage_collection_type,
+                    device_info={
+                        "manage_ip": base_result.get("device_ip", ""),
+                        "serial_num": webhook_args.get("serial_num", ""),
+                        "vendor__alias": plan.summary_plan.vendor,
+                    },
+                    processed_data=collection_results,
+                )
+            except Exception as capability_error:
+                logging.warning(
+                    "能力画像回写失败: %s - %s",
+                    device_ip,
+                    capability_error,
+                )
         except Exception as e:
             logging.error(
                 f"保存采集结果到MongoDB失败: {device_ip} - 错误: {str(e)}",
@@ -774,13 +804,10 @@ def inject_collection_context(data: list, context: dict) -> list:
 
 
 def resolve_raw_data(plan, collection_result, collection_method):
-    """处理原始采集数据，按优先级依次尝试三条路径：
-    1. processors/ 注册处理器（硬编码，协议感知）
-    2. tools/ 类方法（仅 netmiko，最终兜底）
+    """处理原始采集数据，仅允许 processors/ 注册处理器参与解析。
 
-    运行链路不再执行子方案字段映射配置（netmiko_path/netconf_path + *_field_mappings）。
-    NETCONF 采集若无可用处理器，直接返回失败，
-    避免用 netmiko 专用的 tools/ 方法处理嵌套 XML dict 导致静默空结果。
+    运行链路不再执行子方案字段映射配置（netmiko_path/netconf_path + *_field_mappings），
+    也不再回退到 tools/ 旧入口。缺失 processor 视为未覆盖，直接返回失败。
 
     Args:
         plan: 采集方案对象
@@ -792,9 +819,12 @@ def resolve_raw_data(plan, collection_result, collection_method):
     """
     try:
         # netmiko 采集如果 data 是字符串，说明 TextFSM 解析失败（未匹配到模板或模板与设备输出格式不符）
-        if collection_method.lower() == "netmiko" and isinstance(
+        if (
+            collection_method.lower() == "netmiko"
+            and collection_type not in RAW_NETMIKO_COLLECTION_TYPES
+            and isinstance(
             collection_result.get("data", ""), str
-        ):
+        )):
             raw_preview = (collection_result.get("data") or "")[:500]
             logging.warning(
                 "[resolve_raw_data] TextFSM 解析失败，返回原始字符串。"
@@ -855,58 +885,19 @@ def resolve_raw_data(plan, collection_result, collection_method):
                 )
                 return False, f"processor_failed: {str(e)}", []
 
-        # ── NETCONF 无处理器：直接失败（避免误走 netmiko tools）────────────────────
-        if method == "netconf":
-            logging.warning(
-                f"[resolve] NETCONF 采集无可用处理器，无法处理原始 XML 数据: "
-                f"{vendor_alias}:{device_type}:{resolved_collection_type} - {plan.name}"
-            )
-            return (
-                False,
-                f"netconf_no_processor: {vendor_alias}:{resolved_collection_type}",
-                [],
-            )
-
-        # ── 路径 2：tools/ 类方法（仅 netmiko，最终兜底）───────────────────────────
-        try:
-            module_name, class_name = get_vendor_class(vendor_alias, method)
-            if not module_name or not class_name:
-                logging.warning(f"[resolve] 不支持的厂商: {vendor_alias}，跳过数据处理")
-                return True, "", []
-
-            module = importlib.import_module(f"apps.device_api.tools.{module_name}")
-            plan_class = getattr(module, class_name, None)
-            if not plan_class:
-                logging.warning(f"[resolve] 未找到类: {class_name}，跳过数据处理")
-                return True, "", []
-
-            method_func = getattr(plan_class, f"get_{resolved_collection_type}", None)
-            if method_func and callable(method_func):
-                result = normalize_processed_data(
-                    collection_type, method_func(command_result)
-                )
-                logging.info(f"[resolve] tools 处理完成: {plan.name}")
-                return True, "", _inject_manage_ip(result, manage_ip)
-            else:
-                logging.warning(
-                    f"[resolve] 未找到处理方法: {class_name}.get_{resolved_collection_type}()，跳过数据处理"
-                )
-                return True, "", []
-
-        except ImportError as e:
-            logging.warning(
-                f"[resolve] 导入模块失败: apps.device_api.tools.{module_name}, 错误: {str(e)}"
-            )
-            return True, "", []
-        except Exception as e:
-            logging.error(
-                f"[resolve] tools 数据处理失败: {plan.name} - {str(e)}", exc_info=True
-            )
-            return (
-                False,
-                f"{collection_method}_vendor_process_data_failed: {str(e)}",
-                [],
-            )
+        logging.warning(
+            "[resolve] 未找到 processor，数据处理失败: %s:%s:%s:%s - %s",
+            vendor_alias,
+            device_type,
+            resolved_collection_type,
+            method,
+            plan.name,
+        )
+        return (
+            False,
+            f"processor_not_found: {vendor_alias}:{resolved_collection_type}:{method}",
+            [],
+        )
 
     except Exception as e:
         logging.error(f"[resolve] 数据处理异常: {plan.name} - {str(e)}", exc_info=True)
