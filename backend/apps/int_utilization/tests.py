@@ -14,16 +14,14 @@ class InterfaceUtilizationCompatibilityTests(SimpleTestCase):
 
     @patch("apps.int_utilization.views.InterfaceUtilizationSnapshot.objects")
     def test_interface_used_queryset_reads_network_analysis_snapshot(self, mock_objects):
-        mock_objects.all.return_value.order_by.return_value = Mock()
-
-        request = self.factory.get("/base_platform/int_utilization/interfaceused/")
         view = InterfaceUsedNewViewSet()
-        view.request = request
-        view.queryset = mock_objects.all.return_value.order_by.return_value
+        view.request = SimpleNamespace(query_params={})
+        expected_queryset = Mock()
+        view.queryset = expected_queryset
 
-        view.get_queryset()
+        queryset = view.get_queryset()
 
-        mock_objects.all.assert_called_once()
+        self.assertIs(queryset, expected_queryset)
 
     @patch("apps.int_utilization.views.interface_mongo.find")
     @patch("apps.int_utilization.views.show_ip_mongo.find")

@@ -1,3 +1,4 @@
+import django_filters
 from django.http import JsonResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
@@ -13,6 +14,7 @@ from apps.network_analysis.models import (
 from apps.network_analysis.serializers import (
     AddressTraceSnapshotSerializer,
     AnalysisRunSerializer,
+    InterfaceUtilizationLegacySerializer,
     InterfaceUtilizationSnapshotSerializer,
 )
 from apps.network_analysis.services import (
@@ -54,6 +56,28 @@ class InterfaceUtilizationSnapshotViewSet(CustomViewBase):
             execute_time=request.GET.get("execute_time"),
         )
         return JsonResponse({"code": 200, "message": "获取成功", "data": result})
+
+
+class InterfaceUtilizationLegacyFilter(django_filters.FilterSet):
+    log_time = django_filters.CharFilter(field_name="snapshot_time", lookup_expr="icontains")
+    host = django_filters.CharFilter(field_name="device_name", lookup_expr="icontains")
+    host_ip = django_filters.CharFilter(field_name="manage_ip", lookup_expr="icontains")
+
+    class Meta:
+        model = InterfaceUtilizationSnapshot
+        fields = ["manage_ip", "device_name", "device_serial_num", "component_scope"]
+
+
+class InterfaceUtilizationLegacyViewSet(CustomViewBase):
+    http_method_names = ["get", "head", "options"]
+    queryset = InterfaceUtilizationSnapshot.objects.all().order_by("-snapshot_time")
+    serializer_class = InterfaceUtilizationLegacySerializer
+    pagination_class = LargeResultsSetPagination
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    filterset_class = InterfaceUtilizationLegacyFilter
+    search_fields = ("manage_ip", "device_name", "component_name", "device_serial_num")
+    filter_fields = ("manage_ip", "device_name")
+    ordering_fields = ("snapshot_time", "utilization_percent", "manage_ip")
 
 
 class AddressTraceSnapshotViewSet(CustomViewBase):

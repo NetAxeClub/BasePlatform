@@ -13,9 +13,12 @@ from apps.network_analysis.services import (
     NetworkAnalysisOrchestratorService,
     TopologyReconcileService,
 )
+from apps.network_analysis.serializers import InterfaceUtilizationLegacySerializer
 from apps.network_analysis.views import (
     AddressTraceSnapshotViewSet,
     AnalysisRunViewSet,
+    InterfaceUtilizationLegacyFilter,
+    InterfaceUtilizationLegacyViewSet,
     InterfaceUtilizationSnapshotViewSet,
 )
 
@@ -217,6 +220,10 @@ class NetworkAnalysisViewTests(SimpleTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(payload["data"]["snapshots"], 2)
         mock_overview.assert_called_once_with(device_ip="10.0.0.1", execute_time=None)
+
+    def test_interface_utilization_legacy_view_uses_compat_contract(self):
+        self.assertIs(InterfaceUtilizationLegacyViewSet.serializer_class, InterfaceUtilizationLegacySerializer)
+        self.assertIs(InterfaceUtilizationLegacyViewSet.filterset_class, InterfaceUtilizationLegacyFilter)
 
     @patch("apps.network_analysis.views.AddressTrackingAnalysisService.quality_summary")
     def test_address_trace_quality_endpoint(self, mock_quality):
