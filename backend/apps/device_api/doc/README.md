@@ -51,3 +51,5 @@ Automation.DeviceApiExecutionLog：批次加载、去重、跳过、下发、子
 Automation.SubPlanCollectionCelery：子方案状态、coverage_issue、coverage_reason、raw_result_preview。
 Automation.PlanCollectionCelery：设备级汇总，包括失败数、跳过数、覆盖缺口汇总。
 Automation.TestDeviceCollection：原始结果、处理结果、错误信息，适合做深度回放。
+
+默认行为：`plan_collect_device_main(clear_history=True)` 会在全局采集开始前先清空以上 4 个运行态集合；如需保留历史做灰度对比或回放，可显式传入 `clear_history=False`。

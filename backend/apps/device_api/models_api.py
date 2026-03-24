@@ -118,6 +118,51 @@ PROCESSOR_MODULES = (
     "apps.device_api.processors.hillstone",
     "apps.device_api.processors.legacy_bridge",
 )
+
+NETMIKO_EMPTY_OUTPUT_HINTS = {
+    "ospf_neighbors": (
+        "ospf is not configured",
+        "ospf not configured",
+        "ospf is not enabled",
+        "ospf not enabled",
+    ),
+    "ospf_interfaces": (
+        "ospf is not configured",
+        "ospf not configured",
+        "ospf is not enabled",
+        "ospf not enabled",
+    ),
+    "isis_neighbors": (
+        "isis is not configured",
+        "isis not configured",
+        "isis is not enabled",
+        "isis not enabled",
+    ),
+    "bgp_neighbors": (
+        "bgp is not configured",
+        "bgp not configured",
+        "bgp is not enabled",
+        "bgp not enabled",
+    ),
+    "bgp_summary": (
+        "bgp is not configured",
+        "bgp not configured",
+        "bgp is not enabled",
+        "bgp not enabled",
+    ),
+}
+
+
+def _is_known_empty_netmiko_output(collection_type, raw_output) -> bool:
+    if not isinstance(raw_output, str):
+        return False
+
+    output = str(raw_output or "").strip().lower()
+    if not output:
+        return True
+
+    hints = NETMIKO_EMPTY_OUTPUT_HINTS.get(collection_type, ())
+    return any(hint in output for hint in hints)
 _processors_bootstrapped = False
 
 
@@ -845,6 +890,9 @@ def resolve_raw_data(plan, collection_result, collection_method):
         vendor_alias = plan.summary_plan.vendor
         device_type = plan.summary_plan.device_type
         collection_type = plan.collection_type
+        resolved_collection_type = COLLECTION_TYPE_ALIASES.get(
+            collection_type, collection_type
+        )
 
         # netmiko 采集如果 data 是字符串，说明 TextFSM 解析失败（未匹配到模板或模板与设备输出格式不符）
         if (
@@ -853,6 +901,17 @@ def resolve_raw_data(plan, collection_result, collection_method):
             and isinstance(
             collection_result.get("data", ""), str
         )):
+            if _is_known_empty_netmiko_output(
+                resolved_collection_type, collection_result.get("data", "")
+            ):
+                logging.info(
+                    "[resolve_raw_data] 识别为协议未配置或空输出，按空结果返回: %s:%s:%s - %s",
+                    vendor_alias,
+                    device_type,
+                    resolved_collection_type,
+                    plan.name,
+                )
+                return True, "", []
             raw_preview = (collection_result.get("data") or "")[:500]
             logging.warning(
                 "[resolve_raw_data] TextFSM 解析失败，返回原始字符串。"
@@ -866,9 +925,6 @@ def resolve_raw_data(plan, collection_result, collection_method):
         command_result = collection_result["data"]
         method = collection_method.lower()
         manage_ip = collection_result.get("device_ip", "")
-        resolved_collection_type = COLLECTION_TYPE_ALIASES.get(
-            collection_type, collection_type
-        )
 
         # ── 路径 1：查找已注册的 processors/ 解析器（P0-3）────────────────────
         from apps.device_api.processors.base import (

@@ -1501,6 +1501,32 @@ class DeviceApiModelApiTests(SimpleTestCase):
         self.assertEqual(processed, [])
         mock_get_vendor_class.assert_not_called()
 
+    def test_resolve_raw_data_treats_ospf_not_configured_as_empty_result(self):
+        plan = self._build_plan(vendor="H3C", collection_type="ospf_interfaces")
+
+        status, error, processed = resolve_raw_data(
+            plan,
+            {"data": "OSPF is not configured.\n", "device_ip": "10.0.0.1"},
+            "netmiko",
+        )
+
+        self.assertTrue(status)
+        self.assertEqual(error, "")
+        self.assertEqual(processed, [])
+
+    def test_resolve_raw_data_treats_isis_not_configured_as_empty_result(self):
+        plan = self._build_plan(vendor="Huawei", collection_type="isis_neighbors")
+
+        status, error, processed = resolve_raw_data(
+            plan,
+            {"data": "ISIS is not enabled.\n", "device_ip": "10.0.0.1"},
+            "netmiko",
+        )
+
+        self.assertTrue(status)
+        self.assertEqual(error, "")
+        self.assertEqual(processed, [])
+
     @patch("apps.device_api.models_api.importlib.import_module")
     def test_ensure_processors_bootstrapped_imports_once(self, mock_import_module):
         with patch("apps.device_api.models_api._processors_bootstrapped", False):
@@ -1939,6 +1965,57 @@ class DeviceApiConnectionManagerTests(SimpleTestCase):
         self.assertEqual(mock_handler.call_args.kwargs["device_type"], "hillstone_telnet")
         self.assertEqual(mock_handler.call_args.kwargs["username"], "ops")
         self.assertEqual(mock_handler.call_args.kwargs["port"], 23)
+
+    @patch("apps.device_api.connection_manager.ZetmikoConnectHandler")
+    def test_get_netmiko_connection_passes_handshake_timeouts_from_policy(self, mock_handler):
+        mock_handler.return_value = Mock()
+        manager = DeviceConnectionManager(
+            "10.0.0.1",
+            {
+                "vendor__alias": "Huawei",
+                "ssh": {"username": "ops", "password": "secret", "port": 22},
+                "connection_policy": {
+                    "netmiko_timeout_seconds": 7,
+                    "netmiko_conn_timeout_seconds": 12,
+                    "netmiko_auth_timeout_seconds": 18,
+                    "netmiko_banner_timeout_seconds": 25,
+                    "netmiko_blocking_timeout_seconds": 30,
+                    "netmiko_session_timeout_seconds": 40,
+                },
+            },
+        )
+
+        manager.get_netmiko_connection()
+
+        self.assertEqual(mock_handler.call_args.kwargs["timeout"], 7)
+        self.assertEqual(mock_handler.call_args.kwargs["conn_timeout"], 12)
+        self.assertEqual(mock_handler.call_args.kwargs["auth_timeout"], 18)
+        self.assertEqual(mock_handler.call_args.kwargs["banner_timeout"], 25)
+        self.assertEqual(mock_handler.call_args.kwargs["blocking_timeout"], 30)
+        self.assertEqual(mock_handler.call_args.kwargs["session_timeout"], 40)
+
+    @patch("apps.device_api.connection_manager.time.sleep")
+    @patch("apps.device_api.connection_manager.ZetmikoConnectHandler")
+    def test_get_netmiko_connection_retries_transient_connect_failure(
+        self,
+        mock_handler,
+        mock_sleep,
+    ):
+        mock_handler.side_effect = [RuntimeError("No existing session"), Mock()]
+        manager = DeviceConnectionManager(
+            "10.0.0.1",
+            {
+                "vendor__alias": "Huawei",
+                "ssh": {"username": "ops", "password": "secret", "port": 22},
+                "connection_policy": {"netmiko_retry_times": 1},
+            },
+        )
+
+        connection = manager.get_netmiko_connection()
+
+        self.assertIsNotNone(connection)
+        self.assertEqual(mock_handler.call_count, 2)
+        mock_sleep.assert_called_once()
 
     @patch("apps.device_api.connection_manager.HuaweiyangNetconfConnect")
     def test_get_netconf_connection_prefers_netconf_manage_ip(self, mock_huawei_connect):
@@ -4083,20 +4160,36 @@ class DeviceApiProcessorOnlyTests(SimpleTestCase):
 
 
 class DeviceApiCleanupTests(SimpleTestCase):
-    @patch("apps.device_api.tasks.MongoOps")
+    @patch("apps.device_api.tasks.COLLECTION_EXECUTION_LOG.delete")
     @patch("apps.device_api.tasks.COLLECTION_SUB_PLAN.delete")
+    @patch("apps.device_api.tasks.COLLECTION_RESULTS_DB.delete")
     @patch("apps.device_api.tasks.COLLECTION_PLAN.delete")
-    def test_clear_his_collect_res_skips_plan_data_by_default(
+    @patch("apps.device_api.tasks.MongoOps")
+    def test_clear_his_collect_res_clears_runtime_collections_by_default(
         self,
-        mock_plan_delete,
-        mock_sub_plan_delete,
         mock_mongo_ops,
+        mock_plan_delete,
+        mock_results_delete,
+        mock_sub_plan_delete,
+        mock_execution_log_delete,
     ):
         clear_his_collect_res(execute_time="2026-03-24 10:00:00")
 
-        mock_plan_delete.assert_called_once_with({"execute_time": "2026-03-24 10:00:00"})
-        mock_sub_plan_delete.assert_called_once_with({"execute_time": "2026-03-24 10:00:00"})
+        mock_plan_delete.assert_called_once_with()
+        mock_results_delete.assert_called_once_with()
+        mock_sub_plan_delete.assert_called_once_with()
+        mock_execution_log_delete.assert_called_once_with()
         mock_mongo_ops.assert_not_called()
+
+    @patch("apps.device_api.tasks.MongoOps")
+    def test_clear_his_collect_res_uses_execute_time_filter_only_for_plan_data(
+        self,
+        mock_mongo_ops,
+    ):
+        clear_his_collect_res(execute_time="2026-03-24 10:00:00", clear_plan_data=True)
+
+        mock_mongo_ops.assert_called()
+        mock_mongo_ops.return_value.delete.assert_called_with({"execute_time": "2026-03-24 10:00:00"})
 
     def test_mongo_ops_delete_uses_delete_many_compatible_api(self):
         mongo = MongoOps.__new__(MongoOps)

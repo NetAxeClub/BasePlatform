@@ -104,7 +104,12 @@ from apps.device_api.analysis_hooks import (
     count_expected_interface_devices,
     schedule_batch_network_analysis,
 )
-from apps.device_api import COLLECTION_EXECUTION_LOG, COLLECTION_PLAN, COLLECTION_SUB_PLAN
+from apps.device_api import (
+    COLLECTION_EXECUTION_LOG,
+    COLLECTION_PLAN,
+    COLLECTION_RESULTS_DB,
+    COLLECTION_SUB_PLAN,
+)
 from apps.device_api import arp_mongo, mac_mongo, lldp_mongo, aggre_port_mongo
 from netaxe.settings import DEBUG
 from utils.db.mongo_ops import MongoOps, MongoNetOps
@@ -530,13 +535,16 @@ class MainIn:
 
 
 def clear_his_collect_res(execute_time=None, clear_plan_data=False):
-    delete_filter = {"execute_time": execute_time} if execute_time else None
-    COLLECTION_PLAN.delete(delete_filter)
-    COLLECTION_SUB_PLAN.delete(delete_filter)
+    """清理批次运行态集合，并按需清理 plan_* 明细表。"""
+    COLLECTION_RESULTS_DB.delete()
+    COLLECTION_PLAN.delete()
+    COLLECTION_SUB_PLAN.delete()
+    COLLECTION_EXECUTION_LOG.delete()
 
     if not clear_plan_data:
         return
 
+    delete_filter = {"execute_time": execute_time} if execute_time else None
     for collect_type in field_mapping.keys():
         MongoOps(db="Automation", coll=f"plan_{collect_type}").delete(delete_filter)
     return
@@ -1668,6 +1676,31 @@ def plan_collect_device_main(**kwargs):
     datas_to_cache()  # 将数据写入缓存
     logger.info("数据缓存更新完成")
     runtime_options, device_filters = split_runtime_control_kwargs(kwargs)
+    clear_history = should_clear_history_before_batch(runtime_options)
+    clear_plan_data = should_clear_plan_data_before_batch(runtime_options)
+
+    # 运行态排障集合需要在批次开始前清空，避免多轮全局采集结果混在一起。
+    if clear_history:
+        try:
+            clear_his_collect_res(clear_plan_data=clear_plan_data)
+            logger.info("批次运行态记录已清理: clear_plan_data=%s", clear_plan_data)
+        except Exception as e:
+            logger.warning(f"清空历史采集数据失败: {str(e)}")
+            _record_execution_event(
+                event_scope="batch",
+                event_type="batch_history_clear_failed",
+                status="failed",
+                severity="error",
+                reason="clear_history_failed",
+                error=str(e),
+                details={
+                    "clear_history": True,
+                    "clear_plan_data": clear_plan_data,
+                },
+            )
+            raise RuntimeError(f"清空历史采集数据失败: {str(e)}") from e
+    else:
+        logger.info("本批次保留历史采集数据: clear_history=False")
 
     # 同步CMDB设备信息到MongoDB
     try:
@@ -1746,56 +1779,19 @@ def plan_collect_device_main(**kwargs):
     total_expected_interface_devices = count_expected_interface_devices(valid_hosts)
     batch_execute_time = deduped_hosts[0].get("execute_time") if deduped_hosts else batch_execute_time
 
-    clear_history = should_clear_history_before_batch(runtime_options)
-    clear_plan_data = should_clear_plan_data_before_batch(runtime_options)
-
     # 清空历史采集数据
     if clear_history:
-        try:
-            if batch_execute_time:
-                clear_his_collect_res(
-                    execute_time=batch_execute_time,
-                    clear_plan_data=clear_plan_data,
-                )
-                logger.info(
-                    "历史批次任务记录已清理: execute_time=%s clear_plan_data=%s",
-                    batch_execute_time,
-                    clear_plan_data,
-                )
-                _record_execution_event(
-                    event_scope="batch",
-                    event_type="batch_history_cleared",
-                    status="success",
-                    execute_time=batch_execute_time,
-                    details={
-                        "clear_history": True,
-                        "clear_plan_data": clear_plan_data,
-                    },
-                )
-            else:
-                logger.info("当前批次无 execute_time，跳过历史采集数据清理")
-                _record_execution_event(
-                    event_scope="batch",
-                    event_type="batch_history_clear_skipped",
-                    status="skipped",
-                    severity="warning",
-                    execute_time=batch_execute_time,
-                    reason="missing_execute_time",
-                )
-        except Exception as e:
-            logger.warning(f"清空历史采集数据失败: {str(e)}")
-            _record_execution_event(
-                event_scope="batch",
-                event_type="batch_history_clear_failed",
-                status="failed",
-                severity="error",
-                execute_time=batch_execute_time,
-                reason="clear_history_failed",
-                error=str(e),
-            )
-            raise RuntimeError(f"清空历史采集数据失败: {str(e)}") from e
+        _record_execution_event(
+            event_scope="batch",
+            event_type="batch_history_cleared",
+            status="success",
+            execute_time=batch_execute_time,
+            details={
+                "clear_history": True,
+                "clear_plan_data": clear_plan_data,
+            },
+        )
     else:
-        logger.info("本批次保留历史采集数据: clear_history=False")
         _record_execution_event(
             event_scope="batch",
             event_type="batch_history_retained",

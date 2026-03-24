@@ -31,6 +31,10 @@ logger = logging.getLogger(__name__)
 class DeviceConnectionManager:
     """设备连接管理器，确保单设备采集时只建立一次连接"""
     DEFAULT_NETMIKO_TIMEOUT = 5
+    DEFAULT_NETMIKO_CONN_TIMEOUT = 10
+    DEFAULT_NETMIKO_AUTH_TIMEOUT = 15
+    DEFAULT_NETMIKO_BANNER_TIMEOUT = 20
+    DEFAULT_NETMIKO_BLOCKING_TIMEOUT = 20
     DEFAULT_NETMIKO_SESSION_TIMEOUT = 20
     DEFAULT_NETCONF_TIMEOUT = 30
     DEFAULT_RESTCONF_TIMEOUT = 10
@@ -181,17 +185,37 @@ class DeviceConnectionManager:
                 if access_protocol == "telnet" and not device_type.endswith("_telnet"):
                     device_type = f"{device_type}_telnet"
 
-                # 使用自定义的 ConnectHandler（支持更多设备类型）
-                self._netmiko_conn = ZetmikoConnectHandler(
-                    device_type=device_type,
-                    host=self.device_ip,
-                    username=account.get("username"),
-                    password=account.get("password"),
-                    port=account.get("port", 22),
-                    timeout=self._get_timeout_seconds("netmiko", self.DEFAULT_NETMIKO_TIMEOUT),
-                    session_timeout=self._get_timeout_seconds(
+                connection_kwargs = {
+                    "device_type": device_type,
+                    "host": self.device_ip,
+                    "username": account.get("username"),
+                    "password": account.get("password"),
+                    "port": account.get("port", 22),
+                    "timeout": self._get_timeout_seconds(
+                        "netmiko", self.DEFAULT_NETMIKO_TIMEOUT
+                    ),
+                    "conn_timeout": self._get_timeout_seconds(
+                        "netmiko_conn", self.DEFAULT_NETMIKO_CONN_TIMEOUT
+                    ),
+                    "auth_timeout": self._get_timeout_seconds(
+                        "netmiko_auth", self.DEFAULT_NETMIKO_AUTH_TIMEOUT
+                    ),
+                    "banner_timeout": self._get_timeout_seconds(
+                        "netmiko_banner", self.DEFAULT_NETMIKO_BANNER_TIMEOUT
+                    ),
+                    "blocking_timeout": self._get_timeout_seconds(
+                        "netmiko_blocking", self.DEFAULT_NETMIKO_BLOCKING_TIMEOUT
+                    ),
+                    "session_timeout": self._get_timeout_seconds(
                         "netmiko_session", self.DEFAULT_NETMIKO_SESSION_TIMEOUT
                     ),
+                }
+
+                self._netmiko_conn = self._with_retry(
+                    "netmiko",
+                    "connect",
+                    ZetmikoConnectHandler,
+                    **connection_kwargs,
                 )
                 logger.info(
                     f"Netmiko连接已建立: {self.device_ip}, device_type={device_type}"
