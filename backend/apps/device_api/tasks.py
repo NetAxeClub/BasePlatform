@@ -111,7 +111,17 @@ from utils.db.mongo_ops import MongoOps, MongoNetOps
 
 logger = logging.getLogger("device_api")
 
-RUNTIME_CONTROL_KWARGS = {"clear_history"}
+RUNTIME_CONTROL_KWARGS = {"clear_history", "clear_plan_data"}
+INCREMENTAL_SNAPSHOT_COLLECTION_TYPES = frozenset(
+    {
+        "arp",
+        "mac",
+        "lldp",
+        "aggre_port",
+        "interface_brief",
+        "ip_interface",
+    }
+)
 
 if DEBUG:
     CELERY_QUEUE = "dev"
@@ -119,19 +129,36 @@ else:
     CELERY_QUEUE = "config"
 
 
+def _coerce_runtime_flag(value, default=False):
+    if value is None:
+        return default
+    if isinstance(value, str):
+        return value.strip().lower() not in {"0", "false", "no", "off"}
+    return bool(value)
+
+
 def should_clear_history_before_batch(kwargs=None):
-    """决定批次前是否清理历史结果。
+    """决定批次前是否清理批次任务记录。
 
     默认保持现有行为；灰度对比、回退演练或人工排障时可显式传入
-    clear_history=False 保留历史批次数据。
+    clear_history=False 保留当前 execute_time 的批次任务记录。
     """
     if not kwargs:
         return True
 
-    clear_history = kwargs.get("clear_history", True)
-    if isinstance(clear_history, str):
-        return clear_history.strip().lower() not in {"0", "false", "no", "off"}
-    return bool(clear_history)
+    return _coerce_runtime_flag(kwargs.get("clear_history", True), default=True)
+
+
+def should_clear_plan_data_before_batch(kwargs=None):
+    """决定批次前是否显式清理 plan_* 明细表。
+
+    默认关闭，统一快照类表通过单设备覆盖写入实现增量更新；只有在明确要求
+    全量重建时，才打开 clear_plan_data=True。
+    """
+    if not kwargs:
+        return False
+
+    return _coerce_runtime_flag(kwargs.get("clear_plan_data", False), default=False)
 
 
 def split_runtime_control_kwargs(kwargs=None):
@@ -502,14 +529,64 @@ class MainIn:
         return
 
 
-def clear_his_collect_res(execute_time=None):
+def clear_his_collect_res(execute_time=None, clear_plan_data=False):
     delete_filter = {"execute_time": execute_time} if execute_time else None
     COLLECTION_PLAN.delete(delete_filter)
     COLLECTION_SUB_PLAN.delete(delete_filter)
 
+    if not clear_plan_data:
+        return
+
     for collect_type in field_mapping.keys():
         MongoOps(db="Automation", coll=f"plan_{collect_type}").delete(delete_filter)
     return
+
+
+def _get_collection_db(storage_collection_type: str):
+    collection_name = build_plan_collection_name(storage_collection_type)
+    collection_db = COLLECTION_TYPE_MONGO_MAP.get(storage_collection_type)
+    if collection_db:
+        return collection_name, collection_db
+
+    collection_db = MongoOps(db="Automation", coll=collection_name)
+    logger.warning(f"使用动态创建的 MongoDB 集合: {collection_name}")
+    return collection_name, collection_db
+
+
+def _should_replace_snapshot_rows(storage_collection_type: str) -> bool:
+    return storage_collection_type in INCREMENTAL_SNAPSHOT_COLLECTION_TYPES
+
+
+def _build_snapshot_replace_filter(
+    manage_ip: str,
+    storage_collection_type: str,
+    collection_method: str,
+):
+    replace_filter = {
+        "hostip": manage_ip,
+        "collection_type": storage_collection_type,
+    }
+    if collection_method:
+        replace_filter["collection_method"] = collection_method
+    return replace_filter
+
+
+def _replace_snapshot_rows(
+    collection_db,
+    *,
+    manage_ip: str,
+    storage_collection_type: str,
+    collection_method: str,
+    processed_data,
+):
+    replace_filter = _build_snapshot_replace_filter(
+        manage_ip,
+        storage_collection_type,
+        collection_method,
+    )
+    collection_db.delete_many(replace_filter)
+    if processed_data:
+        collection_db.insert_many(processed_data)
 
 
 @shared_task(base=AxeTask, once={"graceful": True})
@@ -1445,22 +1522,35 @@ def _process_and_save_result(
         data_count = len(processed_data) if isinstance(processed_data, list) else 0
         coverage_issue = False
         coverage_reason = ""
-        if isinstance(processed_data, list) and processed_data and storage_collection_type:
-            collection_name = build_plan_collection_name(storage_collection_type)
-            collection_db = COLLECTION_TYPE_MONGO_MAP.get(storage_collection_type)
-            if not collection_db:
-                from utils.db.mongo_ops import MongoOps
-
-                collection_db = MongoOps(
-                    db="Automation", coll=collection_name
-                )
-                logger.warning(f"使用动态创建的 MongoDB 集合: {collection_name}")
+        if isinstance(processed_data, list) and storage_collection_type:
+            collection_name, collection_db = _get_collection_db(storage_collection_type)
             try:
-                collection_db.insert_many(processed_data)
-                logger.info(
-                    f"采集数据已保存: {manage_ip}, type={storage_collection_type}, "
-                    f"method={collection_method}, count={len(processed_data)}"
-                )
+                if _should_replace_snapshot_rows(storage_collection_type):
+                    _replace_snapshot_rows(
+                        collection_db,
+                        manage_ip=manage_ip,
+                        storage_collection_type=storage_collection_type,
+                        collection_method=collection_method,
+                        processed_data=processed_data,
+                    )
+                    logger.info(
+                        "采集快照已覆盖更新: %s, type=%s, method=%s, count=%s, collection=%s",
+                        manage_ip,
+                        storage_collection_type,
+                        collection_method,
+                        len(processed_data),
+                        collection_name,
+                    )
+                elif processed_data:
+                    collection_db.insert_many(processed_data)
+                    logger.info(
+                        "采集数据已保存: %s, type=%s, method=%s, count=%s, collection=%s",
+                        manage_ip,
+                        storage_collection_type,
+                        collection_method,
+                        len(processed_data),
+                        collection_name,
+                    )
             except Exception as e:
                 logger.error(
                     f"保存采集数据到 MongoDB 失败: {manage_ip}, type={storage_collection_type}, {str(e)}",
@@ -1477,6 +1567,17 @@ def _process_and_save_result(
                     str(e),
                 )
                 return {"success": False, "reason": str(e)}
+
+            if not processed_data:
+                logger.warning(
+                    "采集结果为空，已清理旧快照: %s, type=%s, method=%s, collection=%s",
+                    manage_ip,
+                    storage_collection_type,
+                    collection_method,
+                    collection_name,
+                )
+                coverage_issue = True
+                coverage_reason = "empty_processed_data"
         else:
             logger.warning(
                 f"采集结果为空或无法保存: {manage_ip}, type={storage_collection_type}, "
@@ -1646,19 +1747,30 @@ def plan_collect_device_main(**kwargs):
     batch_execute_time = deduped_hosts[0].get("execute_time") if deduped_hosts else batch_execute_time
 
     clear_history = should_clear_history_before_batch(runtime_options)
+    clear_plan_data = should_clear_plan_data_before_batch(runtime_options)
 
     # 清空历史采集数据
     if clear_history:
         try:
             if batch_execute_time:
-                clear_his_collect_res(execute_time=batch_execute_time)
-                logger.info("历史采集数据已按批次清空: execute_time=%s", batch_execute_time)
+                clear_his_collect_res(
+                    execute_time=batch_execute_time,
+                    clear_plan_data=clear_plan_data,
+                )
+                logger.info(
+                    "历史批次任务记录已清理: execute_time=%s clear_plan_data=%s",
+                    batch_execute_time,
+                    clear_plan_data,
+                )
                 _record_execution_event(
                     event_scope="batch",
                     event_type="batch_history_cleared",
                     status="success",
                     execute_time=batch_execute_time,
-                    details={"clear_history": True},
+                    details={
+                        "clear_history": True,
+                        "clear_plan_data": clear_plan_data,
+                    },
                 )
             else:
                 logger.info("当前批次无 execute_time，跳过历史采集数据清理")
@@ -1791,6 +1903,7 @@ def plan_collect_device_main(**kwargs):
         "tasks": len(net_tower_tasks),
         "time_cost": f"{total_time:.2f}分钟",
         "clear_history": clear_history,
+        "clear_plan_data": clear_plan_data,
         "deduplicated_devices": duplicate_count,
         "skipped_without_sub_plans": len(skipped_hosts_without_sub_plans),
         "dispatch_failed_devices": len(dispatch_failures),
