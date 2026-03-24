@@ -115,10 +115,12 @@ from apps.device_api.platform_profiles import (
 )
 from apps.device_api.tasks import (
     _process_and_save_result,
+    clear_his_collect_res,
     plan_collect_device,
     plan_collect_device_main,
     split_runtime_control_kwargs,
     should_clear_history_before_batch,
+    should_clear_plan_data_before_batch,
 )
 from apps.device_api.tools.collect_device import get_auto_device
 from apps.device_api.tools.centec import CentecPlan
@@ -147,6 +149,7 @@ from apps.device_api.views import (
     DeviceCapabilitiesAPIView,
     PlansToDeviceViewSet,
 )
+from utils.db.mongo_ops import MongoOps
 
 
 class FakeQuerySet(list):
@@ -3163,6 +3166,13 @@ class DeviceApiTaskTests(SimpleTestCase):
         with patch("apps.device_api.tasks.COLLECTION_TYPE_MONGO_MAP", {"arp": collection_db}):
             _process_and_save_result(plan, device_info, raw_result=[{"raw": "data"}], collection_method="netmiko")
 
+        collection_db.delete_many.assert_called_once_with(
+            {
+                "hostip": "10.0.0.1",
+                "collection_type": "arp",
+                "collection_method": "netmiko",
+            }
+        )
         inserted_docs = collection_db.insert_many.call_args[0][0]
         self.assertEqual(inserted_docs[0]["hostip"], "10.0.0.1")
         self.assertEqual(inserted_docs[0]["hostname"], "device-1")
@@ -3172,6 +3182,57 @@ class DeviceApiTaskTests(SimpleTestCase):
         self.assertEqual(inserted_docs[0]["collection_type"], "arp")
         self.assertEqual(inserted_docs[0]["collection_method"], "netmiko")
         self.assertEqual(inserted_docs[0]["execute_time"], "2026-03-12T11:00:00")
+        mock_insert_sub_task.assert_called_once()
+        mock_save_local_result.assert_called_once()
+
+    @patch("apps.device_api.tasks.save_local_collection_result")
+    @patch("apps.device_api.tasks.COLLECTION_SUB_PLAN.insert_one")
+    @patch("apps.device_api.tasks.resolve_raw_data")
+    @patch("apps.device_api.models.DeviceSubCollectionPlan.objects")
+    def test_process_and_save_result_replaces_incremental_snapshot_rows_per_device(
+        self,
+        mock_plan_objects,
+        mock_resolve_raw_data,
+        mock_insert_sub_task,
+        mock_save_local_result,
+    ):
+        mock_plan_objects.select_related.return_value.get.return_value = SimpleNamespace()
+        mock_resolve_raw_data.return_value = (True, "", [{"interface": "GE1/0/1"}])
+        collection_db = Mock()
+
+        plan = {
+            "id": 12,
+            "summary_plan": 1,
+            "collection_type": "interface_brief",
+            "summary_plan_vendor": "Huawei",
+            "summary_plan_device_type": "switch",
+        }
+        device_info = {
+            "manage_ip": "10.0.0.12",
+            "name": "device-12",
+            "idc__name": "IDC-A",
+            "execute_time": "2026-03-24T10:00:00",
+        }
+
+        with patch("apps.device_api.tasks.COLLECTION_TYPE_MONGO_MAP", {"interface_brief": collection_db}):
+            _process_and_save_result(
+                plan,
+                device_info,
+                raw_result=[{"raw": "data"}],
+                collection_method="netmiko",
+            )
+
+        collection_db.delete_many.assert_called_once_with(
+            {
+                "hostip": "10.0.0.12",
+                "collection_type": "interface_brief",
+                "collection_method": "netmiko",
+            }
+        )
+        collection_db.insert_many.assert_called_once()
+        inserted_docs = collection_db.insert_many.call_args[0][0]
+        self.assertEqual(inserted_docs[0]["hostip"], "10.0.0.12")
+        self.assertEqual(inserted_docs[0]["collection_type"], "interface_brief")
         mock_insert_sub_task.assert_called_once()
         mock_save_local_result.assert_called_once()
 
@@ -3284,6 +3345,7 @@ class DeviceApiTaskTests(SimpleTestCase):
     ):
         mock_plan_objects.select_related.return_value.get.return_value = SimpleNamespace()
         mock_resolve_raw_data.return_value = (True, "", [])
+        collection_db = Mock()
 
         plan = {
             "id": 3,
@@ -3300,19 +3362,84 @@ class DeviceApiTaskTests(SimpleTestCase):
             "execute_time": "2026-03-18T10:00:00",
         }
 
-        result = _process_and_save_result(
-            plan,
-            device_info,
-            raw_result=[],
-            collection_method="netmiko",
-        )
+        with patch("apps.device_api.tasks.COLLECTION_TYPE_MONGO_MAP", {"arp": collection_db}):
+            result = _process_and_save_result(
+                plan,
+                device_info,
+                raw_result=[],
+                collection_method="netmiko",
+            )
 
         self.assertTrue(result["success"])
         self.assertTrue(result["coverage_issue"])
         self.assertEqual(result["reason"], "empty_processed_data")
+        collection_db.delete_many.assert_called_once_with(
+            {
+                "hostip": "10.0.0.3",
+                "collection_type": "arp",
+                "collection_method": "netmiko",
+            }
+        )
         inserted_doc = mock_insert_sub_task.call_args[0][0]
         self.assertTrue(inserted_doc["coverage_issue"])
         self.assertEqual(inserted_doc["coverage_reason"], "empty_processed_data")
+        mock_save_local_result.assert_called_once()
+
+    @patch("apps.device_api.tasks.save_local_collection_result")
+    @patch("apps.device_api.tasks.DeviceFactService.update_from_processed_data")
+    @patch("apps.device_api.tasks.COLLECTION_SUB_PLAN.insert_one")
+    @patch("apps.device_api.tasks.resolve_raw_data")
+    @patch("apps.device_api.models.DeviceSubCollectionPlan.objects")
+    def test_process_and_save_result_clears_incremental_snapshot_rows_when_processed_data_empty(
+        self,
+        mock_plan_objects,
+        mock_resolve_raw_data,
+        mock_insert_sub_task,
+        mock_update_facts,
+        mock_save_local_result,
+    ):
+        mock_plan_objects.select_related.return_value.get.return_value = SimpleNamespace()
+        mock_resolve_raw_data.return_value = (True, "", [])
+        collection_db = Mock()
+
+        plan = {
+            "id": 13,
+            "summary_plan": 1,
+            "collection_type": "interface_brief",
+            "summary_plan_vendor": "Huawei",
+            "summary_plan_device_type": "switch",
+            "netmiko_method": "display interface brief",
+        }
+        device_info = {
+            "manage_ip": "10.0.0.13",
+            "name": "device-13",
+            "idc__name": "IDC-A",
+            "execute_time": "2026-03-24T10:10:00",
+        }
+
+        with patch("apps.device_api.tasks.COLLECTION_TYPE_MONGO_MAP", {"interface_brief": collection_db}):
+            result = _process_and_save_result(
+                plan,
+                device_info,
+                raw_result=[],
+                collection_method="netmiko",
+            )
+
+        self.assertTrue(result["success"])
+        self.assertTrue(result["coverage_issue"])
+        self.assertEqual(result["reason"], "empty_processed_data")
+        collection_db.delete_many.assert_called_once_with(
+            {
+                "hostip": "10.0.0.13",
+                "collection_type": "interface_brief",
+                "collection_method": "netmiko",
+            }
+        )
+        collection_db.insert_many.assert_not_called()
+        inserted_doc = mock_insert_sub_task.call_args[0][0]
+        self.assertTrue(inserted_doc["coverage_issue"])
+        self.assertEqual(inserted_doc["coverage_reason"], "empty_processed_data")
+        mock_update_facts.assert_called_once()
         mock_save_local_result.assert_called_once()
 
     @patch("apps.device_api.tasks._record_execution_event")
@@ -3569,7 +3696,10 @@ class DeviceApiTaskTests(SimpleTestCase):
         result = plan_collect_device_main()
 
         self.assertEqual(result["total"], 2)
-        mock_clear_his_collect_res.assert_called_once_with(execute_time="2026-03-15 10:00:00")
+        mock_clear_his_collect_res.assert_called_once_with(
+            execute_time="2026-03-15 10:00:00",
+            clear_plan_data=False,
+        )
         mock_schedule_batch_network_analysis.assert_called_once_with(
             execute_time="2026-03-15 10:00:00",
             expected_devices=2,
@@ -3578,6 +3708,7 @@ class DeviceApiTaskTests(SimpleTestCase):
             triggered_by="device_api-plan_collect_device_main",
         )
         self.assertTrue(result["clear_history"])
+        self.assertFalse(result["clear_plan_data"])
         self.assertTrue(result["analysis_trigger"]["scheduled"])
         mock_plan_collect_apply_async.assert_any_call(
             kwargs=mock_get_auto_device.return_value[0],
@@ -3622,6 +3753,7 @@ class DeviceApiTaskTests(SimpleTestCase):
 
         mock_clear_his_collect_res.assert_not_called()
         self.assertFalse(result["clear_history"])
+        self.assertFalse(result["clear_plan_data"])
         self.assertEqual(result["tasks"], 1)
         mock_record_event.assert_called()
 
@@ -3926,6 +4058,7 @@ class DeviceApiTaskTests(SimpleTestCase):
         )
         mock_clear_his_collect_res.assert_not_called()
         self.assertFalse(result["clear_history"])
+        self.assertFalse(result["clear_plan_data"])
         self.assertEqual(result["total"], 1)
         mock_record_event.assert_called()
 
@@ -3947,6 +4080,36 @@ class DeviceApiProcessorOnlyTests(SimpleTestCase):
         self.assertFalse(status)
         self.assertEqual(error, "processor_not_found: H3C:board_status:netmiko")
         self.assertEqual(processed, [])
+
+
+class DeviceApiCleanupTests(SimpleTestCase):
+    @patch("apps.device_api.tasks.MongoOps")
+    @patch("apps.device_api.tasks.COLLECTION_SUB_PLAN.delete")
+    @patch("apps.device_api.tasks.COLLECTION_PLAN.delete")
+    def test_clear_his_collect_res_skips_plan_data_by_default(
+        self,
+        mock_plan_delete,
+        mock_sub_plan_delete,
+        mock_mongo_ops,
+    ):
+        clear_his_collect_res(execute_time="2026-03-24 10:00:00")
+
+        mock_plan_delete.assert_called_once_with({"execute_time": "2026-03-24 10:00:00"})
+        mock_sub_plan_delete.assert_called_once_with({"execute_time": "2026-03-24 10:00:00"})
+        mock_mongo_ops.assert_not_called()
+
+    def test_mongo_ops_delete_uses_delete_many_compatible_api(self):
+        mongo = MongoOps.__new__(MongoOps)
+        mongo.coll = Mock()
+
+        mongo.delete({"execute_time": "2026-03-24 10:00:00"})
+        mongo.delete()
+        mongo.delete_one({"hostip": "10.0.0.1"})
+
+        self.assertEqual(mongo.coll.delete_many.call_count, 2)
+        mongo.coll.delete_many.assert_any_call({"execute_time": "2026-03-24 10:00:00"})
+        mongo.coll.delete_many.assert_any_call({})
+        mongo.coll.delete_one.assert_called_once_with({"hostip": "10.0.0.1"})
 
 
 class DeviceApiH3CIdentityTests(TestCase):
@@ -4403,12 +4566,13 @@ class DeviceApiProtocolExtensionTests(SimpleTestCase):
         runtime_options, device_filters = split_runtime_control_kwargs(
             {
                 "clear_history": False,
+                "clear_plan_data": True,
                 "manage_ip": "10.0.0.1",
                 "plan_id": 201,
             }
         )
 
-        self.assertEqual(runtime_options, {"clear_history": False})
+        self.assertEqual(runtime_options, {"clear_history": False, "clear_plan_data": True})
         self.assertEqual(
             device_filters,
             {"manage_ip": "10.0.0.1", "plan_id": 201},
@@ -4425,6 +4589,18 @@ class DeviceApiProtocolExtensionTests(SimpleTestCase):
             with self.subTest(value=value):
                 self.assertFalse(
                     should_clear_history_before_batch({"clear_history": value})
+                )
+
+    def test_should_clear_plan_data_before_batch_defaults_to_false(self):
+        self.assertFalse(should_clear_plan_data_before_batch())
+        self.assertFalse(should_clear_plan_data_before_batch({}))
+        self.assertFalse(should_clear_plan_data_before_batch({"clear_plan_data": False}))
+
+    def test_should_clear_plan_data_before_batch_supports_explicit_true_values(self):
+        for value in (True, "true", "True", "1", "yes", "on"):
+            with self.subTest(value=value):
+                self.assertTrue(
+                    should_clear_plan_data_before_batch({"clear_plan_data": value})
                 )
 
     def test_default_collection_types_include_routing_protocol_types(self):

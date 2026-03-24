@@ -206,12 +206,20 @@ class MongoOps:
         """
         return self.coll.delete_one(query)
 
+    @staticmethod
+    def _normalize_delete_filter(spec_or_id=None):
+        if spec_or_id in (None, ""):
+            return {}
+        if isinstance(spec_or_id, dict):
+            return spec_or_id
+        return {"_id": spec_or_id}
+
     def delete_one(self, spec_or_id):
         """
         删除指定日志记录
         :return:
         """
-        return self.coll.remove(spec_or_id)
+        return self.coll.delete_one(self._normalize_delete_filter(spec_or_id))
 
     def delete_many(self, query=None):
         """
@@ -227,10 +235,7 @@ class MongoOps:
         删除所有日志记录
         :return:
         """
-        if spec_or_id:
-            return self.coll.remove(spec_or_id=spec_or_id)
-        else:
-            return self.coll.delete_many({})
+        return self.coll.delete_many(self._normalize_delete_filter(spec_or_id))
 
     def insert_many(self, doc):
         """
