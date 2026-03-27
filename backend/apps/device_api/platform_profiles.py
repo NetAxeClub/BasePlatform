@@ -2888,6 +2888,13 @@ class PlatformProfileService:
         name_text = str(getattr(plan, "name", "") or "").lower()
         description_text = str(getattr(plan, "description", "") or "").lower()
         haystack = " ".join(filter(None, [profile_text, name_text, description_text]))
+        builtin_profile_codes = {
+            str(profile.code or "").strip()
+            for profile in PlatformProfileService.ensure_builtin_profiles()
+        }
+        has_builtin_profile = (
+            str(getattr(plan, "profile_code", "") or "").strip() in builtin_profile_codes
+        )
         if protocol_hint == "netconf":
             keywords = ("netconf",)
             method_order = {
@@ -2904,6 +2911,7 @@ class PlatformProfileService:
             }
         method_value = str(getattr(plan, "collection_method", "") or "").lower()
         return (
+            1 if has_builtin_profile else 0,
             1 if any(keyword in profile_text for keyword in keywords) else 0,
             1 if any(keyword in name_text for keyword in keywords) else 0,
             1 if any(keyword in haystack for keyword in keywords) else 0,
@@ -2956,6 +2964,30 @@ class PlatformProfileService:
                 } or any(keyword in haystack for keyword in ("cli", "netmiko")):
                     filtered.append(plan)
         return filtered
+
+    @staticmethod
+    def _plan_supports_collection_type(
+        plan: DeviceCollectionPlans,
+        *,
+        collection_type: str,
+    ) -> bool:
+        enabled_types = list(getattr(plan, "enabled_collection_types", []) or [])
+        if collection_type and collection_type not in enabled_types:
+            return False
+        sub_plan = plan.collect_plans.filter(collection_type=collection_type).first()
+        if sub_plan is None:
+            return False
+        if collection_type == "netconf_capability":
+            if not getattr(sub_plan, "netconf_enabled", False):
+                return False
+            if hasattr(sub_plan, "xml_templates") and not sub_plan.xml_templates.exists():
+                return False
+        if collection_type == "cli_output_capability":
+            if not getattr(sub_plan, "netmiko_enabled", False):
+                return False
+            if not getattr(sub_plan, "netmiko_method", ""):
+                return False
+        return True
 
     @classmethod
     def _probe_capability_with_plan(
@@ -3798,6 +3830,114 @@ class PlatformProfileService:
         return blockers
 
     @classmethod
+    def audit_legacy_default_plan_aliases(
+        cls,
+        *,
+        profile_codes: Optional[List[str]] = None,
+    ) -> Dict[str, object]:
+        builtin_profiles = {
+            str(profile.code or "").strip(): profile
+            for profile in cls.ensure_builtin_profiles()
+        }
+        scoped_profile_codes = [
+            profile_code
+            for profile_code in PROFILE_LEGACY_PLAN_NAME_ALIASES.keys()
+            if not profile_codes or profile_code in profile_codes
+        ]
+        summary = {
+            "profiles_scanned": len(scoped_profile_codes),
+            "alias_names_declared": sum(
+                len(PROFILE_LEGACY_PLAN_NAME_ALIASES.get(profile_code, []))
+                for profile_code in scoped_profile_codes
+            ),
+            "alias_plans_found": 0,
+            "adoptable": 0,
+            "retirable": 0,
+            "blocked_by_active_bindings": 0,
+            "readiness_blocked": 0,
+            "non_builtin_profile_code": 0,
+            "runtime_plan_kind": 0,
+            "non_system_generated": 0,
+            "inactive_alias": 0,
+        }
+        results = []
+
+        for profile_code in scoped_profile_codes:
+            profile = builtin_profiles.get(profile_code)
+            alias_names = PROFILE_LEGACY_PLAN_NAME_ALIASES.get(profile_code, [])
+            canonical_plan = None
+            if profile is not None:
+                canonical_plan = DeviceCollectionPlans.objects.filter(
+                    name=profile.default_plan_name
+                ).first()
+
+            alias_plans = list(
+                DeviceCollectionPlans.objects.filter(name__in=alias_names)
+                .order_by("id")
+                .prefetch_related("collect_plans__xml_templates")
+            )
+            for alias_plan in alias_plans:
+                summary["alias_plans_found"] += 1
+                readiness_blockers = cls.audit_plan_readiness(alias_plan)
+                active_bindings = PlansToDevice.objects.filter(plan=alias_plan, is_active=True).count()
+                total_bindings = PlansToDevice.objects.filter(plan=alias_plan).count()
+                issue_codes = []
+                if getattr(alias_plan, "profile_code", "") != profile_code:
+                    issue_codes.append("legacy_profile_code_mismatch")
+                    summary["non_builtin_profile_code"] += 1
+                if getattr(alias_plan, "plan_kind", "") != DeviceCollectionPlans.PLAN_KIND_TEMPLATE:
+                    issue_codes.append("legacy_runtime_plan_kind")
+                    summary["runtime_plan_kind"] += 1
+                if not getattr(alias_plan, "generated_by_system", False):
+                    issue_codes.append("legacy_not_generated_by_system")
+                    summary["non_system_generated"] += 1
+                if not getattr(alias_plan, "is_active", False):
+                    issue_codes.append("legacy_alias_inactive")
+                    summary["inactive_alias"] += 1
+                if readiness_blockers:
+                    issue_codes.append("legacy_alias_not_ready")
+                    summary["readiness_blocked"] += 1
+
+                if canonical_plan is None:
+                    recommended_action = "adopt_alias"
+                    summary["adoptable"] += 1
+                elif active_bindings:
+                    recommended_action = "keep_alias_with_active_bindings"
+                    summary["blocked_by_active_bindings"] += 1
+                else:
+                    recommended_action = "retire_alias"
+                    summary["retirable"] += 1
+
+                results.append(
+                    {
+                        "profile_code": profile_code,
+                        "default_plan_name": getattr(profile, "default_plan_name", ""),
+                        "alias_plan_id": getattr(alias_plan, "id", None),
+                        "alias_plan_name": getattr(alias_plan, "name", ""),
+                        "alias_plan_profile_code": getattr(alias_plan, "profile_code", ""),
+                        "alias_plan_kind": getattr(alias_plan, "plan_kind", ""),
+                        "alias_generated_by_system": bool(
+                            getattr(alias_plan, "generated_by_system", False)
+                        ),
+                        "alias_is_default": bool(getattr(alias_plan, "is_default", False)),
+                        "alias_is_active": bool(getattr(alias_plan, "is_active", False)),
+                        "canonical_plan_exists": canonical_plan is not None,
+                        "canonical_plan_id": getattr(canonical_plan, "id", None),
+                        "canonical_plan_name": getattr(canonical_plan, "name", ""),
+                        "active_bindings": active_bindings,
+                        "total_bindings": total_bindings,
+                        "recommended_action": recommended_action,
+                        "issues": issue_codes,
+                        "readiness_blockers": readiness_blockers,
+                    }
+                )
+
+        return {
+            "summary": summary,
+            "results": results,
+        }
+
+    @classmethod
     def audit_device_coverage(cls, devices) -> Dict[str, object]:
         profiles = cls.ensure_builtin_profiles()
         summary = {
@@ -4161,6 +4301,11 @@ class PlatformProfileService:
             return response
 
         desired_protocol = ""
+        capability_selected_profile_code = ""
+        candidate_plans_for_netconf = cls._filter_candidate_plans_by_protocol(
+            candidate_plans,
+            protocol_hint="netconf",
+        )
         if "netconf_capability" in requested_types:
             netconf_probe = cls._probe_device_connectivity(
                 device,
@@ -4170,7 +4315,52 @@ class PlatformProfileService:
             response["probes"].append(netconf_probe)
             if netconf_probe["status"] == "success":
                 response["probe_summary"]["success"] += 1
-                desired_protocol = "netconf"
+                capability_probe_candidates = [
+                    plan
+                    for plan in candidate_plans_for_netconf
+                    if cls._plan_supports_collection_type(plan, collection_type="netconf_capability")
+                ]
+                capability_probe_plan = cls._select_plan_for_protocol(
+                    capability_probe_candidates or candidate_plans_for_netconf,
+                    protocol_hint="netconf",
+                )
+                if capability_probe_plan is None:
+                    response["probe_summary"]["skipped"] += 1
+                    response["probes"].append(
+                        {
+                            "collection_type": "netconf_capability",
+                            "status": "skipped",
+                            "reason": (
+                                "netconf_capability_plan_not_found"
+                                if candidate_plans_for_netconf
+                                else "candidate_plan_not_found"
+                            ),
+                            "probe_mode": "capability",
+                        }
+                    )
+                else:
+                    capability_probe = cls._probe_capability_with_plan(
+                        device,
+                        plan=capability_probe_plan,
+                        collection_type="netconf_capability",
+                        connection_policy=connection_policy,
+                    )
+                    response["probes"].append(capability_probe)
+                    if capability_probe["status"] == "success":
+                        response["probe_summary"]["success"] += 1
+                        desired_protocol = "netconf"
+                        candidate_profiles = cls._resolve_profiles_for_plans(candidate_plans_for_netconf)
+                        if candidate_profiles:
+                            matched_profile = cls.match_profile_for_device(
+                                device_for_matching,
+                                profiles=candidate_profiles,
+                            )
+                            if matched_profile:
+                                capability_selected_profile_code = matched_profile.code
+                    elif capability_probe["status"] == "failed":
+                        response["probe_summary"]["failed"] += 1
+                    else:
+                        response["probe_summary"]["skipped"] += 1
             elif netconf_probe["status"] == "failed":
                 response["probe_summary"]["failed"] += 1
             else:
@@ -4213,35 +4403,6 @@ class PlatformProfileService:
             candidate_plans,
             protocol_hint=desired_protocol,
         )
-        capability_selected_profile_code = ""
-        if desired_protocol == "netconf" and candidate_plans_for_protocol:
-            capability_probe_plan = cls._select_plan_for_protocol(
-                candidate_plans_for_protocol,
-                protocol_hint="netconf",
-            )
-            if capability_probe_plan is not None:
-                capability_probe = cls._probe_capability_with_plan(
-                    device,
-                    plan=capability_probe_plan,
-                    collection_type="netconf_capability",
-                    connection_policy=connection_policy,
-                )
-                response["probes"].append(capability_probe)
-                if capability_probe["status"] == "success":
-                    response["probe_summary"]["success"] += 1
-                elif capability_probe["status"] == "failed":
-                    response["probe_summary"]["failed"] += 1
-                else:
-                    response["probe_summary"]["skipped"] += 1
-
-            candidate_profiles = cls._resolve_profiles_for_plans(candidate_plans_for_protocol)
-            if candidate_profiles:
-                matched_profile = cls.match_profile_for_device(
-                    device_for_matching,
-                    profiles=candidate_profiles,
-                )
-                if matched_profile:
-                    capability_selected_profile_code = matched_profile.code
 
         selected_plan = None
         if capability_selected_profile_code:
@@ -4349,13 +4510,39 @@ class PlatformProfileService:
         if existing_state is None and device.manage_ip:
             existing_state = DeviceDiscoveryState.objects.filter(manage_ip=device.manage_ip).first()
 
+        existing_probe = (
+            (
+                (getattr(existing_state, "capability_facts", {}) or {}).get("probes", {})
+                or {}
+            ).get(collection_type, {})
+            or {}
+        )
+        preserved_probe_state = {
+            "ran_success": bool(existing_probe.get("ran_success")),
+            "connection_verified": bool(existing_probe.get("connection_verified")),
+            "verified_at": str(existing_probe.get("verified_at") or ""),
+            "verified_method": str(existing_probe.get("verified_method") or ""),
+            "probe_mode": str(existing_probe.get("probe_mode") or ""),
+        }
+
         capability_facts = cls._merge_capability_facts(
             getattr(existing_state, "capability_facts", {}) or {},
             failure_facts,
         )
+        probe_state = ((capability_facts.get("probes") or {}).get(collection_type) or {})
+        if preserved_probe_state["ran_success"]:
+            probe_state["ran_success"] = True
+        if preserved_probe_state["connection_verified"]:
+            probe_state["connection_verified"] = True
+        if preserved_probe_state["verified_at"]:
+            probe_state["verified_at"] = preserved_probe_state["verified_at"]
+        if preserved_probe_state["verified_method"]:
+            probe_state["verified_method"] = preserved_probe_state["verified_method"]
+        if preserved_probe_state["probe_mode"]:
+            probe_state["probe_mode"] = preserved_probe_state["probe_mode"]
         state_defaults = {
             "manage_ip": device.manage_ip,
-            "profile_code": "",
+            "profile_code": str(getattr(existing_state, "profile_code", "") or ""),
             "capability_facts": capability_facts,
             "last_discovered_at": now,
             "last_discovery_status": "failed",

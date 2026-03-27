@@ -36,10 +36,21 @@ from apps.device_api.models_api import (
 
 logger = logging.getLogger(__name__)
 
+LEGACY_SUB_PLAN_COLLECTION_TYPE_ALIASES = {
+    "cli_output_capabilit": "cli_output_capability",
+}
+
 
 class DeviceCollectionService:
     """设备采集服务类（新版本）"""
     FIELD_MAPPING_PROTOCOLS = ("netmiko", "netconf", "snmp", "restconf", "telemetry")
+
+    @staticmethod
+    def normalize_sub_plan_collection_type(collection_type: str) -> str:
+        normalized_type = str(collection_type or "").strip()
+        if not normalized_type:
+            return ""
+        return LEGACY_SUB_PLAN_COLLECTION_TYPE_ALIASES.get(normalized_type, normalized_type)
 
     @staticmethod
     def _emit_progress(
@@ -164,7 +175,8 @@ class DeviceCollectionService:
     def ensure_default_sub_plans(summary_plan) -> Dict[str, Any]:
         """为父方案补齐默认 collection_type 对应的子方案。"""
         existing_types = set(
-            summary_plan.collect_plans.values_list("collection_type", flat=True)
+            DeviceCollectionService.normalize_sub_plan_collection_type(collection_type)
+            for collection_type in summary_plan.collect_plans.values_list("collection_type", flat=True)
         )
         created_types = []
 
@@ -203,7 +215,10 @@ class DeviceCollectionService:
         existing_sub_plans = list(summary_plan.collect_plans.all())
         existing_by_type = {}
         for sub_plan in existing_sub_plans:
-            existing_by_type.setdefault(sub_plan.collection_type, sub_plan)
+            normalized_type = DeviceCollectionService.normalize_sub_plan_collection_type(
+                sub_plan.collection_type
+            )
+            existing_by_type.setdefault(normalized_type, sub_plan)
 
         created_types = []
         updated_types = []
@@ -289,7 +304,12 @@ class DeviceCollectionService:
         """按 collection_type 聚合父方案下的字段映射配置。"""
         enabled_type_set = set(DeviceCollectionService.get_enabled_collection_types(summary_plan))
         sub_plans = list(summary_plan.collect_plans.all())
-        sub_plan_by_type = {sub_plan.collection_type: sub_plan for sub_plan in sub_plans}
+        sub_plan_by_type = {}
+        for sub_plan in sub_plans:
+            normalized_type = DeviceCollectionService.normalize_sub_plan_collection_type(
+                sub_plan.collection_type
+            )
+            sub_plan_by_type.setdefault(normalized_type, sub_plan)
 
         ordered_types = []
         for collection_type in DEFAULT_COLLECTION_TYPES:
@@ -313,9 +333,12 @@ class DeviceCollectionService:
             raise ValueError("请求体必须为以 collection_type 为 key 的对象")
 
         DeviceCollectionService.sync_summary_plan_sub_plans(summary_plan)
-        sub_plan_by_type = {
-            sub_plan.collection_type: sub_plan for sub_plan in summary_plan.collect_plans.all()
-        }
+        sub_plan_by_type = {}
+        for sub_plan in summary_plan.collect_plans.all():
+            normalized_type = DeviceCollectionService.normalize_sub_plan_collection_type(
+                sub_plan.collection_type
+            )
+            sub_plan_by_type.setdefault(normalized_type, sub_plan)
 
         for collection_type, config in payload.items():
             if collection_type not in sub_plan_by_type:
