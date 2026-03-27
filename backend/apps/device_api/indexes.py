@@ -6,6 +6,7 @@ import pymongo
 
 from apps.device_api.contract import build_plan_collection_name
 from apps.device_api import (
+    COLLECTION_BINDING_ANALYSIS,
     COLLECTION_EXECUTION_LOG,
     COLLECTION_PLAN,
     COLLECTION_RESULTS_DB,
@@ -32,6 +33,7 @@ from apps.device_api import (
     slb_info_mongo,
     vrrp_info_mongo,
     mac_mongo,
+    mac_evpn_mongo,
     mac_bd_mongo,
     mac_vxlan_mongo,
     mac_vxlan_control_mongo,
@@ -72,6 +74,7 @@ PLAN_DATA_COLLECTIONS = {
     build_plan_collection_name("device_identity"): device_identity_mongo,
     build_plan_collection_name("arp"): arp_mongo,
     build_plan_collection_name("mac"): mac_mongo,
+    build_plan_collection_name("mac_evpn"): mac_evpn_mongo,
     build_plan_collection_name("mac_bd"): mac_bd_mongo,
     build_plan_collection_name("mac_vxlan"): mac_vxlan_mongo,
     build_plan_collection_name("mac_vxlan_control"): mac_vxlan_control_mongo,
@@ -186,6 +189,20 @@ RESULT_COLLECTION_INDEXES = {
             {"name": "idx_status_execute_time"},
         ),
     ),
+    "DevicePlanBindingAnalysisChecklist": (
+        (
+            [("doc_type", pymongo.ASCENDING), ("execute_time", pymongo.DESCENDING)],
+            {"name": "idx_doc_type_execute_time"},
+        ),
+        (
+            [("execute_time", pymongo.DESCENDING), ("device_ip", pymongo.ASCENDING)],
+            {"name": "idx_execute_time_device_ip"},
+        ),
+        (
+            [("execute_time", pymongo.DESCENDING), ("has_recommendations", pymongo.ASCENDING)],
+            {"name": "idx_execute_time_has_recommendations"},
+        ),
+    ),
 }
 
 _AUTO_INDEXES_BOOTSTRAPPED = False
@@ -208,6 +225,11 @@ def build_device_api_index_targets():
         ("PlanCollectionCelery", COLLECTION_PLAN, RESULT_COLLECTION_INDEXES["PlanCollectionCelery"]),
         ("SubPlanCollectionCelery", COLLECTION_SUB_PLAN, RESULT_COLLECTION_INDEXES["SubPlanCollectionCelery"]),
         ("DeviceApiExecutionLog", COLLECTION_EXECUTION_LOG, RESULT_COLLECTION_INDEXES["DeviceApiExecutionLog"]),
+        (
+            "DevicePlanBindingAnalysisChecklist",
+            COLLECTION_BINDING_ANALYSIS,
+            RESULT_COLLECTION_INDEXES["DevicePlanBindingAnalysisChecklist"],
+        ),
     ]
     for collection_name, mongo in PLAN_DATA_COLLECTIONS.items():
         targets.append((collection_name, mongo, PLAN_DATA_INDEXES))

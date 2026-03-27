@@ -8,6 +8,7 @@ import django_filters
 from ncclient import manager
 from datetime import date, datetime
 from django.core.cache import cache
+from django.db import transaction
 from django.db.models import Count, Case, When, Value, IntegerField
 from django.db.models.expressions import RawSQL
 from django.http import JsonResponse, FileResponse, Http404, HttpResponse
@@ -26,6 +27,7 @@ from apps.asset.serializers import IdcSerializer, AssetAccountSerializer, AssetV
     CategorySerializer, ModelSerializer, AttributeSerializer, FrameworkSerializer, NetworkDeviceSerializer, \
     IdcModelSerializer, NetZoneSerializer, CmdbRackSerializer, AdminRecordSerializer, ServerSerializer, \
     ServerModelSerializer, ContainerServiceSerializer, ServerVendorSerializer, AssetIpInfoSerializer
+from apps.device_api.tasks import onboard_network_device
 from utils.cmdb_import import pandas_read_file, new_import_parse, new_import_server_parse
 from utils.db.mongo_ops import MongoOps
 from utils.connect_layer.snmp.snmp_test import probe_snmp
@@ -38,8 +40,10 @@ from django.db.models import Prefetch
 
 if DEBUG:
     CELERY_QUEUE = 'dev'
+    DEVICE_API_CELERY_QUEUE = 'dev'
 else:
     CELERY_QUEUE = 'config_backup'
+    DEVICE_API_CELERY_QUEUE = 'config'
 show_ip_mongo = MongoOps(db='Automation', coll='layer3interface')
 metric_mongo = MongoOps(db='metric', coll='level2')
 
@@ -633,6 +637,45 @@ class NetworkDeviceViewSet(CustomViewBase):
     search_fields = ('serial_num', 'manage_ip', 'category__name',
                      'name', 'vendor__name', 'idc__name', 'patch_version', 'soft_version',
                      'model__name', 'memo', 'status', 'ha_status')
+
+    ONBOARDING_RELEVANT_FIELDS = {
+        'serial_num',
+        'manage_ip',
+        'vendor',
+        'category',
+        'status',
+        'auto_enable',
+        'ssh_enable',
+        'ssh_account',
+        'netconf_enable',
+        'netconf_account',
+    }
+
+    @staticmethod
+    def _schedule_device_api_onboarding(device_id, trigger):
+        if not device_id:
+            return
+        transaction.on_commit(
+            lambda: onboard_network_device.apply_async(
+                kwargs={"device_id": device_id, "trigger": trigger},
+                queue=DEVICE_API_CELERY_QUEUE,
+                retry=True,
+            )
+        )
+
+    def perform_create(self, serializer):
+        super().perform_create(serializer)
+        instance = serializer.instance
+        self._schedule_device_api_onboarding(getattr(instance, "id", None), "asset_create")
+
+    def perform_update(self, serializer):
+        relevant_changed = bool(
+            self.ONBOARDING_RELEVANT_FIELDS.intersection(serializer.validated_data.keys())
+        )
+        super().perform_update(serializer)
+        if relevant_changed:
+            instance = serializer.instance
+            self._schedule_device_api_onboarding(getattr(instance, "id", None), "asset_update")
 
     def get_queryset(self):
         """

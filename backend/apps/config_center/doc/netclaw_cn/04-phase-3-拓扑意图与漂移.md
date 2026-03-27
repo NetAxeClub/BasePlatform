@@ -75,7 +75,7 @@
 - `backend/apps/network_analysis/services.py`
 - `backend/apps/network_analysis/tests.py`
 - `backend/apps/network_analysis/migrations/0003_auto_20260319_2335.py`
-- [04b-phase-3-三方对账流程说明.md](./04b-phase-3-%E4%B8%89%E6%96%B9%E5%AF%B9%E8%B4%A6%E6%B5%81%E7%A8%8B%E8%AF%B4%E6%98%8E.md)
+- [04b-phase-3-三方对账流程说明.md](04b-phase-3-三方对账流程说明.md)
 
 ## 7. 接口或模型变更
 

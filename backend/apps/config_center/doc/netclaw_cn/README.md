@@ -36,17 +36,17 @@
 
 | 阶段 | 文档 | 目标 | 当前状态 | 验收结论 |
 |---|---|---|---|---|
-| Phase 0 | [01-phase-0-架构定版与遗留切割.md](./01-phase-0-%E6%9E%B6%E6%9E%84%E5%AE%9A%E7%89%88%E4%B8%8E%E9%81%97%E7%95%99%E5%88%87%E5%89%B2.md) | 架构定版、边界切割、遗留冻结 | DONE | PASS |
-| Phase 1 | [02-phase-1-巡检与事实主链.md](./02-phase-1-%E5%B7%A1%E6%A3%80%E4%B8%8E%E4%BA%8B%E5%AE%9E%E4%B8%BB%E9%93%BE.md) | facts/capabilities/inspection/security audit 统一只读主链 | DONE | PASS |
-| Phase 2 | [03-phase-2-变更治理主链.md](./03-phase-2-%E5%8F%98%E6%9B%B4%E6%B2%BB%E7%90%86%E4%B8%BB%E9%93%BE.md) | 审批、执行、验证、回滚闭环 | DONE | PASS |
-| Phase 3 | [04-phase-3-拓扑意图与漂移.md](./04-phase-3-%E6%8B%93%E6%89%91%E6%84%8F%E5%9B%BE%E4%B8%8E%E6%BC%82%E7%A7%BB.md) | 事实拓扑、意图对比、漂移诊断 | DONE | PASS |
-| Phase 4 | [05-phase-4-mcp与skill产品化.md](./05-phase-4-mcp%E4%B8%8Eskill%E4%BA%A7%E5%93%81%E5%8C%96.md) | MCP / Skill 产品化边界 | DONE | PASS |
+| Phase 0 | [01-phase-0-架构定版与遗留切割.md](01-phase-0-架构定版与遗留切割.md) | 架构定版、边界切割、遗留冻结 | DONE | PASS |
+| Phase 1 | [02-phase-1-巡检与事实主链.md](02-phase-1-巡检与事实主链.md) | facts/capabilities/inspection/security audit 统一只读主链 | DONE | PASS |
+| Phase 2 | [03-phase-2-变更治理主链.md](03-phase-2-变更治理主链.md) | 审批、执行、验证、回滚闭环 | DONE | PASS |
+| Phase 3 | [04-phase-3-拓扑意图与漂移.md](04-phase-3-拓扑意图与漂移.md) | 事实拓扑、意图对比、漂移诊断 | DONE | PASS |
+| Phase 4 | [05-phase-4-mcp与skill产品化.md](05-phase-4-mcp与skill产品化.md) | MCP / Skill 产品化边界 | DONE | PASS |
 
 ## 5. 文档入口
 
-- [00-总控说明与治理机制.md](./00-%E6%80%BB%E6%8E%A7%E8%AF%B4%E6%98%8E%E4%B8%8E%E6%B2%BB%E7%90%86%E6%9C%BA%E5%88%B6.md)
-- [06-统一验收流程与结论模板.md](./06-%E7%BB%9F%E4%B8%80%E9%AA%8C%E6%94%B6%E6%B5%81%E7%A8%8B%E4%B8%8E%E7%BB%93%E8%AE%BA%E6%A8%A1%E6%9D%BF.md)
-- [07-风险台账与豁免记录.md](./07-%E9%A3%8E%E9%99%A9%E5%8F%B0%E8%B4%A6%E4%B8%8E%E8%B1%81%E5%85%8D%E8%AE%B0%E5%BD%95.md)
+- [00-总控说明与治理机制.md](00-总控说明与治理机制.md)
+- [06-统一验收流程与结论模板.md](06-统一验收流程与结论模板.md)
+- [07-风险台账与豁免记录.md](07-风险台账与豁免记录.md)
 
 ## 6. 使用规则
 

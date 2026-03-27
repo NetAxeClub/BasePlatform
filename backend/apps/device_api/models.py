@@ -8,6 +8,43 @@ from .processors import get_processor
 
 logger = logging.getLogger(__name__)
 
+VENDOR_NAME_FALLBACKS = {
+    "H3C": "华三",
+    "Huawei": "华为",
+    "Ruijie": "锐捷",
+    "Hillstone": "山石网科",
+    "Cisco": "思科",
+    "ZTE": "中兴",
+    "centec": "盛科",
+    "colasoft": "科来",
+    "Mellanox": "Mellanox",
+    "DELL": "戴尔",
+    "F5": "F5",
+    "Maipu": "迈普",
+    "Citrix": "Citrix",
+    "sangfor": "深信服",
+    "inspur": "浪潮思科",
+    "nsfocus": "绿盟",
+    "nettap": "成都数维",
+    "TJX": "腾捷兴",
+}
+VENDOR_ALIAS_FALLBACKS = {
+    value: key for key, value in VENDOR_NAME_FALLBACKS.items()
+}
+DEVICE_TYPE_NAME_FALLBACKS = {
+    "switch": "交换机",
+    "firewall": "防火墙",
+    "router": "路由器",
+    "tap交换机": "TAP交换机",
+    "TAP交换机": "TAP交换机",
+}
+DEVICE_TYPE_ALIAS_FALLBACKS = {
+    "交换机": "switch",
+    "防火墙": "firewall",
+    "路由器": "router",
+    "TAP交换机": "switch",
+}
+
 
 class PlatformProfile(models.Model):
     """设备平台画像，用于按厂商/产品线/版本选择默认方案与采集能力。"""
@@ -85,28 +122,8 @@ class DeviceCollectionPlans(models.Model):
         (COLLECTION_METHOD_BOTH, "Netmiko + NETCONF"),
     ]
 
-    VENDOR_CHOICES = [
-        ('H3C', '华三'),
-        ('Huawei', '华为'),
-        ('Ruijie', '锐捷'),
-        ('Hillstone', '山石'),
-        ('Cisco', '思科'),
-        ('Mellanox', 'Mellanox'),
-        ('ZTE', '中兴'),
-        ('centec', '盛科'),
-        ('colasoft', '科来'),
-        ('DELL', '戴尔'),
-        ('F5', 'F5'),
-        ('Maipu', '迈普'),
-        ('Citrix', 'Citrix'),
-        ('sangfor', '深信服'),
-        ('inspur', '浪潮思科'),
-        ('nsfocus', '绿盟'),
-        ('nettap', '成都数维'),
-        ('TJX', '腾捷兴')
-    ]
     name = models.CharField(max_length=100, verbose_name='父采集方案名称', unique=True)
-    vendor = models.CharField(max_length=30, choices=VENDOR_CHOICES, verbose_name='厂商')
+    vendor = models.CharField(max_length=30, verbose_name='厂商')
     device_type = models.CharField(max_length=30, verbose_name='设备类型')
     description = models.TextField(blank=True, null=True, verbose_name='描述')
     profile_code = models.CharField(max_length=64, blank=True, default="", verbose_name="画像编码")
@@ -145,6 +162,170 @@ class DeviceCollectionPlans(models.Model):
     def __str__(self):
         return f"{self.name} ({self.get_vendor_display()})"
 
+    @classmethod
+    def resolve_vendor_record(cls, vendor_value):
+        from apps.asset.models import Vendor
+
+        normalized_value = str(vendor_value or "").strip()
+        if not normalized_value:
+            return None
+
+        vendor = Vendor.objects.filter(name=normalized_value).first()
+        if vendor:
+            return vendor
+        return Vendor.objects.filter(alias=normalized_value).first()
+
+    @classmethod
+    def normalize_vendor_value(cls, vendor_value: str) -> str:
+        normalized_value = str(vendor_value or "").strip()
+        if not normalized_value:
+            return ""
+
+        fallback_name = VENDOR_NAME_FALLBACKS.get(normalized_value)
+        if fallback_name:
+            return fallback_name
+        if normalized_value in VENDOR_ALIAS_FALLBACKS:
+            return normalized_value
+
+        vendor = cls.resolve_vendor_record(normalized_value)
+        if vendor:
+            return str(vendor.name or "").strip()
+        return normalized_value
+
+    @classmethod
+    def resolve_vendor_alias(cls, vendor_value: str) -> str:
+        normalized_value = str(vendor_value or "").strip()
+        if not normalized_value:
+            return ""
+
+        fallback_alias = VENDOR_ALIAS_FALLBACKS.get(normalized_value)
+        if fallback_alias:
+            return fallback_alias
+        if normalized_value in VENDOR_NAME_FALLBACKS:
+            return normalized_value
+
+        vendor = cls.resolve_vendor_record(normalized_value)
+        if vendor and getattr(vendor, "alias", ""):
+            return str(vendor.alias or "").strip()
+        return normalized_value
+
+    @classmethod
+    def resolve_vendor_variants(cls, vendor_value: str):
+        normalized_value = str(vendor_value or "").strip()
+        if not normalized_value:
+            return []
+
+        variants = []
+        for value in (
+            normalized_value,
+            cls.normalize_vendor_value(normalized_value),
+            cls.resolve_vendor_alias(normalized_value),
+        ):
+            value = str(value or "").strip()
+            if value and value not in variants:
+                variants.append(value)
+        return variants
+
+    @property
+    def vendor_alias(self) -> str:
+        return self.resolve_vendor_alias(self.vendor)
+
+    def get_vendor_display(self):
+        return self.normalize_vendor_value(self.vendor) or self.vendor
+
+    @classmethod
+    def resolve_device_type_record(cls, device_type_value):
+        from apps.asset.models import Category
+
+        normalized_value = str(device_type_value or "").strip()
+        if not normalized_value:
+            return None
+
+        candidate_names = [normalized_value]
+        fallback_name = DEVICE_TYPE_NAME_FALLBACKS.get(normalized_value)
+        if fallback_name and fallback_name not in candidate_names:
+            candidate_names.append(fallback_name)
+
+        for candidate_name in candidate_names:
+            category = Category.objects.filter(name=candidate_name).first()
+            if category:
+                return category
+        return None
+
+    @classmethod
+    def normalize_device_type_value(cls, device_type_value: str) -> str:
+        normalized_value = str(device_type_value or "").strip()
+        if not normalized_value:
+            return ""
+
+        fallback_name = DEVICE_TYPE_NAME_FALLBACKS.get(normalized_value)
+        if fallback_name:
+            return fallback_name
+        if normalized_value in DEVICE_TYPE_ALIAS_FALLBACKS:
+            return normalized_value
+
+        category = cls.resolve_device_type_record(normalized_value)
+        if category:
+            return str(category.name or "").strip()
+        return normalized_value
+
+    @classmethod
+    def resolve_device_type_alias(cls, device_type_value: str) -> str:
+        normalized_value = str(device_type_value or "").strip()
+        if not normalized_value:
+            return ""
+
+        fallback_alias = DEVICE_TYPE_ALIAS_FALLBACKS.get(normalized_value)
+        if fallback_alias:
+            return fallback_alias
+        if normalized_value in DEVICE_TYPE_NAME_FALLBACKS:
+            return normalized_value
+
+        category = cls.resolve_device_type_record(normalized_value)
+        if category:
+            category_name = str(category.name or "").strip()
+            return DEVICE_TYPE_ALIAS_FALLBACKS.get(category_name, category_name)
+        return normalized_value
+
+    @classmethod
+    def resolve_device_type_variants(cls, device_type_value: str):
+        normalized_value = str(device_type_value or "").strip()
+        if not normalized_value:
+            return []
+
+        variants = []
+        for value in (
+            normalized_value,
+            cls.normalize_device_type_value(normalized_value),
+            cls.resolve_device_type_alias(normalized_value),
+        ):
+            value = str(value or "").strip()
+            if value and value not in variants:
+                variants.append(value)
+        return variants
+
+    @property
+    def device_type_alias(self) -> str:
+        return self.resolve_device_type_alias(self.device_type)
+
+    def get_device_type_display(self):
+        return self.normalize_device_type_value(self.device_type) or self.device_type
+
+    def save(self, *args, **kwargs):
+        original_vendor = getattr(self, "vendor", "")
+        normalized_vendor = self.normalize_vendor_value(original_vendor)
+        self.vendor = normalized_vendor
+        original_device_type = getattr(self, "device_type", "")
+        normalized_device_type = self.normalize_device_type_value(original_device_type)
+        self.device_type = normalized_device_type
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and normalized_vendor != original_vendor and "vendor" not in update_fields:
+            kwargs["update_fields"] = list(update_fields) + ["vendor"]
+            update_fields = kwargs["update_fields"]
+        if update_fields is not None and normalized_device_type != original_device_type and "device_type" not in update_fields:
+            kwargs["update_fields"] = list(update_fields) + ["device_type"]
+        super().save(*args, **kwargs)
+
 
 class DeviceSubCollectionPlan(models.Model):
     """子采集方案模型"""
@@ -157,7 +338,7 @@ class DeviceSubCollectionPlan(models.Model):
 
     # 基本信息
     name = models.CharField(max_length=50, verbose_name='子采集方案名称', unique=True)
-    collection_type = models.CharField(max_length=20, default='arp', verbose_name='采集类型')
+    collection_type = models.CharField(max_length=32, default='arp', verbose_name='采集类型')
     description = models.TextField(blank=True, verbose_name='方案描述')
 
     # 采集方式配置,Netmiko配置（新建时默认关闭，由用户在前端按需开启）
@@ -271,8 +452,8 @@ class DeviceSubCollectionPlan(models.Model):
         if not processor_enabled or not (processor_code and str(processor_code).strip()):
             return data
 
-        vendor = self.summary_plan.vendor
-        device_type = self.summary_plan.device_type
+        vendor = DeviceCollectionPlans.resolve_vendor_alias(self.summary_plan.vendor)
+        device_type = DeviceCollectionPlans.resolve_device_type_alias(self.summary_plan.device_type)
         collection_type = self.collection_type
 
         # 1. 尝试使用注册的处理器

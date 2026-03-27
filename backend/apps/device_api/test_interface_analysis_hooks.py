@@ -44,32 +44,30 @@ class DeviceApiInterfaceAnalysisHookTests(SimpleTestCase):
         self.assertFalse(skipped["scheduled"])
         mock_apply_async.assert_called_once()
 
-    @patch("apps.device_api.views.maybe_schedule_interface_utilization")
-    @patch("apps.device_api.views.DeviceCollectionService.execute_both_collection_local")
+    @patch("apps.device_api.views._store_runtime_task_snapshot")
+    @patch("apps.device_api.views.run_sub_plan_execute_task.apply_async")
     @patch("apps.device_api.views.DeviceSubCollectionPlanViewSet.validate_execution_params")
     @patch.object(DeviceSubCollectionPlanViewSet, "get_object")
-    def test_execute_sub_plan_local_returns_analysis_trigger(
+    def test_execute_sub_plan_local_dispatches_async_task(
         self,
         mock_get_object,
         mock_validate_params,
-        mock_execute_local,
-        mock_schedule_analysis,
+        mock_apply_async,
+        _mock_store_snapshot,
     ):
-        plan = SimpleNamespace(name="interface-plan", collection_type="interface_brief")
+        plan = SimpleNamespace(
+            id=11,
+            name="interface-plan",
+            collection_type="interface_brief",
+            summary_plan_id=1,
+            summary_plan=None,
+        )
         device = SimpleNamespace(manage_ip="10.0.0.1")
+        device.id = 101
+        device.serial_num = "SER-1"
         mock_get_object.return_value = plan
         mock_validate_params.return_value = (True, "验证通过", device)
-        mock_execute_local.return_value = {
-            "success": True,
-            "message": "NETMIKO 采集成功",
-            "netconf_result": None,
-            "netmiko_result": {"success": True},
-            "snmp_result": None,
-            "restconf_result": None,
-            "telemetry_result": None,
-            "execute_time": "2026-03-16 10:00:00",
-        }
-        mock_schedule_analysis.return_value = {"scheduled": True, "reason": "scheduled"}
+        mock_apply_async.return_value = "task-subplan-async-1"
 
         request = self.factory.post(
             "/base_platform/device_api/sub-collection-plan/11/execute_sub_plan/",
@@ -80,13 +78,10 @@ class DeviceApiInterfaceAnalysisHookTests(SimpleTestCase):
         payload = json.loads(response.content)
 
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(payload["data"]["analysis_trigger"]["scheduled"])
-        mock_schedule_analysis.assert_called_once_with(
-            collection_type="interface_brief",
-            device_ip="10.0.0.1",
-            execute_time="2026-03-16 10:00:00",
-            triggered_by="device_api-execute_sub_plan-local",
-        )
+        self.assertEqual(payload["code"], 200)
+        self.assertEqual(payload["data"]["task_id"], "task-subplan-async-1")
+        self.assertTrue(payload["data"]["async"])
+        mock_apply_async.assert_called_once()
 
     @patch("apps.device_api.views.maybe_schedule_interface_utilization")
     @patch("apps.device_api.views.DeviceCollectionService.execute_both_collection_local")

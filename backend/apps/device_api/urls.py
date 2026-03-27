@@ -19,8 +19,8 @@ router.register(r'plans-to-device', PlansToDeviceViewSet, basename='plans-to-dev
 app_name = 'device_api'
 
 urlpatterns = [
-    path('devices/<str:serial_num>/facts/', DeviceFactsAPIView.as_view(), name='device-facts'),
-    path('devices/<str:serial_num>/capabilities/', DeviceCapabilitiesAPIView.as_view(), name='device-capabilities'),
+    path('devices/<str:manage_ip>/facts/', DeviceFactsAPIView.as_view(), name='device-facts'),
+    path('devices/<str:manage_ip>/capabilities/', DeviceCapabilitiesAPIView.as_view(), name='device-capabilities'),
     path('collection-rule-tools/', DeviceCollectionRuleToolView.as_view(), name='collection-rule-tools'),
     path('v1/devices/<str:serial_num>/facts/', DeviceFactsAPIView.as_view(), name='device-facts-v1'),
     path('v1/devices/<str:serial_num>/capabilities/', DeviceCapabilitiesAPIView.as_view(), name='device-capabilities-v1'),

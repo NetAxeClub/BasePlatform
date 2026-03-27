@@ -69,8 +69,8 @@
 - `backend/apps/api/agent_views.py`
 - `backend/apps/api/agent_urls.py`
 - `backend/apps/api/tests_agent_v1.py`
-- [05a-phase-4-完成包与产品化约束.md](./05a-phase-4-%E5%AE%8C%E6%88%90%E5%8C%85%E4%B8%8E%E4%BA%A7%E5%93%81%E5%8C%96%E7%BA%A6%E6%9D%9F.md)
-- [05b-phase-4-错误语义与权限规则.md](./05b-phase-4-%E9%94%99%E8%AF%AF%E8%AF%AD%E4%B9%89%E4%B8%8E%E6%9D%83%E9%99%90%E8%A7%84%E5%88%99.md)
+- [05a-phase-4-完成包与产品化约束.md](05a-phase-4-完成包与产品化约束.md)
+- [05b-phase-4-错误语义与权限规则.md](05b-phase-4-错误语义与权限规则.md)
 
 ## 7. 接口或模型变更
 

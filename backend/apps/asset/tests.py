@@ -1,9 +1,12 @@
+import json
 from unittest.mock import patch
 
 from django.test import TestCase
+from rest_framework.test import APIRequestFactory
 
-from apps.asset.models import AssetAccount, NetworkDevice
+from apps.asset.models import AssetAccount, Category, NetworkDevice, Vendor
 from apps.asset.tasks import check_network_device_protocol_connectivity
+from apps.asset.views import NetworkDeviceViewSet
 
 
 class _FakeTransport:
@@ -142,3 +145,90 @@ class NetworkDeviceProtocolConnectivityTaskTestCase(TestCase):
 
         self.assertEqual(mock_probe_snmp.call_count, 2)
         self.assertEqual(mock_ssh_client.call_count, 2)
+
+
+class NetworkDeviceOnboardingTriggerTestCase(TestCase):
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.vendor, _ = Vendor.objects.get_or_create(name='华为', defaults={'alias': 'Huawei'})
+        if self.vendor.alias != 'Huawei':
+            self.vendor.alias = 'Huawei'
+            self.vendor.save(update_fields=['alias'])
+        self.category, _ = Category.objects.get_or_create(name='switch')
+        self.ssh_account = AssetAccount.objects.create(
+            name='ssh-admin',
+            username='admin',
+            password='secret',
+            protocol='ssh',
+            port=22,
+        )
+        self.netconf_account = AssetAccount.objects.create(
+            name='netconf-admin',
+            username='admin',
+            password='secret',
+            protocol='netconf',
+            port=830,
+        )
+
+    @patch('apps.asset.views.onboard_network_device.apply_async')
+    def test_create_network_device_schedules_device_api_onboarding(self, mock_apply_async):
+        request = self.factory.post(
+            '/base_platform/asset/asset_networkdevice/',
+            {
+                'serial_num': 'ND-201',
+                'manage_ip': '10.0.1.1',
+                'name': 'edge-a',
+                'vendor': self.vendor.id,
+                'category': self.category.id,
+                'ssh_enable': 'account',
+                'ssh_account': self.ssh_account.id,
+                'netconf_enable': 'account',
+                'netconf_account': self.netconf_account.id,
+            },
+            format='json',
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = NetworkDeviceViewSet.as_view({'post': 'create'})(request)
+        response.render()
+        payload = json.loads(response.content)
+        created_device = NetworkDevice.objects.get(serial_num='ND-201')
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(payload['code'], 201)
+        mock_apply_async.assert_called_once_with(
+            kwargs={'device_id': created_device.id, 'trigger': 'asset_create'},
+            queue='dev',
+            retry=True,
+        )
+
+    @patch('apps.asset.views.onboard_network_device.apply_async')
+    def test_update_network_device_schedules_onboarding_when_access_fields_change(self, mock_apply_async):
+        device = NetworkDevice.objects.create(
+            serial_num='ND-202',
+            manage_ip='10.0.1.2',
+            name='edge-b',
+            vendor=self.vendor,
+            category=self.category,
+            ssh_enable='0',
+            netconf_enable='0',
+        )
+        request = self.factory.patch(
+            f'/base_platform/asset/asset_networkdevice/{device.id}/',
+            {
+                'ssh_enable': 'account',
+                'ssh_account': self.ssh_account.id,
+            },
+            format='json',
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = NetworkDeviceViewSet.as_view({'patch': 'partial_update'})(request, pk=str(device.id))
+        response.render()
+        payload = json.loads(response.content)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload['code'], 200)
+        mock_apply_async.assert_called_once_with(
+            kwargs={'device_id': device.id, 'trigger': 'asset_update'},
+            queue='dev',
+            retry=True,
+        )

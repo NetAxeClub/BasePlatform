@@ -103,6 +103,11 @@ def _normalize_mac(mac_str):
     return mac_str.lower()
 
 
+def _normalize_h3c_model_name(model_name: str) -> str:
+    text = str(model_name or "").strip()
+    return re.sub(r"^H3C\s+", "", text, flags=re.IGNORECASE)
+
+
 def _build_ifindex_map(top):
     """从 Ifmgr.Interfaces.Interface 构建 IfIndex → 接口名 映射。"""
     ifindex_map = {}
@@ -118,6 +123,22 @@ def _build_ifindex_map(top):
     except Exception:
         pass
     return ifindex_map
+
+
+def _build_portindex_map(top):
+    portindex_map = {}
+    try:
+        interfaces = top.get('Ifmgr', {}).get('Interfaces', {}).get('Interface', [])
+        if isinstance(interfaces, dict):
+            interfaces = [interfaces]
+        for iface in interfaces:
+            port_index = str(iface.get('PortIndex', '') or '')
+            name = iface.get('Name', '')
+            if port_index and name:
+                portindex_map[port_index] = name
+    except Exception:
+        pass
+    return portindex_map
 
 
 def _collect_h3c_schemas(value):
@@ -210,6 +231,39 @@ def _index_by(items, key_name):
     return result
 
 
+def _extract_h3c_patch_version(top):
+    package = top.get('Package', {}) or {}
+    boot_lists = _as_list((package.get('BootLoaderList', {}) or {}).get('BootList'))
+    pattern = re.compile(r"(R\d+H\w?\d+)", re.IGNORECASE)
+    for boot in boot_lists:
+        image_files = (boot.get('ImageFiles', {}) or {}).get('FileName', [])
+        for file_name in _as_list(image_files):
+            match = pattern.search(str(file_name or ''))
+            if match:
+                return match.group(1)
+    return ''
+
+
+def _extract_h3c_physical_entities(top):
+    entities = top.get('Device', {}).get('PhysicalEntities', {}).get('Entity', [])
+    return _as_list(entities)
+
+
+def _pick_h3c_identity_entity(entities):
+    if not entities:
+        return {}
+
+    def _rank(entity):
+        class_rank = {'3': 0, '9': 1}.get(str(entity.get('Class') or '').strip(), 2)
+        slot_rank = 0 if str(entity.get('Slot') or '').strip() in {'', '0'} else 1
+        missing_serial = 0 if entity.get('SerialNumber') else 1
+        missing_model = 0 if entity.get('Model') else 1
+        missing_software = 0 if entity.get('SoftwareRev') else 1
+        return (class_rank, slot_rank, missing_serial, missing_model, missing_software)
+
+    return sorted(entities, key=_rank)[0]
+
+
 def _is_established(state: str) -> bool:
     text = str(state or '').strip().lower()
     return text in {'established', 'estab', 'up'} or 'established' in text
@@ -255,6 +309,35 @@ def process_version_netmiko(data):
     ]
 
 
+@register_processor(vendor='H3C', device_type='', collection_type='version', method='netconf')
+def process_version_netconf(data):
+    top = data.get('top', {}) if isinstance(data, dict) else {}
+    base = top.get('Device', {}).get('Base', {}) or {}
+    entity = _pick_h3c_identity_entity(_extract_h3c_physical_entities(top))
+
+    model_name = _normalize_h3c_model_name(
+        entity.get('Model') or entity.get('Name') or entity.get('Description') or ''
+    )
+    soft_version = str(entity.get('SoftwareRev') or '').strip()
+    patch_version = _extract_h3c_patch_version(top)
+    serial_num = str(entity.get('SerialNumber') or '').strip()
+    hostname = str(base.get('HostName') or '').strip()
+
+    if not any([hostname, model_name, soft_version, patch_version, serial_num]):
+        return []
+
+    return [
+        dict(
+            vendor_alias='H3C',
+            hostname=hostname,
+            serial_num=serial_num,
+            model_name=model_name,
+            soft_version=soft_version,
+            patch_version=patch_version,
+        )
+    ]
+
+
 @register_processor(vendor='H3C', device_type='', collection_type='board_status', method='netmiko')
 def process_board_status_netmiko(data):
     """H3C display device manuinfo 处理 (Netmiko/TextFSM)。"""
@@ -285,6 +368,35 @@ def process_board_status_netmiko(data):
     return rows
 
 
+@register_processor(vendor='H3C', device_type='', collection_type='board_status', method='netconf')
+def process_board_status_netconf(data):
+    top = data.get('top', {}) if isinstance(data, dict) else {}
+    rows = []
+    for entity in _extract_h3c_physical_entities(top):
+        slot = str(entity.get('Slot') or '').strip()
+        chassis_id = str(entity.get('Chassis') or '').strip()
+        board_model = _normalize_h3c_model_name(
+            entity.get('Model') or entity.get('Name') or entity.get('Description') or ''
+        )
+        board_name = str(entity.get('Name') or entity.get('Description') or board_model).strip()
+        serial_num = str(entity.get('SerialNumber') or '').strip()
+        if not any([slot, chassis_id, board_name, board_model, serial_num]):
+            continue
+        slot_type = "slot" if slot and slot != "0" else "chassis" if chassis_id else "module"
+        rows.append(
+            dict(
+                slot=slot,
+                board_name=board_name,
+                board_model=board_model,
+                serial_num=serial_num,
+                status=str(entity.get('SoftwareRev') or entity.get('Description') or '').strip(),
+                slot_type=slot_type,
+                chassis_id=chassis_id,
+            )
+        )
+    return rows
+
+
 @register_processor(vendor='H3C', device_type='', collection_type='irf_status', method='netmiko')
 def process_irf_status_netmiko(data):
     """H3C display irf 处理 (Netmiko/TextFSM)。"""
@@ -304,6 +416,34 @@ def process_irf_status_netmiko(data):
                 mac=str(item.get('Mac') or item.get('mac') or '').strip(),
             )
         )
+    return rows
+
+
+@register_processor(vendor='H3C', device_type='', collection_type='irf_status', method='netconf')
+def process_irf_status_netconf(data):
+    top = data.get('top', {}) if isinstance(data, dict) else {}
+    members = _as_list((top.get('IRF', {}) or {}).get('Members', {}).get('Member'))
+    role_map = {'1': 'Master', '2': 'Standby', '3': 'Loading', '4': 'Other'}
+    rows = []
+    for member in members:
+        boards = _as_list(member.get('Board'))
+        if not boards:
+            boards = [{}]
+        for board in boards:
+            slot = str(board.get('Slot') or '').strip()
+            member_id = slot or str(member.get('MemberID') or '').strip()
+            role = str(board.get('Role') or '').strip()
+            rows.append(
+                dict(
+                    chassis_id=str(board.get('Chassis') or '').strip(),
+                    member_id=member_id,
+                    slot=slot or member_id,
+                    role=role_map.get(role, role),
+                    priority=str(member.get('Priority') or '').strip(),
+                    mac=str(member.get('CPUMac') or '').strip(),
+                    irf_member_id=str(member.get('MemberID') or '').strip(),
+                )
+            )
     return rows
 
 
@@ -346,13 +486,26 @@ def process_arp_netconf(data):
     """
     top = data['top']
     ifindex_map = _build_ifindex_map(top)
+    portindex_map = _build_portindex_map(top)
+    evpn_ifindex_map = {}
+    for mac_entry in _as_list((top.get('L2VPN', {}) or {}).get('LocalMACs', {}).get('MAC')):
+        mac_address = _normalize_mac(mac_entry.get('MacAddr', ''))
+        if mac_address and mac_entry.get('IfIndex'):
+            evpn_ifindex_map[mac_address] = str(mac_entry.get('IfIndex'))
     arp_entries = top.get('ARP', {}).get('ArpTable', {}).get('ArpEntry', [])
     if isinstance(arp_entries, dict):
         arp_entries = [arp_entries]
     arp_datas = []
     for entry in arp_entries:
         ifindex = str(entry.get('IfIndex', ''))
-        interface_name = ifindex_map.get(ifindex, ifindex)
+        normalized_mac = _normalize_mac(entry.get('MacAddress', ''))
+        if not ifindex and normalized_mac:
+            ifindex = evpn_ifindex_map.get(normalized_mac, '')
+        interface_name = (
+            ifindex_map.get(ifindex)
+            or portindex_map.get(str(entry.get('PortIndex', '')))
+            or ifindex
+        )
         if not interface_name:
             continue
         arp_datas.append(dict(
@@ -537,6 +690,47 @@ def process_mac_evpn_netconf(data):
         ))
 
     return mac_datas
+
+
+@register_processor(vendor='H3C', device_type='', collection_type='vrrp_info', method='netconf')
+def process_vrrp_info_netconf(data):
+    top = data.get('top', {}) if isinstance(data, dict) else {}
+    operations = _as_list((top.get('VRRP', {}) or {}).get('VRRPOper', {}).get('Operation'))
+    assoc_entries = _as_list((top.get('VRRP', {}) or {}).get('VRRPAssoIpAddress', {}).get('AssoIpAddr'))
+    assoc_map = {
+        (str(item.get('IfIndex') or ''), str(item.get('VrID') or '')): item
+        for item in assoc_entries
+    }
+    ifindex_map = _build_ifindex_map(top)
+    state_map = {
+        "0": "Inactive",
+        "1": "Initialize",
+        "2": "Backup",
+        "3": "Master",
+    }
+
+    results = []
+    for operation in operations:
+        if_index = str(operation.get('IfIndex') or '')
+        vrid = str(operation.get('VrID') or '')
+        assoc = assoc_map.get((if_index, vrid), {})
+        interface_name = _normalize_h3c_interface(ifindex_map.get(if_index, if_index))
+        if not interface_name:
+            continue
+        virtual_ip = str(assoc.get('IpAddress') or '').strip()
+        results.append(
+            dict(
+                interface=interface_name,
+                vrid=vrid,
+                virtual_ip=virtual_ip,
+                ipmask='255.255.255.255' if virtual_ip else '',
+                priority=str(operation.get('PriorityRun') or operation.get('PriorityConfig') or '').strip(),
+                preempt_mode=str(operation.get('PreemptMode') or '').strip(),
+                admin_state=state_map.get(str(operation.get('OperState') or ''), str(operation.get('OperState') or '')),
+                config_state=str(operation.get('AuthTypeRun') or operation.get('AuthTypeConfig') or '').strip(),
+            )
+        )
+    return results
 
 
 @register_processor(vendor='H3C', device_type='', collection_type='route_table', method='netconf')

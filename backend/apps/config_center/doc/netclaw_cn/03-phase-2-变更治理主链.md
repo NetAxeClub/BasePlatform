@@ -79,8 +79,8 @@
 - `backend/apps/api/tests_agent_v1.py`
 - `backend/apps/api/tests_agent_v1_integration.py`
 - `backend/apps/workflow_center/models.py`
-- [03b-phase-2-低风险变更模板清单.md](./03b-phase-2-%E4%BD%8E%E9%A3%8E%E9%99%A9%E5%8F%98%E6%9B%B4%E6%A8%A1%E6%9D%BF%E6%B8%85%E5%8D%95.md)
-- [03c-phase-2-审计留痕字段规范.md](./03c-phase-2-%E5%AE%A1%E8%AE%A1%E7%95%99%E7%97%95%E5%AD%97%E6%AE%B5%E8%A7%84%E8%8C%83.md)
+- [03b-phase-2-低风险变更模板清单.md](03b-phase-2-低风险变更模板清单.md)
+- [03c-phase-2-审计留痕字段规范.md](03c-phase-2-审计留痕字段规范.md)
 
 ## 7. 接口或模型变更
 

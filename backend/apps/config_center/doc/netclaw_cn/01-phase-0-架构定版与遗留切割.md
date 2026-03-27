@@ -76,10 +76,10 @@
 
 当前交付物索引：
 
-- [01a-phase-0-领域边界与责任矩阵.md](./01a-phase-0-%E9%A2%86%E5%9F%9F%E8%BE%B9%E7%95%8C%E4%B8%8E%E8%B4%A3%E4%BB%BB%E7%9F%A9%E9%98%B5.md)
-- [01b-phase-0-主链与遗留切割清单.md](./01b-phase-0-%E4%B8%BB%E9%93%BE%E4%B8%8E%E9%81%97%E7%95%99%E5%88%87%E5%89%B2%E6%B8%85%E5%8D%95.md)
-- [01c-phase-0-统一-agent-api-草案.md](./01c-phase-0-%E7%BB%9F%E4%B8%80-agent-api-%E8%8D%89%E6%A1%88.md)
-- [01d-phase-0-模块迁移清单.md](./01d-phase-0-%E6%A8%A1%E5%9D%97%E8%BF%81%E7%A7%BB%E6%B8%85%E5%8D%95.md)
+- [01a-phase-0-领域边界与责任矩阵.md](01a-phase-0-领域边界与责任矩阵.md)
+- [01b-phase-0-主链与遗留切割清单.md](01b-phase-0-主链与遗留切割清单.md)
+- [01c-phase-0-统一-agent-api-草案.md](01c-phase-0-统一-agent-api-草案.md)
+- [01d-phase-0-模块迁移清单.md](01d-phase-0-模块迁移清单.md)
 
 ## 7. 接口或模型变更
 
