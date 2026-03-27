@@ -395,8 +395,8 @@ NetAxe平台提供RESTful API接口，基于Django REST Framework实现。所有
 ```json
 {
   "name": "default-h3c-modern-switch",
-  "vendor": "H3C",
-  "device_type": "switch",
+  "vendor": "华三",
+  "device_type": "交换机",
   "description": "H3C 现代交换机默认模板方案",
   "enabled_collection_types": ["arp", "mac", "lldp", "interface_brief"],
   "collection_method": "both",
@@ -408,6 +408,8 @@ NetAxe平台提供RESTful API接口，基于Django REST Framework实现。所有
 }
 ```
 
+- `vendor` 必须传 `asset.Vendor.name` 中真实存在的中文厂商名；后端会兼容旧的 alias 输入，但统一按中文厂商名落库和返回。
+- `device_type` 必须传 `asset.Category.name` 中真实存在的设备类型名称；后端会兼容 `switch/router/firewall` 等历史别名输入，但统一按资产侧真实类型名称落库和返回。
 - `enabled_collection_types` 为空数组或不传时，表示使用后端默认的全部采集类型。
 - `collection_method` 支持 `netmiko`、`netconf`、`both`，保存父方案时会自动同步到对应子方案的 `netmiko_enabled` / `netconf_enabled`。
 
@@ -487,9 +489,140 @@ NetAxe平台提供RESTful API接口，基于Django REST Framework实现。所有
 - **URL**: `/base_platform/device_api/collection-results/latest/`
 - **方法**: GET
 - **查询参数**:
-  - `serial_num`: 设备序列号
-  - `manage_ip`: 设备管理IP
+  - `manage_ip`: 设备管理IP，必填
   - `collection_type`: 采集类型，可选
+- **说明**:
+  - 不支持 `serial_num` 作为查询参数；device_api 结果查询统一按 `manage_ip` 检索。
+  - 返回中的 `device_serial_nums` 用于展示当前管理 IP 在资产中的关联序列号列表；若仅命中 1 个序列号，`serial_num` 会同步返回该值，否则返回空串。
+
+#### 获取设备采集链路追溯
+- **URL**: `/base_platform/device_api/collection-results/device_traceability/`
+- **方法**: GET
+- **用途**:
+  - 按设备维度返回当前活跃父方案绑定、该父方案最新批次执行摘要、子采集方案最近一次执行状态。
+  - 适合前端在“设备采集链路追溯 / 方案执行排障”场景展示父方案卡片、子方案状态列表和问题摘要。
+- **查询参数**:
+  - `manage_ip`: 设备管理 IP，必填。
+  - `summary_plan_id`: 父方案 ID，可选；传入后只返回该父方案绑定链路。
+  - `plan_id`: 子方案 ID，可选；传入后只返回该子方案记录。
+  - `execute_time`: 执行批次时间，可选；格式建议与运行态一致，例如 `2026-03-24 11:31:48`。
+  - `collection_type`: 采集类型，可选；例如 `arp`、`mac`、`lldp`、`cli_output_capability`。
+- **限制**:
+  - 不支持 `serial_num` 作为查询参数；device_api 结果追溯统一按 `manage_ip` 检索。
+- **请求示例**:
+```http
+GET /base_platform/device_api/collection-results/device_traceability/?manage_ip=10.254.34.50&summary_plan_id=33&execute_time=2026-03-24%2011:31:48
+```
+- **成功响应示例**:
+```json
+{
+  "code": 200,
+  "message": "获取成功",
+  "data": {
+    "manage_ip": "10.254.34.50",
+    "serial_num": "",
+    "device_serial_nums": ["219801A34C6239V00014", "219801A34C6239V00015"],
+    "count": 1,
+    "results": [
+      {
+        "relation_id": 201,
+        "manage_ip": "10.254.34.50",
+        "device_serial_num": "219801A34C6239V00014",
+        "serial_num": "219801A34C6239V00014",
+        "use_local": true,
+        "execute_node": "",
+        "issue_code": "textfsm_template_mismatch",
+        "recommendation": "CLI 解析存在 TextFSM 模板失配",
+        "error": "Unexpected element netconf-state",
+        "summary_plan": {
+          "id": 33,
+          "name": "summary-plan",
+          "vendor": "华三",
+          "device_type": "交换机",
+          "is_active": true
+        },
+        "latest_execution": {
+          "task_status": "failed",
+          "device_name": "sw-b",
+          "device_serial_num": "219801A34C6239V00014",
+          "serial_num": "219801A34C6239V00014",
+          "idc_name": "IDC-A",
+          "execute_time": "2026-03-24 11:31:48",
+          "sub_plans_count": 2,
+          "successful_sub_plans": 0,
+          "failed_sub_plans": 1,
+          "issue_code": "textfsm_template_mismatch",
+          "recommendation": "CLI 解析存在 TextFSM 模板失配",
+          "error": "Unexpected element netconf-state",
+          "error_message": "Unexpected element netconf-state"
+        },
+        "sub_plans": [
+          {
+            "plan_id": 2919,
+            "plan_name": "summary-plan-cli",
+            "collection_type": "cli_output_capability",
+            "collection_label": "CLI 输出能力探测",
+            "description": "CLI capability collect",
+            "enabled_methods": ["netmiko"],
+            "latest_run": {
+              "task_status": "failed",
+              "collection_method": "netmiko",
+              "execute_time": "2026-03-24 11:31:48",
+              "task_errors": ["timeout"],
+              "device_serial_num": "219801A34C6239V00014",
+              "serial_num": "219801A34C6239V00014",
+              "detail_query": {
+                "summary_plan_id": 33,
+                "plan_id": 2919,
+                "device_ip": "10.254.34.50",
+                "execute_time": "2026-03-24 11:31:48",
+                "collection_type": "cli_output_capability"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+- **字段说明**:
+  - `data.serial_num`: 兼容字段；仅当当前 `manage_ip` 只关联 1 个序列号时返回该值，否则为空串。
+  - `data.device_serial_nums`: 当前 `manage_ip` 在资产中命中的序列号列表。
+  - `data.count`: 当前命中的父方案绑定数。
+  - `results[].relation_id`: `PlansToDevice` 绑定记录 ID。
+  - `results[].device_serial_num`: 当前绑定记录对应的设备序列号。
+  - `results[].use_local`: 是否本机直连执行。
+  - `results[].execute_node`: 执行节点；本机直连时通常为空串。
+  - `results[].issue_code`: 绑定分析清单中的首个建议码，没有则为空串。
+  - `results[].recommendation`: 绑定分析清单中的首条建议文案，没有则为空串。
+  - `results[].error`: 从最近子任务错误或执行日志提取的错误摘要，没有则为空串。
+  - `results[].summary_plan`: 父方案基础信息。
+  - `results[].latest_execution.task_status`: 父方案最近一次设备级执行状态；常见值包括 `success`、`partial_success`、`failed`、`skipped`、`never_run`。
+  - `results[].latest_execution.sub_plans_count`: 该批次父方案记录中的子方案总数；若父批次不存在，则回退为当前父方案下配置的子方案数量。
+  - `results[].latest_execution.successful_sub_plans`: 当前返回范围内状态为 `finished` 或 `success` 的子方案数。
+  - `results[].latest_execution.failed_sub_plans`: 当前返回范围内存在最近执行记录且未成功的子方案数。
+  - `results[].latest_execution.device_serial_num`: 当前绑定记录对应的设备序列号。
+  - `results[].sub_plans[].enabled_methods`: 子方案启用的采集协议列表，可能包含 `netmiko`、`netconf`、`snmp`、`restconf`、`telemetry`。
+  - `results[].sub_plans[].latest_run.task_errors`: 子方案最近一次执行的错误列表。
+  - `results[].sub_plans[].latest_run.device_serial_num`: 当前绑定记录对应的设备序列号。
+  - `results[].sub_plans[].latest_run.detail_query`: 前端如需进一步跳转明细页，可直接复用的查询参数对象。
+- **错误响应**:
+```json
+{
+  "code": 400,
+  "message": "缺少必要参数: manage_ip",
+  "data": null
+}
+```
+- **前端展示建议**:
+  - 顶部摘要优先展示 `summary_plan.name`、`latest_execution.task_status`、`issue_code`、`recommendation`、`error`。
+  - 子方案表格建议展示 `collection_label`、`enabled_methods`、`latest_run.task_status`、`latest_run.collection_method`、`latest_run.execute_time`、`latest_run.task_errors`。
+  - `detail_query` 可直接透传给明细页或二次查询接口，不建议前端自行拼字段名。
+- **语义约束**:
+  - 该接口只基于当前 `PlansToDevice.is_active=true` 的绑定关系返回数据，不承诺返回设备全部历史绑定。
+  - 若运行任务使用 `clear_history=True` 清空运行态集合，则接口只能看到清空后的留存窗口数据。
+  - 传入 `plan_id` 或 `collection_type` 后，`successful_sub_plans` / `failed_sub_plans` 会按过滤后的子方案范围统计。
 
 ### 6.4 方案设备关联
 
@@ -509,7 +642,7 @@ NetAxe平台提供RESTful API接口，基于Django REST Framework实现。所有
 }
 ```
 
-#### 自动绑定设备到默认方案
+#### 单设备能力探测并收敛默认方案绑定
 - **URL**: `/base_platform/device_api/plans-to-device/auto_bind/`
 - **方法**: POST
 - **请求参数**:
@@ -518,6 +651,11 @@ NetAxe平台提供RESTful API接口，基于Django REST Framework实现。所有
   "manage_ip": "10.0.0.1"
 }
 ```
+- **说明**:
+  - 最小推荐入参格式为仅传 `manage_ip`。
+  - `category_name` 现在是可选 hint，只有在资产里缺少设备类型时才建议补充，如 `switch`、`router`、`firewall`。
+  - 接口会按设备事实自动选择合适的 capability probe，不需要调用方显式传 `collection_type`。
+  - 探测完成后会回写 `DeviceDiscoveryState`，并自动收敛 `PlansToDevice` 绑定。
 
 #### 获取设备事实
 - **URL**: `/base_platform/device_api/devices/{serial_num}/facts/`

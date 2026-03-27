@@ -102,6 +102,9 @@ from apps.device_api.management.commands.audit_device_api_coverage import (
 from apps.device_api.management.commands.audit_huawei_switch_profile_bindings import (
     Command as AuditHuaweiSwitchProfileBindingsCommand,
 )
+from apps.device_api.management.commands.repair_device_api_plan_catalog import (
+    Command as RepairDeviceApiPlanCatalogCommand,
+)
 from apps.device_api.management.commands.refresh_capability_discovery import (
     Command as RefreshCapabilityDiscoveryCommand,
 )
@@ -1923,6 +1926,94 @@ class DeviceCollectionPlanVendorAlignmentTests(TestCase):
 
         self.assertEqual(plan.vendor, "华为")
         self.assertEqual(plan.device_type, "交换机")
+
+
+class DeviceApiPlanCatalogRepairCommandTests(TestCase):
+    def setUp(self):
+        self.vendor, _ = Vendor.objects.get_or_create(name="华三", defaults={"alias": "H3C"})
+        if self.vendor.alias != "H3C":
+            self.vendor.alias = "H3C"
+            self.vendor.save(update_fields=["alias"])
+        self.category, _ = Category.objects.get_or_create(name="交换机")
+
+    @patch.object(RepairDeviceApiPlanCatalogCommand, "_migration_0013_applied", return_value=False)
+    @patch.object(RepairDeviceApiPlanCatalogCommand, "_get_collection_type_column_length", return_value=20)
+    def test_command_dedupes_legacy_cli_capability_rows_and_normalizes_plan_names_when_schema_is_short(
+        self,
+        _mock_length,
+        _mock_migration,
+    ):
+        plan = DeviceCollectionPlans.objects.create(
+            name="default-h3c-modern-switch",
+            vendor="H3C",
+            device_type="switch",
+            collection_method=DeviceCollectionPlans.COLLECTION_METHOD_BOTH,
+        )
+        DeviceCollectionPlans.objects.filter(id=plan.id).update(vendor="H3C", device_type="switch")
+        plan.refresh_from_db()
+        keeper = DeviceSubCollectionPlan.objects.create(
+            summary_plan=plan,
+            name="default-h3c-modern-switch-cli_output_capability",
+            collection_type="cli_output_capabilit",
+            netmiko_enabled=True,
+            netmiko_method="display irf",
+        )
+        DeviceSubCollectionPlan.objects.create(
+            summary_plan=plan,
+            name="default-h3c-modern-switch-1-cli_output_capability",
+            collection_type="cli_output_capabilit",
+        )
+        DeviceSubCollectionPlan.objects.create(
+            summary_plan=plan,
+            name="default-h3c-modern-switch-2-cli_output_capability",
+            collection_type="cli_output_capabilit",
+        )
+
+        command = RepairDeviceApiPlanCatalogCommand()
+        command.handle(plan_name=plan.name, vendor="", fix=True, sample_limit=10, output=None)
+
+        plan.refresh_from_db()
+        self.assertEqual(plan.vendor, "华三")
+        self.assertEqual(plan.device_type, "交换机")
+        sub_plans = list(
+            DeviceSubCollectionPlan.objects.filter(summary_plan=plan).order_by("id")
+        )
+        self.assertEqual(len(sub_plans), 1)
+        self.assertEqual(sub_plans[0].id, keeper.id)
+        self.assertEqual(sub_plans[0].collection_type, "cli_output_capabilit")
+        self.assertEqual(sub_plans[0].netmiko_method, "display irf")
+
+    @patch.object(RepairDeviceApiPlanCatalogCommand, "_migration_0013_applied", return_value=True)
+    @patch.object(RepairDeviceApiPlanCatalogCommand, "_get_collection_type_column_length", return_value=32)
+    def test_command_normalizes_legacy_collection_type_when_schema_is_ready(
+        self,
+        _mock_length,
+        _mock_migration,
+    ):
+        plan = DeviceCollectionPlans.objects.create(
+            name="default-h3c-modern-cli-switch",
+            vendor="H3C",
+            device_type="switch",
+            collection_method=DeviceCollectionPlans.COLLECTION_METHOD_NETMIKO,
+        )
+        DeviceCollectionPlans.objects.filter(id=plan.id).update(vendor="H3C", device_type="switch")
+        plan.refresh_from_db()
+        DeviceSubCollectionPlan.objects.create(
+            summary_plan=plan,
+            name="default-h3c-modern-cli-switch-cli_output_capability",
+            collection_type="cli_output_capabilit",
+            netmiko_enabled=True,
+            netmiko_method="display irf",
+        )
+
+        command = RepairDeviceApiPlanCatalogCommand()
+        command.handle(plan_name=plan.name, vendor="", fix=True, sample_limit=10, output=None)
+
+        plan.refresh_from_db()
+        sub_plan = DeviceSubCollectionPlan.objects.get(summary_plan=plan)
+        self.assertEqual(plan.vendor, "华三")
+        self.assertEqual(plan.device_type, "交换机")
+        self.assertEqual(sub_plan.collection_type, "cli_output_capability")
 
 
 class DeviceApiModelApiTests(SimpleTestCase):
@@ -5297,10 +5388,12 @@ class DeviceApiAutoBindingCutoverTests(TestCase):
         self.assertEqual(result["retired"], 1)
         self.assertEqual(result["results"][0]["retired_auto_bindings"], 1)
 
+    @patch("apps.device_api.platform_profiles.PlatformProfileService._probe_capability_with_plan")
     @patch("apps.device_api.platform_profiles.PlatformProfileService._probe_device_connectivity")
     def test_auto_bind_device_by_connection_priority_prefers_netconf_named_plan(
         self,
         mock_probe_device_connectivity,
+        mock_probe_capability_with_plan,
     ):
         netconf_plan = DeviceCollectionPlans.objects.create(
             name="default-h3c-modern-switch",
@@ -5332,6 +5425,14 @@ class DeviceApiAutoBindingCutoverTests(TestCase):
             "message": "NETCONF连接验证成功",
             "probe_mode": "connectivity",
         }
+        mock_probe_capability_with_plan.return_value = {
+            "collection_type": "netconf_capability",
+            "status": "success",
+            "message": "capability ok",
+            "probe_mode": "capability",
+            "plan_id": netconf_plan.id,
+            "plan_name": netconf_plan.name,
+        }
 
         result = PlatformProfileService.auto_bind_device_by_connection_priority(
             self.device,
@@ -5352,6 +5453,7 @@ class DeviceApiAutoBindingCutoverTests(TestCase):
             collection_type="netconf_capability",
             connection_policy=PlatformProfileService.build_discovery_connection_policy(self.device),
         )
+        mock_probe_capability_with_plan.assert_called_once()
 
     @patch("apps.device_api.platform_profiles.PlatformProfileService._probe_capability_with_plan")
     @patch("apps.device_api.platform_profiles.PlatformProfileService._probe_device_connectivity")
@@ -5459,6 +5561,210 @@ class DeviceApiAutoBindingCutoverTests(TestCase):
             plan=ce88_plan,
         )
         self.assertEqual(active_binding.profile_code, "Huawei-CE88xx")
+
+    @patch("apps.device_api.platform_profiles.PlatformProfileService._probe_capability_with_plan")
+    @patch("apps.device_api.platform_profiles.PlatformProfileService._probe_device_connectivity")
+    def test_auto_bind_device_by_connection_priority_prefers_configured_netconf_capability_plan_over_legacy_alias(
+        self,
+        mock_probe_device_connectivity,
+        mock_probe_capability_with_plan,
+    ):
+        modern_model, _ = Model.objects.get_or_create(name="S6520X", vendor=self.vendor)
+        modern_device = NetworkDevice.objects.create(
+            name="s6520-edge-b",
+            manage_ip="192.0.2.112",
+            serial_num="SER-H3C-MODERN-002",
+            vendor=self.vendor,
+            category=self.category,
+            model=modern_model,
+            soft_version="7.1.070 Feature 2707",
+            patch_version="-",
+            ssh_enable="account",
+            ssh_account=self.ssh_account,
+            netconf_enable="account",
+            netconf_account=self.netconf_account,
+        )
+        profiles_by_code = {
+            item.code: item
+            for item in PlatformProfileService.ensure_builtin_profiles()
+        }
+        modern_plan = PlatformProfileService.ensure_default_plan_for_profile(
+            profiles_by_code["H3C-modern-netconf"]
+        )
+        legacy_plan = DeviceCollectionPlans.objects.create(
+            name="default-h3c-netconf-switch",
+            vendor="H3C",
+            device_type="switch",
+            profile_code="default-h3c-netconf-switch",
+            plan_kind=DeviceCollectionPlans.PLAN_KIND_TEMPLATE,
+            generated_by_system=False,
+            is_default=False,
+            enabled_collection_types=["arp"],
+            collection_method=DeviceCollectionPlans.COLLECTION_METHOD_NETCONF,
+            is_active=True,
+        )
+        PlatformProfileService.ensure_default_plan_for_profile(
+            profiles_by_code["H3C-modern-cli"]
+        )
+        DeviceCollectionService.sync_summary_plan_sub_plans(legacy_plan)
+        legacy_plan.collect_plans.filter(collection_type="netconf_capability").update(
+            netconf_enabled=False,
+        )
+
+        mock_probe_device_connectivity.return_value = {
+            "collection_type": "netconf_capability",
+            "status": "success",
+            "message": "NETCONF连接验证成功",
+            "probe_mode": "connectivity",
+        }
+
+        def capability_probe(device_obj, *, plan, collection_type, connection_policy=None):
+            self.assertEqual(plan.id, modern_plan.id)
+            PlatformProfileService.update_capability_facts(
+                device_info={
+                    "manage_ip": device_obj.manage_ip,
+                    "serial_num": device_obj.serial_num,
+                    "vendor__alias": getattr(device_obj.vendor, "alias", ""),
+                },
+                capability_facts={
+                    "protocols": {
+                        "netconf": True,
+                        "ssh": True,
+                    },
+                    "probes": {
+                        "netconf_capability": {
+                            "ran_success": True,
+                            "schema_count": 128,
+                            "has_l2vpn_schema": True,
+                        }
+                    },
+                },
+                resolve_profile=False,
+            )
+            return {
+                "collection_type": collection_type,
+                "status": "success",
+                "message": "capability ok",
+                "probe_mode": "capability",
+                "plan_id": plan.id,
+                "plan_name": plan.name,
+            }
+
+        mock_probe_capability_with_plan.side_effect = capability_probe
+
+        result = PlatformProfileService.auto_bind_device_by_connection_priority(
+            modern_device,
+            category_name="switch",
+        )
+
+        self.assertEqual(result["selected_plan"]["id"], modern_plan.id)
+        self.assertEqual(result["selected_plan"]["profile_code"], "H3C-modern-netconf")
+        self.assertEqual(result["matched_profile_after"], "H3C-modern-netconf")
+        self.assertEqual(result["capabilities"]["profile_code"], "H3C-modern-netconf")
+
+    @patch("apps.device_api.platform_profiles.PlatformProfileService._probe_capability_with_plan")
+    @patch("apps.device_api.platform_profiles.PlatformProfileService._probe_device_connectivity")
+    def test_auto_bind_device_by_connection_priority_falls_back_to_cli_when_netconf_capability_probe_fails_after_connectivity_success(
+        self,
+        mock_probe_device_connectivity,
+        mock_probe_capability_with_plan,
+    ):
+        modern_model, _ = Model.objects.get_or_create(name="S6520X", vendor=self.vendor)
+        modern_device = NetworkDevice.objects.create(
+            name="s6520-edge-a",
+            manage_ip="192.0.2.111",
+            serial_num="SER-H3C-MODERN-001",
+            vendor=self.vendor,
+            category=self.category,
+            model=modern_model,
+            soft_version="7.1.070 Feature 2707",
+            patch_version="-",
+            ssh_enable="account",
+            ssh_account=self.ssh_account,
+            netconf_enable="account",
+            netconf_account=self.netconf_account,
+        )
+        DeviceCollectionPlans.objects.create(
+            name="default-h3c-modern-switch",
+            vendor="H3C",
+            device_type="switch",
+            profile_code="H3C-modern-netconf",
+            plan_kind=DeviceCollectionPlans.PLAN_KIND_TEMPLATE,
+            generated_by_system=True,
+            is_default=True,
+            enabled_collection_types=["device_identity", "netconf_capability"],
+            collection_method=DeviceCollectionPlans.COLLECTION_METHOD_BOTH,
+            is_active=True,
+        )
+        cli_plan = DeviceCollectionPlans.objects.create(
+            name="default-h3c-modern-cli-switch",
+            vendor="H3C",
+            device_type="switch",
+            profile_code="H3C-modern-cli",
+            plan_kind=DeviceCollectionPlans.PLAN_KIND_TEMPLATE,
+            generated_by_system=True,
+            is_default=True,
+            enabled_collection_types=["device_identity", "cli_output_capability"],
+            collection_method=DeviceCollectionPlans.COLLECTION_METHOD_NETMIKO,
+            is_active=True,
+        )
+
+        def connectivity_probe(device_obj, *, collection_type, connection_policy=None):
+            method = "netconf" if collection_type == "netconf_capability" else "ssh"
+            PlatformProfileService._record_connectivity_probe_success(
+                device=device_obj,
+                collection_type=collection_type,
+                method=method,
+            )
+            return {
+                "collection_type": collection_type,
+                "status": "success",
+                "message": (
+                    "NETCONF连接验证成功"
+                    if collection_type == "netconf_capability"
+                    else "SSH连接验证成功"
+                ),
+                "probe_mode": "connectivity",
+            }
+
+        def capability_probe(device_obj, *, plan, collection_type, connection_policy=None):
+            PlatformProfileService.record_capability_probe_failure(
+                device_info={
+                    "manage_ip": device_obj.manage_ip,
+                    "serial_num": device_obj.serial_num,
+                },
+                collection_type=collection_type,
+                error="所有可用的采集方式都失败了",
+                rebind_on_failure=False,
+            )
+            return {
+                "collection_type": collection_type,
+                "status": "failed",
+                "error": "所有可用的采集方式都失败了",
+                "probe_mode": "capability",
+                "plan_id": plan.id,
+                "plan_name": plan.name,
+            }
+
+        mock_probe_device_connectivity.side_effect = connectivity_probe
+        mock_probe_capability_with_plan.side_effect = capability_probe
+
+        result = PlatformProfileService.auto_bind_device_by_connection_priority(
+            modern_device,
+            category_name="switch",
+        )
+
+        self.assertEqual(result["selected_plan"]["id"], cli_plan.id)
+        self.assertEqual(result["selected_plan"]["profile_code"], "H3C-modern-cli")
+        self.assertEqual(result["matched_profile_after"], "H3C-modern-cli")
+        self.assertEqual(result["capabilities"]["profile_code"], "H3C-modern-cli")
+        self.assertEqual(result["probe_summary"]["failed"], 1)
+        self.assertEqual(result["probe_summary"]["success"], 2)
+        discovery_state = DeviceDiscoveryState.objects.get(device_serial_num=modern_device.serial_num)
+        probe_payload = discovery_state.capability_facts["probes"]["netconf_capability"]
+        self.assertTrue(probe_payload["ran_success"])
+        self.assertTrue(probe_payload["connection_verified"])
+        self.assertEqual(probe_payload["last_error"], "所有可用的采集方式都失败了")
 
     @patch("apps.device_api.platform_profiles.PlatformProfileService._probe_device_connectivity")
     def test_auto_bind_device_by_connection_priority_falls_back_to_cli_named_plan(
@@ -5869,6 +6175,143 @@ class DeviceApiDefaultPlanAliasTests(TestCase):
         legacy_plan.refresh_from_db()
         self.assertFalse(legacy_plan.is_active)
         self.assertFalse(legacy_plan.is_default)
+
+
+class DeviceApiLegacyPlanAliasAuditTests(TestCase):
+    def _profile_by_code(self, code):
+        return next(
+            item
+            for item in PlatformProfileService.ensure_builtin_profiles()
+            if item.code == code
+        )
+
+    def test_audit_legacy_default_plan_aliases_marks_missing_canonical_as_adoptable(self):
+        DeviceCollectionPlans.objects.create(
+            name="default-h3c-netconf-switch",
+            vendor="H3C",
+            device_type="switch",
+            profile_code="default-h3c-netconf-switch",
+            plan_kind=DeviceCollectionPlans.PLAN_KIND_RUNTIME,
+            generated_by_system=False,
+            is_default=False,
+            enabled_collection_types=["arp"],
+            collection_method=DeviceCollectionPlans.COLLECTION_METHOD_NETCONF,
+            is_active=True,
+        )
+
+        audit_result = PlatformProfileService.audit_legacy_default_plan_aliases(
+            profile_codes=["H3C-modern-netconf"]
+        )
+
+        self.assertEqual(audit_result["summary"]["adoptable"], 1)
+        self.assertEqual(audit_result["summary"]["non_builtin_profile_code"], 1)
+        self.assertEqual(audit_result["summary"]["runtime_plan_kind"], 1)
+        self.assertEqual(audit_result["summary"]["non_system_generated"], 1)
+        item = audit_result["results"][0]
+        self.assertEqual(item["recommended_action"], "adopt_alias")
+        self.assertFalse(item["canonical_plan_exists"])
+        self.assertIn("legacy_profile_code_mismatch", item["issues"])
+        self.assertIn("legacy_runtime_plan_kind", item["issues"])
+        self.assertIn("legacy_not_generated_by_system", item["issues"])
+
+    def test_audit_legacy_default_plan_aliases_marks_unused_alias_as_retirable(self):
+        profile = self._profile_by_code("Huawei-CE88xx")
+        DeviceCollectionPlans.objects.create(
+            name="default-huawei-ce88xx-switch",
+            vendor="Huawei",
+            device_type="switch",
+            profile_code="Huawei-CE88xx",
+            plan_kind=DeviceCollectionPlans.PLAN_KIND_TEMPLATE,
+            generated_by_system=True,
+            is_default=False,
+            enabled_collection_types=["device_identity"],
+            collection_method=DeviceCollectionPlans.COLLECTION_METHOD_NETMIKO,
+            is_active=True,
+        )
+        DeviceCollectionPlans.objects.create(
+            name=profile.default_plan_name,
+            vendor="Huawei",
+            device_type="switch",
+            profile_code="Huawei-CE88xx",
+            plan_kind=DeviceCollectionPlans.PLAN_KIND_TEMPLATE,
+            generated_by_system=True,
+            is_default=True,
+            enabled_collection_types=["device_identity"],
+            collection_method=DeviceCollectionPlans.COLLECTION_METHOD_NETCONF,
+            is_active=True,
+        )
+
+        audit_result = PlatformProfileService.audit_legacy_default_plan_aliases(
+            profile_codes=["Huawei-CE88xx"]
+        )
+
+        self.assertEqual(audit_result["summary"]["retirable"], 1)
+        item = audit_result["results"][0]
+        self.assertEqual(item["recommended_action"], "retire_alias")
+        self.assertTrue(item["canonical_plan_exists"])
+        self.assertEqual(item["active_bindings"], 0)
+
+    def test_audit_legacy_default_plan_aliases_keeps_alias_when_active_bindings_exist(self):
+        vendor, _ = Vendor.objects.get_or_create(name="华为", defaults={"alias": "Huawei"})
+        if vendor.alias != "Huawei":
+            vendor.alias = "Huawei"
+            vendor.save(update_fields=["alias"])
+        category, _ = Category.objects.get_or_create(name="switch")
+        model, _ = Model.objects.get_or_create(name="CE8850", vendor=vendor)
+        device = NetworkDevice.objects.create(
+            name="ce88-legacy-alias-a",
+            manage_ip="192.0.2.211",
+            serial_num="SER-LEGACY-ALIAS-001",
+            vendor=vendor,
+            category=category,
+            model=model,
+            soft_version="V200R021C10",
+            patch_version="-",
+        )
+        profile = self._profile_by_code("Huawei-CE88xx")
+        alias_plan = DeviceCollectionPlans.objects.create(
+            name="default-huawei-ce88xx-switch",
+            vendor="Huawei",
+            device_type="switch",
+            profile_code="Huawei-CE88xx",
+            plan_kind=DeviceCollectionPlans.PLAN_KIND_TEMPLATE,
+            generated_by_system=True,
+            is_default=False,
+            enabled_collection_types=["device_identity"],
+            collection_method=DeviceCollectionPlans.COLLECTION_METHOD_NETMIKO,
+            is_active=True,
+        )
+        canonical_plan = DeviceCollectionPlans.objects.create(
+            name=profile.default_plan_name,
+            vendor="Huawei",
+            device_type="switch",
+            profile_code="Huawei-CE88xx",
+            plan_kind=DeviceCollectionPlans.PLAN_KIND_TEMPLATE,
+            generated_by_system=True,
+            is_default=True,
+            enabled_collection_types=["device_identity"],
+            collection_method=DeviceCollectionPlans.COLLECTION_METHOD_NETCONF,
+            is_active=True,
+        )
+        PlansToDevice.objects.create(
+            device_serial_num=device.serial_num,
+            manage_ip=device.manage_ip,
+            plan=alias_plan,
+            profile_code="Huawei-CE88xx",
+            binding_source=PlansToDevice.BINDING_SOURCE_MANUAL,
+            is_active=True,
+            use_local=True,
+        )
+
+        audit_result = PlatformProfileService.audit_legacy_default_plan_aliases(
+            profile_codes=["Huawei-CE88xx"]
+        )
+
+        self.assertEqual(audit_result["summary"]["blocked_by_active_bindings"], 1)
+        item = audit_result["results"][0]
+        self.assertEqual(item["recommended_action"], "keep_alias_with_active_bindings")
+        self.assertEqual(item["canonical_plan_id"], canonical_plan.id)
+        self.assertEqual(item["active_bindings"], 1)
 
 
 class DeviceApiCapabilityDiscoveryStateTests(TestCase):
@@ -8919,6 +9362,39 @@ class DeviceCollectionServiceSyncTests(SimpleTestCase):
         self.assertIn("bgp_neighbors", sync_result["created_types"])
         created_types = {item["collection_type"] for item in created_records}
         self.assertEqual(created_types, set(DEFAULT_COLLECTION_TYPES) - {"arp"})
+
+    @patch("apps.device_api.services_new.DeviceSubCollectionPlan.objects")
+    def test_ensure_default_sub_plans_treats_legacy_truncated_cli_capability_as_existing(
+        self,
+        mock_objects,
+    ):
+        existing_names = {"sync-summary-arp", "sync-summary-cli_output_capability"}
+        created_records = []
+
+        def filter_side_effect(**kwargs):
+            name = kwargs.get("name")
+            return SimpleNamespace(exists=lambda: name in existing_names)
+
+        def create_side_effect(**kwargs):
+            created_records.append(kwargs)
+            existing_names.add(kwargs["name"])
+            return SimpleNamespace(**kwargs)
+
+        mock_objects.filter.side_effect = filter_side_effect
+        mock_objects.create.side_effect = create_side_effect
+
+        summary_plan = SimpleNamespace(
+            name="sync-summary",
+            collect_plans=SimpleNamespace(
+                values_list=Mock(return_value=["arp", "cli_output_capabilit"])
+            ),
+        )
+
+        sync_result = DeviceCollectionService.ensure_default_sub_plans(summary_plan)
+
+        self.assertNotIn("cli_output_capability", sync_result["created_types"])
+        created_types = {item["collection_type"] for item in created_records}
+        self.assertNotIn("cli_output_capability", created_types)
 
     @patch("apps.device_api.services_new.DeviceSubCollectionPlan.objects")
     def test_sync_summary_plan_sub_plans_updates_method_and_disables_unselected_types(
