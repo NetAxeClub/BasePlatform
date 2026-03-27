@@ -8,7 +8,7 @@ import logging
 import re
 import time
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import Callable, List, Dict, Any, Optional
 from apps.asset.models import AssetIpInfo, NetworkDevice
 from apps.device_api.contract import (
     build_plan_collection_name,
@@ -40,6 +40,18 @@ logger = logging.getLogger(__name__)
 class DeviceCollectionService:
     """设备采集服务类（新版本）"""
     FIELD_MAPPING_PROTOCOLS = ("netmiko", "netconf", "snmp", "restconf", "telemetry")
+
+    @staticmethod
+    def _emit_progress(
+        progress_callback: Optional[Callable[[Dict[str, Any]], None]],
+        payload: Dict[str, Any],
+    ) -> None:
+        if not callable(progress_callback):
+            return
+        try:
+            progress_callback(payload)
+        except Exception as exc:
+            logger.warning("进度回调执行失败: %s", exc)
 
     @staticmethod
     def _resolve_netconf_manage_ip_for_local(device) -> str:
@@ -362,7 +374,12 @@ class DeviceCollectionService:
         }
 
     @staticmethod
-    def collect_with_connection_manager(plan: Dict[str, Any], device_info: Dict[str, Any]) -> Dict[str, Any]:
+    def collect_with_connection_manager(
+        plan: Dict[str, Any],
+        device_info: Dict[str, Any],
+        connection_manager: Optional[DeviceConnectionManager] = None,
+        progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ) -> Dict[str, Any]:
         """
         使用连接管理器执行采集（支持所有采集方式）
         确保单设备只建立一次连接
@@ -387,192 +404,254 @@ class DeviceCollectionService:
             'telemetry': None,
         }
 
-        # 使用连接管理器，确保单设备只建立一次连接
-        try:
-            with DeviceConnectionManager(manage_ip, device_info) as conn_mgr:
-                # 按采集方式分组执行
-                if plan.get('netmiko_enabled') and device_info.get('ssh_enable'):
-                    try:
-                        logger.info(f"执行Netmiko采集: {manage_ip}")
-                        command = plan.get('netmiko_method', '')
-                        textfsm_template = plan.get('textfsm_template')
-                        collection_type = plan.get('collection_type', '')
-                        use_textfsm = collection_type not in RAW_NETMIKO_COLLECTION_TYPES
-                        
-                        result = conn_mgr.execute_netmiko_command(
-                            command=command,
-                            use_textfsm=use_textfsm,
-                            textfsm_template=textfsm_template if use_textfsm else None
-                        )
-                        
-                        # 处理采集结果
+        def emit(method: str, stage: str, **extra):
+            DeviceCollectionService._emit_progress(
+                progress_callback,
+                {
+                    'plan_id': plan.get('id'),
+                    'plan_name': plan.get('name'),
+                    'collection_type': plan.get('collection_type'),
+                    'device_ip': manage_ip,
+                    'collection_method': method,
+                    'stage': stage,
+                    **extra,
+                },
+            )
+
+        def execute_collections(conn_mgr: DeviceConnectionManager):
+            if plan.get('netmiko_enabled') and device_info.get('ssh_enable'):
+                emit('netmiko', 'started', message='开始执行 NETMIKO 采集')
+                try:
+                    logger.info(f"执行Netmiko采集: {manage_ip}")
+                    command = plan.get('netmiko_method', '')
+                    textfsm_template = plan.get('textfsm_template')
+                    collection_type = plan.get('collection_type', '')
+                    use_textfsm = collection_type not in RAW_NETMIKO_COLLECTION_TYPES
+
+                    result = conn_mgr.execute_netmiko_command(
+                        command=command,
+                        use_textfsm=use_textfsm,
+                        textfsm_template=textfsm_template if use_textfsm else None,
+                    )
+
+                    processed_result = DeviceCollectionService._process_collection_result(
+                        plan=plan,
+                        device_info=device_info,
+                        raw_result=result,
+                        collection_method='netmiko',
+                        execute_time=execute_time,
+                    )
+
+                    results['netmiko'] = processed_result
+                    logger.info(f"Netmiko采集完成: {manage_ip}")
+                    emit(
+                        'netmiko',
+                        'finished',
+                        success=processed_result.get('success', False),
+                        message='NETMIKO 采集完成',
+                        result=processed_result,
+                    )
+                except Exception as e:
+                    logger.error(f"Netmiko采集异常: {manage_ip}, {str(e)}", exc_info=True)
+                    results['netmiko'] = DeviceCollectionService._build_method_error(
+                        "netmiko",
+                        str(e),
+                    )
+                    emit('netmiko', 'failed', success=False, message=str(e))
+
+            if plan.get('netconf_enabled') and device_info.get('netconf_enable'):
+                emit('netconf', 'started', message='开始执行 NETCONF 采集')
+                try:
+                    logger.info(f"执行NETCONF采集: {manage_ip}")
+                    xml_templates = plan.get('xml_templates', [])
+                    if xml_templates and len(xml_templates) > 0:
+                        selected_template = xml_templates[0]
+                        xml_template = selected_template.get('xml_template', '')
+                        collect_method = selected_template.get('collect_method', 'get')
+
+                        if collect_method == 'get':
+                            result = conn_mgr.execute_netconf_get(xml_template)
+                        elif collect_method == 'get_config':
+                            result = conn_mgr.execute_netconf_get_config(xml_template)
+                        else:
+                            raise ValueError(
+                                f"不支持的 NETCONF collect_method: {collect_method}，仅允许 get/get_config"
+                            )
+
                         processed_result = DeviceCollectionService._process_collection_result(
                             plan=plan,
                             device_info=device_info,
                             raw_result=result,
-                            collection_method='netmiko',
-                            execute_time=execute_time
-                        )
-                        
-                        results['netmiko'] = processed_result
-                        logger.info(f"Netmiko采集完成: {manage_ip}")
-                    except Exception as e:
-                        logger.error(f"Netmiko采集异常: {manage_ip}, {str(e)}", exc_info=True)
-                        results['netmiko'] = DeviceCollectionService._build_method_error(
-                            "netmiko",
-                            str(e),
+                            collection_method='netconf',
+                            execute_time=execute_time,
                         )
 
-                if plan.get('netconf_enabled') and device_info.get('netconf_enable'):
-                    try:
-                        logger.info(f"执行NETCONF采集: {manage_ip}")
-                        xml_templates = plan.get('xml_templates', [])
-                        if xml_templates and len(xml_templates) > 0:
-                            selected_template = xml_templates[0]
-                            xml_template = selected_template.get('xml_template', '')
-                            collect_method = selected_template.get('collect_method', 'get')
-                            
-                            if collect_method == 'get':
-                                result = conn_mgr.execute_netconf_get(xml_template)
-                            elif collect_method == 'get_config':
-                                result = conn_mgr.execute_netconf_get_config(xml_template)
-                            else:
-                                raise ValueError(
-                                    f"不支持的 NETCONF collect_method: {collect_method}，仅允许 get/get_config"
-                                )
-                            
-                            # 处理采集结果
-                            processed_result = DeviceCollectionService._process_collection_result(
-                                plan=plan,
-                                device_info=device_info,
-                                raw_result=result,
-                                collection_method='netconf',
-                                execute_time=execute_time
-                            )
-                            
-                            results['netconf'] = processed_result
-                            logger.info(f"NETCONF采集完成: {manage_ip}")
-                        else:
-                            logger.warning(f"NETCONF采集跳过: {manage_ip} (未配置XML模板)")
-                            results['netconf'] = DeviceCollectionService._build_method_error(
-                                "netconf",
-                                "未配置XML模板",
-                                error_code="missing_xml_template",
-                            )
-                    except Exception as e:
-                        logger.error(f"NETCONF采集异常: {manage_ip}, {str(e)}", exc_info=True)
+                        results['netconf'] = processed_result
+                        logger.info(f"NETCONF采集完成: {manage_ip}")
+                        emit(
+                            'netconf',
+                            'finished',
+                            success=processed_result.get('success', False),
+                            message='NETCONF 采集完成',
+                            result=processed_result,
+                        )
+                    else:
+                        logger.warning(f"NETCONF采集跳过: {manage_ip} (未配置XML模板)")
                         results['netconf'] = DeviceCollectionService._build_method_error(
                             "netconf",
-                            str(e),
+                            "未配置XML模板",
+                            error_code="missing_xml_template",
+                        )
+                        emit('netconf', 'failed', success=False, message='未配置XML模板')
+                except Exception as e:
+                    logger.error(f"NETCONF采集异常: {manage_ip}, {str(e)}", exc_info=True)
+                    results['netconf'] = DeviceCollectionService._build_method_error(
+                        "netconf",
+                        str(e),
+                    )
+                    emit('netconf', 'failed', success=False, message=str(e))
+
+            if plan.get('snmp_enabled'):
+                emit('snmp', 'started', message='开始执行 SNMP 采集')
+                try:
+                    logger.info(f"执行SNMP采集: {manage_ip}")
+                    oids = plan.get('snmp_oids', [])
+                    if oids:
+                        result = conn_mgr.execute_snmp_get(oids)
+
+                        processed_result = DeviceCollectionService._process_collection_result(
+                            plan=plan,
+                            device_info=device_info,
+                            raw_result=result,
+                            collection_method='snmp',
+                            execute_time=execute_time,
                         )
 
-                if plan.get('snmp_enabled'):
-                    try:
-                        logger.info(f"执行SNMP采集: {manage_ip}")
-                        oids = plan.get('snmp_oids', [])
-                        if oids:
-                            result = conn_mgr.execute_snmp_get(oids)
-                            
-                            # 处理采集结果
-                            processed_result = DeviceCollectionService._process_collection_result(
-                                plan=plan,
-                                device_info=device_info,
-                                raw_result=result,
-                                collection_method='snmp',
-                                execute_time=execute_time
-                            )
-                            
-                            results['snmp'] = processed_result
-                            logger.info(f"SNMP采集完成: {manage_ip}")
-                        else:
-                            logger.warning(f"SNMP采集跳过: {manage_ip} (未配置OID)")
-                            results['snmp'] = DeviceCollectionService._build_method_error(
-                                "snmp",
-                                "未配置OID",
-                                error_code="missing_snmp_oids",
-                            )
-                    except Exception as e:
-                        logger.error(f"SNMP采集异常: {manage_ip}, {str(e)}", exc_info=True)
+                        results['snmp'] = processed_result
+                        logger.info(f"SNMP采集完成: {manage_ip}")
+                        emit(
+                            'snmp',
+                            'finished',
+                            success=processed_result.get('success', False),
+                            message='SNMP 采集完成',
+                            result=processed_result,
+                        )
+                    else:
+                        logger.warning(f"SNMP采集跳过: {manage_ip} (未配置OID)")
                         results['snmp'] = DeviceCollectionService._build_method_error(
                             "snmp",
-                            str(e),
+                            "未配置OID",
+                            error_code="missing_snmp_oids",
+                        )
+                        emit('snmp', 'failed', success=False, message='未配置OID')
+                except Exception as e:
+                    logger.error(f"SNMP采集异常: {manage_ip}, {str(e)}", exc_info=True)
+                    results['snmp'] = DeviceCollectionService._build_method_error(
+                        "snmp",
+                        str(e),
+                    )
+                    emit('snmp', 'failed', success=False, message=str(e))
+
+            if plan.get('restconf_enabled'):
+                emit('restconf', 'started', message='开始执行 RESTCONF 采集')
+                try:
+                    logger.info(f"执行RESTCONF采集: {manage_ip}")
+                    endpoint = plan.get('restconf_endpoint', '')
+                    if endpoint:
+                        result = conn_mgr.execute_restconf_get(endpoint)
+
+                        processed_result = DeviceCollectionService._process_collection_result(
+                            plan=plan,
+                            device_info=device_info,
+                            raw_result=result,
+                            collection_method='restconf',
+                            execute_time=execute_time,
                         )
 
-                if plan.get('restconf_enabled'):
-                    try:
-                        logger.info(f"执行RESTCONF采集: {manage_ip}")
-                        endpoint = plan.get('restconf_endpoint', '')
-                        if endpoint:
-                            result = conn_mgr.execute_restconf_get(endpoint)
-                            
-                            # 处理采集结果
-                            processed_result = DeviceCollectionService._process_collection_result(
-                                plan=plan,
-                                device_info=device_info,
-                                raw_result=result,
-                                collection_method='restconf',
-                                execute_time=execute_time
-                            )
-                            
-                            results['restconf'] = processed_result
-                            logger.info(f"RESTCONF采集完成: {manage_ip}")
-                        else:
-                            logger.warning(f"RESTCONF采集跳过: {manage_ip} (未配置端点)")
-                            results['restconf'] = DeviceCollectionService._build_method_error(
-                                "restconf",
-                                "未配置RESTCONF端点",
-                                error_code="missing_restconf_endpoint",
-                            )
-                    except Exception as e:
-                        logger.error(f"RESTCONF采集异常: {manage_ip}, {str(e)}", exc_info=True)
+                        results['restconf'] = processed_result
+                        logger.info(f"RESTCONF采集完成: {manage_ip}")
+                        emit(
+                            'restconf',
+                            'finished',
+                            success=processed_result.get('success', False),
+                            message='RESTCONF 采集完成',
+                            result=processed_result,
+                        )
+                    else:
+                        logger.warning(f"RESTCONF采集跳过: {manage_ip} (未配置端点)")
                         results['restconf'] = DeviceCollectionService._build_method_error(
                             "restconf",
-                            str(e),
+                            "未配置RESTCONF端点",
+                            error_code="missing_restconf_endpoint",
+                        )
+                        emit('restconf', 'failed', success=False, message='未配置RESTCONF端点')
+                except Exception as e:
+                    logger.error(f"RESTCONF采集异常: {manage_ip}, {str(e)}", exc_info=True)
+                    results['restconf'] = DeviceCollectionService._build_method_error(
+                        "restconf",
+                        str(e),
+                    )
+                    emit('restconf', 'failed', success=False, message=str(e))
+
+            if plan.get('telemetry_enabled'):
+                emit('telemetry', 'started', message='开始执行 TELEMETRY 采集')
+                try:
+                    logger.info(f"执行Telemetry采集: {manage_ip}")
+                    subscription_path = plan.get('telemetry_subscription_path', '')
+                    sampling_interval = plan.get('telemetry_sampling_interval', 10)
+                    if subscription_path:
+                        result = conn_mgr.execute_telemetry_subscribe(
+                            subscription_path=subscription_path,
+                            sampling_interval=sampling_interval,
                         )
 
-                if plan.get('telemetry_enabled'):
-                    try:
-                        logger.info(f"执行Telemetry采集: {manage_ip}")
-                        subscription_path = plan.get('telemetry_subscription_path', '')
-                        sampling_interval = plan.get('telemetry_sampling_interval', 10)
-                        if subscription_path:
-                            result = conn_mgr.execute_telemetry_subscribe(
-                                subscription_path=subscription_path,
-                                sampling_interval=sampling_interval
-                            )
-                            
-                            # 处理采集结果
-                            processed_result = DeviceCollectionService._process_collection_result(
-                                plan=plan,
-                                device_info=device_info,
-                                raw_result=result,
-                                collection_method='telemetry',
-                                execute_time=execute_time
-                            )
-                            
-                            results['telemetry'] = processed_result
-                            logger.info(f"Telemetry采集完成: {manage_ip}")
-                        else:
-                            logger.warning(f"Telemetry采集跳过: {manage_ip} (未配置订阅路径)")
-                            results['telemetry'] = DeviceCollectionService._build_method_error(
-                                "telemetry",
-                                "未配置Telemetry订阅路径",
-                                error_code="missing_telemetry_subscription_path",
-                            )
-                    except NotImplementedError as e:
-                        logger.warning(f"Telemetry采集延期项: {manage_ip}, {str(e)}")
-                        results['telemetry'] = DeviceCollectionService._build_method_error(
-                            "telemetry",
-                            str(e),
-                            error_code="telemetry_not_implemented",
-                        )
-                    except Exception as e:
-                        logger.error(f"Telemetry采集异常: {manage_ip}, {str(e)}", exc_info=True)
-                        results['telemetry'] = DeviceCollectionService._build_method_error(
-                            "telemetry",
-                            str(e),
+                        processed_result = DeviceCollectionService._process_collection_result(
+                            plan=plan,
+                            device_info=device_info,
+                            raw_result=result,
+                            collection_method='telemetry',
+                            execute_time=execute_time,
                         )
 
+                        results['telemetry'] = processed_result
+                        logger.info(f"Telemetry采集完成: {manage_ip}")
+                        emit(
+                            'telemetry',
+                            'finished',
+                            success=processed_result.get('success', False),
+                            message='TELEMETRY 采集完成',
+                            result=processed_result,
+                        )
+                    else:
+                        logger.warning(f"Telemetry采集跳过: {manage_ip} (未配置订阅路径)")
+                        results['telemetry'] = DeviceCollectionService._build_method_error(
+                            "telemetry",
+                            "未配置Telemetry订阅路径",
+                            error_code="missing_telemetry_subscription_path",
+                        )
+                        emit('telemetry', 'failed', success=False, message='未配置Telemetry订阅路径')
+                except NotImplementedError as e:
+                    logger.warning(f"Telemetry采集延期项: {manage_ip}, {str(e)}")
+                    results['telemetry'] = DeviceCollectionService._build_method_error(
+                        "telemetry",
+                        str(e),
+                        error_code="telemetry_not_implemented",
+                    )
+                    emit('telemetry', 'failed', success=False, message=str(e))
+                except Exception as e:
+                    logger.error(f"Telemetry采集异常: {manage_ip}, {str(e)}", exc_info=True)
+                    results['telemetry'] = DeviceCollectionService._build_method_error(
+                        "telemetry",
+                        str(e),
+                    )
+                    emit('telemetry', 'failed', success=False, message=str(e))
+
+        try:
+            if connection_manager is not None:
+                execute_collections(connection_manager)
+            else:
+                with DeviceConnectionManager(manage_ip, device_info) as conn_mgr:
+                    execute_collections(conn_mgr)
         except Exception as e:
             logger.error(f"连接管理器异常: {manage_ip}, {str(e)}", exc_info=True)
             return {
@@ -757,8 +836,16 @@ class DeviceCollectionService:
                 "task_status": "finished",
                 "collection_type": storage_collection_type,
                 "collection_method": collection_method,
-                "vendor": plan.get('summary_plan_vendor'),
-                "device_type": plan.get('summary_plan_device_type'),
+                "vendor": DeviceCollectionPlans.normalize_vendor_value(plan.get('summary_plan_vendor')),
+                "vendor_alias": DeviceCollectionPlans.resolve_vendor_alias(
+                    plan.get('summary_plan_vendor')
+                ),
+                "device_type": DeviceCollectionPlans.normalize_device_type_value(
+                    plan.get('summary_plan_device_type')
+                ),
+                "device_type_alias": DeviceCollectionPlans.resolve_device_type_alias(
+                    plan.get('summary_plan_device_type')
+                ),
                 "execute_time": execute_time,
                 "created_at": datetime.now().isoformat(),
                 "task_errors": [],
@@ -842,10 +929,24 @@ class DeviceCollectionService:
                 "device_name": device_info.get("name", ''),
                 "device_ip": device_ip,
                 "soft_version": device_info.get("soft_version"),
-                "vendor": device_info.get('vendor__alias', ''),
-                "vendor_name": device_info.get('vendor__name', ''),
+                "vendor": (
+                    device_info.get('vendor__name')
+                    or DeviceCollectionPlans.normalize_vendor_value(device_info.get('vendor__alias', ''))
+                ),
+                "vendor_alias": DeviceCollectionPlans.resolve_vendor_alias(
+                    device_info.get('vendor__alias', '')
+                ),
+                "vendor_name": (
+                    device_info.get('vendor__name')
+                    or DeviceCollectionPlans.normalize_vendor_value(device_info.get('vendor__alias', ''))
+                ),
                 "task_status": "running",
-                "device_type": plan.get('summary_plan_device_type', ''),
+                "device_type": DeviceCollectionPlans.normalize_device_type_value(
+                    plan.get('summary_plan_device_type', '')
+                ),
+                "device_type_alias": DeviceCollectionPlans.resolve_device_type_alias(
+                    plan.get('summary_plan_device_type', '')
+                ),
                 "sub_plans_count": sub_plans_count,  # 子方案数量
                 "successful_sub_plans": 0,
                 "failed_sub_plans": 0,
@@ -899,14 +1000,16 @@ class DeviceCollectionService:
     def _build_device_info_for_local(
         device,
         connection_policy: Optional[Dict[str, Any]] = None,
+        execute_time: Optional[str] = None,
     ) -> Dict[str, Any]:
         """从设备 ORM 对象构建 DeviceConnectionManager 所需的 device_info 字典（本地执行用）"""
         device_info = {
             "manage_ip": device.manage_ip,
             "name": getattr(device, "name", ""),
             "idc__name": device.idc.name if device.idc else "",
+            "vendor__name": device.vendor.name if device.vendor else "",
             "vendor__alias": device.vendor.alias if device.vendor else "Huawei",
-            "execute_time": datetime.now().isoformat(),
+            "execute_time": execute_time or datetime.now().isoformat(),
             "ssh_enable": bool(hasattr(device, "ssh_account") and device.ssh_account),
             "netconf_enable": bool(hasattr(device, "netconf_account") and device.netconf_account),
             "snmp_version": getattr(device, "snmp_version", "v2c"),
@@ -1011,6 +1114,9 @@ class DeviceCollectionService:
         plan,
         device,
         connection_policy: Optional[Dict[str, Any]] = None,
+        connection_manager: Optional[DeviceConnectionManager] = None,
+        execute_time: Optional[str] = None,
+        progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> Dict[str, Any]:
         """使用程序自身连接执行已启用的采集方式（不走南向驱动）。"""
         try:
@@ -1021,8 +1127,14 @@ class DeviceCollectionService:
             device_info = DeviceCollectionService._build_device_info_for_local(
                 device,
                 connection_policy=connection_policy,
+                execute_time=execute_time,
             )
-            result = DeviceCollectionService.collect_with_connection_manager(plan_payload, device_info)
+            result = DeviceCollectionService.collect_with_connection_manager(
+                plan_payload,
+                device_info,
+                connection_manager=connection_manager,
+                progress_callback=progress_callback,
+            )
             method_results = result.get("results", {})
             response = {
                 "success": result.get("success", False),

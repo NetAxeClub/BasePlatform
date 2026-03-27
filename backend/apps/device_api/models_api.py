@@ -11,7 +11,7 @@ from apps.device_api.contract import (
     normalize_collection_type_for_storage,
 )
 from apps.device_api.fields_mapping import COLLECTION_TYPE_ALIASES, RAW_NETMIKO_COLLECTION_TYPES
-from apps.device_api.models import DeviceSubCollectionPlan
+from apps.device_api.models import DeviceCollectionPlans, DeviceSubCollectionPlan
 from apps.device_api import (
     COLLECTION_RESULTS_DB,
     COLLECTION_SUB_PLAN,
@@ -19,6 +19,7 @@ from apps.device_api import (
     device_identity_mongo,
     arp_mongo,
     mac_mongo,
+    mac_evpn_mongo,
     mac_bd_mongo,
     mac_vxlan_mongo,
     mac_vxlan_control_mongo,
@@ -68,6 +69,7 @@ COLLECTION_TYPE_MONGO_MAP = {
     "version": device_identity_mongo,
     "arp": arp_mongo,
     "mac": mac_mongo,
+    "mac_evpn": mac_evpn_mongo,
     "mac_bd": mac_bd_mongo,
     "mac_vxlan": mac_vxlan_mongo,
     "mac_vxlan_control": mac_vxlan_control_mongo,
@@ -190,14 +192,24 @@ def save_local_collection_result(
     """将本地执行的采集结果写入 COLLECTION_RESULTS_DB，与南向驱动 webhook 回调写入结构一致，便于统一查询。"""
     created_on = datetime.now().isoformat()
     task_id = f"{device.manage_ip}_{plan.id}_{collection_method}_{int(time.time())}"
+    vendor_name = DeviceCollectionPlans.normalize_vendor_value(
+        getattr(plan.summary_plan, "vendor", "")
+    )
+    vendor_alias = DeviceCollectionPlans.resolve_vendor_alias(vendor_name)
+    device_type_name = DeviceCollectionPlans.normalize_device_type_value(
+        getattr(plan.summary_plan, "device_type", "")
+    )
+    device_type_alias = DeviceCollectionPlans.resolve_device_type_alias(device_type_name)
     base = {
         "plan_id": plan.id,
         "plan_name": plan.name,
         "device_ip": device.manage_ip,
         "device_name": getattr(device, "name", ""),
         "idc_name": device.idc.name if device.idc else "",
-        "device_type": plan.summary_plan.device_type,
-        "vendor": plan.summary_plan.vendor,
+        "device_type": device_type_name,
+        "device_type_alias": device_type_alias,
+        "vendor": vendor_name,
+        "vendor_alias": vendor_alias,
         "collection_method": collection_method,
         "collection_type": plan.collection_type,
         "collected_at": created_on,
@@ -239,14 +251,22 @@ def _build_base_collection_result(plan, webhook_args, task_info, status):
     Returns:
         dict: 基础采集结果字典
     """
+    vendor_name = DeviceCollectionPlans.normalize_vendor_value(
+        getattr(plan.summary_plan, "vendor", "")
+    )
+    device_type_name = DeviceCollectionPlans.normalize_device_type_value(
+        getattr(plan.summary_plan, "device_type", "")
+    )
     return {
         "plan_id": plan.id,
         "plan_name": plan.name,
         "device_ip": webhook_args.get("device_ip"),
         "device_name": webhook_args.get("device_name"),
         "idc_name": webhook_args.get("idc_name", ""),
-        "device_type": plan.summary_plan.device_type,
-        "vendor": plan.summary_plan.vendor,
+        "device_type": device_type_name,
+        "device_type_alias": DeviceCollectionPlans.resolve_device_type_alias(device_type_name),
+        "vendor": vendor_name,
+        "vendor_alias": DeviceCollectionPlans.resolve_vendor_alias(vendor_name),
         "collection_method": webhook_args.get("collection_method", "netmiko"),
         "collection_type": webhook_args.get("collection_type", "arp"),
         "collected_at": task_info.get("created_on", ""),
@@ -636,7 +656,9 @@ def celery_data_mongodb(**kwargs):
                     device_info={
                         "manage_ip": base_result.get("device_ip", ""),
                         "serial_num": webhook_args.get("serial_num", ""),
-                        "vendor__alias": plan.summary_plan.vendor,
+                        "vendor__alias": DeviceCollectionPlans.resolve_vendor_alias(
+                            plan.summary_plan.vendor
+                        ),
                     },
                     processed_data=collection_results,
                 )
@@ -887,8 +909,8 @@ def resolve_raw_data(plan, collection_result, collection_method):
         tuple: (status, error_message, processed_data)
     """
     try:
-        vendor_alias = plan.summary_plan.vendor
-        device_type = plan.summary_plan.device_type
+        vendor_alias = DeviceCollectionPlans.resolve_vendor_alias(plan.summary_plan.vendor)
+        device_type = DeviceCollectionPlans.resolve_device_type_alias(plan.summary_plan.device_type)
         collection_type = plan.collection_type
         resolved_collection_type = COLLECTION_TYPE_ALIASES.get(
             collection_type, collection_type
@@ -1185,11 +1207,12 @@ def apply_vendor_processor(plan, processed_data):
             return processed_data
 
         # 获取厂商和采集类型
-        vendor = plan.summary_plan.vendor
+        vendor = getattr(plan.summary_plan, "vendor", "")
+        vendor_alias = DeviceCollectionPlans.resolve_vendor_alias(vendor)
         collection_type = plan.collection_type
 
         # 获取模块名和类名（使用default方法，因为apply_vendor_processor不区分采集方法）
-        module_name, class_name = get_vendor_class(vendor, "default")
+        module_name, class_name = get_vendor_class(vendor_alias, "default")
 
         if not module_name or not class_name:
             logging.warning(f"不支持的厂商: {vendor}，跳过厂商处理")

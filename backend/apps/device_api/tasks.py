@@ -76,6 +76,7 @@ from __future__ import absolute_import, unicode_literals
 import logging
 import time
 import json
+from collections import Counter, defaultdict
 from datetime import datetime
 from celery import shared_task
 from django.core.cache import cache
@@ -99,12 +100,15 @@ from apps.device_api.models_api import (
 )
 from apps.device_api.tools.collect_device import get_auto_device
 from apps.device_api.platform_profiles import DeviceFactService
+from apps.device_api.platform_profiles import PlatformProfileService
 from apps.device_api.cache_utils import cache_network_data
 from apps.device_api.analysis_hooks import (
     count_expected_interface_devices,
+    maybe_schedule_interface_utilization,
     schedule_batch_network_analysis,
 )
 from apps.device_api import (
+    COLLECTION_BINDING_ANALYSIS,
     COLLECTION_EXECUTION_LOG,
     COLLECTION_PLAN,
     COLLECTION_RESULTS_DB,
@@ -112,6 +116,7 @@ from apps.device_api import (
 )
 from apps.device_api import arp_mongo, mac_mongo, lldp_mongo, aggre_port_mongo
 from netaxe.settings import DEBUG
+from utils.connect_layer.auto_main import send_ws_msg
 from utils.db.mongo_ops import MongoOps, MongoNetOps
 
 logger = logging.getLogger("device_api")
@@ -127,11 +132,575 @@ INCREMENTAL_SNAPSHOT_COLLECTION_TYPES = frozenset(
         "ip_interface",
     }
 )
+DEVICE_API_RUNTIME_TASK_CACHE_PREFIX = "device_api:runtime_task:"
+DEVICE_API_RUNTIME_TASK_CACHE_TIMEOUT = 6 * 60 * 60
+DEVICE_API_WS_GROUP_PREFIX = "device_collection_"
 
 if DEBUG:
     CELERY_QUEUE = "dev"
 else:
     CELERY_QUEUE = "config"
+
+
+def _runtime_task_cache_key(task_id: str) -> str:
+    return f"{DEVICE_API_RUNTIME_TASK_CACHE_PREFIX}{task_id}"
+
+
+def get_runtime_task_snapshot(task_id: str):
+    if not task_id:
+        return None
+    return cache.get(_runtime_task_cache_key(task_id))
+
+
+def _store_runtime_task_snapshot(snapshot: dict) -> dict:
+    task_id = str(snapshot.get("task_id") or "").strip()
+    if not task_id:
+        return snapshot
+    payload = {**snapshot, "updated_at": datetime.now().isoformat()}
+    cache.set(
+        _runtime_task_cache_key(task_id),
+        payload,
+        timeout=DEVICE_API_RUNTIME_TASK_CACHE_TIMEOUT,
+    )
+    username = str(payload.get("username") or "").strip()
+    if username:
+        try:
+            send_ws_msg(
+                channel="device_collection_message",
+                group_name=f"{DEVICE_API_WS_GROUP_PREFIX}{username}",
+                data=payload,
+            )
+        except Exception as exc:
+            logger.warning("推送 device_api websocket 事件失败: task_id=%s error=%s", task_id, exc)
+    return payload
+
+
+def _build_runtime_task_snapshot(
+    *,
+    task_id: str,
+    task_type: str,
+    username: str,
+    device_ip: str,
+    serial_num: str = "",
+    summary_plan_id=None,
+    summary_plan_name: str = "",
+    plan_id=None,
+    plan_name: str = "",
+    status: str = "queued",
+    message: str = "",
+    execute_time: str = "",
+    progress: dict = None,
+    data: dict = None,
+    result_code: int = 200,
+    event: dict = None,
+):
+    return {
+        "task_id": task_id,
+        "task_type": task_type,
+        "username": username,
+        "device_ip": device_ip,
+        "serial_num": serial_num,
+        "summary_plan_id": summary_plan_id,
+        "summary_plan_name": summary_plan_name,
+        "plan_id": plan_id,
+        "plan_name": plan_name,
+        "status": status,
+        "message": message,
+        "execute_time": execute_time,
+        "progress": progress or {},
+        "data": data or {},
+        "result_code": result_code,
+        "event": event or {},
+    }
+
+
+def _build_plan_execution_payload(plan, status, message, collection_result=None):
+    payload = {
+        "plan_id": getattr(plan, "id", None),
+        "plan_name": getattr(plan, "name", ""),
+        "collection_type": getattr(plan, "collection_type", ""),
+        "status": status,
+        "message": message,
+    }
+    if collection_result is not None:
+        payload.update(
+            {
+                "netconf_result": collection_result.get("netconf_result"),
+                "netmiko_result": collection_result.get("netmiko_result"),
+                "snmp_result": collection_result.get("snmp_result"),
+                "restconf_result": collection_result.get("restconf_result"),
+                "telemetry_result": collection_result.get("telemetry_result"),
+                "execute_time": collection_result.get("execute_time", ""),
+            }
+        )
+    return payload
+
+
+def _group_plan_results_by_collection_type(results):
+    grouped_results = {}
+    for result in results:
+        grouped_results.setdefault(result.get("collection_type", ""), []).append(result)
+    return grouped_results
+
+
+def _validate_plan_for_device(plan, device, device_ip: str, use_local: bool):
+    enabled_methods = {
+        "netmiko": bool(getattr(plan, "netmiko_enabled", False)),
+        "netconf": bool(getattr(plan, "netconf_enabled", False)),
+        "snmp": bool(getattr(plan, "snmp_enabled", False)),
+        "restconf": bool(getattr(plan, "restconf_enabled", False)),
+        "telemetry": bool(getattr(plan, "telemetry_enabled", False)),
+    }
+    if not any(enabled_methods.values()):
+        return False, "采集方案未启用任何采集方式"
+
+    available_methods = []
+    error_parts = []
+
+    if enabled_methods["netmiko"]:
+        if getattr(device, "ssh_account", None):
+            available_methods.append("netmiko")
+        else:
+            error_parts.append("未配置SSH账户")
+
+    if enabled_methods["netconf"]:
+        if getattr(device, "netconf_account", None):
+            available_methods.append("netconf")
+        else:
+            error_parts.append("未配置NETCONF账户")
+
+    if use_local:
+        if enabled_methods["snmp"]:
+            snmp_community = getattr(device, "snmp_community", "")
+            if snmp_community and snmp_community != "-":
+                available_methods.append("snmp")
+            else:
+                error_parts.append("未配置SNMP团体字")
+
+        if enabled_methods["restconf"]:
+            available_methods.append("restconf")
+
+        if enabled_methods["telemetry"]:
+            error_parts.append("Telemetry 仍在延期范围（未纳入默认主链）")
+    elif enabled_methods["snmp"] or enabled_methods["restconf"] or enabled_methods["telemetry"]:
+        error_parts.append("南向驱动验证当前仅支持NETMIKO/NETCONF")
+
+    if not available_methods:
+        return False, f"设备 {device_ip} {', '.join(error_parts)}"
+
+    return True, "验证通过"
+
+
+def _count_method_outcomes(execution_result):
+    success_count = 0
+    failed_count = 0
+    for method in ("netmiko_result", "netconf_result", "snmp_result", "restconf_result", "telemetry_result"):
+        result = execution_result.get(method)
+        if not result:
+            continue
+        if result.get("success"):
+            success_count += 1
+        else:
+            failed_count += 1
+    return success_count, failed_count
+
+
+@shared_task(base=AxeTask, once={"graceful": True}, bind=True)
+def run_summary_plan_validation_task(self, task_context):
+    from apps.device_api.models import DeviceCollectionPlans
+
+    task_id = str(getattr(self.request, "id", "") or "")
+    username = str(task_context.get("username") or "")
+    summary_plan_id = task_context.get("summary_plan_id")
+    device_id = task_context.get("device_id")
+    device_ip = str(task_context.get("device_ip") or "")
+    serial_num = str(task_context.get("serial_num") or "")
+    use_local = bool(task_context.get("use_local", False))
+    south_driver = str(task_context.get("south_driver") or "")
+    plan_ids = [int(plan_id) for plan_id in (task_context.get("plan_ids") or [])]
+    execute_time = datetime.now().isoformat()
+
+    snapshot = _build_runtime_task_snapshot(
+        task_id=task_id,
+        task_type="summary_plan_validate",
+        username=username,
+        device_ip=device_ip,
+        serial_num=serial_num,
+        summary_plan_id=summary_plan_id,
+        status="running",
+        message="验证任务已启动",
+        execute_time=execute_time,
+        progress={"current": 0, "total": 0, "success_count": 0, "failed_count": 0, "skipped_count": 0},
+        data={},
+    )
+    _store_runtime_task_snapshot(snapshot)
+
+    try:
+        summary_plan = (
+            DeviceCollectionPlans.objects.prefetch_related("collect_plans", "collect_plans__xml_templates")
+            .get(id=summary_plan_id)
+        )
+        device = NetworkDevice.objects.select_related("idc").get(id=device_id)
+        enabled_plans = [
+            plan
+            for plan in summary_plan.collect_plans.all()
+            if (not plan_ids or plan.id in plan_ids)
+        ]
+
+        snapshot["summary_plan_name"] = getattr(summary_plan, "name", "")
+        snapshot["progress"]["total"] = len(enabled_plans)
+        _store_runtime_task_snapshot(snapshot)
+
+        results = []
+        success_count = 0
+        failed_count = 0
+        skipped_count = 0
+
+        def publish_plan_progress(plan, current_index, message, event=None, data=None):
+            snapshot["status"] = "running"
+            snapshot["message"] = message
+            snapshot["plan_id"] = getattr(plan, "id", None)
+            snapshot["plan_name"] = getattr(plan, "name", "")
+            snapshot["progress"] = {
+                "current": current_index,
+                "total": len(enabled_plans),
+                "success_count": success_count,
+                "failed_count": failed_count,
+                "skipped_count": skipped_count,
+            }
+            if event is not None:
+                snapshot["event"] = event
+            if data is not None:
+                snapshot["data"] = data
+            _store_runtime_task_snapshot(snapshot)
+
+        if use_local:
+            shared_device_info = DeviceCollectionService._build_device_info_for_local(
+                device,
+                execute_time=execute_time,
+            )
+            with DeviceConnectionManager(device.manage_ip, shared_device_info) as conn_mgr:
+                for index, plan in enumerate(enabled_plans, start=1):
+                    publish_plan_progress(
+                        plan,
+                        index - 1,
+                        f"正在验证 {plan.name} ({index}/{len(enabled_plans)})",
+                    )
+                    is_valid, error_msg = _validate_plan_for_device(
+                        plan,
+                        device,
+                        device_ip=device_ip or getattr(device, "manage_ip", ""),
+                        use_local=use_local,
+                    )
+                    if not is_valid:
+                        results.append(_build_plan_execution_payload(plan, "skipped", error_msg))
+                        skipped_count += 1
+                        publish_plan_progress(
+                            plan,
+                            index,
+                            f"{plan.name} 前置校验未通过",
+                            event={"stage": "skipped", "message": error_msg},
+                            data={"results": _group_plan_results_by_collection_type(results)},
+                        )
+                        continue
+
+                    def plan_progress(event):
+                        publish_plan_progress(
+                            plan,
+                            index - 1,
+                            event.get("message") or f"正在执行 {plan.name}",
+                            event=event,
+                            data={"results": _group_plan_results_by_collection_type(results)},
+                        )
+
+                    execution_result = DeviceCollectionService.execute_both_collection_local(
+                        plan,
+                        device,
+                        connection_manager=conn_mgr,
+                        execute_time=execute_time,
+                        progress_callback=plan_progress,
+                    )
+                    if execution_result.get("success"):
+                        results.append(
+                            _build_plan_execution_payload(
+                                plan,
+                                "success",
+                                execution_result.get("message", "验证成功"),
+                                execution_result,
+                            )
+                        )
+                        success_count += 1
+                    else:
+                        results.append(
+                            _build_plan_execution_payload(
+                                plan,
+                                "failed",
+                                execution_result.get("error", "验证失败"),
+                                execution_result,
+                            )
+                        )
+                        failed_count += 1
+
+                    publish_plan_progress(
+                        plan,
+                        index,
+                        f"{plan.name} 已完成 ({index}/{len(enabled_plans)})",
+                        event={"stage": "plan_finished"},
+                        data={"results": _group_plan_results_by_collection_type(results)},
+                    )
+        else:
+            for index, plan in enumerate(enabled_plans, start=1):
+                publish_plan_progress(
+                    plan,
+                    index - 1,
+                    f"正在验证 {plan.name} ({index}/{len(enabled_plans)})",
+                )
+                is_valid, error_msg = _validate_plan_for_device(
+                    plan,
+                    device,
+                    device_ip=device_ip or getattr(device, "manage_ip", ""),
+                    use_local=use_local,
+                )
+                if not is_valid:
+                    results.append(_build_plan_execution_payload(plan, "skipped", error_msg))
+                    skipped_count += 1
+                    publish_plan_progress(
+                        plan,
+                        index,
+                        f"{plan.name} 前置校验未通过",
+                        event={"stage": "skipped", "message": error_msg},
+                        data={"results": _group_plan_results_by_collection_type(results)},
+                    )
+                    continue
+
+                execution_result = DeviceCollectionService.execute_both_collection(
+                    plan,
+                    device,
+                    south_driver,
+                )
+                if execution_result.get("success"):
+                    results.append(
+                        _build_plan_execution_payload(
+                            plan,
+                            "success",
+                            execution_result.get("message", "验证成功"),
+                            execution_result,
+                        )
+                    )
+                    success_count += 1
+                else:
+                    results.append(
+                        _build_plan_execution_payload(
+                            plan,
+                            "failed",
+                            execution_result.get("error", "验证失败"),
+                            execution_result,
+                        )
+                    )
+                    failed_count += 1
+
+                publish_plan_progress(
+                    plan,
+                    index,
+                    f"{plan.name} 已完成 ({index}/{len(enabled_plans)})",
+                    event={"stage": "plan_finished"},
+                    data={"results": _group_plan_results_by_collection_type(results)},
+                )
+
+        grouped_results = _group_plan_results_by_collection_type(results)
+        total_plans = len(enabled_plans)
+        if success_count == total_plans:
+            message = f"所有采集方案验证成功 ({success_count}/{total_plans})"
+        elif success_count > 0:
+            message = f"部分采集方案验证成功 ({success_count}/{total_plans})，失败 {failed_count}，跳过 {skipped_count}"
+        elif skipped_count == total_plans:
+            message = f"所有采集方案均未通过前置校验 ({skipped_count}/{total_plans})"
+        else:
+            message = f"所有采集方案验证失败 ({failed_count}/{total_plans})"
+
+        result_code = 200 if success_count > 0 else 500
+        if skipped_count == total_plans:
+            result_code = 400
+
+        snapshot["status"] = "finished" if result_code == 200 else "failed"
+        snapshot["message"] = message
+        snapshot["progress"] = {
+            "current": total_plans,
+            "total": total_plans,
+            "success_count": success_count,
+            "failed_count": failed_count,
+            "skipped_count": skipped_count,
+        }
+        snapshot["result_code"] = result_code
+        snapshot["data"] = {
+            "summary_plan_id": summary_plan.id,
+            "summary_plan_name": summary_plan.name,
+            "device_ip": device_ip or getattr(device, "manage_ip", ""),
+            "serial_num": serial_num,
+            "total_plans": total_plans,
+            "success_count": success_count,
+            "failed_count": failed_count,
+            "skipped_count": skipped_count,
+            "results": grouped_results,
+        }
+        snapshot["event"] = {"stage": "finished"}
+        _store_runtime_task_snapshot(snapshot)
+        return snapshot
+    except Exception as exc:
+        logger.error("异步父方案验证失败: summary_plan_id=%s device_id=%s error=%s", summary_plan_id, device_id, exc, exc_info=True)
+        snapshot["status"] = "failed"
+        snapshot["message"] = f"验证失败: {exc}"
+        snapshot["result_code"] = 500
+        snapshot["event"] = {"stage": "failed"}
+        _store_runtime_task_snapshot(snapshot)
+        raise
+
+
+@shared_task(base=AxeTask, once={"graceful": True}, bind=True)
+def run_sub_plan_execute_task(self, task_context):
+    from apps.device_api.models import DeviceSubCollectionPlan
+
+    task_id = str(getattr(self.request, "id", "") or "")
+    username = str(task_context.get("username") or "")
+    plan_id = task_context.get("plan_id")
+    device_id = task_context.get("device_id")
+    device_ip = str(task_context.get("device_ip") or "")
+    serial_num = str(task_context.get("serial_num") or "")
+    use_local = bool(task_context.get("use_local", False))
+    south_driver = str(task_context.get("south_driver") or "")
+    execute_time = datetime.now().isoformat()
+
+    snapshot = _build_runtime_task_snapshot(
+        task_id=task_id,
+        task_type="sub_plan_execute",
+        username=username,
+        device_ip=device_ip,
+        serial_num=serial_num,
+        plan_id=plan_id,
+        status="running",
+        message="子方案测试任务已启动",
+        execute_time=execute_time,
+        progress={"current": 0, "total": 5, "success_count": 0, "failed_count": 0, "skipped_count": 0},
+        data={},
+    )
+    _store_runtime_task_snapshot(snapshot)
+
+    try:
+        plan = DeviceSubCollectionPlan.objects.select_related("summary_plan").prefetch_related("xml_templates").get(id=plan_id)
+        device = NetworkDevice.objects.select_related("idc").get(id=device_id)
+
+        snapshot["summary_plan_id"] = getattr(plan, "summary_plan_id", None)
+        snapshot["summary_plan_name"] = getattr(getattr(plan, "summary_plan", None), "name", "")
+        snapshot["plan_name"] = getattr(plan, "name", "")
+        snapshot["data"] = {
+            "collection_type": getattr(plan, "collection_type", ""),
+            "execute_time": execute_time,
+        }
+        _store_runtime_task_snapshot(snapshot)
+
+        def publish_protocol_event(event):
+            method = str(event.get("collection_method") or "").lower()
+            stage = event.get("stage")
+            message = event.get("message") or "执行中"
+            if method:
+                field_name = f"{method}_result"
+                if stage == "finished" and isinstance(event.get("result"), dict):
+                    snapshot["data"][field_name] = event["result"]
+                elif stage == "failed":
+                    snapshot["data"][field_name] = {
+                        "success": False,
+                        "status": "失败",
+                        "message": message,
+                        "error": message,
+                    }
+                else:
+                    snapshot["data"][field_name] = {
+                        "success": None,
+                        "status": "执行中",
+                        "message": message,
+                    }
+            snapshot["message"] = message
+            snapshot["event"] = event
+            success_count, failed_count = _count_method_outcomes(snapshot["data"])
+            snapshot["progress"] = {
+                "current": min(success_count + failed_count, 5),
+                "total": 5,
+                "success_count": success_count,
+                "failed_count": failed_count,
+                "skipped_count": 0,
+            }
+            _store_runtime_task_snapshot(snapshot)
+
+        if use_local:
+            shared_device_info = DeviceCollectionService._build_device_info_for_local(
+                device,
+                execute_time=execute_time,
+            )
+            with DeviceConnectionManager(device.manage_ip, shared_device_info) as conn_mgr:
+                execution_result = DeviceCollectionService.execute_both_collection_local(
+                    plan,
+                    device,
+                    connection_manager=conn_mgr,
+                    execute_time=execute_time,
+                    progress_callback=publish_protocol_event,
+                )
+        else:
+            execution_result = DeviceCollectionService.execute_both_collection(
+                plan,
+                device,
+                south_driver,
+            )
+
+        success_count, failed_count = _count_method_outcomes(execution_result)
+        analysis_trigger = {
+            "scheduled": False,
+            "reason": "not_local_execution",
+        }
+        if use_local:
+            analysis_trigger = maybe_schedule_interface_utilization(
+                collection_type=getattr(plan, "collection_type", ""),
+                device_ip=device_ip or getattr(device, "manage_ip", ""),
+                execute_time=execution_result.get("execute_time"),
+                triggered_by="device_api-execute_sub_plan-async-local",
+            )
+        snapshot["data"] = {
+            "collection_type": getattr(plan, "collection_type", ""),
+            "execute_time": execution_result.get("execute_time", execute_time),
+            "analysis_trigger": analysis_trigger,
+            "success_count": success_count,
+            "failed_count": failed_count,
+            "netconf_result": execution_result.get("netconf_result"),
+            "netmiko_result": execution_result.get("netmiko_result"),
+            "snmp_result": execution_result.get("snmp_result"),
+            "restconf_result": execution_result.get("restconf_result"),
+            "telemetry_result": execution_result.get("telemetry_result"),
+        }
+        snapshot["progress"] = {
+            "current": min(success_count + failed_count, 5),
+            "total": 5,
+            "success_count": success_count,
+            "failed_count": failed_count,
+            "skipped_count": 0,
+        }
+        if execution_result.get("success"):
+            snapshot["status"] = "finished"
+            snapshot["message"] = execution_result.get("message", "子方案测试完成")
+            snapshot["result_code"] = 200
+        else:
+            snapshot["status"] = "failed"
+            snapshot["message"] = execution_result.get("error", "子方案测试失败")
+            snapshot["result_code"] = 500
+        snapshot["event"] = {"stage": "finished"}
+        _store_runtime_task_snapshot(snapshot)
+        return snapshot
+    except Exception as exc:
+        logger.error("异步子方案测试失败: plan_id=%s device_id=%s error=%s", plan_id, device_id, exc, exc_info=True)
+        snapshot["status"] = "failed"
+        snapshot["message"] = f"子方案测试失败: {exc}"
+        snapshot["result_code"] = 500
+        snapshot["event"] = {"stage": "failed"}
+        _store_runtime_task_snapshot(snapshot)
+        raise
 
 
 def _coerce_runtime_flag(value, default=False):
@@ -269,6 +838,144 @@ def dedupe_batch_hosts(hosts):
                 }
             )
     return list(deduped_hosts.values()), duplicate_count, duplicate_details
+
+
+def _load_onboarding_device(device_id):
+    if not device_id:
+        return None
+    return (
+        NetworkDevice.objects.select_related(
+            "vendor", "category", "model", "ssh_account", "netconf_account"
+        )
+        .filter(id=device_id)
+        .first()
+    )
+
+
+def _validate_onboarding_device(device):
+    if device is None:
+        return "device_not_found"
+    if not getattr(device, "auto_enable", False):
+        return "auto_enable_disabled"
+    status_value = getattr(device, "status", 1)
+    if status_value is None:
+        status_value = 1
+    if int(status_value) != 0:
+        return "device_not_online"
+    manage_ip = str(getattr(device, "manage_ip", "") or "").strip()
+    if not manage_ip or manage_ip == "0.0.0.0":
+        return "invalid_manage_ip"
+    if not getattr(getattr(device, "category", None), "name", ""):
+        return "missing_category"
+    has_netconf = (
+        getattr(device, "netconf_enable", "") == "account"
+        and getattr(device, "netconf_account", None)
+    )
+    has_ssh = (
+        getattr(device, "ssh_enable", "") == "account"
+        and getattr(device, "ssh_account", None)
+    )
+    if not (has_netconf or has_ssh):
+        return "missing_access_account"
+    return ""
+
+
+@shared_task(base=AxeTask, once={"graceful": True})
+def onboard_network_device(device_id, trigger="asset_upsert"):
+    """为新纳管设备补齐首轮绑定、首轮采集和二次收敛。"""
+    connections.close_all()
+    result = {
+        "device_id": device_id,
+        "trigger": trigger,
+        "status": "skipped",
+        "reason": "",
+        "auto_bind_result": None,
+        "initial_collection": None,
+        "rebind_result": None,
+    }
+
+    device = _load_onboarding_device(device_id)
+    validation_error = _validate_onboarding_device(device)
+    if validation_error:
+        result["reason"] = validation_error
+        return result
+
+    category_name = str(getattr(getattr(device, "category", None), "name", "") or "").strip()
+    try:
+        auto_bind_result = PlatformProfileService.auto_bind_device_by_connection_priority(
+            device,
+            category_name=category_name,
+        )
+    except ValueError as exc:
+        result["reason"] = str(exc)
+        return result
+    except Exception as exc:
+        logger.error(
+            "设备 onboarding 自动绑定失败: device_id=%s manage_ip=%s error=%s",
+            device_id,
+            getattr(device, "manage_ip", ""),
+            exc,
+            exc_info=True,
+        )
+        result["status"] = "failed"
+        result["reason"] = str(exc)
+        return result
+
+    result["auto_bind_result"] = auto_bind_result
+    if auto_bind_result.get("status") != "finished":
+        result["reason"] = str(auto_bind_result.get("reason") or "auto_bind_not_finished")
+        return result
+
+    hosts = get_auto_device(device_serial_num=getattr(device, "serial_num", "") or "")
+    if not hosts and getattr(device, "manage_ip", ""):
+        hosts = get_auto_device(manage_ip=device.manage_ip)
+    deduped_hosts, duplicate_count, duplicate_details = dedupe_batch_hosts(hosts)
+    selected_host = deduped_hosts[0] if deduped_hosts else None
+    result["initial_collection"] = {
+        "status": "skipped",
+        "reason": "binding_not_ready",
+        "duplicate_bindings": duplicate_count,
+        "duplicate_details": duplicate_details[:20],
+    }
+    if selected_host and selected_host.get("sub_plans"):
+        collection_result = plan_collect_device(**selected_host)
+        result["initial_collection"] = {
+            "status": "finished",
+            "result": collection_result,
+            "duplicate_bindings": duplicate_count,
+            "duplicate_details": duplicate_details[:20],
+        }
+    elif selected_host:
+        result["initial_collection"] = {
+            "status": "skipped",
+            "reason": "missing_sub_plans",
+            "duplicate_bindings": duplicate_count,
+            "duplicate_details": duplicate_details[:20],
+        }
+
+    device = _load_onboarding_device(device_id)
+    if device is None:
+        result["status"] = "failed"
+        result["reason"] = "device_not_found_after_collection"
+        return result
+
+    try:
+        result["rebind_result"] = PlatformProfileService.auto_bind_devices([device])
+    except Exception as exc:
+        logger.error(
+            "设备 onboarding 二次收敛失败: device_id=%s manage_ip=%s error=%s",
+            device_id,
+            getattr(device, "manage_ip", ""),
+            exc,
+            exc_info=True,
+        )
+        result["status"] = "failed"
+        result["reason"] = str(exc)
+        return result
+
+    result["status"] = "finished"
+    result["reason"] = ""
+    return result
 
 
 def _truncate_preview(value, max_length=1200):
@@ -965,6 +1672,7 @@ def plan_collect_device(**kwargs):
                             f"NETCONF采集异常: {sub_plan['name']} (设备: {host_ip}), {str(e)}",
                             exc_info=True,
                         )
+                        # 采集链路严格按 PlansToDevice 执行，只记录运行态事实，不在这里改绑定。
                         _record_execution_event(
                             event_scope="sub_plan",
                             event_type="sub_plan_exception",
@@ -1904,6 +2612,406 @@ def plan_collect_device_main(**kwargs):
         "skipped_without_sub_plans": len(skipped_hosts_without_sub_plans),
         "dispatch_failed_devices": len(dispatch_failures),
         "analysis_trigger": analysis_trigger,
+    }
+
+
+def _pick_latest_execute_time():
+    latest_doc = COLLECTION_PLAN.coll.find_one({}, {"execute_time": 1}, sort=[("_id", -1)])
+    return str((latest_doc or {}).get("execute_time") or "")
+
+
+def _top_method_samples(log_docs, limit=3):
+    method_counter = Counter()
+    for doc in log_docs:
+        method_name = (
+            (doc.get("details") or {}).get("method_name")
+            or doc.get("collection_method")
+            or doc.get("collection_type")
+            or "unknown"
+        )
+        method_counter[method_name] += 1
+    return [name for name, _ in method_counter.most_common(limit)]
+
+
+def _persist_binding_analysis_checklist(execute_time, summary, checklist_items):
+    now_iso = datetime.now().isoformat()
+    log_time = time.time()
+    COLLECTION_BINDING_ANALYSIS.delete_many({"execute_time": execute_time})
+
+    docs = [
+        {
+            "doc_type": "summary",
+            "execute_time": execute_time,
+            **summary,
+            "created_at": now_iso,
+            "log_time": log_time,
+        }
+    ]
+    for item in checklist_items:
+        docs.append(
+            {
+                "doc_type": "device",
+                "execute_time": execute_time,
+                **item,
+                "has_recommendations": bool(item.get("recommendations")),
+                "recommendation_codes": [
+                    recommendation.get("code", "")
+                    for recommendation in item.get("recommendations", [])
+                    if recommendation.get("code")
+                ],
+                "created_at": now_iso,
+                "log_time": log_time,
+            }
+        )
+
+    if len(docs) == 1:
+        COLLECTION_BINDING_ANALYSIS.insert_one(docs[0])
+    else:
+        COLLECTION_BINDING_ANALYSIS.insert_many(docs)
+
+
+def _build_binding_analysis_recommendations(plan_doc, sub_docs, log_docs, audit_item):
+    recommendations = []
+    failed_logs = [doc for doc in log_docs if doc.get("status") == "failed"]
+    error_texts = [
+        " ".join(
+            filter(
+                None,
+                [
+                    str(doc.get("reason") or ""),
+                    str(doc.get("error") or ""),
+                    str((doc.get("details") or {}).get("method_name") or ""),
+                ],
+            )
+        )
+        for doc in failed_logs
+    ]
+    coverage_counter = Counter(
+        str(doc.get("collection_type") or "")
+        for doc in sub_docs
+        if doc.get("coverage_issue")
+    )
+    blocker_map = {
+        str(item.get("code") or ""): str(item.get("message") or "")
+        for item in (audit_item or {}).get("blockers", [])
+    }
+
+    if plan_doc.get("task_status") == "running":
+        recommendations.append(
+            {
+                "code": "stale_running_task",
+                "message": "批次结束后设备任务仍处于 running，建议核对 Celery 回调或任务落库完整性。",
+            }
+        )
+
+    if any("NETCONF账号信息不存在" in text for text in error_texts):
+        recommendations.append(
+            {
+                "code": "missing_netconf_account",
+                "message": "当前 PlansToDevice 绑定方案包含 NETCONF 子方案，但设备缺少 NETCONF 账号；建议补齐账号或调整方案。",
+            }
+        )
+
+    if any(
+        token in text
+        for text in error_texts
+        for token in (
+            "Unexpected element",
+            "Capability exchange timed out",
+            "Could not open socket",
+            "AuthenticationException",
+        )
+    ):
+        recommendations.append(
+            {
+                "code": "netconf_protocol_mismatch",
+                "message": "运行结果显示当前绑定方案中的 NETCONF 子方案与设备协议能力不匹配；建议在独立绑定分析环节评估是否切换到 CLI 方案。",
+            }
+        )
+
+    textfsm_fail_logs = [
+        doc
+        for doc in failed_logs
+        if "Textfsm 模板解析失败" in str(doc.get("reason") or "")
+        or "Textfsm 模板解析失败" in str(doc.get("error") or "")
+    ]
+    if textfsm_fail_logs:
+        recommendations.append(
+            {
+                "code": "textfsm_template_mismatch",
+                "message": "CLI 解析存在 TextFSM 模板失配，主要命令: %s；建议修模板或从方案中下线对应子方案。"
+                % ", ".join(_top_method_samples(textfsm_fail_logs)),
+            }
+        )
+
+    empty_processed = {
+        collection_type: count
+        for collection_type, count in coverage_counter.items()
+        if collection_type
+    }
+    if empty_processed:
+        recommendations.append(
+            {
+                "code": "empty_processed_data_review",
+                "message": "存在空处理结果子方案，主要类型: %s；建议确认协议是否未配置、命令输出为空或字段映射缺口。"
+                % ", ".join(
+                    f"{collection_type}={count}"
+                    for collection_type, count in sorted(
+                        empty_processed.items(),
+                        key=lambda item: item[1],
+                        reverse=True,
+                    )[:5]
+                ),
+            }
+        )
+
+    for blocker_code, blocker_message in blocker_map.items():
+        recommendations.append(
+            {
+                "code": blocker_code,
+                "message": blocker_message,
+            }
+        )
+
+    deduped = []
+    seen_codes = set()
+    for item in recommendations:
+        code = item.get("code")
+        if not code or code in seen_codes:
+            continue
+        seen_codes.add(code)
+        deduped.append(item)
+    return deduped
+
+
+@shared_task(base=AxeTask, once={"graceful": True})
+def analyze_collection_plan_bindings(execute_time="", max_devices=0, sample_limit=100):
+    execute_time = str(execute_time or "").strip() or _pick_latest_execute_time()
+    if not execute_time:
+        return {
+            "execute_time": "",
+            "analyzed_devices": 0,
+            "devices_with_recommendations": 0,
+            "reason": "missing_execute_time",
+            "results": [],
+        }
+
+    plan_docs = COLLECTION_PLAN.find(
+        {"execute_time": execute_time},
+        fields={
+            "_id": 0,
+            "device_ip": 1,
+            "device_name": 1,
+            "task_status": 1,
+            "plan_id": 1,
+            "plan_name": 1,
+            "failed_sub_plans": 1,
+            "coverage_issue_sub_plans": 1,
+            "skipped_sub_plans": 1,
+            "failed_details": 1,
+            "coverage_details": 1,
+        },
+    )
+    issue_plan_docs = [
+        doc
+        for doc in plan_docs
+        if doc.get("task_status") != "success"
+        or int(doc.get("failed_sub_plans") or 0) > 0
+        or int(doc.get("coverage_issue_sub_plans") or 0) > 0
+        or int(doc.get("skipped_sub_plans") or 0) > 0
+    ]
+    issue_plan_docs.sort(
+        key=lambda item: (
+            int(item.get("failed_sub_plans") or 0),
+            int(item.get("coverage_issue_sub_plans") or 0),
+            int(item.get("skipped_sub_plans") or 0),
+        ),
+        reverse=True,
+    )
+    if max_devices:
+        issue_plan_docs = issue_plan_docs[: max(int(max_devices), 0)]
+
+    device_ips = [str(doc.get("device_ip") or "") for doc in issue_plan_docs if doc.get("device_ip")]
+    if not device_ips:
+        _record_execution_event(
+            event_scope="analysis",
+            event_type="batch_plan_binding_analysis_finished",
+            status="success",
+            execute_time=execute_time,
+            reason="no_issue_devices",
+            details={"analyzed_devices": 0, "devices_with_recommendations": 0},
+        )
+        return {
+            "execute_time": execute_time,
+            "analyzed_devices": 0,
+            "devices_with_recommendations": 0,
+            "reason": "no_issue_devices",
+            "results": [],
+        }
+
+    sub_docs = COLLECTION_SUB_PLAN.find(
+        {"execute_time": execute_time, "device_ip": {"$in": device_ips}},
+        fields={
+            "_id": 0,
+            "device_ip": 1,
+            "collection_type": 1,
+            "task_status": 1,
+            "coverage_issue": 1,
+            "coverage_reason": 1,
+            "collection_method": 1,
+            "method_name": 1,
+        },
+    )
+    log_docs = COLLECTION_EXECUTION_LOG.find(
+        {"execute_time": execute_time, "device_ip": {"$in": device_ips}},
+        fields={
+            "_id": 0,
+            "device_ip": 1,
+            "event_scope": 1,
+            "event_type": 1,
+            "status": 1,
+            "reason": 1,
+            "error": 1,
+            "details": 1,
+            "collection_method": 1,
+            "collection_type": 1,
+        },
+    )
+    test_docs = COLLECTION_RESULTS_DB.find(
+        {"execute_time": execute_time, "device_ip": {"$in": device_ips}},
+        fields={
+            "_id": 0,
+            "device_ip": 1,
+            "collection_type": 1,
+            "processed_status": 1,
+            "processed_error": 1,
+            "status": 1,
+        },
+    )
+
+    sub_docs_by_ip = defaultdict(list)
+    for doc in sub_docs:
+        sub_docs_by_ip[str(doc.get("device_ip") or "")].append(doc)
+
+    log_docs_by_ip = defaultdict(list)
+    for doc in log_docs:
+        log_docs_by_ip[str(doc.get("device_ip") or "")].append(doc)
+
+    test_docs_by_ip = defaultdict(list)
+    for doc in test_docs:
+        test_docs_by_ip[str(doc.get("device_ip") or "")].append(doc)
+
+    devices = list(
+        NetworkDevice.objects.filter(manage_ip__in=device_ips).select_related(
+            "vendor",
+            "category",
+            "model",
+            "ssh_account",
+            "netconf_account",
+        )
+    )
+    audit_result = PlatformProfileService.audit_device_coverage(devices)
+    audit_result_map = {
+        str(item.get("manage_ip") or ""): item for item in audit_result.get("results", [])
+    }
+
+    recommendation_counter = Counter()
+    coverage_reason_counter = Counter()
+    devices_with_recommendations = 0
+    checklist_items = []
+    results = []
+    sample_limit = max(int(sample_limit or 0), 0)
+
+    for plan_doc in issue_plan_docs:
+        device_ip = str(plan_doc.get("device_ip") or "")
+        device_sub_docs = sub_docs_by_ip.get(device_ip, [])
+        device_log_docs = log_docs_by_ip.get(device_ip, [])
+        device_test_docs = test_docs_by_ip.get(device_ip, [])
+        audit_item = audit_result_map.get(device_ip, {})
+        recommendations = _build_binding_analysis_recommendations(
+            plan_doc,
+            device_sub_docs,
+            device_log_docs,
+            audit_item,
+        )
+
+        for sub_doc in device_sub_docs:
+            if sub_doc.get("coverage_issue"):
+                coverage_reason_counter[str(sub_doc.get("coverage_reason") or "coverage_issue")] += 1
+        for item in recommendations:
+            recommendation_counter[item["code"]] += 1
+        if recommendations:
+            devices_with_recommendations += 1
+
+        if recommendations:
+            _record_execution_event(
+                event_scope="device",
+                event_type="binding_analysis_suggested",
+                status="warning",
+                severity="warning",
+                execute_time=execute_time,
+                device_info={"manage_ip": device_ip, "device_name": plan_doc.get("device_name", "")},
+                reason=recommendations[0]["code"],
+                details={
+                    "task_status": plan_doc.get("task_status", ""),
+                    "failed_sub_plans": int(plan_doc.get("failed_sub_plans") or 0),
+                    "coverage_issue_sub_plans": int(plan_doc.get("coverage_issue_sub_plans") or 0),
+                    "recommendation_codes": [item["code"] for item in recommendations[:8]],
+                    "test_collection_errors": [
+                        {
+                            "collection_type": item.get("collection_type", ""),
+                            "processed_status": item.get("processed_status", ""),
+                            "processed_error": item.get("processed_error", ""),
+                        }
+                        for item in device_test_docs
+                        if item.get("processed_error")
+                    ][:5],
+                },
+            )
+
+        checklist_item = {
+            "device_ip": device_ip,
+            "device_name": plan_doc.get("device_name", ""),
+            "task_status": plan_doc.get("task_status", ""),
+            "plan_id": plan_doc.get("plan_id"),
+            "plan_name": plan_doc.get("plan_name", ""),
+            "failed_sub_plans": int(plan_doc.get("failed_sub_plans") or 0),
+            "coverage_issue_sub_plans": int(plan_doc.get("coverage_issue_sub_plans") or 0),
+            "coverage_reasons": dict(
+                Counter(
+                    str(item.get("coverage_reason") or "coverage_issue")
+                    for item in device_sub_docs
+                    if item.get("coverage_issue")
+                )
+            ),
+            "audit_blockers": (audit_item or {}).get("blockers", []),
+            "recommendations": recommendations,
+        }
+        checklist_items.append(checklist_item)
+
+        if sample_limit == 0 or len(results) < sample_limit:
+            results.append(checklist_item)
+
+    summary = {
+        "execute_time": execute_time,
+        "analyzed_devices": len(issue_plan_docs),
+        "devices_with_recommendations": devices_with_recommendations,
+        "recommendation_summary": dict(recommendation_counter),
+        "coverage_reason_summary": dict(coverage_reason_counter),
+        "stored_checklist_items": len(checklist_items),
+        "sampled_results": len(results),
+    }
+    _persist_binding_analysis_checklist(execute_time, summary, checklist_items)
+    _record_execution_event(
+        event_scope="analysis",
+        event_type="batch_plan_binding_analysis_finished",
+        status="success",
+        execute_time=execute_time,
+        details=summary,
+    )
+    return {
+        **summary,
+        "results": results,
     }
 
 

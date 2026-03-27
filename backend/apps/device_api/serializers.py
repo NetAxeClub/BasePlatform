@@ -46,6 +46,28 @@ def _normalize_enabled_collection_types(value):
     return normalized_types
 
 
+def _normalize_summary_plan_vendor(value):
+    normalized_value = str(value or "").strip()
+    if not normalized_value:
+        raise serializers.ValidationError("vendor 不能为空")
+
+    vendor = DeviceCollectionPlans.resolve_vendor_record(normalized_value)
+    if vendor is None:
+        raise serializers.ValidationError("vendor 必须使用 asset.Vendor 中已存在的厂商名称")
+    return str(vendor.name or "").strip()
+
+
+def _normalize_summary_plan_device_type(value):
+    normalized_value = str(value or "").strip()
+    if not normalized_value:
+        raise serializers.ValidationError("device_type 不能为空")
+
+    category = DeviceCollectionPlans.resolve_device_type_record(normalized_value)
+    if category is None:
+        raise serializers.ValidationError("device_type 必须使用 asset.Category 中已存在的设备类型名称")
+    return str(category.name or "").strip()
+
+
 class DeviceCollectionPlansSerializer(serializers.ModelSerializer):
     """采集汇总方案序列化器"""
 
@@ -136,6 +158,12 @@ class DeviceCollectionPlansCreateSerializer(serializers.ModelSerializer):
     def validate_enabled_collection_types(self, value):
         return _normalize_enabled_collection_types(value)
 
+    def validate_vendor(self, value):
+        return _normalize_summary_plan_vendor(value)
+
+    def validate_device_type(self, value):
+        return _normalize_summary_plan_device_type(value)
+
     def create(self, validated_data):
         with transaction.atomic():
             validated_data.setdefault("plan_kind", DeviceCollectionPlans.PLAN_KIND_RUNTIME)
@@ -189,6 +217,12 @@ class DeviceCollectionPlansUpdateSerializer(serializers.ModelSerializer):
 
     def validate_enabled_collection_types(self, value):
         return _normalize_enabled_collection_types(value)
+
+    def validate_vendor(self, value):
+        return _normalize_summary_plan_vendor(value)
+
+    def validate_device_type(self, value):
+        return _normalize_summary_plan_device_type(value)
 
     def update(self, instance, validated_data):
         with transaction.atomic():
@@ -939,11 +973,79 @@ class PlansToDeviceSerializer(serializers.ModelSerializer):
     """采集方案和设备关联序列化"""
 
     plan_name = serializers.CharField(source="plan.name", read_only=True)
+    binding_status = serializers.SerializerMethodField()
+    is_binding_conflict = serializers.SerializerMethodField()
+    active_bindings_count = serializers.SerializerMethodField()
+    other_active_bindings = serializers.SerializerMethodField()
 
     class Meta:
         model = PlansToDevice
         fields = "__all__"
         read_only_fields = ["created_at", "updated_at"]
+
+    def _get_binding_cache(self):
+        cache = getattr(self, "_binding_snapshot_cache", None)
+        if cache is None:
+            cache = {}
+            setattr(self, "_binding_snapshot_cache", cache)
+        return cache
+
+    @staticmethod
+    def _binding_device_key(obj):
+        serial_num = str(getattr(obj, "device_serial_num", "") or "").strip()
+        if serial_num:
+            return ("device_serial_num", serial_num)
+        return ("manage_ip", str(getattr(obj, "manage_ip", "") or "").strip())
+
+    def _get_active_bindings_for_device(self, obj):
+        cache = self._get_binding_cache()
+        device_key = self._binding_device_key(obj)
+        if device_key not in cache:
+            lookup_field, lookup_value = device_key
+            queryset = PlansToDevice.objects.filter(is_active=True).select_related("plan")
+            if lookup_value:
+                queryset = queryset.filter(**{lookup_field: lookup_value})
+            else:
+                queryset = queryset.none()
+            cache[device_key] = list(queryset.order_by("id"))
+        return cache[device_key]
+
+    def get_binding_status(self, obj):
+        active_bindings = self._get_active_bindings_for_device(obj)
+        if not active_bindings:
+            return "unbound"
+        if len(active_bindings) > 1:
+            return "conflict"
+        if obj.is_active:
+            return "bound"
+        return "inactive"
+
+    def get_is_binding_conflict(self, obj):
+        return len(self._get_active_bindings_for_device(obj)) > 1
+
+    def get_active_bindings_count(self, obj):
+        return len(self._get_active_bindings_for_device(obj))
+
+    def get_other_active_bindings(self, obj):
+        active_bindings = self._get_active_bindings_for_device(obj)
+        current_id = getattr(obj, "id", None)
+        payload = []
+        for binding in active_bindings:
+            if getattr(binding, "id", None) == current_id:
+                continue
+            payload.append(
+                {
+                    "id": binding.id,
+                    "plan_id": binding.plan_id,
+                    "plan_name": getattr(getattr(binding, "plan", None), "name", ""),
+                    "profile_code": binding.profile_code,
+                    "binding_source": binding.binding_source,
+                    "use_local": binding.use_local,
+                    "execute_node": binding.execute_node,
+                    "is_active": binding.is_active,
+                }
+            )
+        return payload
 
     def create(self, validated_data):
         """
@@ -988,7 +1090,6 @@ class DeviceFactsSerializer(serializers.ModelSerializer):
     vendor_alias = serializers.CharField(source="vendor.alias", read_only=True)
     category_name = serializers.CharField(source="category.name", read_only=True)
     model_name = serializers.CharField(source="model.name", read_only=True)
-    legacy_plan_name = serializers.CharField(source="plan.name", read_only=True)
 
     class Meta:
         model = NetworkDevice
@@ -1002,8 +1103,7 @@ class DeviceFactsSerializer(serializers.ModelSerializer):
             "category_name",
             "model_name",
             "soft_version",
-            "patch_version",
-            "legacy_plan_name",
+            "patch_version"
         ]
 
 
@@ -1019,7 +1119,6 @@ class DeviceDiscoveryStateSerializer(serializers.ModelSerializer):
 
 
 class DeviceCapabilitiesSerializer(serializers.Serializer):
-    serial_num = serializers.CharField()
     manage_ip = serializers.CharField()
     profile_code = serializers.CharField()
     supported_collection_types = serializers.ListField(child=serializers.CharField())

@@ -186,6 +186,19 @@ class Command(BaseCommand):
                     device_probe_failed = True
                     summary["probe_failed"] += 1
                     vendor_summary["probe_failed"] += 1
+                    if (
+                        vendor_alias == "H3C"
+                        and sub_plan.collection_type == "netconf_capability"
+                    ):
+                        PlatformProfileService.record_capability_probe_failure(
+                            device_info={
+                                "manage_ip": device.manage_ip,
+                                "serial_num": device.serial_num,
+                            },
+                            collection_type="netconf_capability",
+                            error=result.get("error", ""),
+                            rebind_on_failure=False,
+                        )
                     probe_details.append(
                         {
                             "collection_type": sub_plan.collection_type,

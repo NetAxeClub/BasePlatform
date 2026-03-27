@@ -21,6 +21,22 @@ class PlansToDeviceFilter(django_filters.FilterSet):
 
 class DeviceCollectionPlansFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(lookup_expr='icontains')
+    vendor = django_filters.CharFilter(method="filter_vendor")
+    device_type = django_filters.CharFilter(method="filter_device_type")
+
+    @staticmethod
+    def filter_vendor(queryset, name, value):
+        variants = DeviceCollectionPlans.resolve_vendor_variants(value)
+        if not variants:
+            return queryset
+        return queryset.filter(vendor__in=variants)
+
+    @staticmethod
+    def filter_device_type(queryset, name, value):
+        variants = DeviceCollectionPlans.resolve_device_type_variants(value)
+        if not variants:
+            return queryset
+        return queryset.filter(device_type__in=variants)
 
     class Meta:
         model = DeviceCollectionPlans
@@ -30,6 +46,22 @@ class DeviceCollectionPlansFilter(django_filters.FilterSet):
 class DeviceSubCollectionPlanFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(lookup_expr='icontains')
     description = django_filters.CharFilter(lookup_expr='icontains')
+    summary_plan__vendor = django_filters.CharFilter(method="filter_summary_plan_vendor")
+    summary_plan__device_type = django_filters.CharFilter(method="filter_summary_plan_device_type")
+
+    @staticmethod
+    def filter_summary_plan_vendor(queryset, name, value):
+        variants = DeviceCollectionPlans.resolve_vendor_variants(value)
+        if not variants:
+            return queryset
+        return queryset.filter(summary_plan__vendor__in=variants)
+
+    @staticmethod
+    def filter_summary_plan_device_type(queryset, name, value):
+        variants = DeviceCollectionPlans.resolve_device_type_variants(value)
+        if not variants:
+            return queryset
+        return queryset.filter(summary_plan__device_type__in=variants)
 
     class Meta:
         model = DeviceSubCollectionPlan

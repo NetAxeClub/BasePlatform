@@ -69,7 +69,7 @@
 - `backend/apps/api/agent_views.py`
 - `backend/apps/api/agent_urls.py`
 - `backend/apps/api/tests_agent_v1.py`
-- [02b-phase-1-国产主厂商覆盖清单.md](./02b-phase-1-%E5%9B%BD%E4%BA%A7%E4%B8%BB%E5%8E%82%E5%95%86%E8%A6%86%E7%9B%96%E6%B8%85%E5%8D%95.md)
+- [02b-phase-1-国产主厂商覆盖清单.md](02b-phase-1-国产主厂商覆盖清单.md)
 
 ## 7. 接口或模型变更
 
