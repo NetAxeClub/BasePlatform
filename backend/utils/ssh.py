@@ -10,6 +10,7 @@
                     2022/10/7 10:37
 -------------------------------------------------
 """
+import asyncio
 import logging
 import os
 import re
@@ -27,6 +28,10 @@ from apps.asset.tasks import admin_file
 
 fort_logger = logging.getLogger('webssh')
 
+# WebSSH：单次 recv 上限与批量刷盘阈值，减少 async_to_sync(send) 次数，缓解大回显时事件循环与前端卡顿
+_SSH_RECV_MAX = 64 * 1024
+_SSH_WS_BATCH_BYTES = 32 * 1024
+
 
 class MyThread(threading.Thread):
     def __init__(self, chan):
@@ -40,39 +45,68 @@ class MyThread(threading.Thread):
     def stop(self):
         self._stop_event.set()
 
+    def _apply_tab_history(self, str_data):
+        """按原始 recv 分片处理 tab/历史，避免批量发送时合并破坏补全逻辑。"""
+        if self.chan.tab_mode:
+            tmp = str_data.split(' ')
+            if len(tmp) == 2 and tmp[1] == '' and tmp[0] != '':
+                self.chan.cmd_tmp = self.chan.cmd_tmp + tmp[0].encode().replace(b'\x07', b'').decode()
+            elif len(tmp) == 1 and tmp[0].encode() != b'\x07':  # \x07 蜂鸣声
+                self.chan.cmd_tmp = self.chan.cmd_tmp + tmp[0].encode().replace(b'\x07', b'').decode()
+            self.chan.tab_mode = False
+        if self.chan.history_mode:
+            self.chan.index = 0
+            if str_data.strip() != '':
+                self.chan.cmd_tmp = re.sub(r'(?:\x1B[@-_]|[\x80-\x9F])[0-?]*[ -/]*[@-~]|\x08', '', str_data)
+            self.chan.history_mode = False
+
+    def _flush_pending_ws(self, raw_bytes):
+        if not raw_bytes:
+            return
+        str_data = raw_bytes.decode('utf-8', 'ignore')
+        async_to_sync(self.chan.send)(text_data=str_data)
+        self.stdout.append([time.time() - self.start_time, 'o', str_data])
+
     def run(self):
+        pending = b''
         try:
             while not self._stop_event.is_set():
                 if self.chan.chan.exit_status_ready():
+                    if pending:
+                        self._flush_pending_ws(pending)
+                        pending = b''
                     break
                 try:
-                    data = self.chan.chan.recv(1024)
-                    if data:
-                        str_data = data.decode('utf-8', 'ignore')
-                        # 使用 async_to_sync 调用异步的 send
-                        async_to_sync(self.chan.send)(text_data=str_data)
-                        self.stdout.append([time.time() - self.start_time, 'o', str_data])
-                        # 捕获敲tab键的动作
-                        if self.chan.tab_mode:
-                            tmp = str_data.split(' ')
-                            if len(tmp) == 2 and tmp[1] == '' and tmp[0] != '':
-                                self.chan.cmd_tmp = self.chan.cmd_tmp + tmp[0].encode().replace(b'\x07', b'').decode()
-                            elif len(tmp) == 1 and tmp[0].encode() != b'\x07':  # \x07 蜂鸣声
-                                self.chan.cmd_tmp = self.chan.cmd_tmp + tmp[0].encode().replace(b'\x07', b'').decode()
-                            self.chan.tab_mode = False
-                        if self.chan.history_mode:
-                            self.chan.index = 0
-                            if str_data.strip() != '':
-                                self.chan.cmd_tmp = re.sub(r'(?:\x1B[@-_]|[\x80-\x9F])[0-?]*[ -/]*[@-~]|\x08', '', str_data)
-                            self.chan.history_mode = False
-                    else:
+                    data = self.chan.chan.recv(_SSH_RECV_MAX)
+                    if not data:
+                        if pending:
+                            self._flush_pending_ws(pending)
+                            pending = b''
                         break
+                    str_chunk = data.decode('utf-8', 'ignore')
+                    self._apply_tab_history(str_chunk)
+                    pending += data
+                    while len(pending) >= _SSH_WS_BATCH_BYTES:
+                        self._flush_pending_ws(pending[:_SSH_WS_BATCH_BYTES])
+                        pending = pending[_SSH_WS_BATCH_BYTES:]
+                    # 本轮读不满缓冲区，通常表示当前 burst 已结束，尽快刷出以降低交互延迟
+                    if len(data) < _SSH_RECV_MAX and pending:
+                        self._flush_pending_ws(pending)
+                        pending = b''
                 except timeout:
+                    if pending:
+                        self._flush_pending_ws(pending)
+                        pending = b''
                     continue
                 except Exception as e:
                     fort_logger.error(f"SSH Thread error: {e}")
+                    if pending:
+                        self._flush_pending_ws(pending)
+                        pending = b''
                     break
-            
+            if pending:
+                self._flush_pending_ws(pending)
+
             # 断开连接后的处理
             if not self._stop_event.is_set():
                 async_to_sync(self.chan.send)(text_data='\n由于长时间没有操作或连接已断开!', close=True)
@@ -177,11 +211,15 @@ class MySSH(AsyncWebsocketConsumer):
         
         self.close_ssh()
 
+    def _ssh_channel_send(self, text_data):
+        """在线程中执行 paramiko 写通道，供 run_in_executor 调用。"""
+        self.chan.send(text_data)
+
     async def receive(self, text_data=None, bytes_data=None):
         try:
-            if self.chan:
-                # 某些情况下 send 可能阻塞，但在 shell 模式下通常很快
-                self.chan.send(text_data)
+            if self.chan and text_data is not None:
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(None, self._ssh_channel_send, text_data)
                 self.gen_cmd(text_data)
         except Exception as e:
             fort_logger.error(f"Receive error: {e}")
