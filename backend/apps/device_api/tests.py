@@ -175,12 +175,12 @@ class DeviceApiViewTests(SimpleTestCase):
         self.factory = APIRequestFactory()
 
     @patch("apps.device_api.views.DeviceCollectionService.execute_both_collection")
-    @patch("apps.device_api.views.NetworkDevice.objects.get")
+    @patch("apps.device_api.views.DeviceSubCollectionPlanViewSet._resolve_execution_device")
     @patch.object(DeviceCollectionPlansViewSet, "get_object")
     def test_execute_all_collections_passes_south_driver(
         self,
         mock_get_object,
-        mock_get_device,
+        mock_resolve_execution_device,
         mock_execute_both_collection,
     ):
         plan = SimpleNamespace(id=11, name="arp-plan", netconf_enabled=False, netmiko_enabled=True)
@@ -191,7 +191,13 @@ class DeviceApiViewTests(SimpleTestCase):
             collect_plans=SimpleNamespace(all=lambda: FakeQuerySet([plan])),
         )
         mock_get_object.return_value = summary_plan
-        mock_get_device.return_value = SimpleNamespace(ssh_account=object(), netconf_account=None)
+        device = SimpleNamespace(
+            manage_ip="10.0.0.1",
+            serial_num="SER-1",
+            ssh_account=object(),
+            netconf_account=None,
+        )
+        mock_resolve_execution_device.return_value = (True, "验证通过", device)
         mock_execute_both_collection.return_value = {
             "success": True,
             "message": "ok",
@@ -209,7 +215,7 @@ class DeviceApiViewTests(SimpleTestCase):
         payload = json.loads(response.content)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(payload["code"], 200)
-        mock_execute_both_collection.assert_called_once_with(plan, mock_get_device.return_value, "10.0.0.10")
+        mock_execute_both_collection.assert_called_once_with(plan, device, "10.0.0.10")
 
     @patch("apps.device_api.views._store_runtime_task_snapshot")
     @patch("apps.device_api.views.run_summary_plan_validation_task.apply_async")
@@ -3131,6 +3137,83 @@ class DeviceApiCollectDeviceTests(SimpleTestCase):
     @patch("apps.device_api.tools.collect_device.AssetIpInfo.objects")
     @patch("apps.device_api.tools.collect_device.PlansToDevice.objects")
     @patch("apps.device_api.tools.collect_device.NetworkDevice.objects")
+    def test_get_auto_device_ignores_manual_binding_without_plan_id(
+        self,
+        mock_device_objects,
+        mock_relation_objects,
+        mock_asset_ip_objects,
+        mock_account_objects,
+        mock_sub_plan_objects,
+        mock_sub_plan_serializer,
+    ):
+        device_row = {
+            "id": 1,
+            "serial_num": "SER-1",
+            "manage_ip": "10.0.0.1",
+            "name": "switch-a",
+            "soft_version": "v1",
+            "vendor__name": "Huawei",
+            "vendor__alias": "Huawei",
+            "category__name": "switch",
+            "model__name": "CE8850",
+            "ssh_enable": "0",
+            "ssh_account": None,
+            "netconf_enable": "0",
+            "netconf_account": None,
+            "patch_version": "p1",
+            "status": 0,
+            "idc__name": "IDC-A",
+            "auto_enable": True,
+            "ha_status": 0,
+            "chassis": 1,
+            "slot": 1,
+        }
+        mock_device_objects.filter.return_value.select_related.return_value.values.return_value = [device_row]
+        invalid_manual_relation = SimpleNamespace(
+            manage_ip="10.0.0.1",
+            device_serial_num="SER-1",
+            plan_id=None,
+            use_local=True,
+            execute_node="",
+            profile_code="",
+            binding_source="manual",
+            last_bound_at=datetime(2026, 3, 22, 10, 0, 0),
+            created_at=datetime(2026, 3, 19, 10, 0, 0),
+            updated_at=datetime(2026, 3, 22, 10, 0, 0),
+        )
+        valid_auto_relation = SimpleNamespace(
+            manage_ip="10.0.0.1",
+            device_serial_num="SER-1",
+            plan_id=201,
+            use_local=True,
+            execute_node="",
+            profile_code="Huawei-auto",
+            binding_source="auto",
+            last_bound_at=datetime(2026, 3, 22, 11, 0, 0),
+            created_at=datetime(2026, 3, 20, 10, 0, 0),
+            updated_at=datetime(2026, 3, 22, 11, 0, 0),
+        )
+        mock_relation_objects.select_related.return_value.filter.return_value = [
+            invalid_manual_relation,
+            valid_auto_relation,
+        ]
+        mock_asset_ip_objects.filter.return_value.values.return_value = []
+        mock_account_objects.filter.return_value.values.return_value = []
+        mock_sub_plan_objects.filter.return_value.select_related.return_value.order_by.return_value = []
+        mock_sub_plan_serializer.return_value.data = []
+
+        result = get_auto_device(manage_ip="10.0.0.1")
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["plan_id"], 201)
+        self.assertEqual(result[0]["binding_source"], "auto")
+
+    @patch("apps.device_api.tools.collect_device.DeviceSubCollectionPlanSerializer")
+    @patch("apps.device_api.tools.collect_device.DeviceSubCollectionPlan.objects")
+    @patch("apps.device_api.tools.collect_device.AssetAccount.objects")
+    @patch("apps.device_api.tools.collect_device.AssetIpInfo.objects")
+    @patch("apps.device_api.tools.collect_device.PlansToDevice.objects")
+    @patch("apps.device_api.tools.collect_device.NetworkDevice.objects")
     def test_get_auto_device_filters_out_non_executable_sub_plans(
         self,
         mock_device_objects,
@@ -5805,6 +5888,42 @@ class DeviceApiAutoBindingCutoverTests(TestCase):
         self.assertEqual(result["retired"], 1)
         self.assertEqual(result["results"][0]["retired_auto_bindings"], 1)
 
+    def test_auto_bind_devices_retires_invalid_manual_binding_without_plan(self):
+        PlatformProfileService.ensure_builtin_profiles()
+        invalid_manual = PlansToDevice.objects.create(
+            device_serial_num=self.device.serial_num,
+            manage_ip=self.device.manage_ip,
+            plan=None,
+            profile_code="",
+            binding_source=PlansToDevice.BINDING_SOURCE_MANUAL,
+            is_active=True,
+            use_local=True,
+        )
+
+        result = PlatformProfileService.auto_bind_devices([self.device])
+
+        invalid_manual.refresh_from_db()
+        active_relations = list(
+            PlansToDevice.objects.filter(
+                device_serial_num=self.device.serial_num,
+                is_active=True,
+            ).values_list("plan_id", flat=True)
+        )
+
+        self.assertFalse(invalid_manual.is_active)
+        self.assertTrue(any(plan_id for plan_id in active_relations))
+        self.assertEqual(result["results"][0]["retired_auto_bindings"], 2)
+
+    def test_auto_bind_devices_enable_auto_collection_after_binding(self):
+        PlatformProfileService.ensure_builtin_profiles()
+        self.device.auto_enable = False
+        self.device.save(update_fields=["auto_enable"])
+
+        PlatformProfileService.auto_bind_devices([self.device])
+
+        self.device.refresh_from_db()
+        self.assertTrue(self.device.auto_enable)
+
     @patch("apps.device_api.platform_profiles.PlatformProfileService._probe_capability_with_plan")
     @patch("apps.device_api.platform_profiles.PlatformProfileService._probe_device_connectivity")
     def test_auto_bind_device_by_connection_priority_prefers_netconf_named_plan(
@@ -6500,6 +6619,57 @@ class DeviceApiOnboardingTaskTests(TransactionTestCase):
 
         self.assertEqual(result["status"], "skipped")
         self.assertEqual(result["reason"], "missing_category")
+
+    @patch("apps.device_api.tasks.PlatformProfileService.auto_bind_devices")
+    @patch("apps.device_api.tasks.plan_collect_device")
+    @patch("apps.device_api.tasks.get_auto_device")
+    @patch("apps.device_api.tasks.PlatformProfileService.auto_bind_device_by_connection_priority")
+    def test_onboard_network_device_does_not_skip_when_auto_enable_initially_false(
+        self,
+        mock_auto_bind_single,
+        mock_get_auto_device,
+        mock_plan_collect_device,
+        mock_auto_bind_devices,
+    ):
+        self.device.auto_enable = False
+        self.device.save(update_fields=["auto_enable"])
+        mock_auto_bind_single.return_value = {
+            "status": "finished",
+            "selected_plan": {"id": 201, "name": "default-h3c-modern-switch"},
+            "auto_bind_result": {"created": 1, "updated": 0, "skipped": 0, "retired": 0, "results": []},
+        }
+        mock_get_auto_device.return_value = [
+            {
+                "manage_ip": self.device.manage_ip,
+                "device_serial_num": self.device.serial_num,
+                "plan_id": 201,
+                "sub_plans": [{"id": 11, "summary_plan": 201, "collection_type": "device_identity"}],
+                "binding_source": "auto",
+                "use_local": True,
+            }
+        ]
+        mock_plan_collect_device.return_value = {
+            "host_ip": self.device.manage_ip,
+            "task_status": "finished",
+            "successful_sub_plans": 1,
+            "failed_sub_plans": 0,
+        }
+        mock_auto_bind_devices.return_value = {
+            "created": 0,
+            "updated": 1,
+            "skipped": 0,
+            "retired": 0,
+            "results": [],
+        }
+
+        result = onboard_network_device.run(self.device.id, trigger="asset_create")
+
+        self.assertEqual(result["status"], "finished")
+        self.assertEqual(result["reason"], "")
+        mock_auto_bind_single.assert_called_once_with(
+            self.device,
+            category_name="switch",
+        )
 
 
 class DeviceApiDefaultPlanAliasTests(TestCase):

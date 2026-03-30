@@ -3409,6 +3409,35 @@ class PlatformProfileService:
 
         return queryset.update(is_active=False)
 
+    @classmethod
+    def _retire_invalid_active_bindings(
+        cls,
+        *,
+        device: NetworkDevice,
+        target_plan: DeviceCollectionPlans,
+    ) -> int:
+        queryset = PlansToDevice.objects.filter(
+            is_active=True,
+            plan__isnull=True,
+        )
+
+        if getattr(device, "serial_num", ""):
+            queryset = queryset.filter(device_serial_num=device.serial_num)
+        else:
+            queryset = queryset.filter(manage_ip=device.manage_ip)
+
+        queryset = queryset.exclude(plan=target_plan)
+        return queryset.update(is_active=False)
+
+    @staticmethod
+    def _ensure_device_auto_enable(device: Optional[NetworkDevice]) -> bool:
+        if device is None or getattr(device, "auto_enable", False):
+            return False
+
+        device.auto_enable = True
+        device.save(update_fields=["auto_enable"])
+        return True
+
     @staticmethod
     def template_exists(template_name: str) -> bool:
         if not template_name:
@@ -3996,6 +4025,11 @@ class PlatformProfileService:
                 device=device,
                 target_plan=plan,
             )
+            retired_count += cls._retire_invalid_active_bindings(
+                device=device,
+                target_plan=plan,
+            )
+            cls._ensure_device_auto_enable(device)
 
         return {
             "manage_ip": device.manage_ip,
