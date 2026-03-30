@@ -666,7 +666,6 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
         """按父方案异步验证所有启用子方案，并通过 websocket 推送进度。"""
         summary_plan = self.get_object()
         device_ip = (request.data.get('device_ip') or '').strip()
-        serial_num = (request.data.get('serial_num') or '').strip()
         south_driver = request.data.get('south_driver')
         use_local = request.data.get('use_local', False)
 
@@ -678,10 +677,10 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
                     'data': None,
                 })
 
-            if not device_ip and not serial_num:
+            if not device_ip:
                 return JsonResponse({
                     'code': 400,
-                    'message': '缺少必要参数: serial_num 或 device_ip',
+                    'message': '缺少必要参数: device_ip',
                     'data': None,
                 })
 
@@ -705,7 +704,7 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
 
             ok, message, device = DeviceSubCollectionPlanViewSet._resolve_execution_device(
                 device_ip=device_ip,
-                serial_num=serial_num,
+                serial_num='',
             )
             if not ok:
                 return JsonResponse({
@@ -720,7 +719,7 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
                 'summary_plan_id': summary_plan.id,
                 'device_id': device.id,
                 'device_ip': device_ip or device.manage_ip,
-                'serial_num': serial_num or getattr(device, 'serial_num', ''),
+                'serial_num': getattr(device, 'serial_num', ''),
                 'south_driver': south_driver,
                 'use_local': use_local,
                 'plan_ids': [plan.id for plan in enabled_plans],
@@ -745,7 +744,7 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
                 task_type='summary_plan_validate',
                 username=username,
                 device_ip=device_ip or device.manage_ip,
-                serial_num=serial_num or getattr(device, 'serial_num', ''),
+                serial_num=getattr(device, 'serial_num', ''),
                 summary_plan_id=summary_plan.id,
                 summary_plan_name=summary_plan.name,
                 status='queued',
@@ -795,7 +794,6 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
         """执行当前汇总采集方案下所有的子采集方案"""
         summary_plan = self.get_object()
         device_ip = request.data.get('device_ip')
-        serial_num = (request.data.get('serial_num') or '').strip()
         south_driver = request.data.get('south_driver')
         use_local = request.data.get('use_local', False)
 
@@ -808,15 +806,15 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
                 })
 
             # 验证设备IP参数
-            if not device_ip and not serial_num:
+            if not device_ip:
                 return JsonResponse({
                     "code": 400,
-                    "message": "缺少必要参数: serial_num 或 device_ip"
+                    "message": "缺少必要参数: device_ip"
                 })
 
             ok, message, device = DeviceSubCollectionPlanViewSet._resolve_execution_device(
                 device_ip=device_ip,
-                serial_num=serial_num,
+                serial_num='',
             )
             if not ok:
                 return JsonResponse({
@@ -925,8 +923,8 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
                 "data": {
                     "summary_plan_id": summary_plan.id,
                     "summary_plan_name": summary_plan.name,
-                    "device_ip": device_ip,
-                    "serial_num": serial_num,
+                    "device_ip": device_ip or getattr(device, "manage_ip", ""),
+                    "serial_num": getattr(device, "serial_num", ""),
                     "total_plans": total_plans,
                     "success_count": success_count,
                     "failed_count": failed_count,
@@ -1175,14 +1173,13 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
         """异步执行子采集方案，并通过 websocket 推送协议级进度。"""
         plan = self.get_object()
         device_ip = request.data.get('device_ip')           # 设备IP
-        serial_num = (request.data.get('serial_num') or '').strip()
         south_driver = request.data.get('south_driver')      # 南向驱动（可选）
         use_local = request.data.get('use_local', False)     # 是否使用本机直连（不走南向驱动）
 
         try:
             # 使用统一的参数验证方法
             is_valid, error_msg, device = self.validate_execution_params(
-                plan, device_ip, 'both', use_local=use_local, serial_num=serial_num
+                plan, device_ip, 'both', use_local=use_local, serial_num=''
             )
             if not is_valid:
                 return JsonResponse({
@@ -1202,7 +1199,7 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
                 'plan_id': plan.id,
                 'device_id': device.id,
                 'device_ip': device_ip or device.manage_ip,
-                'serial_num': serial_num or getattr(device, 'serial_num', ''),
+                'serial_num': getattr(device, 'serial_num', ''),
                 'south_driver': south_driver,
                 'use_local': use_local,
                 'username': username,
@@ -1226,7 +1223,7 @@ class DeviceSubCollectionPlanViewSet(CustomViewBase):
                 task_type='sub_plan_execute',
                 username=username,
                 device_ip=device_ip or device.manage_ip,
-                serial_num=serial_num or getattr(device, 'serial_num', ''),
+                serial_num=getattr(device, 'serial_num', ''),
                 summary_plan_id=getattr(plan, 'summary_plan_id', None),
                 summary_plan_name=getattr(getattr(plan, 'summary_plan', None), 'name', ''),
                 plan_id=plan.id,

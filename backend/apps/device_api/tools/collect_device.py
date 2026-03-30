@@ -151,12 +151,19 @@ def get_auto_device(**kwargs):
             identity = _relation_identity(relation)
             relation_groups.setdefault(identity, []).append(relation)
         for grouped_relations in relation_groups.values():
-            manual_relations = [
+            executable_relations = [
                 relation
                 for relation in grouped_relations
+                if getattr(relation, "plan_id", None)
+            ]
+            manual_relations = [
+                relation
+                for relation in executable_relations
                 if getattr(relation, "binding_source", "") == PlansToDevice.BINDING_SOURCE_MANUAL
             ]
-            manual_only_relations.extend(manual_relations or grouped_relations)
+            manual_only_relations.extend(
+                manual_relations or executable_relations or grouped_relations
+            )
         relations = manual_only_relations
     if not relations:
         connections.close_all()
