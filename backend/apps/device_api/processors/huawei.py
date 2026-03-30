@@ -1287,6 +1287,46 @@ def process_board_status_netconf(data):
 
 
 @register_processor(
+    vendor="Huawei", device_type="", collection_type="board_status", method="netmiko"
+)
+def process_board_status_netmiko(data):
+    """Huawei board_status 处理 (Netmiko/TextFSM)。
+
+    说明：不同方案可能复用同一 TextFSM 模板字段（如
+    hp_comware_display_device_manuinfo.textfsm），因此这里按标准化字段名做兼容映射。
+    """
+    rows = []
+    for item in _as_list(data):
+        if not isinstance(item, dict):
+            continue
+
+        slot_type = str(item.get("SLOT_TYPE") or item.get("slot_type") or "").strip()
+        slot_id = str(item.get("SLOT_ID") or item.get("slot_id") or "").strip()
+        serial_num = str(
+            item.get("DEVICE_SERIAL_NUMBER") or item.get("device_serial_number") or ""
+        ).strip()
+        if serial_num.upper() == "NONE":
+            serial_num = ""
+
+        device_name = str(item.get("DEVICE_NAME") or item.get("device_name") or "").strip()
+        chassis_id = str(item.get("CHASSIS_ID") or item.get("chassis_id") or "").strip()
+
+        rows.append(
+            dict(
+                slot="" if slot_id == "self" else slot_id,
+                board_name=device_name,
+                board_model=device_name,
+                serial_num=serial_num,
+                status=slot_type,
+                slot_type=slot_type.lower(),
+                chassis_id=chassis_id,
+            )
+        )
+
+    return rows
+
+
+@register_processor(
     vendor="Huawei", device_type="", collection_type="stack_status", method="netconf"
 )
 def process_stack_status_netconf(data):

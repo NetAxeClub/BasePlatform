@@ -436,7 +436,7 @@ class DeviceConnectionManager:
                 template_dir = os.environ.get("NET_TEXTFSM") or os.environ.get("NTC_TEMPLATES_DIR")
                 if template_dir:
                     template_str = os.path.join(template_dir, template_str)
-            return self._with_retry(
+            result = self._with_retry(
                 "netmiko",
                 "send_command_with_textfsm",
                 conn.send_command,
@@ -444,6 +444,17 @@ class DeviceConnectionManager:
                 use_textfsm=True,
                 textfsm_template=template_str or None,
             )
+            # TextFSM 解析失败时，netmiko 通常会返回原始字符串。
+            # 为降低因方案模板失配导致的整批失败，这里在失败后回退到 index 匹配的模板解析。
+            if isinstance(result, str) and result.strip():
+                return self._with_retry(
+                    "netmiko",
+                    "send_command_with_textfsm_index_fallback",
+                    conn.send_command,
+                    command,
+                    use_textfsm=True,
+                )
+            return result
         return self._with_retry(
             "netmiko",
             "send_command",

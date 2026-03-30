@@ -122,6 +122,7 @@ from apps.device_api.platform_profiles import (
     TEMPLATE_BASE_DIR,
     PlatformProfileService,
 )
+from apps.device_api.binding_analysis_service import analyze_collection_plan_bindings_service
 from apps.device_api.tasks import (
     analyze_collection_plan_bindings,
     _process_and_save_result,
@@ -3016,6 +3017,179 @@ class DeviceApiCollectDeviceTests(SimpleTestCase):
         self.assertEqual(result[0]["binding_created_at"], relation.created_at)
         self.assertEqual(result[0]["binding_updated_at"], relation.updated_at)
 
+    @patch("apps.device_api.tools.collect_device.DeviceSubCollectionPlanSerializer")
+    @patch("apps.device_api.tools.collect_device.DeviceSubCollectionPlan.objects")
+    @patch("apps.device_api.tools.collect_device.AssetAccount.objects")
+    @patch("apps.device_api.tools.collect_device.AssetIpInfo.objects")
+    @patch("apps.device_api.tools.collect_device.PlansToDevice.objects")
+    @patch("apps.device_api.tools.collect_device.NetworkDevice.objects")
+    def test_get_auto_device_returns_only_manual_bindings_when_manual_exists(
+        self,
+        mock_device_objects,
+        mock_relation_objects,
+        mock_asset_ip_objects,
+        mock_account_objects,
+        mock_sub_plan_objects,
+        mock_sub_plan_serializer,
+    ):
+        device_row = {
+            "id": 1,
+            "serial_num": "SER-1",
+            "manage_ip": "10.0.0.1",
+            "name": "switch-a",
+            "soft_version": "v1",
+            "vendor__name": "Huawei",
+            "vendor__alias": "Huawei",
+            "category__name": "switch",
+            "model__name": "CE8850",
+            "ssh_enable": "0",
+            "ssh_account": None,
+            "netconf_enable": "0",
+            "netconf_account": None,
+            "patch_version": "p1",
+            "status": 0,
+            "idc__name": "IDC-A",
+            "auto_enable": True,
+            "ha_status": 0,
+            "chassis": 1,
+            "slot": 1,
+        }
+        mock_device_objects.filter.return_value.select_related.return_value.values.return_value = [device_row]
+        auto_relation = SimpleNamespace(
+            manage_ip="10.0.0.1",
+            device_serial_num="SER-1",
+            plan_id=201,
+            use_local=True,
+            execute_node="",
+            profile_code="Huawei-auto",
+            binding_source="auto",
+            last_bound_at=datetime(2026, 3, 20, 10, 0, 0),
+            created_at=datetime(2026, 3, 18, 10, 0, 0),
+            updated_at=datetime(2026, 3, 21, 10, 0, 0),
+        )
+        manual_relation = SimpleNamespace(
+            manage_ip="10.0.0.1",
+            device_serial_num="SER-1",
+            plan_id=202,
+            use_local=True,
+            execute_node="",
+            profile_code="Huawei-manual",
+            binding_source="manual",
+            last_bound_at=datetime(2026, 3, 22, 10, 0, 0),
+            created_at=datetime(2026, 3, 19, 10, 0, 0),
+            updated_at=datetime(2026, 3, 22, 10, 0, 0),
+        )
+        mock_relation_objects.select_related.return_value.filter.return_value = [
+            auto_relation,
+            manual_relation,
+        ]
+        mock_asset_ip_objects.filter.return_value.values.return_value = []
+        mock_account_objects.filter.return_value.values.return_value = []
+        mock_sub_plan_objects.filter.return_value.select_related.return_value.order_by.return_value = []
+        mock_sub_plan_serializer.return_value.data = []
+
+        result = get_auto_device(manage_ip="10.0.0.1")
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["plan_id"], 202)
+        self.assertEqual(result[0]["binding_source"], "manual")
+
+    @patch("apps.device_api.tools.collect_device.DeviceSubCollectionPlanSerializer")
+    @patch("apps.device_api.tools.collect_device.DeviceSubCollectionPlan.objects")
+    @patch("apps.device_api.tools.collect_device.AssetAccount.objects")
+    @patch("apps.device_api.tools.collect_device.AssetIpInfo.objects")
+    @patch("apps.device_api.tools.collect_device.PlansToDevice.objects")
+    @patch("apps.device_api.tools.collect_device.NetworkDevice.objects")
+    def test_get_auto_device_filters_out_non_executable_sub_plans(
+        self,
+        mock_device_objects,
+        mock_relation_objects,
+        mock_asset_ip_objects,
+        mock_account_objects,
+        mock_sub_plan_objects,
+        mock_sub_plan_serializer,
+    ):
+        device_row = {
+            "id": 1,
+            "serial_num": "SER-1",
+            "manage_ip": "10.0.0.1",
+            "name": "switch-a",
+            "soft_version": "v1",
+            "vendor__name": "Huawei",
+            "vendor__alias": "Huawei",
+            "category__name": "switch",
+            "model__name": "CE8850",
+            "ssh_enable": "0",
+            "ssh_account": None,
+            "netconf_enable": "0",
+            "netconf_account": None,
+            "patch_version": "p1",
+            "status": 0,
+            "idc__name": "IDC-A",
+            "auto_enable": True,
+            "ha_status": 0,
+            "chassis": 1,
+            "slot": 1,
+        }
+        mock_device_objects.filter.return_value.select_related.return_value.values.return_value = [device_row]
+        relation = SimpleNamespace(
+            manage_ip="10.0.0.1",
+            device_serial_num="SER-1",
+            plan_id=201,
+            use_local=True,
+            execute_node="",
+            profile_code="Huawei-manual",
+            binding_source="manual",
+            last_bound_at=datetime(2026, 3, 22, 10, 0, 0),
+            created_at=datetime(2026, 3, 19, 10, 0, 0),
+            updated_at=datetime(2026, 3, 22, 10, 0, 0),
+        )
+        mock_relation_objects.select_related.return_value.filter.return_value = [relation]
+        mock_asset_ip_objects.filter.return_value.values.return_value = []
+        mock_account_objects.filter.return_value.values.return_value = []
+        mock_sub_plan_objects.filter.return_value.select_related.return_value.order_by.return_value = []
+        mock_sub_plan_serializer.return_value.data = [
+            {
+                "summary_plan": 201,
+                "id": 11,
+                "collection_type": "arp",
+                "netmiko_enabled": False,
+                "netconf_enabled": True,
+                "snmp_enabled": False,
+                "restconf_enabled": False,
+                "telemetry_enabled": False,
+            },
+            {
+                "summary_plan": 201,
+                "id": 12,
+                "collection_type": "device_identity",
+                "netmiko_enabled": False,
+                "netconf_enabled": False,
+                "snmp_enabled": False,
+                "restconf_enabled": False,
+                "telemetry_enabled": False,
+            },
+        ]
+
+        result = get_auto_device(manage_ip="10.0.0.1")
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(
+            result[0]["sub_plans"],
+            [
+                {
+                    "summary_plan": 201,
+                    "id": 11,
+                    "collection_type": "arp",
+                    "netmiko_enabled": False,
+                    "netconf_enabled": True,
+                    "snmp_enabled": False,
+                    "restconf_enabled": False,
+                    "telemetry_enabled": False,
+                }
+            ],
+        )
+
 
 class DeviceApiBridgeCommandTests(SimpleTestCase):
     @patch("apps.device_api.management.commands.sync_legacy_plan_bindings.PlansToDevice.objects")
@@ -4216,6 +4390,106 @@ class DeviceApiTaskTests(SimpleTestCase):
         mock_update_facts.assert_called_once()
         mock_save_local_result.assert_called_once()
 
+    @patch("apps.device_api.tasks.save_local_collection_result")
+    @patch("apps.device_api.tasks.DeviceFactService.update_from_processed_data")
+    @patch("apps.device_api.tasks.COLLECTION_SUB_PLAN.insert_one")
+    @patch("apps.device_api.tasks.resolve_raw_data")
+    @patch("apps.device_api.models.DeviceSubCollectionPlan.objects")
+    def test_process_and_save_result_marks_known_empty_netmiko_string_as_coverage_issue(
+        self,
+        mock_plan_objects,
+        mock_resolve_raw_data,
+        mock_insert_sub_task,
+        mock_update_facts,
+        mock_save_local_result,
+    ):
+        mock_plan_objects.select_related.return_value.get.return_value = SimpleNamespace()
+        collection_db = Mock()
+
+        plan = {
+            "id": 23,
+            "summary_plan": 1,
+            "collection_type": "lldp",
+            "summary_plan_vendor": "Huawei",
+            "summary_plan_device_type": "switch",
+            "netmiko_method": "display lldp neighbor",
+        }
+        device_info = {
+            "manage_ip": "10.0.0.23",
+            "name": "device-23",
+            "idc__name": "IDC-A",
+            "execute_time": "2026-03-30T09:17:56",
+        }
+
+        with patch("apps.device_api.tasks.COLLECTION_TYPE_MONGO_MAP", {"lldp": collection_db}):
+            result = _process_and_save_result(
+                plan,
+                device_info,
+                raw_result="No neighbor information",
+                collection_method="netmiko",
+            )
+
+        self.assertTrue(result["success"])
+        self.assertTrue(result["coverage_issue"])
+        self.assertEqual(result["reason"], "netmiko_feature_not_configured")
+        mock_resolve_raw_data.assert_not_called()
+        collection_db.delete_many.assert_called_once_with(
+            {
+                "hostip": "10.0.0.23",
+                "collection_type": "lldp",
+                "collection_method": "netmiko",
+            }
+        )
+        inserted_doc = mock_insert_sub_task.call_args[0][0]
+        self.assertTrue(inserted_doc["coverage_issue"])
+        self.assertEqual(inserted_doc["coverage_reason"], "netmiko_feature_not_configured")
+        mock_save_local_result.assert_called_once()
+        self.assertEqual(mock_save_local_result.call_args[0][7], "netmiko_feature_not_configured")
+
+    @patch("apps.device_api.tasks.save_local_collection_result")
+    @patch("apps.device_api.tasks.DeviceFactService.mark_discovery_failure")
+    @patch("apps.device_api.tasks.resolve_raw_data")
+    @patch("apps.device_api.models.DeviceSubCollectionPlan.objects")
+    def test_process_and_save_result_keeps_textfsm_failure_for_non_empty_netmiko_string(
+        self,
+        mock_plan_objects,
+        mock_resolve_raw_data,
+        mock_mark_failure,
+        mock_save_local_result,
+    ):
+        mock_plan_objects.select_related.return_value.get.return_value = SimpleNamespace()
+        mock_resolve_raw_data.return_value = (False, "Textfsm 模板解析失败", [])
+
+        plan = {
+            "id": 24,
+            "summary_plan": 1,
+            "collection_type": "clock_status",
+            "summary_plan_vendor": "Huawei",
+            "summary_plan_device_type": "switch",
+            "netmiko_method": "display clock",
+        }
+        device_info = {
+            "manage_ip": "10.0.0.24",
+            "name": "device-24",
+            "idc__name": "IDC-A",
+            "execute_time": "2026-03-30T09:17:56",
+        }
+
+        result = _process_and_save_result(
+            plan,
+            device_info,
+            raw_result="2026-03-30 09:17:56+08:00",
+            collection_method="netmiko",
+        )
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["reason"], "Textfsm 模板解析失败")
+        mock_resolve_raw_data.assert_called_once()
+        mock_mark_failure.assert_called_once_with(device_info, "Textfsm 模板解析失败")
+        mock_save_local_result.assert_called_once()
+        self.assertEqual(mock_save_local_result.call_args[0][6], "error")
+        self.assertEqual(mock_save_local_result.call_args[0][7], "Textfsm 模板解析失败")
+
     @patch("apps.device_api.tasks._record_execution_event")
     @patch("apps.device_api.tasks.COLLECTION_PLAN")
     @patch("apps.device_api.tasks._process_and_save_result")
@@ -4343,15 +4617,14 @@ class DeviceApiTaskTests(SimpleTestCase):
         conn_mgr.execute_netconf_get.assert_called_once_with("<netconf-state />")
         mock_collection_plan.update_one.assert_called_once()
 
-    @patch("apps.device_api.tasks._record_execution_event")
-    @patch("apps.device_api.tasks.COLLECTION_BINDING_ANALYSIS")
-    @patch("apps.device_api.tasks.PlatformProfileService.audit_device_coverage")
-    @patch("apps.device_api.tasks.NetworkDevice.objects")
-    @patch("apps.device_api.tasks.COLLECTION_RESULTS_DB")
-    @patch("apps.device_api.tasks.COLLECTION_EXECUTION_LOG")
-    @patch("apps.device_api.tasks.COLLECTION_SUB_PLAN")
-    @patch("apps.device_api.tasks.COLLECTION_PLAN")
-    def test_analyze_collection_plan_bindings_reports_runtime_recommendations(
+    @patch("apps.device_api.binding_analysis_service.COLLECTION_BINDING_ANALYSIS")
+    @patch("apps.device_api.binding_analysis_service.PlatformProfileService.audit_device_coverage")
+    @patch("apps.device_api.binding_analysis_service.NetworkDevice.objects")
+    @patch("apps.device_api.binding_analysis_service.COLLECTION_RESULTS_DB")
+    @patch("apps.device_api.binding_analysis_service.COLLECTION_EXECUTION_LOG")
+    @patch("apps.device_api.binding_analysis_service.COLLECTION_SUB_PLAN")
+    @patch("apps.device_api.binding_analysis_service.COLLECTION_PLAN")
+    def test_analyze_collection_plan_bindings_service_reports_runtime_recommendations(
         self,
         mock_collection_plan,
         mock_collection_sub_plan,
@@ -4360,7 +4633,6 @@ class DeviceApiTaskTests(SimpleTestCase):
         mock_network_device_objects,
         mock_audit_device_coverage,
         mock_binding_analysis,
-        mock_record_event,
     ):
         execute_time = "2026-03-24 10:36:38"
         mock_collection_plan.coll.find_one.return_value = {"execute_time": execute_time}
@@ -4433,8 +4705,13 @@ class DeviceApiTaskTests(SimpleTestCase):
                 }
             ],
         }
+        mock_record_event = Mock()
 
-        result = analyze_collection_plan_bindings(execute_time=execute_time, sample_limit=10)
+        result = analyze_collection_plan_bindings_service(
+            execute_time=execute_time,
+            sample_limit=10,
+            record_execution_event=mock_record_event,
+        )
 
         self.assertEqual(result["execute_time"], execute_time)
         self.assertEqual(result["analyzed_devices"], 1)
@@ -4450,6 +4727,23 @@ class DeviceApiTaskTests(SimpleTestCase):
         self.assertIn("binding_analysis_suggested", event_types)
         self.assertIn("batch_plan_binding_analysis_finished", event_types)
         mock_record_event.assert_called()
+
+    @patch("apps.device_api.tasks.analyze_collection_plan_bindings_service")
+    def test_analyze_collection_plan_bindings_task_delegates_to_service(self, mock_service):
+        mock_service.return_value = {"execute_time": "2026-03-30 16:00:00", "results": []}
+
+        result = analyze_collection_plan_bindings(
+            execute_time="2026-03-30 16:00:00",
+            max_devices=10,
+            sample_limit=20,
+        )
+
+        self.assertEqual(result["execute_time"], "2026-03-30 16:00:00")
+        mock_service.assert_called_once()
+        self.assertEqual(mock_service.call_args.kwargs["execute_time"], "2026-03-30 16:00:00")
+        self.assertEqual(mock_service.call_args.kwargs["max_devices"], 10)
+        self.assertEqual(mock_service.call_args.kwargs["sample_limit"], 20)
+        self.assertTrue(callable(mock_service.call_args.kwargs["record_execution_event"]))
 
     @patch("apps.device_api.tasks._record_execution_event")
     @patch("apps.device_api.tasks.COLLECTION_PLAN")
@@ -4761,7 +5055,7 @@ class DeviceApiTaskTests(SimpleTestCase):
     @patch("apps.device_api.tasks.MainIn.cmdb_to_mongo")
     @patch("apps.device_api.tasks.datas_to_cache")
     @patch("apps.device_api.tasks.get_auto_device")
-    def test_plan_collect_device_main_prefers_executable_binding_over_empty_manual_binding(
+    def test_plan_collect_device_main_keeps_manual_binding_even_when_auto_has_sub_plans(
         self,
         mock_get_auto_device,
         mock_datas_to_cache,
@@ -4798,12 +5092,12 @@ class DeviceApiTaskTests(SimpleTestCase):
 
         result = plan_collect_device_main(clear_history=False)
 
-        self.assertEqual(result["total"], 1)
-        self.assertEqual(result["tasks"], 1)
+        self.assertEqual(result["total"], 0)
+        self.assertEqual(result["tasks"], 0)
         self.assertEqual(result["deduplicated_devices"], 1)
-        self.assertEqual(result["skipped_without_sub_plans"], 0)
-        dispatched_host = mock_plan_collect_apply_async.call_args.kwargs["kwargs"]
-        self.assertEqual(dispatched_host["plan_id"], 301)
+        self.assertEqual(result["skipped_without_sub_plans"], 1)
+        self.assertEqual(result["analysis_trigger"]["reason"], "no_dispatched_tasks")
+        mock_plan_collect_apply_async.assert_not_called()
         mock_record_event.assert_called()
 
     @patch("apps.device_api.tasks._record_execution_event")
@@ -6757,6 +7051,55 @@ class DeviceApiProtocolExtensionTests(SimpleTestCase):
         self.assertEqual(result[1]["slot"], "2")
         self.assertEqual(result[1]["serial_num"], "BOARD456")
 
+    def test_h3c_arp_evpn_netconf_processor_maps_entries(self):
+        from apps.device_api.processors.h3c import process_arp_evpn_netconf
+
+        result = process_arp_evpn_netconf(
+            {
+                "top": {
+                    "Ifmgr": {
+                        "Interfaces": {
+                            "Interface": [
+                                {
+                                    "IfIndex": "101",
+                                    "Name": "GigabitEthernet1/0/1",
+                                    "PortIndex": "1",
+                                }
+                            ]
+                        }
+                    },
+                    "L2VPN": {
+                        "LocalMACs": {
+                            "MAC": [
+                                {"MacAddr": "0011-2233-4455", "IfIndex": "101"}
+                            ]
+                        },
+                        "ArpTable": {
+                            "ArpEntry": [
+                                {
+                                    "Ipv4Address": "10.0.0.1",
+                                    "MacAddress": "0011-2233-4455",
+                                    "VrfIndex": "100",
+                                    "PortIndex": "1",
+                                    "IfIndex": "",
+                                    "ArpType": "DynamicArp",
+                                    "aging": "10",
+                                }
+                            ]
+                        },
+                    },
+                }
+            }
+        )
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["ipaddress"], "10.0.0.1")
+        self.assertEqual(result[0]["macaddress"], "0011-2233-4455")
+        self.assertEqual(result[0]["vlan"], "100")
+        self.assertEqual(result[0]["vpninstance"], "100")
+        self.assertEqual(result[0]["interface"], "GigabitEthernet1/0/1")
+        self.assertEqual(result[0]["type"], "DynamicArp")
+
     def test_h3c_irf_status_netconf_processor_maps_member_roles(self):
         result = process_h3c_irf_status_netconf(
             {
@@ -7109,6 +7452,38 @@ class DeviceApiProtocolExtensionTests(SimpleTestCase):
         self.assertEqual(result[1]["slot"], "1")
         self.assertEqual(result[1]["board_model"], "CEL36DQHG-X")
         self.assertEqual(result[1]["slot_type"], "lpu")
+
+    def test_huawei_board_status_netmiko_processor_maps_physical_entities(self):
+        from apps.device_api.processors.huawei import process_board_status_netmiko
+
+        result = process_board_status_netmiko(
+            [
+                {
+                    "SLOT_TYPE": "Slot",
+                    "SLOT_ID": "0",
+                    "DEVICE_NAME": "Fan Module",
+                    "DEVICE_SERIAL_NUMBER": "SER001",
+                    "CHASSIS_ID": "1",
+                },
+                {
+                    "SLOT_TYPE": "Chassis",
+                    "SLOT_ID": "self",
+                    "DEVICE_NAME": "Chassis Main",
+                    "DEVICE_SERIAL_NUMBER": "NONE",
+                    "CHASSIS_ID": "1",
+                },
+            ]
+        )
+
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]["slot"], "0")
+        self.assertEqual(result[0]["board_name"], "Fan Module")
+        self.assertEqual(result[0]["serial_num"], "SER001")
+        self.assertEqual(result[0]["slot_type"], "slot")
+
+        self.assertEqual(result[1]["slot"], "")
+        self.assertEqual(result[1]["serial_num"], "")
+        self.assertEqual(result[1]["status"], "Chassis")
 
     def test_huawei_arp_netconf_processor_maps_fields(self):
         result = process_huawei_arp_netconf(

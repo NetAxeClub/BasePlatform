@@ -87,6 +87,9 @@
 当前主链遵循以下原则：
 
 - `plan_collect_device_main` / `plan_collect_device` 严格以 `PlansToDevice` 为执行依据
+- 同一设备若同时存在 active `manual` 与 active `auto` 绑定，执行链路只采纳 `manual`
+- `auto` 绑定在这种场景下保留为分析证据，不再参与本轮采集下发
+- 下发前会过滤 `netmiko / netconf / snmp / restconf / telemetry` 全部未启用的不可执行子方案
 - 采集任务只负责执行、留痕、入库，不在执行时自动改写绑定
 - 如果设备与当前绑定方案不匹配，异常和覆盖缺口统一保留到运行态集合
 - 绑定是否调整，由独立分析任务给出建议，再由人工或显式操作执行
@@ -160,12 +163,119 @@
 - `GET /device_api/collection-results/analysis_checklist/`
 - `POST /device_api/collection-results/refresh_analysis_checklist/`
 
+## 9. tasks.py 任务职责
+
+`backend/apps/device_api/tasks.py` 当前主要承担“异步任务入口 + 采集编排 + 运行态留痕”职责，核心方法可分为 6 组：
+
+### 9.1 运行态任务快照与事件留痕
+
+- `get_runtime_task_snapshot`
+- `_store_runtime_task_snapshot`
+- `_build_runtime_task_snapshot`
+- `_record_execution_event`
+
+说明：
+
+- 负责缓存异步任务进度、推送 websocket 事件、写入批次 / 设备 / 子方案级运行态执行日志
+
+### 9.2 方案验证与单子方案调试
+
+- `_validate_plan_for_device`
+- `run_summary_plan_validation_task`
+- `run_sub_plan_execute_task`
+
+说明：
+
+- 用于前端或人工验证“某父方案 / 某子方案在某台设备上是否具备执行条件并能否跑通”
+- 这里校验的是协议启用、账号准备、执行模式匹配，不直接做平台画像绑定决策
+
+### 9.3 设备 onboarding 与画像绑定编排
+
+- `_load_onboarding_device`
+- `_validate_onboarding_device`
+- `onboard_network_device`
+
+说明：
+
+- 负责新纳管设备的首轮编排
+- 典型链路是：设备准入校验 -> 首轮自动绑定 -> 首轮采集 -> 二次自动收敛
+- 这是 `tasks.py` 中最接近“设备画像校验 / 自动绑定”的任务入口
+
+### 9.4 全量采集批次调度
+
+- `should_clear_history_before_batch`
+- `should_clear_plan_data_before_batch`
+- `split_runtime_control_kwargs`
+- `_binding_source_priority`
+- `_host_identity`
+- `_has_executable_sub_plans`
+- `_host_preference_key`
+- `dedupe_batch_hosts`
+- `plan_collect_device_main`
+
+说明：
+
+- 负责批次前清理、加载待采设备、按设备去重、处理 `manual` 优先、跳过无可执行子方案设备、批量下发 Celery 采集任务
+
+### 9.5 单设备采集执行与结果处理
+
+- `datas_to_cache`
+- `clear_his_collect_res`
+- `_get_collection_db`
+- `_should_replace_snapshot_rows`
+- `_build_snapshot_replace_filter`
+- `_replace_snapshot_rows`
+- `plan_collect_device`
+- `_classify_temporary_netmiko_string_result`
+- `_process_and_save_result`
+
+说明：
+
+- 负责单设备维度的父方案执行、子方案协议调用、结果解析、Mongo 落库、覆盖缺口分类、设备事实回填
+- 当前“netmiko 返回字符串时区分无配置与模板解析失败”的临时策略也在这一层
+
+### 9.6 采集后分析与辅助批量任务
+
+- `analyze_collection_plan_bindings`
+- `batch_update_device_name_by_snmp`
+
+说明：
+
+- `analyze_collection_plan_bindings` 现在仅保留 Celery 薄入口，具体绑定分析逻辑已迁到 `backend/apps/device_api/binding_analysis_service.py`
+- `batch_update_device_name_by_snmp` 是独立的 SNMP 批量探测更新设备名称任务
+
+### 9.7 两条核心调用链
+
+全量采集主链：
+
+- `plan_collect_device_main`
+- `get_auto_device`
+- `dedupe_batch_hosts`
+- `plan_collect_device`
+- `_process_and_save_result`
+- `DeviceFactService.update_from_processed_data`
+
+新设备纳管主链：
+
+- `onboard_network_device`
+- `PlatformProfileService.auto_bind_device_by_connection_priority`
+- `get_auto_device`
+- `plan_collect_device`
+- `PlatformProfileService.auto_bind_devices`
+
+职责边界：
+
+- `tasks.py` 更偏向“什么时候跑、如何编排、如何留痕”
+- `platform_profiles.py` 更偏向“如何匹配画像、如何自动绑定、如何审计覆盖”
+- 后续若继续重构，优先把方案可执行性校验、批次去重规则、结果处理规则逐步下沉到独立 service
+
 
 ## 10. 当前文档入口
 
 - [当前能力](./当前能力.md)
 - [遗留任务](./遗留任务.md)
 - [前端页面需求](./前端页面需求.md)
+- [2026-03-30 全量采集结果分析与整改验收](./2026-03-30_全量采集结果分析与整改验收.md)
 
 ## 11. 证据文件
 
