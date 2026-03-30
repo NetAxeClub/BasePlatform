@@ -132,6 +132,14 @@
 - 若 NETCONF 不通且 SSH 可用，则回退匹配 `cli` 语义方案
 - 自动绑定只会收敛 `binding_source=auto` 的关系，不覆盖手工绑定
 
+`/device_api/plans-to-device/batch-auto-bind/` 当前用于批量异步画像重绑：
+
+- 通过 Celery 批任务异步执行，适合处理大批量 `binding_plan_mismatch` 设备
+- 支持按 `manage_ip / serial_num / vendor_aliases / target_blockers / limit` 筛选候选设备
+- 任务内部会先做画像覆盖审计，再并发执行 capability discovery 和自动重绑
+- 若命中 active `manual` 绑定且与目标方案冲突，任务会跳过该设备并返回 `manual_binding_conflict`，避免误覆盖手工绑定
+- 任务提交后可通过 `/device_api/plans-to-device/task-status/?task_id=<task_id>` 查询进度
+
 ## 7. 运行态排障入口
 
 生产排障优先看 4 处：
