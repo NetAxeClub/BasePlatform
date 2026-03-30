@@ -125,10 +125,12 @@ from apps.device_api.platform_profiles import (
 from apps.device_api.binding_analysis_service import analyze_collection_plan_bindings_service
 from apps.device_api.tasks import (
     analyze_collection_plan_bindings,
+    execute_batch_profile_rebind,
     _process_and_save_result,
     clear_his_collect_res,
     plan_collect_device,
     plan_collect_device_main,
+    run_batch_profile_rebind_task,
     split_runtime_control_kwargs,
     should_clear_history_before_batch,
     should_clear_plan_data_before_batch,
@@ -1169,6 +1171,35 @@ class DeviceApiViewTests(SimpleTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(payload["code"], 400)
         self.assertEqual(payload["message"], "缺少必要参数: manage_ip")
+
+    @patch("apps.device_api.views._store_runtime_task_snapshot")
+    @patch("apps.device_api.views.run_batch_profile_rebind_task.apply_async")
+    def test_plans_to_device_batch_auto_bind_endpoint_submits_async_task(
+        self,
+        mock_apply_async,
+        _mock_store_snapshot,
+    ):
+        mock_apply_async.return_value = "task-batch-auto-bind-1"
+
+        request = self.factory.post(
+            "/base_platform/device_api/plans-to-device/batch-auto-bind/",
+            {
+                "vendor_aliases": ["H3C"],
+                "target_blockers": ["binding_plan_mismatch"],
+                "max_workers": 16,
+            },
+            format="json",
+        )
+        response = PlansToDeviceViewSet.as_view({"post": "batch_auto_bind"})(request)
+        payload = json.loads(response.content)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["code"], 200)
+        self.assertEqual(payload["message"], "批量画像重绑任务已提交")
+        self.assertEqual(payload["data"]["task_id"], "task-batch-auto-bind-1")
+        self.assertTrue(payload["data"]["async"])
+        mock_apply_async.assert_called_once()
+
 
     def test_collection_rule_tool_returns_cmdb_fields(self):
         request = self.factory.get(
@@ -4744,6 +4775,98 @@ class DeviceApiTaskTests(SimpleTestCase):
         self.assertEqual(mock_service.call_args.kwargs["max_devices"], 10)
         self.assertEqual(mock_service.call_args.kwargs["sample_limit"], 20)
         self.assertTrue(callable(mock_service.call_args.kwargs["record_execution_event"]))
+
+    @patch("apps.device_api.tasks._store_runtime_task_snapshot")
+    @patch("apps.device_api.tasks.PlatformProfileService.discover_device_capabilities")
+    @patch("apps.device_api.tasks.PlatformProfileService.audit_device_coverage")
+    @patch("apps.device_api.tasks.NetworkDevice.objects")
+    @patch("apps.device_api.tasks.connections.close_all")
+    def test_execute_batch_profile_rebind_processes_mismatch_candidates(
+        self,
+        _mock_close_all,
+        mock_network_device_objects,
+        mock_audit_device_coverage,
+        mock_discover_capabilities,
+        _mock_store_snapshot,
+    ):
+        device = SimpleNamespace(
+            id=101,
+            manage_ip="10.0.0.1",
+            serial_num="SER-1",
+            category=SimpleNamespace(name="switch"),
+        )
+
+        queryset = Mock()
+        queryset.select_related.return_value = queryset
+        queryset.filter.return_value = queryset
+        queryset.__iter__ = Mock(return_value=iter([device]))
+        mock_network_device_objects.filter.return_value = queryset
+
+        detail_queryset = Mock()
+        detail_queryset.filter.return_value.first.return_value = device
+        mock_network_device_objects.select_related.return_value = detail_queryset
+
+        mock_audit_device_coverage.return_value = {
+            "summary": {"total": 1, "blocked": 1},
+            "results": [
+                {
+                    "manage_ip": "10.0.0.1",
+                    "serial_num": "SER-1",
+                    "vendor_alias": "H3C",
+                    "model_name": "S6800",
+                    "profile_code": "H3C-modern-cli",
+                    "plan_name": "default-h3c-modern-cli-switch",
+                    "blockers": [
+                        {
+                            "code": "binding_plan_mismatch",
+                            "message": "设备已绑定方案与画像默认方案不一致",
+                        }
+                    ],
+                }
+            ],
+        }
+
+        mock_discover_capabilities.return_value = {
+            "status": "finished",
+            "matched_profile_before": "H3C-legacy-cli",
+            "matched_profile_after": "H3C-modern-cli",
+            "probe_summary": {"total": 1, "success": 1, "failed": 0, "skipped": 0},
+            "auto_bind_result": {"created": 0, "updated": 1, "skipped": 0, "retired": 1},
+        }
+
+        with patch("apps.device_api.tasks._execute_single_batch_profile_rebind") as mock_single_rebind:
+            mock_single_rebind.return_value = {
+                "manage_ip": "10.0.0.1",
+                "serial_num": "SER-1",
+                "status": "success",
+                "reason": "rebind_applied",
+                "target_profile_code": "H3C-modern-cli",
+                "target_plan_name": "default-h3c-modern-cli-switch",
+                "target_blockers": ["binding_plan_mismatch"],
+                "matched_profile_before": "H3C-legacy-cli",
+                "matched_profile_after": "H3C-modern-cli",
+                "probe_summary": {"total": 1, "success": 1, "failed": 0, "skipped": 0},
+                "auto_bind_result": {"created": 0, "updated": 1, "skipped": 0, "retired": 1},
+            }
+
+            result = execute_batch_profile_rebind(
+                "task-batch-1",
+                {
+                    "vendor_aliases": ["H3C"],
+                    "target_blockers": ["binding_plan_mismatch"],
+                    "max_workers": 2,
+                    "sample_limit": 5,
+                    "username": "tester",
+                },
+            )
+
+        self.assertEqual(result["status"], "finished")
+        self.assertEqual(result["progress"]["total"], 1)
+        self.assertEqual(result["progress"]["success_count"], 1)
+        self.assertEqual(result["data"]["candidate_summary"]["count"], 1)
+        self.assertEqual(result["data"]["result_summary"]["success"], 1)
+        mock_audit_device_coverage.assert_called_once()
+        mock_single_rebind.assert_called_once()
 
     @patch("apps.device_api.tasks._record_execution_event")
     @patch("apps.device_api.tasks.COLLECTION_PLAN")

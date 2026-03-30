@@ -73,6 +73,7 @@
    - 支持字段映射和自定义数据处理
 """
 from __future__ import absolute_import, unicode_literals
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
 import time
 import json
@@ -220,6 +221,9 @@ INCREMENTAL_SNAPSHOT_COLLECTION_TYPES = frozenset(
 DEVICE_API_RUNTIME_TASK_CACHE_PREFIX = "device_api:runtime_task:"
 DEVICE_API_RUNTIME_TASK_CACHE_TIMEOUT = 6 * 60 * 60
 DEVICE_API_WS_GROUP_PREFIX = "device_collection_"
+BATCH_PROFILE_REBIND_DEFAULT_BLOCKERS = ("binding_plan_mismatch",)
+BATCH_PROFILE_REBIND_MAX_WORKERS = 50
+BATCH_PROFILE_REBIND_RESULT_SAMPLE_LIMIT = 100
 
 if DEBUG:
     CELERY_QUEUE = "dev"
@@ -855,6 +859,25 @@ def _safe_timestamp(value) -> float:
     return 0.0
 
 
+def _normalize_string_list(value, default=None):
+    if value is None:
+        return list(default or [])
+    if isinstance(value, str):
+        parts = [part.strip() for part in value.split(",")]
+        return [part for part in parts if part]
+    if isinstance(value, (list, tuple, set)):
+        normalized = []
+        for item in value:
+            text = str(item or "").strip()
+            if text:
+                normalized.append(text)
+        return normalized or list(default or [])
+    text = str(value or "").strip()
+    if text:
+        return [text]
+    return list(default or [])
+
+
 def _host_identity(host: dict) -> str:
     return (
         host.get("device_serial_num")
@@ -923,6 +946,304 @@ def dedupe_batch_hosts(hosts):
                 }
             )
     return list(deduped_hosts.values()), duplicate_count, duplicate_details
+
+
+def _load_batch_profile_rebind_candidates(devices, target_blockers):
+    audit_result = PlatformProfileService.audit_device_coverage(devices)
+    device_by_identity = {}
+    for device in devices:
+        serial_num = str(getattr(device, "serial_num", "") or "").strip()
+        manage_ip = str(getattr(device, "manage_ip", "") or "").strip()
+        if serial_num:
+            device_by_identity[f"serial:{serial_num}"] = device
+        if manage_ip:
+            device_by_identity[f"ip:{manage_ip}"] = device
+
+    candidates = []
+    blocker_counter = Counter()
+    for item in audit_result.get("results", []):
+        blockers = item.get("blockers") or []
+        target_items = [
+            blocker
+            for blocker in blockers
+            if str(blocker.get("code") or "") in target_blockers
+        ]
+        if not target_items:
+            continue
+        manage_ip = str(item.get("manage_ip") or "").strip()
+        serial_num = str(item.get("serial_num") or "").strip()
+        device = device_by_identity.get(f"serial:{serial_num}") or device_by_identity.get(f"ip:{manage_ip}")
+        if device is None:
+            continue
+        target_codes = [str(blocker.get("code") or "") for blocker in target_items if blocker.get("code")]
+        for code in target_codes:
+            blocker_counter[code] += 1
+        candidates.append(
+            {
+                "device_id": getattr(device, "id", None),
+                "manage_ip": manage_ip,
+                "serial_num": serial_num,
+                "vendor_alias": str(item.get("vendor_alias") or ""),
+                "model_name": str(item.get("model_name") or ""),
+                "target_profile_code": str(item.get("profile_code") or ""),
+                "target_plan_name": str(item.get("plan_name") or ""),
+                "target_blockers": target_codes,
+            }
+        )
+    return audit_result, candidates, blocker_counter
+
+
+def _execute_single_batch_profile_rebind(candidate, *, rebind=True, skip_manual_conflict=True):
+    from apps.device_api.models import PlansToDevice
+
+    connections.close_all()
+    try:
+        device = (
+            NetworkDevice.objects.select_related("vendor", "category", "model", "ssh_account", "netconf_account")
+            .filter(id=candidate.get("device_id"))
+            .first()
+        )
+        if device is None:
+            return {
+                "manage_ip": candidate.get("manage_ip", ""),
+                "serial_num": candidate.get("serial_num", ""),
+                "status": "failed",
+                "reason": "device_not_found",
+                "target_profile_code": candidate.get("target_profile_code", ""),
+                "target_plan_name": candidate.get("target_plan_name", ""),
+                "target_blockers": candidate.get("target_blockers", []),
+            }
+
+        bindings = list(
+            PlansToDevice.objects.select_related("plan").filter(
+                is_active=True,
+                device_serial_num=getattr(device, "serial_num", "") or "",
+            )
+        )
+        if not bindings and getattr(device, "manage_ip", ""):
+            bindings = list(
+                PlansToDevice.objects.select_related("plan").filter(
+                    is_active=True,
+                    manage_ip=getattr(device, "manage_ip", ""),
+                )
+            )
+
+        target_plan_name = str(candidate.get("target_plan_name") or "")
+        has_manual_conflict = any(
+            getattr(binding, "binding_source", "") == getattr(PlansToDevice, "BINDING_SOURCE_MANUAL", "manual")
+            and str(getattr(getattr(binding, "plan", None), "name", "") or "") != target_plan_name
+            for binding in bindings
+        )
+        if skip_manual_conflict and has_manual_conflict:
+            return {
+                "manage_ip": getattr(device, "manage_ip", ""),
+                "serial_num": getattr(device, "serial_num", ""),
+                "status": "skipped",
+                "reason": "manual_binding_conflict",
+                "target_profile_code": candidate.get("target_profile_code", ""),
+                "target_plan_name": target_plan_name,
+                "target_blockers": candidate.get("target_blockers", []),
+                "active_binding_sources": sorted(
+                    {
+                        str(getattr(binding, "binding_source", "") or "")
+                        for binding in bindings
+                        if getattr(binding, "binding_source", "")
+                    }
+                ),
+            }
+
+        result = PlatformProfileService.discover_device_capabilities(
+            device,
+            category_name=str(getattr(getattr(device, "category", None), "name", "") or "").strip(),
+            rebind=rebind,
+        )
+        auto_bind_result = result.get("auto_bind_result") or {}
+        changed = any(
+            int(auto_bind_result.get(field) or 0) > 0
+            for field in ("created", "updated", "retired")
+        )
+
+        status = "success"
+        reason = "rebind_applied" if changed else "no_binding_change"
+        if result.get("status") == "skipped":
+            status = "skipped"
+            reason = str(result.get("reason") or "discovery_skipped")
+        elif result.get("status") != "finished":
+            status = "failed"
+            reason = str(result.get("reason") or "discovery_failed")
+        elif not rebind:
+            reason = "discovery_finished"
+
+        return {
+            "manage_ip": getattr(device, "manage_ip", ""),
+            "serial_num": getattr(device, "serial_num", ""),
+            "status": status,
+            "reason": reason,
+            "target_profile_code": candidate.get("target_profile_code", ""),
+            "target_plan_name": target_plan_name,
+            "target_blockers": candidate.get("target_blockers", []),
+            "matched_profile_before": result.get("matched_profile_before", ""),
+            "matched_profile_after": result.get("matched_profile_after", ""),
+            "probe_summary": result.get("probe_summary") or {},
+            "auto_bind_result": auto_bind_result,
+        }
+    except Exception as exc:
+        return {
+            "manage_ip": candidate.get("manage_ip", ""),
+            "serial_num": candidate.get("serial_num", ""),
+            "status": "failed",
+            "reason": str(exc),
+            "target_profile_code": candidate.get("target_profile_code", ""),
+            "target_plan_name": candidate.get("target_plan_name", ""),
+            "target_blockers": candidate.get("target_blockers", []),
+        }
+    finally:
+        connections.close_all()
+
+
+def execute_batch_profile_rebind(task_id: str, task_context: dict):
+    username = str((task_context or {}).get("username") or "")
+    manage_ip = str((task_context or {}).get("manage_ip") or "").strip()
+    serial_num = str((task_context or {}).get("serial_num") or "").strip()
+    vendor_aliases = _normalize_string_list((task_context or {}).get("vendor_aliases"))
+    target_blockers = _normalize_string_list(
+        (task_context or {}).get("target_blockers"),
+        default=BATCH_PROFILE_REBIND_DEFAULT_BLOCKERS,
+    )
+    limit = max(int((task_context or {}).get("limit") or 0), 0)
+    max_workers = max(int((task_context or {}).get("max_workers") or 10), 1)
+    max_workers = min(max_workers, BATCH_PROFILE_REBIND_MAX_WORKERS)
+    rebind = _coerce_runtime_flag((task_context or {}).get("rebind", True), default=True)
+    sample_limit = max(
+        int((task_context or {}).get("sample_limit") or BATCH_PROFILE_REBIND_RESULT_SAMPLE_LIMIT),
+        1,
+    )
+    sample_limit = min(sample_limit, BATCH_PROFILE_REBIND_RESULT_SAMPLE_LIMIT)
+
+    snapshot = _build_runtime_task_snapshot(
+        task_id=task_id,
+        task_type="batch_profile_rebind",
+        username=username,
+        device_ip="",
+        serial_num="",
+        status="running",
+        message="批量画像重绑任务已启动",
+        execute_time=datetime.now().isoformat(),
+        progress={"current": 0, "total": 0, "success_count": 0, "failed_count": 0, "skipped_count": 0},
+        data={
+            "filters": {
+                "manage_ip": manage_ip or None,
+                "serial_num": serial_num or None,
+                "vendor_aliases": vendor_aliases,
+            },
+            "target_blockers": target_blockers,
+            "max_workers": max_workers,
+            "rebind": rebind,
+        },
+    )
+    _store_runtime_task_snapshot(snapshot)
+
+    queryset = NetworkDevice.objects.filter(status=0, auto_enable=True).select_related(
+        "vendor",
+        "category",
+        "model",
+        "ssh_account",
+        "netconf_account",
+    )
+    if manage_ip:
+        queryset = queryset.filter(manage_ip=manage_ip)
+    if serial_num:
+        queryset = queryset.filter(serial_num=serial_num)
+    if vendor_aliases:
+        queryset = queryset.filter(vendor__alias__in=vendor_aliases)
+    if limit > 0:
+        queryset = queryset[:limit]
+    devices = list(queryset)
+
+    audit_result, candidates, blocker_counter = _load_batch_profile_rebind_candidates(
+        devices,
+        target_blockers=target_blockers,
+    )
+    snapshot["progress"]["total"] = len(candidates)
+    snapshot["data"]["audit_summary"] = audit_result.get("summary", {})
+    snapshot["data"]["candidate_summary"] = {
+        "count": len(candidates),
+        "target_blockers": dict(blocker_counter),
+    }
+    _store_runtime_task_snapshot(snapshot)
+
+    if not candidates:
+        snapshot["status"] = "finished"
+        snapshot["message"] = "没有命中可执行的画像重绑候选设备"
+        snapshot["result_code"] = 200
+        snapshot["event"] = {"stage": "finished"}
+        snapshot["data"]["result_summary"] = {"success": 0, "failed": 0, "skipped": 0}
+        _store_runtime_task_snapshot(snapshot)
+        return snapshot
+
+    result_counter = Counter()
+    reason_counter = Counter()
+    profile_counter = Counter()
+    result_samples = []
+
+    with ThreadPoolExecutor(max_workers=min(max_workers, len(candidates))) as executor:
+        future_map = {
+            executor.submit(
+                _execute_single_batch_profile_rebind,
+                candidate,
+                rebind=rebind,
+                skip_manual_conflict=True,
+            ): candidate
+            for candidate in candidates
+        }
+        for index, future in enumerate(as_completed(future_map), start=1):
+            result = future.result()
+            status = str(result.get("status") or "failed")
+            reason = str(result.get("reason") or "")
+            result_counter[status] += 1
+            if reason:
+                reason_counter[reason] += 1
+            if result.get("target_profile_code"):
+                profile_counter[str(result.get("target_profile_code"))] += 1
+            if len(result_samples) < sample_limit:
+                result_samples.append(result)
+
+            snapshot["progress"] = {
+                "current": index,
+                "total": len(candidates),
+                "success_count": result_counter.get("success", 0),
+                "failed_count": result_counter.get("failed", 0),
+                "skipped_count": result_counter.get("skipped", 0),
+            }
+            snapshot["message"] = f"批量画像重绑执行中 ({index}/{len(candidates)})"
+            snapshot["data"]["result_summary"] = {
+                "success": result_counter.get("success", 0),
+                "failed": result_counter.get("failed", 0),
+                "skipped": result_counter.get("skipped", 0),
+                "reason_summary": dict(reason_counter),
+                "target_profile_summary": dict(profile_counter),
+            }
+            snapshot["data"]["samples"] = result_samples
+            if index == len(candidates) or index % 10 == 0:
+                _store_runtime_task_snapshot(snapshot)
+
+    snapshot["status"] = "finished" if result_counter.get("failed", 0) < len(candidates) else "failed"
+    snapshot["message"] = (
+        f"批量画像重绑完成: success={result_counter.get('success', 0)} "
+        f"failed={result_counter.get('failed', 0)} skipped={result_counter.get('skipped', 0)}"
+    )
+    snapshot["result_code"] = 200 if result_counter.get("failed", 0) < len(candidates) else 500
+    snapshot["event"] = {"stage": "finished"}
+    snapshot["data"]["result_summary"] = {
+        "success": result_counter.get("success", 0),
+        "failed": result_counter.get("failed", 0),
+        "skipped": result_counter.get("skipped", 0),
+        "reason_summary": dict(reason_counter),
+        "target_profile_summary": dict(profile_counter),
+    }
+    snapshot["data"]["samples"] = result_samples
+    _store_runtime_task_snapshot(snapshot)
+    return snapshot
 
 
 def _load_onboarding_device(device_id):
@@ -1061,6 +1382,12 @@ def onboard_network_device(device_id, trigger="asset_upsert"):
     result["status"] = "finished"
     result["reason"] = ""
     return result
+
+
+@shared_task(base=AxeTask, once={"graceful": True}, bind=True)
+def run_batch_profile_rebind_task(self, task_context):
+    task_id = str(getattr(self.request, "id", "") or "")
+    return execute_batch_profile_rebind(task_id, task_context or {})
 
 
 def _truncate_preview(value, max_length=1200):

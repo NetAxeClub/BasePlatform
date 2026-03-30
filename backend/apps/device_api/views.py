@@ -57,6 +57,7 @@ from apps.device_api.tasks import (
     _store_runtime_task_snapshot,
     analyze_collection_plan_bindings,
     get_runtime_task_snapshot,
+    run_batch_profile_rebind_task,
     run_sub_plan_execute_task,
     run_summary_plan_validation_task,
 )
@@ -318,6 +319,90 @@ class PlansToDeviceViewSet(CustomViewBase):
             'message': '单设备协议连通性探测与绑定收敛完成',
             'data': result,
         })
+
+    @action(detail=False, methods=['post'], url_path='batch-auto-bind')
+    def batch_auto_bind(self, request, *args, **kwargs):
+        username = _resolve_request_username(request)
+        vendor_aliases = request.data.get("vendor_aliases")
+        if not vendor_aliases:
+            vendor_alias = (request.data.get("vendor_alias") or "").strip()
+            vendor_aliases = [vendor_alias] if vendor_alias else []
+
+        task_context = {
+            "manage_ip": (request.data.get("manage_ip") or "").strip(),
+            "serial_num": (request.data.get("serial_num") or "").strip(),
+            "vendor_aliases": vendor_aliases,
+            "target_blockers": request.data.get("target_blockers") or ["binding_plan_mismatch"],
+            "limit": request.data.get("limit") or 0,
+            "max_workers": request.data.get("max_workers") or 10,
+            "rebind": request.data.get("rebind", True),
+            "sample_limit": request.data.get("sample_limit") or 50,
+            "username": username,
+        }
+
+        res = run_batch_profile_rebind_task.apply_async(
+            kwargs={"task_context": task_context},
+            queue=CELERY_QUEUE,
+            retry=True,
+        )
+        if str(res) == "None":
+            res.forget()
+            return JsonResponse({
+                "code": 400,
+                "message": "重复的任务参数",
+                "data": None,
+            })
+
+        task_id = str(res)
+        snapshot = _build_runtime_task_snapshot(
+            task_id=task_id,
+            task_type="batch_profile_rebind",
+            username=username,
+            device_ip="",
+            serial_num="",
+            status="queued",
+            message="批量画像重绑任务已提交，等待 Celery worker 执行",
+            progress={
+                "current": 0,
+                "total": 0,
+                "success_count": 0,
+                "failed_count": 0,
+                "skipped_count": 0,
+            },
+            data={
+                "filters": {
+                    "manage_ip": task_context["manage_ip"] or None,
+                    "serial_num": task_context["serial_num"] or None,
+                    "vendor_aliases": task_context["vendor_aliases"] or [],
+                },
+                "target_blockers": task_context["target_blockers"],
+                "max_workers": task_context["max_workers"],
+                "rebind": task_context["rebind"],
+            },
+        )
+        _store_runtime_task_snapshot(snapshot)
+
+        return JsonResponse({
+            "code": 200,
+            "message": "批量画像重绑任务已提交",
+            "data": {
+                **snapshot,
+                "async": True,
+                "websocket_path": "/base_platform/ws/device_collection/",
+            },
+        })
+
+    @action(detail=False, methods=['get'], url_path='task-status')
+    def task_status(self, request, *args, **kwargs):
+        task_id = (request.query_params.get('task_id') or '').strip()
+        if not task_id:
+            return JsonResponse({'code': 400, 'message': '缺少 task_id', 'data': None})
+
+        snapshot = get_runtime_task_snapshot(task_id)
+        if not snapshot:
+            return JsonResponse({'code': 404, 'message': '任务不存在或已过期', 'data': None})
+
+        return JsonResponse({'code': 200, 'message': '获取成功', 'data': snapshot})
 
 
 class DeviceFactsAPIView(APIView):
