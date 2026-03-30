@@ -25,7 +25,7 @@ class ProcessorRegistry:
         def decorator(func: Callable):
             key = f"{vendor}:{device_type}:{collection_type}:{method}"
             cls._processors[key] = func
-            logger.info(f"注册处理器: {key} -> {func.__name__}")
+            # logger.info(f"注册处理器: {key} -> {func.__name__}")
             return func
         return decorator
 
