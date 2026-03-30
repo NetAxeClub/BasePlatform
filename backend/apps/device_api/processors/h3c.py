@@ -519,6 +519,107 @@ def process_arp_netconf(data):
     return arp_datas
 
 
+@register_processor(vendor='H3C', device_type='', collection_type='arp_evpn', method='netconf')
+def process_arp_evpn_netconf(data):
+    """H3C 交换机 ARP EVPN 表处理 (NETCONF)。
+
+    由于不同固件/模板可能使用不同 XML 容器名称（如 ArpTable / EvpnArpTable 等），
+    这里对候选路径做了兼容提取；若仍无法定位到表数据，则返回空列表。
+    """
+    top = data.get('top', {}) if isinstance(data, dict) else {}
+    ifindex_map = _build_ifindex_map(top)
+    portindex_map = _build_portindex_map(top)
+
+    # EVPN 场景下 IfIndex 可能缺失，尝试用 LocalMACs.MAC -> IfIndex 回填接口名
+    evpn_ifindex_map = {}
+    l2vpn = (top.get('L2VPN', {}) or {})
+    for mac_entry in _as_list((l2vpn.get('LocalMACs', {}) or {}).get('MAC', None)):
+        if not isinstance(mac_entry, dict):
+            continue
+        raw_mac = (
+            mac_entry.get('MacAddr')
+            or mac_entry.get('MacAddress')
+            or mac_entry.get('mac')
+            or mac_entry.get('mac-address')
+            or ''
+        )
+        mac_address = _normalize_mac(raw_mac)
+        if not mac_address:
+            continue
+        idx = str(mac_entry.get('IfIndex') or mac_entry.get('Ifindex') or '').strip()
+        if idx:
+            evpn_ifindex_map[mac_address] = idx
+
+    # 候选路径：优先在 L2VPN 下查找；找不到则回退到 ARP
+    candidate_paths = [
+        ('ArpTable', 'ArpEntry'),
+        ('EvpnArpTable', 'EvpnArpEntry'),
+        ('EvpnArpTable', 'ArpEntry'),
+        ('EVPNArpTable', 'ArpEntry'),
+    ]
+    arp_entries = None
+    for table_name, entry_name in candidate_paths:
+        container = (l2vpn.get(table_name, {}) or {})
+        entries = container.get(entry_name)
+        if entries:
+            arp_entries = entries
+            break
+    if arp_entries is None:
+        arp_entries = top.get('ARP', {}).get('ArpTable', {}).get('ArpEntry', [])
+
+    if isinstance(arp_entries, dict):
+        arp_entries = [arp_entries]
+
+    results = []
+    for entry in arp_entries or []:
+        if not isinstance(entry, dict):
+            continue
+
+        ipaddress = (
+            entry.get('Ipv4Address')
+            or entry.get('IpAddress')
+            or entry.get('ipaddress')
+            or entry.get('Ip')
+            or ''
+        )
+        mac_raw = entry.get('MacAddress') or entry.get('MacAddr') or entry.get('mac') or ''
+        macaddress = _normalize_mac(mac_raw)
+
+        if not ipaddress and not macaddress:
+            continue
+
+        ifindex = str(entry.get('IfIndex') or entry.get('Ifindex') or '').strip()
+        if not ifindex and macaddress:
+            ifindex = evpn_ifindex_map.get(macaddress, '')
+
+        port_index = str(entry.get('PortIndex') or entry.get('PortIndexId') or '').strip()
+        interface_name = (
+            ifindex_map.get(ifindex)
+            or portindex_map.get(port_index)
+            or ifindex
+        )
+
+        vlan = (
+            entry.get('VrfIndex')
+            or entry.get('VrfId')
+            or entry.get('VlanID')
+            or entry.get('VlanId')
+            or ''
+        )
+
+        results.append(dict(
+            ipaddress=ipaddress,
+            macaddress=macaddress,
+            vlan=vlan,
+            vpninstance=str(vlan),
+            interface=interface_name,
+            type=entry.get('ArpType') or entry.get('Type') or '',
+            aging=entry.get('aging') or entry.get('Aging') or '',
+        ))
+
+    return results
+
+
 @register_processor(vendor='H3C', device_type='', collection_type='mac', method='netconf')
 def process_mac_netconf(data):
     """H3C 交换机 MAC 地址表处理 (NETCONF)

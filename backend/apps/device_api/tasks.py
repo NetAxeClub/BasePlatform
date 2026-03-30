@@ -91,6 +91,7 @@ from netaxe.celery import AxeTask
 from apps.asset.models import NetworkDevice
 from apps.device_api.services_new import DeviceCollectionService
 from apps.device_api.connection_manager import DeviceConnectionManager
+from apps.device_api.binding_analysis_service import analyze_collection_plan_bindings_service
 from apps.device_api.models_api import (
     resolve_raw_data,
     inject_metadata,
@@ -120,6 +121,90 @@ from utils.connect_layer.auto_main import send_ws_msg
 from utils.db.mongo_ops import MongoOps, MongoNetOps
 
 logger = logging.getLogger("device_api")
+
+TEMP_NETMIKO_EMPTY_OUTPUT_HINTS = {
+    "ospf_neighbors": (
+        "ospf is not configured",
+        "ospf not configured",
+        "ospf is not enabled",
+        "ospf not enabled",
+        "no ospf neighbor",
+        "no ospf peer",
+    ),
+    "ospf_interfaces": (
+        "ospf is not configured",
+        "ospf not configured",
+        "ospf is not enabled",
+        "ospf not enabled",
+        "no ospf interface",
+    ),
+    "isis_neighbors": (
+        "isis is not configured",
+        "isis not configured",
+        "isis is not enabled",
+        "isis not enabled",
+        "no isis peer",
+        "no isis neighbor",
+    ),
+    "bgp_neighbors": (
+        "bgp is not configured",
+        "bgp not configured",
+        "bgp is not enabled",
+        "bgp not enabled",
+        "no bgp peer",
+        "no bgp neighbor",
+    ),
+    "bgp_summary": (
+        "bgp is not configured",
+        "bgp not configured",
+        "bgp is not enabled",
+        "bgp not enabled",
+        "no bgp peer",
+        "no bgp neighbor",
+    ),
+    "lldp": (
+        "lldp is not enabled",
+        "lldp is disabled",
+        "no lldp neighbor",
+        "no neighbor information",
+    ),
+    "mac": (
+        "mac address table is empty",
+        "mac-address table is empty",
+        "no mac address entry",
+        "no mac-address entry",
+    ),
+    "arp": (
+        "arp table is empty",
+        "no arp entry",
+        "no arp information",
+    ),
+    "vrrp_info": (
+        "vrrp is not configured",
+        "no vrrp information",
+        "no vrrp instance",
+    ),
+}
+
+TEMP_NETMIKO_GENERIC_EMPTY_HINTS = (
+    "not configured",
+    "not enabled",
+    "no configuration",
+    "no relevant configuration",
+    "no information",
+    "no entry",
+    "no entries",
+    "no neighbor",
+    "no peer",
+)
+
+TEMP_NETMIKO_ZERO_COUNT_HINTS = (
+    "total entries displayed: 0",
+    "total: 0",
+    "total 0",
+    "0 entries",
+    "0 entry",
+)
 
 RUNTIME_CONTROL_KWARGS = {"clear_history", "clear_plan_data"}
 INCREMENTAL_SNAPSHOT_COLLECTION_TYPES = frozenset(
@@ -789,8 +874,8 @@ def _host_preference_key(host: dict) -> tuple:
     except (TypeError, ValueError):
         plan_rank = 0
     return (
-        0 if _has_executable_sub_plans(host) else 1,
         _binding_source_priority(host.get("binding_source")),
+        0 if _has_executable_sub_plans(host) else 1,
         0 if host.get("use_local", True) else 1,
         -_safe_timestamp(host.get("last_bound_at")),
         -_safe_timestamp(host.get("binding_updated_at")),
@@ -1003,6 +1088,52 @@ def _compact_details(data):
     }
 
 
+def _classify_temporary_netmiko_string_result(plan: dict, raw_result, collection_method: str):
+    """临时区分 netmiko 字符串结果中的“无配置”与“模板解析失败”。
+
+    仅在命中强特征时判定为设备确实没有相关配置，其余字符串结果仍回落到 TextFSM 失败路径。
+    """
+    if str(collection_method or "").lower() != "netmiko":
+        return None
+    if not isinstance(raw_result, str):
+        return None
+
+    collection_type = normalize_collection_type_for_storage(plan.get("collection_type"))
+    if collection_type in RAW_NETMIKO_COLLECTION_TYPES:
+        return None
+
+    output = str(raw_result or "").strip()
+    normalized = output.lower()
+    if not normalized:
+        return {
+            "is_known_empty": True,
+            "coverage_reason": "netmiko_feature_not_configured",
+            "classifier_reason": "empty_cli_output",
+        }
+
+    hints = TEMP_NETMIKO_EMPTY_OUTPUT_HINTS.get(collection_type, ())
+    if any(hint in normalized for hint in hints):
+        return {
+            "is_known_empty": True,
+            "coverage_reason": "netmiko_feature_not_configured",
+            "classifier_reason": "collection_type_specific_hint",
+        }
+
+    if any(hint in normalized for hint in TEMP_NETMIKO_ZERO_COUNT_HINTS):
+        generic_match = any(hint in normalized for hint in TEMP_NETMIKO_GENERIC_EMPTY_HINTS)
+        return {
+            "is_known_empty": True,
+            "coverage_reason": "netmiko_feature_not_configured",
+            "classifier_reason": "generic_zero_entry_hint" if generic_match else "zero_entry_hint",
+        }
+
+    return {
+        "is_known_empty": False,
+        "coverage_reason": "",
+        "classifier_reason": "raw_cli_output_requires_template",
+    }
+
+
 def _build_local_device_stub(device_info):
     return type(
         "Device",
@@ -1061,7 +1192,23 @@ def _record_execution_event(
         "log_time": time.time(),
     }
     try:
-        COLLECTION_EXECUTION_LOG.insert_one(doc)
+        # `device_finished` 可能因为 Celery 重试/回调重复产生重复终态事件。
+        # 这里按 (event_scope, event_type, execute_time, device_ip) 做幂等 upsert，
+        # 保证同一设备同一执行批次只保留一条终态事件。
+        if event_scope == "device" and event_type == "device_finished":
+            key = {
+                "event_scope": doc.get("event_scope", event_scope),
+                "event_type": doc.get("event_type", event_type),
+                "execute_time": doc.get("execute_time", ""),
+                "device_ip": doc.get("device_ip", ""),
+            }
+            COLLECTION_EXECUTION_LOG.update_one(
+                filter=key,
+                update={"$set": doc},
+                upsert=True,
+            )
+        else:
+            COLLECTION_EXECUTION_LOG.insert_one(doc)
     except Exception as exc:
         logger.warning(
             "写入执行日志失败: scope=%s event=%s device=%s plan=%s execute_time=%s error=%s",
@@ -1404,6 +1551,51 @@ def plan_collect_device(**kwargs):
 
             # 使用连接管理器执行采集
             with DeviceConnectionManager(host_ip, kwargs) as conn_mgr:
+                # NETCONF 端口不可达/能力交换超时：这里先做一次连接可用性预检查，
+                # 避免在批量执行中制造大量失败（P0：先清阻塞，再重跑）。
+                if netconf_plans:
+                    try:
+                        conn_mgr.get_netconf_connection()
+                    except Exception as e:
+                        text = str(e)
+                        if any(
+                            token in text
+                            for token in (
+                                "NETCONF账号信息不存在",
+                                "Could not open socket",
+                                ":830",
+                                "Capability exchange timed out",
+                                "AuthenticationException",
+                                "Authentication failed",
+                            )
+                        ):
+                            for sub_plan in netconf_plans:
+                                method_name = _get_collection_method_name(sub_plan, "netconf")
+                                task_summary["skipped_sub_plans"] += 1
+                                task_summary["skipped_details"].append(
+                                    {
+                                        "plan_id": sub_plan.get("id"),
+                                        "collection_method": "netconf",
+                                        "reason": "netconf_connection_unavailable",
+                                    }
+                                )
+                                _record_execution_event(
+                                    event_scope="sub_plan",
+                                    event_type="sub_plan_skipped",
+                                    status="skipped",
+                                    severity="warning",
+                                    execute_time=execute_time,
+                                    device_info=kwargs,
+                                    plan=sub_plan,
+                                    collection_method="netconf",
+                                    reason="netconf_connection_unavailable",
+                                    error=text,
+                                    details={"method_name": method_name},
+                                )
+                            netconf_plans = []
+                        else:
+                            raise
+
                 # 执行所有Netmiko采集（复用同一连接）
                 for sub_plan in netmiko_plans:
                     sub_plan_started_at = time.time()
@@ -1503,16 +1695,41 @@ def plan_collect_device(**kwargs):
                                 },
                             )
                     except Exception as e:
+                        text = str(e)
+                        # P0：账号缺失类问题不再计入 failed（避免触发验收阻塞指标）
+                        if isinstance(e, ValueError) and "SSH/Telnet账号信息不存在" in text:
+                            task_summary["skipped_sub_plans"] += 1
+                            task_summary["skipped_details"].append(
+                                {
+                                    "plan_id": sub_plan.get("id"),
+                                    "collection_method": "netmiko",
+                                    "reason": "missing_ssh_telnet_account",
+                                }
+                            )
+                            _record_execution_event(
+                                event_scope="sub_plan",
+                                event_type="sub_plan_skipped",
+                                status="skipped",
+                                severity="warning",
+                                execute_time=execute_time,
+                                device_info=kwargs,
+                                plan=sub_plan,
+                                collection_method="netmiko",
+                                reason="missing_ssh_telnet_account",
+                                details={"method_name": method_name},
+                            )
+                            continue
+
                         task_summary["failed_sub_plans"] += 1
                         task_summary["failed_details"].append(
                             {
                                 "plan_id": sub_plan.get("id"),
                                 "collection_method": "netmiko",
-                                "reason": str(e),
+                                "reason": text,
                             }
                         )
                         logger.error(
-                            f"Netmiko采集异常: {sub_plan['name']} (设备: {host_ip}), {str(e)}",
+                            f"Netmiko采集异常: {sub_plan['name']} (设备: {host_ip}), {text}",
                             exc_info=True,
                         )
                         _record_execution_event(
@@ -1525,7 +1742,7 @@ def plan_collect_device(**kwargs):
                             plan=sub_plan,
                             collection_method="netmiko",
                             reason="collection_exception",
-                            error=str(e),
+                            error=text,
                             details={
                                 "method_name": method_name,
                                 "duration_ms": int((time.time() - sub_plan_started_at) * 1000),
@@ -1660,16 +1877,73 @@ def plan_collect_device(**kwargs):
                                 details={"method_name": method_name},
                             )
                     except Exception as e:
+                        text = str(e)
+                        # P0：账号缺失 / 端口不可达 / capability 超时类问题不再计入 failed
+                        if isinstance(e, ValueError) and "NETCONF账号信息不存在" in text:
+                            task_summary["skipped_sub_plans"] += 1
+                            task_summary["skipped_details"].append(
+                                {
+                                    "plan_id": sub_plan.get("id"),
+                                    "collection_method": "netconf",
+                                    "reason": "missing_netconf_account",
+                                }
+                            )
+                            _record_execution_event(
+                                event_scope="sub_plan",
+                                event_type="sub_plan_skipped",
+                                status="skipped",
+                                severity="warning",
+                                execute_time=execute_time,
+                                device_info=kwargs,
+                                plan=sub_plan,
+                                collection_method="netconf",
+                                reason="missing_netconf_account",
+                                details={"method_name": method_name},
+                            )
+                            continue
+
+                        if any(
+                            token in text
+                            for token in (
+                                "Could not open socket",
+                                ":830",
+                                "Capability exchange timed out",
+                                "AuthenticationException",
+                                "Authentication failed",
+                            )
+                        ):
+                            task_summary["skipped_sub_plans"] += 1
+                            task_summary["skipped_details"].append(
+                                {
+                                    "plan_id": sub_plan.get("id"),
+                                    "collection_method": "netconf",
+                                    "reason": "netconf_connection_unavailable",
+                                }
+                            )
+                            _record_execution_event(
+                                event_scope="sub_plan",
+                                event_type="sub_plan_skipped",
+                                status="skipped",
+                                severity="warning",
+                                execute_time=execute_time,
+                                device_info=kwargs,
+                                plan=sub_plan,
+                                collection_method="netconf",
+                                reason="netconf_connection_unavailable",
+                                details={"method_name": method_name},
+                            )
+                            continue
+
                         task_summary["failed_sub_plans"] += 1
                         task_summary["failed_details"].append(
                             {
                                 "plan_id": sub_plan.get("id"),
                                 "collection_method": "netconf",
-                                "reason": str(e),
+                                "reason": text,
                             }
                         )
                         logger.error(
-                            f"NETCONF采集异常: {sub_plan['name']} (设备: {host_ip}), {str(e)}",
+                            f"NETCONF采集异常: {sub_plan['name']} (设备: {host_ip}), {text}",
                             exc_info=True,
                         )
                         # 采集链路严格按 PlansToDevice 执行，只记录运行态事实，不在这里改绑定。
@@ -1683,7 +1957,7 @@ def plan_collect_device(**kwargs):
                             plan=sub_plan,
                             collection_method="netconf",
                             reason="collection_exception",
-                            error=str(e),
+                            error=text,
                             details={
                                 "method_name": method_name,
                                 "duration_ms": int((time.time() - sub_plan_started_at) * 1000),
@@ -2190,27 +2464,45 @@ def _process_and_save_result(
             return {"success": False, "reason": "plan_not_found"}
 
         # ── Layer 1 + 2：数据解析与规范化 ────────────────────────────────
-        collection_result = {"data": raw_result, "device_ip": manage_ip}
-        resolve_status, resolve_error, processed_data = resolve_raw_data(
-            plan_obj, collection_result, collection_method
+        temp_string_result = _classify_temporary_netmiko_string_result(
+            plan,
+            raw_result,
+            collection_method,
         )
-
-        if not resolve_status:
-            logger.error(
-                f"数据处理失败: {manage_ip}, method={collection_method}, error={resolve_error}"
-            )
-            DeviceFactService.mark_discovery_failure(device_info, resolve_error)
-            save_local_collection_result(
-                plan_obj,
-                device_stub,
+        if temp_string_result and temp_string_result.get("is_known_empty"):
+            logger.info(
+                "临时识别为无相关配置或空表项: device=%s type=%s method=%s command=%s classifier=%s",
+                manage_ip,
+                normalize_collection_type_for_storage(plan.get("collection_type")),
                 collection_method,
                 method_name,
-                raw_result,
-                [],
-                "error",
-                resolve_error,
+                temp_string_result.get("classifier_reason", ""),
             )
-            return {"success": False, "reason": resolve_error or "resolve_failed"}
+            resolve_status = True
+            resolve_error = ""
+            processed_data = []
+        else:
+            collection_result = {"data": raw_result, "device_ip": manage_ip}
+            resolve_status, resolve_error, processed_data = resolve_raw_data(
+                plan_obj, collection_result, collection_method
+            )
+
+            if not resolve_status:
+                logger.error(
+                    f"数据处理失败: {manage_ip}, method={collection_method}, error={resolve_error}"
+                )
+                DeviceFactService.mark_discovery_failure(device_info, resolve_error)
+                save_local_collection_result(
+                    plan_obj,
+                    device_stub,
+                    collection_method,
+                    method_name,
+                    raw_result,
+                    [],
+                    "error",
+                    resolve_error,
+                )
+                return {"success": False, "reason": resolve_error or "resolve_failed"}
 
         # ── Layer 3：元数据注入 ──────────────────────────────────────────
         meta = {
@@ -2293,7 +2585,11 @@ def _process_and_save_result(
                     collection_name,
                 )
                 coverage_issue = True
-                coverage_reason = "empty_processed_data"
+                coverage_reason = (
+                    temp_string_result.get("coverage_reason")
+                    if temp_string_result and temp_string_result.get("is_known_empty")
+                    else "empty_processed_data"
+                )
         else:
             logger.warning(
                 f"采集结果为空或无法保存: {manage_ip}, type={storage_collection_type}, "
@@ -2303,7 +2599,11 @@ def _process_and_save_result(
             if not storage_collection_type:
                 coverage_reason = "missing_storage_collection_type"
             else:
-                coverage_reason = "empty_processed_data"
+                coverage_reason = (
+                    temp_string_result.get("coverage_reason")
+                    if temp_string_result and temp_string_result.get("is_known_empty")
+                    else "empty_processed_data"
+                )
 
         DeviceFactService.update_from_processed_data(
             collection_type=storage_collection_type,
@@ -2615,404 +2915,14 @@ def plan_collect_device_main(**kwargs):
     }
 
 
-def _pick_latest_execute_time():
-    latest_doc = COLLECTION_PLAN.coll.find_one({}, {"execute_time": 1}, sort=[("_id", -1)])
-    return str((latest_doc or {}).get("execute_time") or "")
-
-
-def _top_method_samples(log_docs, limit=3):
-    method_counter = Counter()
-    for doc in log_docs:
-        method_name = (
-            (doc.get("details") or {}).get("method_name")
-            or doc.get("collection_method")
-            or doc.get("collection_type")
-            or "unknown"
-        )
-        method_counter[method_name] += 1
-    return [name for name, _ in method_counter.most_common(limit)]
-
-
-def _persist_binding_analysis_checklist(execute_time, summary, checklist_items):
-    now_iso = datetime.now().isoformat()
-    log_time = time.time()
-    COLLECTION_BINDING_ANALYSIS.delete_many({"execute_time": execute_time})
-
-    docs = [
-        {
-            "doc_type": "summary",
-            "execute_time": execute_time,
-            **summary,
-            "created_at": now_iso,
-            "log_time": log_time,
-        }
-    ]
-    for item in checklist_items:
-        docs.append(
-            {
-                "doc_type": "device",
-                "execute_time": execute_time,
-                **item,
-                "has_recommendations": bool(item.get("recommendations")),
-                "recommendation_codes": [
-                    recommendation.get("code", "")
-                    for recommendation in item.get("recommendations", [])
-                    if recommendation.get("code")
-                ],
-                "created_at": now_iso,
-                "log_time": log_time,
-            }
-        )
-
-    if len(docs) == 1:
-        COLLECTION_BINDING_ANALYSIS.insert_one(docs[0])
-    else:
-        COLLECTION_BINDING_ANALYSIS.insert_many(docs)
-
-
-def _build_binding_analysis_recommendations(plan_doc, sub_docs, log_docs, audit_item):
-    recommendations = []
-    failed_logs = [doc for doc in log_docs if doc.get("status") == "failed"]
-    error_texts = [
-        " ".join(
-            filter(
-                None,
-                [
-                    str(doc.get("reason") or ""),
-                    str(doc.get("error") or ""),
-                    str((doc.get("details") or {}).get("method_name") or ""),
-                ],
-            )
-        )
-        for doc in failed_logs
-    ]
-    coverage_counter = Counter(
-        str(doc.get("collection_type") or "")
-        for doc in sub_docs
-        if doc.get("coverage_issue")
-    )
-    blocker_map = {
-        str(item.get("code") or ""): str(item.get("message") or "")
-        for item in (audit_item or {}).get("blockers", [])
-    }
-
-    if plan_doc.get("task_status") == "running":
-        recommendations.append(
-            {
-                "code": "stale_running_task",
-                "message": "批次结束后设备任务仍处于 running，建议核对 Celery 回调或任务落库完整性。",
-            }
-        )
-
-    if any("NETCONF账号信息不存在" in text for text in error_texts):
-        recommendations.append(
-            {
-                "code": "missing_netconf_account",
-                "message": "当前 PlansToDevice 绑定方案包含 NETCONF 子方案，但设备缺少 NETCONF 账号；建议补齐账号或调整方案。",
-            }
-        )
-
-    if any(
-        token in text
-        for text in error_texts
-        for token in (
-            "Unexpected element",
-            "Capability exchange timed out",
-            "Could not open socket",
-            "AuthenticationException",
-        )
-    ):
-        recommendations.append(
-            {
-                "code": "netconf_protocol_mismatch",
-                "message": "运行结果显示当前绑定方案中的 NETCONF 子方案与设备协议能力不匹配；建议在独立绑定分析环节评估是否切换到 CLI 方案。",
-            }
-        )
-
-    textfsm_fail_logs = [
-        doc
-        for doc in failed_logs
-        if "Textfsm 模板解析失败" in str(doc.get("reason") or "")
-        or "Textfsm 模板解析失败" in str(doc.get("error") or "")
-    ]
-    if textfsm_fail_logs:
-        recommendations.append(
-            {
-                "code": "textfsm_template_mismatch",
-                "message": "CLI 解析存在 TextFSM 模板失配，主要命令: %s；建议修模板或从方案中下线对应子方案。"
-                % ", ".join(_top_method_samples(textfsm_fail_logs)),
-            }
-        )
-
-    empty_processed = {
-        collection_type: count
-        for collection_type, count in coverage_counter.items()
-        if collection_type
-    }
-    if empty_processed:
-        recommendations.append(
-            {
-                "code": "empty_processed_data_review",
-                "message": "存在空处理结果子方案，主要类型: %s；建议确认协议是否未配置、命令输出为空或字段映射缺口。"
-                % ", ".join(
-                    f"{collection_type}={count}"
-                    for collection_type, count in sorted(
-                        empty_processed.items(),
-                        key=lambda item: item[1],
-                        reverse=True,
-                    )[:5]
-                ),
-            }
-        )
-
-    for blocker_code, blocker_message in blocker_map.items():
-        recommendations.append(
-            {
-                "code": blocker_code,
-                "message": blocker_message,
-            }
-        )
-
-    deduped = []
-    seen_codes = set()
-    for item in recommendations:
-        code = item.get("code")
-        if not code or code in seen_codes:
-            continue
-        seen_codes.add(code)
-        deduped.append(item)
-    return deduped
-
-
 @shared_task(base=AxeTask, once={"graceful": True})
 def analyze_collection_plan_bindings(execute_time="", max_devices=0, sample_limit=100):
-    execute_time = str(execute_time or "").strip() or _pick_latest_execute_time()
-    if not execute_time:
-        return {
-            "execute_time": "",
-            "analyzed_devices": 0,
-            "devices_with_recommendations": 0,
-            "reason": "missing_execute_time",
-            "results": [],
-        }
-
-    plan_docs = COLLECTION_PLAN.find(
-        {"execute_time": execute_time},
-        fields={
-            "_id": 0,
-            "device_ip": 1,
-            "device_name": 1,
-            "task_status": 1,
-            "plan_id": 1,
-            "plan_name": 1,
-            "failed_sub_plans": 1,
-            "coverage_issue_sub_plans": 1,
-            "skipped_sub_plans": 1,
-            "failed_details": 1,
-            "coverage_details": 1,
-        },
-    )
-    issue_plan_docs = [
-        doc
-        for doc in plan_docs
-        if doc.get("task_status") != "success"
-        or int(doc.get("failed_sub_plans") or 0) > 0
-        or int(doc.get("coverage_issue_sub_plans") or 0) > 0
-        or int(doc.get("skipped_sub_plans") or 0) > 0
-    ]
-    issue_plan_docs.sort(
-        key=lambda item: (
-            int(item.get("failed_sub_plans") or 0),
-            int(item.get("coverage_issue_sub_plans") or 0),
-            int(item.get("skipped_sub_plans") or 0),
-        ),
-        reverse=True,
-    )
-    if max_devices:
-        issue_plan_docs = issue_plan_docs[: max(int(max_devices), 0)]
-
-    device_ips = [str(doc.get("device_ip") or "") for doc in issue_plan_docs if doc.get("device_ip")]
-    if not device_ips:
-        _record_execution_event(
-            event_scope="analysis",
-            event_type="batch_plan_binding_analysis_finished",
-            status="success",
-            execute_time=execute_time,
-            reason="no_issue_devices",
-            details={"analyzed_devices": 0, "devices_with_recommendations": 0},
-        )
-        return {
-            "execute_time": execute_time,
-            "analyzed_devices": 0,
-            "devices_with_recommendations": 0,
-            "reason": "no_issue_devices",
-            "results": [],
-        }
-
-    sub_docs = COLLECTION_SUB_PLAN.find(
-        {"execute_time": execute_time, "device_ip": {"$in": device_ips}},
-        fields={
-            "_id": 0,
-            "device_ip": 1,
-            "collection_type": 1,
-            "task_status": 1,
-            "coverage_issue": 1,
-            "coverage_reason": 1,
-            "collection_method": 1,
-            "method_name": 1,
-        },
-    )
-    log_docs = COLLECTION_EXECUTION_LOG.find(
-        {"execute_time": execute_time, "device_ip": {"$in": device_ips}},
-        fields={
-            "_id": 0,
-            "device_ip": 1,
-            "event_scope": 1,
-            "event_type": 1,
-            "status": 1,
-            "reason": 1,
-            "error": 1,
-            "details": 1,
-            "collection_method": 1,
-            "collection_type": 1,
-        },
-    )
-    test_docs = COLLECTION_RESULTS_DB.find(
-        {"execute_time": execute_time, "device_ip": {"$in": device_ips}},
-        fields={
-            "_id": 0,
-            "device_ip": 1,
-            "collection_type": 1,
-            "processed_status": 1,
-            "processed_error": 1,
-            "status": 1,
-        },
-    )
-
-    sub_docs_by_ip = defaultdict(list)
-    for doc in sub_docs:
-        sub_docs_by_ip[str(doc.get("device_ip") or "")].append(doc)
-
-    log_docs_by_ip = defaultdict(list)
-    for doc in log_docs:
-        log_docs_by_ip[str(doc.get("device_ip") or "")].append(doc)
-
-    test_docs_by_ip = defaultdict(list)
-    for doc in test_docs:
-        test_docs_by_ip[str(doc.get("device_ip") or "")].append(doc)
-
-    devices = list(
-        NetworkDevice.objects.filter(manage_ip__in=device_ips).select_related(
-            "vendor",
-            "category",
-            "model",
-            "ssh_account",
-            "netconf_account",
-        )
-    )
-    audit_result = PlatformProfileService.audit_device_coverage(devices)
-    audit_result_map = {
-        str(item.get("manage_ip") or ""): item for item in audit_result.get("results", [])
-    }
-
-    recommendation_counter = Counter()
-    coverage_reason_counter = Counter()
-    devices_with_recommendations = 0
-    checklist_items = []
-    results = []
-    sample_limit = max(int(sample_limit or 0), 0)
-
-    for plan_doc in issue_plan_docs:
-        device_ip = str(plan_doc.get("device_ip") or "")
-        device_sub_docs = sub_docs_by_ip.get(device_ip, [])
-        device_log_docs = log_docs_by_ip.get(device_ip, [])
-        device_test_docs = test_docs_by_ip.get(device_ip, [])
-        audit_item = audit_result_map.get(device_ip, {})
-        recommendations = _build_binding_analysis_recommendations(
-            plan_doc,
-            device_sub_docs,
-            device_log_docs,
-            audit_item,
-        )
-
-        for sub_doc in device_sub_docs:
-            if sub_doc.get("coverage_issue"):
-                coverage_reason_counter[str(sub_doc.get("coverage_reason") or "coverage_issue")] += 1
-        for item in recommendations:
-            recommendation_counter[item["code"]] += 1
-        if recommendations:
-            devices_with_recommendations += 1
-
-        if recommendations:
-            _record_execution_event(
-                event_scope="device",
-                event_type="binding_analysis_suggested",
-                status="warning",
-                severity="warning",
-                execute_time=execute_time,
-                device_info={"manage_ip": device_ip, "device_name": plan_doc.get("device_name", "")},
-                reason=recommendations[0]["code"],
-                details={
-                    "task_status": plan_doc.get("task_status", ""),
-                    "failed_sub_plans": int(plan_doc.get("failed_sub_plans") or 0),
-                    "coverage_issue_sub_plans": int(plan_doc.get("coverage_issue_sub_plans") or 0),
-                    "recommendation_codes": [item["code"] for item in recommendations[:8]],
-                    "test_collection_errors": [
-                        {
-                            "collection_type": item.get("collection_type", ""),
-                            "processed_status": item.get("processed_status", ""),
-                            "processed_error": item.get("processed_error", ""),
-                        }
-                        for item in device_test_docs
-                        if item.get("processed_error")
-                    ][:5],
-                },
-            )
-
-        checklist_item = {
-            "device_ip": device_ip,
-            "device_name": plan_doc.get("device_name", ""),
-            "task_status": plan_doc.get("task_status", ""),
-            "plan_id": plan_doc.get("plan_id"),
-            "plan_name": plan_doc.get("plan_name", ""),
-            "failed_sub_plans": int(plan_doc.get("failed_sub_plans") or 0),
-            "coverage_issue_sub_plans": int(plan_doc.get("coverage_issue_sub_plans") or 0),
-            "coverage_reasons": dict(
-                Counter(
-                    str(item.get("coverage_reason") or "coverage_issue")
-                    for item in device_sub_docs
-                    if item.get("coverage_issue")
-                )
-            ),
-            "audit_blockers": (audit_item or {}).get("blockers", []),
-            "recommendations": recommendations,
-        }
-        checklist_items.append(checklist_item)
-
-        if sample_limit == 0 or len(results) < sample_limit:
-            results.append(checklist_item)
-
-    summary = {
-        "execute_time": execute_time,
-        "analyzed_devices": len(issue_plan_docs),
-        "devices_with_recommendations": devices_with_recommendations,
-        "recommendation_summary": dict(recommendation_counter),
-        "coverage_reason_summary": dict(coverage_reason_counter),
-        "stored_checklist_items": len(checklist_items),
-        "sampled_results": len(results),
-    }
-    _persist_binding_analysis_checklist(execute_time, summary, checklist_items)
-    _record_execution_event(
-        event_scope="analysis",
-        event_type="batch_plan_binding_analysis_finished",
-        status="success",
+    return analyze_collection_plan_bindings_service(
         execute_time=execute_time,
-        details=summary,
+        max_devices=max_devices,
+        sample_limit=sample_limit,
+        record_execution_event=_record_execution_event,
     )
-    return {
-        **summary,
-        "results": results,
-    }
 
 
 @shared_task(base=AxeTask, once={"graceful": True})

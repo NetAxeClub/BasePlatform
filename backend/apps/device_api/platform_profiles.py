@@ -8,7 +8,10 @@ from django.utils import timezone
 from apps.asset.models import Model, NetworkDevice, Vendor
 from apps.device_api.connection_manager import DeviceConnectionManager
 from apps.device_api.contract import build_plan_collection_name
-from apps.device_api.fields_mapping import DEFAULT_COLLECTION_TYPES, RAW_NETMIKO_COLLECTION_TYPES
+from apps.device_api.fields_mapping import (
+    DEFAULT_COLLECTION_TYPES,
+    RAW_NETMIKO_COLLECTION_TYPES,
+)
 from apps.device_api.models import (
     DeviceCollectionPlans,
     DeviceDiscoveryState,
@@ -21,11 +24,13 @@ from utils.db.mongo_ops import MongoOps
 
 
 TEMPLATE_BASE_DIR = (
-    Path(__file__).resolve().parents[2] / "utils" / "connect_layer" / "zetmiko" / "templates"
+    Path(__file__).resolve().parents[2]
+    / "utils"
+    / "connect_layer"
+    / "zetmiko"
+    / "templates"
 )
-PLACEHOLDER_TEMPLATE_MARKERS = (
-    "Placeholder template for P1.5 baseline",
-)
+PLACEHOLDER_TEMPLATE_MARKERS = ("Placeholder template for P1.5 baseline",)
 DEVICE_CATEGORY_ALIASES = {
     "switch": "switch",
     "交换机": "switch",
@@ -384,7 +389,13 @@ BUILTIN_PLATFORM_PROFILES: List[Dict[str, object]] = [
         "code": "Huawei-YunShan",
         "vendor_alias": "Huawei",
         "category": "switch",
-        "series_patterns": [r"YunShan", r"CloudEngine.*AI", r"^CE16800-X\d+", r"^CE168\d+", r"CHASSIS-X"],
+        "series_patterns": [
+            r"YunShan",
+            r"CloudEngine.*AI",
+            r"^CE16800-X\d+",
+            r"^CE168\d+",
+            r"CHASSIS-X",
+        ],
         "os_family": "YunShan OS",
         "version_patterns": [r".*"],
         "preferred_methods": {
@@ -1160,15 +1171,33 @@ PROFILE_NETMIKO_SUB_PLAN_DEFAULTS: Dict[str, Dict[str, Dict[str, str]]] = {
         },
     },
     "Huawei-USG": {
-        "device_identity": {"command": "display version", "template": "huawei_vrp_display_version.textfsm"},
-        "arp": {"command": "display arp all", "template": "huawei_vrp_display_arp.textfsm"},
-        "lldp": {"command": "display lldp neighbor", "template": "huawei_usg_display_lldp_neighbor.textfsm"},
-        "mac": {"command": "display mac-address", "template": "huawei_usg_display_mac-address.textfsm"},
+        "device_identity": {
+            "command": "display version",
+            "template": "huawei_vrp_display_version.textfsm",
+        },
+        "arp": {
+            "command": "display arp all",
+            "template": "huawei_vrp_display_arp.textfsm",
+        },
+        "lldp": {
+            "command": "display lldp neighbor",
+            "template": "huawei_usg_display_lldp_neighbor.textfsm",
+        },
+        "mac": {
+            "command": "display mac-address",
+            "template": "huawei_usg_display_mac-address.textfsm",
+        },
     },
     "Huawei-router-cli": {
-        "device_identity": {"command": "display version", "template": "huawei_vrp_display_version.textfsm"},
+        "device_identity": {
+            "command": "display version",
+            "template": "huawei_vrp_display_version.textfsm",
+        },
         "arp": {"command": "display arp", "template": "huawei_vrp_display_arp.textfsm"},
-        "lldp": {"command": "display lldp neighbor", "template": "huawei_vrp_display_lldp_neighbor.textfsm"},
+        "lldp": {
+            "command": "display lldp neighbor",
+            "template": "huawei_vrp_display_lldp_neighbor.textfsm",
+        },
         "interface_brief": {
             "command": "display interface brief",
             "template": "huawei_vrp_display_interface_brief.textfsm",
@@ -1191,12 +1220,30 @@ PROFILE_NETMIKO_SUB_PLAN_DEFAULTS: Dict[str, Dict[str, Dict[str, str]]] = {
         },
     },
     "Huawei-YunShan": {
-        "device_identity": {"command": "display version", "template": "huawei_vrp_display_version.textfsm"},
-        "mac": {"command": "display mac-address", "template": "huawei_vrp_display_mac-address.textfsm"},
-        "lldp": {"command": "display lldp neighbor", "template": "huawei_vrp_display_lldp_neighbor.textfsm"},
-        "interface_brief": {"command": "display interface brief", "template": "huawei_vrp_display_interface_brief.textfsm"},
-        "ip_interface": {"command": "display interface", "template": "huawei_vrp_display_interface.textfsm"},
-        "aggre_port": {"command": "display eth-trunk", "template": "huawei_vrp_display_eth-trunk.textfsm"},
+        "device_identity": {
+            "command": "display version",
+            "template": "huawei_vrp_display_version.textfsm",
+        },
+        "mac": {
+            "command": "display mac-address",
+            "template": "huawei_vrp_display_mac-address.textfsm",
+        },
+        "lldp": {
+            "command": "display lldp neighbor",
+            "template": "huawei_vrp_display_lldp_neighbor.textfsm",
+        },
+        "interface_brief": {
+            "command": "display interface brief",
+            "template": "huawei_vrp_display_interface_brief.textfsm",
+        },
+        "ip_interface": {
+            "command": "display interface",
+            "template": "huawei_vrp_display_interface.textfsm",
+        },
+        "aggre_port": {
+            "command": "display eth-trunk",
+            "template": "huawei_vrp_display_eth-trunk.textfsm",
+        },
         "bgp_neighbors": {
             "command": "display bgp peer verbose",
             "template": "huawei_vrp_display_bgp_peer_verbose.textfsm",
@@ -1207,112 +1254,259 @@ PROFILE_NETMIKO_SUB_PLAN_DEFAULTS: Dict[str, Dict[str, Dict[str, str]]] = {
         },
     },
     "H3C-legacy-cli": {
-        "device_identity": {"command": "display version", "template": "hp_comware_display_version.textfsm"},
+        "device_identity": {
+            "command": "display version",
+            "template": "hp_comware_display_version.textfsm",
+        },
         "cli_output_capability": {"command": "display irf", "template": ""},
-        "board_status": {"command": "display device manuinfo", "template": "hp_comware_display_device_manuinfo.textfsm"},
-        "irf_status": {"command": "display irf", "template": "hp_comware_display_irf.textfsm"},
+        "board_status": {
+            "command": "display device manuinfo",
+            "template": "hp_comware_display_device_manuinfo.textfsm",
+        },
+        "irf_status": {
+            "command": "display irf",
+            "template": "hp_comware_display_irf.textfsm",
+        },
         "arp": {"command": "display arp", "template": "hp_comware_display_arp.textfsm"},
-        "mac": {"command": "display mac-address", "template": "hp_comware_display_mac-address.textfsm"},
+        "mac": {
+            "command": "display mac-address",
+            "template": "hp_comware_display_mac-address.textfsm",
+        },
         "lldp": {
             "command": "display lldp neighbor-information verbose",
             "template": "hp_comware_display_lldp_neighbor-information_verbose.textfsm",
         },
-        "interface_brief": {"command": "display interface brief", "template": "hp_comware_display_interface_brief.textfsm"},
-        "ip_interface": {"command": "display ip interface", "template": "hp_comware_display_ip_interface.textfsm"},
+        "interface_brief": {
+            "command": "display interface brief",
+            "template": "hp_comware_display_interface_brief.textfsm",
+        },
+        "ip_interface": {
+            "command": "display ip interface",
+            "template": "hp_comware_display_ip_interface.textfsm",
+        },
         "aggre_port": {
             "command": "display link-aggregation verbose",
             "template": "hp_comware_display_link-aggregation_verbose.textfsm",
         },
     },
     "H3C-S98xx-cli": {
-        "device_identity": {"command": "display version", "template": "hp_comware_display_version.textfsm"},
+        "device_identity": {
+            "command": "display version",
+            "template": "hp_comware_display_version.textfsm",
+        },
         "cli_output_capability": {"command": "display irf", "template": ""},
-        "board_status": {"command": "display device manuinfo", "template": "hp_comware_display_device_manuinfo.textfsm"},
+        "board_status": {
+            "command": "display device manuinfo",
+            "template": "hp_comware_display_device_manuinfo.textfsm",
+        },
         "arp": {"command": "display arp", "template": "hp_comware_display_arp.textfsm"},
         "lldp": {
             "command": "display lldp neighbor-information verbose",
             "template": "hp_comware_display_lldp_neighbor-information_verbose.textfsm",
         },
-        "ip_interface": {"command": "display ip interface", "template": "hp_comware_display_ip_interface.textfsm"},
+        "ip_interface": {
+            "command": "display ip interface",
+            "template": "hp_comware_display_ip_interface.textfsm",
+        },
     },
     "H3C-modern-netconf": {
-        "device_identity": {"command": "display version", "template": "hp_comware_display_version.textfsm"},
+        "device_identity": {
+            "command": "display version",
+            "template": "hp_comware_display_version.textfsm",
+        },
         "cli_output_capability": {"command": "display irf", "template": ""},
         "arp": {"command": "display arp", "template": "hp_comware_display_arp.textfsm"},
-        "mac": {"command": "display mac-address", "template": "hp_comware_display_mac-address.textfsm"},
+        "mac": {
+            "command": "display mac-address",
+            "template": "hp_comware_display_mac-address.textfsm",
+        },
         "lldp": {
             "command": "display lldp neighbor-information verbose",
             "template": "hp_comware_display_lldp_neighbor-information_verbose.textfsm",
         },
-        "interface_brief": {"command": "display interface brief", "template": "hp_comware_display_interface_brief.textfsm"},
-        "ip_interface": {"command": "display ip interface", "template": "hp_comware_display_ip_interface.textfsm"},
+        "interface_brief": {
+            "command": "display interface brief",
+            "template": "hp_comware_display_interface_brief.textfsm",
+        },
+        "ip_interface": {
+            "command": "display ip interface",
+            "template": "hp_comware_display_ip_interface.textfsm",
+        },
         "aggre_port": {
             "command": "display link-aggregation verbose",
             "template": "hp_comware_display_link-aggregation_verbose.textfsm",
         },
-        "irf_status": {"command": "display irf", "template": "hp_comware_display_irf.textfsm"},
-        "fan_status": {"command": "display fan", "template": "hp_comware_display_fan.textfsm"},
-        "power_status": {"command": "display power", "template": "hp_comware_display_power.textfsm"},
-        "clock_status": {"command": "display clock", "template": "hp_comware_display_clock.textfsm"},
-        "ospf_neighbors": {"command": "display ospf peer verbose", "template": "hp_comware_display_ospf_peer.textfsm"},
-        "ospf_interfaces": {"command": "display ospf interface", "template": "hp_comware_display_ospf_interface.textfsm"},
-        "isis_neighbors": {"command": "display isis peer verbose", "template": "hp_comware_display_isis_peer_verbose.textfsm"},
-        "board_status": {"command": "display device manuinfo", "template": "hp_comware_display_device_manuinfo.textfsm"},
+        "irf_status": {
+            "command": "display irf",
+            "template": "hp_comware_display_irf.textfsm",
+        },
+        "fan_status": {
+            "command": "display fan",
+            "template": "hp_comware_display_fan.textfsm",
+        },
+        "power_status": {
+            "command": "display power",
+            "template": "hp_comware_display_power.textfsm",
+        },
+        "clock_status": {
+            "command": "display clock",
+            "template": "hp_comware_display_clock.textfsm",
+        },
+        "ospf_neighbors": {
+            "command": "display ospf peer verbose",
+            "template": "hp_comware_display_ospf_peer.textfsm",
+        },
+        "ospf_interfaces": {
+            "command": "display ospf interface",
+            "template": "hp_comware_display_ospf_interface.textfsm",
+        },
+        "isis_neighbors": {
+            "command": "display isis peer verbose",
+            "template": "hp_comware_display_isis_peer_verbose.textfsm",
+        },
+        "board_status": {
+            "command": "display device manuinfo",
+            "template": "hp_comware_display_device_manuinfo.textfsm",
+        },
     },
     "H3C-modern-cli": {
-        "device_identity": {"command": "display version", "template": "hp_comware_display_version.textfsm"},
+        "device_identity": {
+            "command": "display version",
+            "template": "hp_comware_display_version.textfsm",
+        },
         "cli_output_capability": {"command": "display irf", "template": ""},
         "arp": {"command": "display arp", "template": "hp_comware_display_arp.textfsm"},
-        "mac": {"command": "display mac-address", "template": "hp_comware_display_mac-address.textfsm"},
+        "mac": {
+            "command": "display mac-address",
+            "template": "hp_comware_display_mac-address.textfsm",
+        },
         "lldp": {
             "command": "display lldp neighbor-information verbose",
             "template": "hp_comware_display_lldp_neighbor-information_verbose.textfsm",
         },
-        "interface_brief": {"command": "display interface brief", "template": "hp_comware_display_interface_brief.textfsm"},
-        "ip_interface": {"command": "display ip interface", "template": "hp_comware_display_ip_interface.textfsm"},
+        "interface_brief": {
+            "command": "display interface brief",
+            "template": "hp_comware_display_interface_brief.textfsm",
+        },
+        "ip_interface": {
+            "command": "display ip interface",
+            "template": "hp_comware_display_ip_interface.textfsm",
+        },
         "aggre_port": {
             "command": "display link-aggregation verbose",
             "template": "hp_comware_display_link-aggregation_verbose.textfsm",
         },
-        "fan_status": {"command": "display fan", "template": "hp_comware_display_fan.textfsm"},
-        "power_status": {"command": "display power", "template": "hp_comware_display_power.textfsm"},
-        "clock_status": {"command": "display clock", "template": "hp_comware_display_clock.textfsm"},
-        "ospf_neighbors": {"command": "display ospf peer verbose", "template": "hp_comware_display_ospf_peer.textfsm"},
-        "ospf_interfaces": {"command": "display ospf interface", "template": "hp_comware_display_ospf_interface.textfsm"},
-        "isis_neighbors": {"command": "display isis peer verbose", "template": "hp_comware_display_isis_peer_verbose.textfsm"},
-        "board_status": {"command": "display device manuinfo", "template": "hp_comware_display_device_manuinfo.textfsm"},
+        "fan_status": {
+            "command": "display fan",
+            "template": "hp_comware_display_fan.textfsm",
+        },
+        "power_status": {
+            "command": "display power",
+            "template": "hp_comware_display_power.textfsm",
+        },
+        "clock_status": {
+            "command": "display clock",
+            "template": "hp_comware_display_clock.textfsm",
+        },
+        "ospf_neighbors": {
+            "command": "display ospf peer verbose",
+            "template": "hp_comware_display_ospf_peer.textfsm",
+        },
+        "ospf_interfaces": {
+            "command": "display ospf interface",
+            "template": "hp_comware_display_ospf_interface.textfsm",
+        },
+        "isis_neighbors": {
+            "command": "display isis peer verbose",
+            "template": "hp_comware_display_isis_peer_verbose.textfsm",
+        },
+        "board_status": {
+            "command": "display device manuinfo",
+            "template": "hp_comware_display_device_manuinfo.textfsm",
+        },
     },
     "H3C-router-cli": {
-        "device_identity": {"command": "display version", "template": "hp_comware_display_version.textfsm"},
+        "device_identity": {
+            "command": "display version",
+            "template": "hp_comware_display_version.textfsm",
+        },
         "arp": {"command": "display arp", "template": "hp_comware_display_arp.textfsm"},
-        "interface_brief": {"command": "display interface brief", "template": "hp_comware_display_interface_brief.textfsm"},
-        "ip_interface": {"command": "display ip interface", "template": "hp_comware_display_ip_interface.textfsm"},
+        "interface_brief": {
+            "command": "display interface brief",
+            "template": "hp_comware_display_interface_brief.textfsm",
+        },
+        "ip_interface": {
+            "command": "display ip interface",
+            "template": "hp_comware_display_ip_interface.textfsm",
+        },
     },
     "H3C-firewall-cli": {
-        "device_identity": {"command": "display version", "template": "hp_comware_display_version.textfsm"},
+        "device_identity": {
+            "command": "display version",
+            "template": "hp_comware_display_version.textfsm",
+        },
         "arp": {"command": "display arp", "template": "hp_comware_display_arp.textfsm"},
-        "interface_brief": {"command": "display interface brief", "template": "hp_comware_display_interface_brief.textfsm"},
-        "ip_interface": {"command": "display ip interface", "template": "hp_comware_display_ip_interface.textfsm"},
+        "interface_brief": {
+            "command": "display interface brief",
+            "template": "hp_comware_display_interface_brief.textfsm",
+        },
+        "ip_interface": {
+            "command": "display ip interface",
+            "template": "hp_comware_display_ip_interface.textfsm",
+        },
     },
     "Ruijie-switch": {
-        "device_identity": {"command": "show version", "template": "ruijie_show_version.textfsm"},
+        "device_identity": {
+            "command": "show version",
+            "template": "ruijie_show_version.textfsm",
+        },
         "fan_status": {"command": "show fan", "template": "ruijie_show_fan.textfsm"},
-        "power_status": {"command": "show power", "template": "ruijie_show_power.textfsm"},
-        "interface_brief": {"command": "show interfaces status", "template": "ruijie_show_interfaces_status.textfsm"},
-        "ip_interface": {"command": "show ip interface brief", "template": "ruijie_show_ip_interface_brief.textfsm"},
+        "power_status": {
+            "command": "show power",
+            "template": "ruijie_show_power.textfsm",
+        },
+        "interface_brief": {
+            "command": "show interfaces status",
+            "template": "ruijie_show_interfaces_status.textfsm",
+        },
+        "ip_interface": {
+            "command": "show ip interface brief",
+            "template": "ruijie_show_ip_interface_brief.textfsm",
+        },
         "arp": {"command": "show ip arp", "template": "ruijie_show_ip_arp.textfsm"},
         "mac": {"command": "show mac", "template": "ruijie_show_mac.textfsm"},
-        "lldp": {"command": "show lldp neighbors detail", "template": "ruijie_show_lldp_neighbors_detail.textfsm"},
-        "aggre_port": {"command": "show aggregatePort summary", "template": "ruijie_show_aggregatePort_summary.textfsm"},
-        "stack_status": {"command": "show switch virtual", "template": "ruijie_show_switch_virtual.textfsm"},
-        "irf_status": {"command": "show member", "template": "ruijie_show_member.textfsm"},
+        "lldp": {
+            "command": "show lldp neighbors detail",
+            "template": "ruijie_show_lldp_neighbors_detail.textfsm",
+        },
+        "aggre_port": {
+            "command": "show aggregatePort summary",
+            "template": "ruijie_show_aggregatePort_summary.textfsm",
+        },
+        "stack_status": {
+            "command": "show switch virtual",
+            "template": "ruijie_show_switch_virtual.textfsm",
+        },
+        "irf_status": {
+            "command": "show member",
+            "template": "ruijie_show_member.textfsm",
+        },
     },
     "Hillstone-firewall": {
-        "device_identity": {"command": "show version", "template": "hillstone_show_version.textfsm"},
+        "device_identity": {
+            "command": "show version",
+            "template": "hillstone_show_version.textfsm",
+        },
         "arp": {"command": "show arp", "template": "hillstone_show_arp.textfsm"},
         "mac": {"command": "show mac", "template": "hillstone_show_mac.textfsm"},
-        "interface_brief": {"command": "show interface", "template": "hillstone_show_interface.textfsm"},
-        "ip_interface": {"command": "show interface", "template": "hillstone_show_interface.textfsm"},
+        "interface_brief": {
+            "command": "show interface",
+            "template": "hillstone_show_interface.textfsm",
+        },
+        "ip_interface": {
+            "command": "show interface",
+            "template": "hillstone_show_interface.textfsm",
+        },
         "zone": {"command": "show zone", "template": "hillstone_show_zone.textfsm"},
         "service_predefined": {
             "command": "show service predefined",
@@ -1327,30 +1521,63 @@ PROFILE_NETMIKO_SUB_PLAN_DEFAULTS: Dict[str, Dict[str, Dict[str, str]]] = {
         "snat": {"command": "show configuration", "template": ""},
     },
     "Cisco-switch": {
-        "device_identity": {"command": "show version", "template": "cisco_ios_show_version.textfsm"},
+        "device_identity": {
+            "command": "show version",
+            "template": "cisco_ios_show_version.textfsm",
+        },
         "arp": {"command": "show ip arp", "template": "cisco_ios_show_ip_arp.textfsm"},
-        "mac": {"command": "show mac-address-table", "template": "cisco_ios_show_mac-address-table.textfsm"},
+        "mac": {
+            "command": "show mac-address-table",
+            "template": "cisco_ios_show_mac-address-table.textfsm",
+        },
     },
     "ZTE-switch": {
-        "device_identity": {"command": "show version", "template": "zte_zxros_show_version.textfsm"},
-        "lldp": {"command": "show lldp entry", "template": "zte_zxros_show_lldp_entry.textfsm"},
+        "device_identity": {
+            "command": "show version",
+            "template": "zte_zxros_show_version.textfsm",
+        },
+        "lldp": {
+            "command": "show lldp entry",
+            "template": "zte_zxros_show_lldp_entry.textfsm",
+        },
         "arp": {"command": "show arp", "template": "zte_zxros_show_arp.textfsm"},
     },
     "Maipu-switch": {
         "arp": {"command": "show arp", "template": "maipu_show_arp.textfsm"},
-        "mac": {"command": "show mac-address all", "template": "maipu_show_mac-address_all.textfsm"},
-        "interface_brief": {"command": "show interface", "template": "maipu_show_interface.textfsm"},
-        "aggre_port": {"command": "show link-aggregation interface", "template": "maipu_show_link-aggregation_interface.textfsm"},
+        "mac": {
+            "command": "show mac-address all",
+            "template": "maipu_show_mac-address_all.textfsm",
+        },
+        "interface_brief": {
+            "command": "show interface",
+            "template": "maipu_show_interface.textfsm",
+        },
+        "aggre_port": {
+            "command": "show link-aggregation interface",
+            "template": "maipu_show_link-aggregation_interface.textfsm",
+        },
     },
     "Mellanox-switch": {
-        "mac": {"command": "show mac-address-table", "template": "mellanox_show_mac-address-table.textfsm"},
-        "aggre_port": {"command": "show interface port-channel summary", "template": "mellanox_show_interface_port-channel_summary.textfsm"},
+        "mac": {
+            "command": "show mac-address-table",
+            "template": "mellanox_show_mac-address-table.textfsm",
+        },
+        "aggre_port": {
+            "command": "show interface port-channel summary",
+            "template": "mellanox_show_interface_port-channel_summary.textfsm",
+        },
         "fan_status": {"command": "show fan", "template": "mellanox_show_fan.textfsm"},
-        "power_status": {"command": "show power", "template": "mellanox_show_power.textfsm"},
+        "power_status": {
+            "command": "show power",
+            "template": "mellanox_show_power.textfsm",
+        },
     },
     "Centec-switch": {
         "arp": {"command": "show ip arp", "template": "centec_show_ip_arp.textfsm"},
-        "ip_interface": {"command": "show ip interface brief", "template": "centec_show_ip_interface_brief.textfsm"},
+        "ip_interface": {
+            "command": "show ip interface brief",
+            "template": "centec_show_ip_interface_brief.textfsm",
+        },
     },
 }
 
@@ -2098,7 +2325,7 @@ PROFILE_NETCONF_XML_TEMPLATE_DEFAULTS: Dict[str, Dict[str, Dict[str, str]]] = {
 """.strip(),
             "description": "HuaweiCollection.collection_trunk_lacp; placeholder for collection_aggregation",
         },
-    }
+    },
 }
 
 PROFILE_NETCONF_XML_TEMPLATE_DEFAULTS["Huawei-USG"] = {
@@ -2515,18 +2742,24 @@ PROFILE_NETCONF_XML_TEMPLATE_DEFAULTS["Huawei-YunShan"] = {
 for _h3c_cli_cap_profile_code in ("H3C-S98xx-cli", "H3C-legacy-cli"):
     PROFILE_NETCONF_XML_TEMPLATE_DEFAULTS[_h3c_cli_cap_profile_code] = {
         "netconf_capability": dict(
-            PROFILE_NETCONF_XML_TEMPLATE_DEFAULTS["H3C-modern-netconf"]["netconf_capability"]
+            PROFILE_NETCONF_XML_TEMPLATE_DEFAULTS["H3C-modern-netconf"][
+                "netconf_capability"
+            ]
         )
     }
 
 for _huawei_netconf_profile_code in ("Huawei-CE98xx", "Huawei-CE88xx", "Huawei-CE"):
     PROFILE_NETCONF_XML_TEMPLATE_DEFAULTS[_huawei_netconf_profile_code] = {
         key: dict(value)
-        for key, value in PROFILE_NETCONF_XML_TEMPLATE_DEFAULTS["Huawei-CE68xx-netconf"].items()
+        for key, value in PROFILE_NETCONF_XML_TEMPLATE_DEFAULTS[
+            "Huawei-CE68xx-netconf"
+        ].items()
     }
 
 for _huawei_vxlan_no_bd_profile_code in ("Huawei-CE98xx", "Huawei-CE"):
-    PROFILE_NETCONF_XML_TEMPLATE_DEFAULTS[_huawei_vxlan_no_bd_profile_code]["vxlan_capability"] = {
+    PROFILE_NETCONF_XML_TEMPLATE_DEFAULTS[_huawei_vxlan_no_bd_profile_code][
+        "vxlan_capability"
+    ] = {
         "collect_method": "get_config",
         "legacy_method": "collection_vxlan_capability",
         "xml_template": """
@@ -2582,7 +2815,8 @@ class PlatformProfileService:
                 requested.append("cli_output_capability")
 
         invalid_types = [
-            item for item in requested
+            item
+            for item in requested
             if item not in cls.CAPABILITY_DISCOVERY_COLLECTION_TYPES
         ]
         if invalid_types:
@@ -2608,7 +2842,9 @@ class PlatformProfileService:
             "netmiko_retry_times": 0,
         }
         vendor_alias = cls._normalize_vendor_alias(device)
-        model_name = str(getattr(getattr(device, "model", None), "name", "") or "").upper()
+        model_name = str(
+            getattr(getattr(device, "model", None), "name", "") or ""
+        ).upper()
         if vendor_alias == "H3C" and model_name.startswith("S5130"):
             policy["netconf_timeout_seconds"] = 5
         return policy
@@ -2618,7 +2854,9 @@ class PlatformProfileService:
         normalized_category_name = str(category_name or "").strip()
         if not normalized_category_name:
             return device
-        current_category_name = getattr(getattr(device, "category", None), "name", "") or ""
+        current_category_name = (
+            getattr(getattr(device, "category", None), "name", "") or ""
+        )
         if current_category_name:
             return device
         return SimpleNamespace(
@@ -2636,7 +2874,9 @@ class PlatformProfileService:
         )
 
     @staticmethod
-    def _resolve_effective_category_name(device: NetworkDevice, category_name: str) -> str:
+    def _resolve_effective_category_name(
+        device: NetworkDevice, category_name: str
+    ) -> str:
         requested_name = str(category_name or "").strip()
         if requested_name:
             return requested_name
@@ -2666,7 +2906,11 @@ class PlatformProfileService:
         initial_capabilities = cls.build_capabilities(device_for_matching)
         profile = cls.match_profile_for_device(device_for_matching)
         requested_types = cls._normalize_requested_capability_types(
-            vendor_alias=getattr(profile, "vendor_alias", cls._normalize_vendor_alias(device_for_matching)),
+            vendor_alias=getattr(
+                profile,
+                "vendor_alias",
+                cls._normalize_vendor_alias(device_for_matching),
+            ),
             collection_type=collection_type,
             collection_types=collection_types,
         )
@@ -2760,7 +3004,9 @@ class PlatformProfileService:
             response["auto_bind_result"] = cls.auto_bind_devices([device])
 
         refreshed_capabilities = cls.build_capabilities(device_for_matching)
-        response["matched_profile_after"] = refreshed_capabilities.get("profile_code", "")
+        response["matched_profile_after"] = refreshed_capabilities.get(
+            "profile_code", ""
+        )
         response["capabilities"] = refreshed_capabilities
         response["status"] = "finished"
         return response
@@ -2782,8 +3028,14 @@ class PlatformProfileService:
             },
             capability_facts={
                 "protocols": {
-                    "netconf": bool(getattr(device, "netconf_account_id", None) or getattr(device, "netconf_account", None)),
-                    "ssh": bool(getattr(device, "ssh_account_id", None) or getattr(device, "ssh_account", None)),
+                    "netconf": bool(
+                        getattr(device, "netconf_account_id", None)
+                        or getattr(device, "netconf_account", None)
+                    ),
+                    "ssh": bool(
+                        getattr(device, "ssh_account_id", None)
+                        or getattr(device, "ssh_account", None)
+                    ),
                 },
                 "probes": {
                     collection_type: {
@@ -2819,9 +3071,13 @@ class PlatformProfileService:
             device,
             connection_policy=connection_policy or {},
         )
-        probe_method = "netconf" if collection_type == "netconf_capability" else "netmiko"
+        probe_method = (
+            "netconf" if collection_type == "netconf_capability" else "netmiko"
+        )
         try:
-            with DeviceConnectionManager(device.manage_ip, device_info) as connection_manager:
+            with DeviceConnectionManager(
+                device.manage_ip, device_info
+            ) as connection_manager:
                 if collection_type == "netconf_capability":
                     connection_manager.get_netconf_connection()
                     success_message = "NETCONF连接验证成功"
@@ -2871,7 +3127,9 @@ class PlatformProfileService:
             or ""
         )
         vendor_variants = DeviceCollectionPlans.resolve_vendor_variants(vendor_value)
-        device_type_variants = DeviceCollectionPlans.resolve_device_type_variants(category_name)
+        device_type_variants = DeviceCollectionPlans.resolve_device_type_variants(
+            category_name
+        )
         if not vendor_variants or not device_type_variants:
             return []
         return list(
@@ -2883,7 +3141,9 @@ class PlatformProfileService:
         )
 
     @staticmethod
-    def _plan_protocol_match_score(plan: DeviceCollectionPlans, protocol_hint: str) -> tuple:
+    def _plan_protocol_match_score(
+        plan: DeviceCollectionPlans, protocol_hint: str
+    ) -> tuple:
         profile_text = str(getattr(plan, "profile_code", "") or "").lower()
         name_text = str(getattr(plan, "name", "") or "").lower()
         description_text = str(getattr(plan, "description", "") or "").lower()
@@ -2893,7 +3153,8 @@ class PlatformProfileService:
             for profile in PlatformProfileService.ensure_builtin_profiles()
         }
         has_builtin_profile = (
-            str(getattr(plan, "profile_code", "") or "").strip() in builtin_profile_codes
+            str(getattr(plan, "profile_code", "") or "").strip()
+            in builtin_profile_codes
         )
         if protocol_hint == "netconf":
             keywords = ("netconf",)
@@ -2918,7 +3179,12 @@ class PlatformProfileService:
             method_order.get(method_value, -1),
             1 if getattr(plan, "is_default", False) else 0,
             1 if getattr(plan, "generated_by_system", False) else 0,
-            1 if getattr(plan, "plan_kind", "") == DeviceCollectionPlans.PLAN_KIND_TEMPLATE else 0,
+            (
+                1
+                if getattr(plan, "plan_kind", "")
+                == DeviceCollectionPlans.PLAN_KIND_TEMPLATE
+                else 0
+            ),
             -(getattr(plan, "id", 0) or 0),
         )
 
@@ -2950,12 +3216,18 @@ class PlatformProfileService:
             profile_text = str(getattr(plan, "profile_code", "") or "").lower()
             name_text = str(getattr(plan, "name", "") or "").lower()
             description_text = str(getattr(plan, "description", "") or "").lower()
-            haystack = " ".join(filter(None, [profile_text, name_text, description_text]))
+            haystack = " ".join(
+                filter(None, [profile_text, name_text, description_text])
+            )
             if protocol_hint == "netconf":
-                if method_value in {
-                    DeviceCollectionPlans.COLLECTION_METHOD_NETCONF,
-                    DeviceCollectionPlans.COLLECTION_METHOD_BOTH,
-                } or "netconf" in haystack:
+                if (
+                    method_value
+                    in {
+                        DeviceCollectionPlans.COLLECTION_METHOD_NETCONF,
+                        DeviceCollectionPlans.COLLECTION_METHOD_BOTH,
+                    }
+                    or "netconf" in haystack
+                ):
                     filtered.append(plan)
             elif protocol_hint == "cli":
                 if method_value in {
@@ -2980,7 +3252,10 @@ class PlatformProfileService:
         if collection_type == "netconf_capability":
             if not getattr(sub_plan, "netconf_enabled", False):
                 return False
-            if hasattr(sub_plan, "xml_templates") and not sub_plan.xml_templates.exists():
+            if (
+                hasattr(sub_plan, "xml_templates")
+                and not sub_plan.xml_templates.exists()
+            ):
                 return False
         if collection_type == "cli_output_capability":
             if not getattr(sub_plan, "netmiko_enabled", False):
@@ -3060,8 +3335,7 @@ class PlatformProfileService:
         candidate_plans: List[DeviceCollectionPlans],
     ) -> List[PlatformProfile]:
         profiles_by_code = {
-            profile.code: profile
-            for profile in cls.ensure_builtin_profiles()
+            profile.code: profile for profile in cls.ensure_builtin_profiles()
         }
         resolved = []
         for plan in candidate_plans:
@@ -3080,8 +3354,10 @@ class PlatformProfileService:
         protocol_hint: str,
     ) -> Optional[DeviceCollectionPlans]:
         filtered = [
-            plan for plan in candidate_plans
-            if str(getattr(plan, "profile_code", "") or "").strip() == str(profile_code or "").strip()
+            plan
+            for plan in candidate_plans
+            if str(getattr(plan, "profile_code", "") or "").strip()
+            == str(profile_code or "").strip()
         ]
         if not filtered:
             return None
@@ -3099,7 +3375,9 @@ class PlatformProfileService:
     ) -> None:
         if not getattr(device, "serial_num", ""):
             return
-        existing_state = DeviceDiscoveryState.objects.filter(device_serial_num=device.serial_num).first()
+        existing_state = DeviceDiscoveryState.objects.filter(
+            device_serial_num=device.serial_num
+        ).first()
         capability_facts = getattr(existing_state, "capability_facts", {}) or {}
         DeviceDiscoveryState.objects.update_or_create(
             device_serial_num=device.serial_num,
@@ -3152,7 +3430,9 @@ class PlatformProfileService:
         except OSError:
             cls._template_placeholder_cache[template_name] = False
             return False
-        is_placeholder = any(marker in content for marker in PLACEHOLDER_TEMPLATE_MARKERS)
+        is_placeholder = any(
+            marker in content for marker in PLACEHOLDER_TEMPLATE_MARKERS
+        )
         cls._template_placeholder_cache[template_name] = is_placeholder
         return is_placeholder
 
@@ -3190,9 +3470,7 @@ class PlatformProfileService:
                         setattr(profile, key, value)
                         changed = True
                 if changed:
-                    profile.save(
-                        update_fields=list(defaults.keys()) + ["updated_at"]
-                    )
+                    profile.save(update_fields=list(defaults.keys()) + ["updated_at"])
             profiles.append(profile)
         return profiles
 
@@ -3220,23 +3498,36 @@ class PlatformProfileService:
     def load_device_capability_facts(cls, device: NetworkDevice) -> Dict[str, object]:
         state = None
         if getattr(device, "serial_num", ""):
-            state = DeviceDiscoveryState.objects.filter(device_serial_num=device.serial_num).first()
+            state = DeviceDiscoveryState.objects.filter(
+                device_serial_num=device.serial_num
+            ).first()
         if state is None and getattr(device, "manage_ip", ""):
-            state = DeviceDiscoveryState.objects.filter(manage_ip=device.manage_ip).first()
+            state = DeviceDiscoveryState.objects.filter(
+                manage_ip=device.manage_ip
+            ).first()
 
-        if state and isinstance(getattr(state, "capability_facts", None), dict) and state.capability_facts:
+        if (
+            state
+            and isinstance(getattr(state, "capability_facts", None), dict)
+            and state.capability_facts
+        ):
             return state.capability_facts
 
         protocol_facts = {
-            "netconf": bool(getattr(device, "netconf_account_id", None) or getattr(device, "netconf_account", None)),
-            "ssh": bool(getattr(device, "ssh_account_id", None) or getattr(device, "ssh_account", None)),
+            "netconf": bool(
+                getattr(device, "netconf_account_id", None)
+                or getattr(device, "netconf_account", None)
+            ),
+            "ssh": bool(
+                getattr(device, "ssh_account_id", None)
+                or getattr(device, "ssh_account", None)
+            ),
         }
         probes: Dict[str, Dict[str, object]] = {}
 
         try:
             vxlan_row = (
-                cls._get_capability_collection("vxlan_capability")
-                .coll.find_one(
+                cls._get_capability_collection("vxlan_capability").coll.find_one(
                     {"hostip": getattr(device, "manage_ip", "")},
                     sort=[("execute_time", -1)],
                 )
@@ -3258,8 +3549,7 @@ class PlatformProfileService:
 
         try:
             netconf_row = (
-                cls._get_capability_collection("netconf_capability")
-                .coll.find_one(
+                cls._get_capability_collection("netconf_capability").coll.find_one(
                     {"hostip": getattr(device, "manage_ip", "")},
                     sort=[("execute_time", -1)],
                 )
@@ -3271,7 +3561,9 @@ class PlatformProfileService:
             probes["netconf_capability"] = {
                 "ran_success": True,
                 "schema_count": int(netconf_row.get("schema_count") or 0),
-                "openconfig_schema_count": int(netconf_row.get("openconfig_schema_count") or 0),
+                "openconfig_schema_count": int(
+                    netconf_row.get("openconfig_schema_count") or 0
+                ),
                 "has_bgp_schema": bool(netconf_row.get("has_bgp_schema")),
                 "has_l2vpn_schema": bool(netconf_row.get("has_l2vpn_schema")),
                 "has_ifmgr_schema": bool(netconf_row.get("has_ifmgr_schema")),
@@ -3282,8 +3574,7 @@ class PlatformProfileService:
 
         try:
             cli_row = (
-                cls._get_capability_collection("cli_output_capability")
-                .coll.find_one(
+                cls._get_capability_collection("cli_output_capability").coll.find_one(
                     {"hostip": getattr(device, "manage_ip", "")},
                     sort=[("execute_time", -1)],
                 )
@@ -3317,7 +3608,9 @@ class PlatformProfileService:
         return facts
 
     @classmethod
-    def _normalize_capability_record(cls, record: Dict[str, object]) -> Dict[str, object]:
+    def _normalize_capability_record(
+        cls, record: Dict[str, object]
+    ) -> Dict[str, object]:
         normalized = {}
         for key, value in (record or {}).items():
             if key in {"_id"}:
@@ -3348,13 +3641,23 @@ class PlatformProfileService:
             return
 
         if capability_facts is None:
-            if collection_type not in {"vxlan_capability", "netconf_capability", "cli_output_capability"}:
+            if collection_type not in {
+                "vxlan_capability",
+                "netconf_capability",
+                "cli_output_capability",
+            }:
                 return
             record = cls._normalize_capability_record((processed_data or [{}])[0] or {})
             capability_facts = {
                 "protocols": {
-                    "netconf": bool(getattr(device, "netconf_account_id", None) or getattr(device, "netconf_account", None)),
-                    "ssh": bool(getattr(device, "ssh_account_id", None) or getattr(device, "ssh_account", None)),
+                    "netconf": bool(
+                        getattr(device, "netconf_account_id", None)
+                        or getattr(device, "netconf_account", None)
+                    ),
+                    "ssh": bool(
+                        getattr(device, "ssh_account_id", None)
+                        or getattr(device, "ssh_account", None)
+                    ),
                 },
                 "probes": {
                     collection_type: {
@@ -3368,18 +3671,21 @@ class PlatformProfileService:
 
         existing_state = None
         if device.serial_num:
-            existing_state = DeviceDiscoveryState.objects.filter(device_serial_num=device.serial_num).first()
+            existing_state = DeviceDiscoveryState.objects.filter(
+                device_serial_num=device.serial_num
+            ).first()
         if existing_state is None and device.manage_ip:
-            existing_state = DeviceDiscoveryState.objects.filter(manage_ip=device.manage_ip).first()
+            existing_state = DeviceDiscoveryState.objects.filter(
+                manage_ip=device.manage_ip
+            ).first()
 
         capability_facts = cls._merge_capability_facts(
             getattr(existing_state, "capability_facts", {}) or {},
             capability_facts,
         )
 
-        profile_code = (
-            getattr(existing_state, "profile_code", "")
-            or str(device_info.get("platform_profile_code") or "")
+        profile_code = getattr(existing_state, "profile_code", "") or str(
+            device_info.get("platform_profile_code") or ""
         )
         if not profile_code and resolve_profile:
             profile = cls.match_profile_for_device(device)
@@ -3406,10 +3712,14 @@ class PlatformProfileService:
     ) -> Dict[str, object]:
         merged = dict(existing_facts or {})
         for top_level_key, top_level_value in (incoming_facts or {}).items():
-            if isinstance(top_level_value, dict) and isinstance(merged.get(top_level_key), dict):
+            if isinstance(top_level_value, dict) and isinstance(
+                merged.get(top_level_key), dict
+            ):
                 section = dict(merged.get(top_level_key) or {})
                 for nested_key, nested_value in top_level_value.items():
-                    if isinstance(nested_value, dict) and isinstance(section.get(nested_key), dict):
+                    if isinstance(nested_value, dict) and isinstance(
+                        section.get(nested_key), dict
+                    ):
                         nested_section = dict(section.get(nested_key) or {})
                         nested_section.update(nested_value)
                         section[nested_key] = nested_section
@@ -3432,13 +3742,20 @@ class PlatformProfileService:
         required_protocols = requirements.get("required_protocols", {}) or {}
         preferred_probes = requirements.get("preferred_successful_probes", []) or []
         preferred_failed_probes = requirements.get("preferred_failed_probes", []) or []
-        disallowed_failed_probes = requirements.get("disallowed_failed_probes", []) or []
+        disallowed_failed_probes = (
+            requirements.get("disallowed_failed_probes", []) or []
+        )
         preferred_probe_flags = requirements.get("preferred_probe_flags", {}) or {}
-        preferred_probe_min_values = requirements.get("preferred_probe_min_values", {}) or {}
-        preferred_identity_patterns = requirements.get("preferred_identity_patterns", {}) or {}
+        preferred_probe_min_values = (
+            requirements.get("preferred_probe_min_values", {}) or {}
+        )
+        preferred_identity_patterns = (
+            requirements.get("preferred_identity_patterns", {}) or {}
+        )
         identity_facts = (capability_facts or {}).get("identity", {}) or {}
         protocol_match_count = sum(
-            1 for key, required in required_protocols.items()
+            1
+            for key, required in required_protocols.items()
             if bool(protocol_facts.get(key)) == bool(required)
         )
         successful_probe_count = 0
@@ -3459,7 +3776,9 @@ class PlatformProfileService:
                 )
                 threshold_hit_count += sum(
                     1
-                    for key, min_value in preferred_probe_min_values.get(probe_name, {}).items()
+                    for key, min_value in preferred_probe_min_values.get(
+                        probe_name, {}
+                    ).items()
                     if float(probe_payload.get(key) or 0) >= float(min_value)
                 )
 
@@ -3474,7 +3793,9 @@ class PlatformProfileService:
                 disallowed_failed_probe_count += 1
 
         for identity_key, patterns in preferred_identity_patterns.items():
-            if cls._match_patterns(str(identity_facts.get(identity_key) or ""), patterns):
+            if cls._match_patterns(
+                str(identity_facts.get(identity_key) or ""), patterns
+            ):
                 identity_hit_count += 1
 
         return (
@@ -3492,7 +3813,9 @@ class PlatformProfileService:
     def _match_patterns(value: str, patterns: List[str]) -> bool:
         if not patterns:
             return True
-        return any(re.search(pattern, value or "", re.IGNORECASE) for pattern in patterns)
+        return any(
+            re.search(pattern, value or "", re.IGNORECASE) for pattern in patterns
+        )
 
     @classmethod
     def match_profile_for_device(
@@ -3512,11 +3835,16 @@ class PlatformProfileService:
         for index, profile in enumerate(profiles):
             if profile.vendor_alias != vendor_alias:
                 continue
-            if profile.category and cls.normalize_device_category(profile.category) != category_name:
+            if (
+                profile.category
+                and cls.normalize_device_category(profile.category) != category_name
+            ):
                 continue
             series_match = cls._match_patterns(haystack, profile.series_patterns)
             version_match = cls._match_patterns(soft_version, profile.version_patterns)
-            capability_score = cls._score_profile_by_capabilities(profile, capability_facts)
+            capability_score = cls._score_profile_by_capabilities(
+                profile, capability_facts
+            )
             score = (
                 1 if series_match and version_match else 0,
                 1 if series_match else 0,
@@ -3544,8 +3872,12 @@ class PlatformProfileService:
         cls, profile: PlatformProfile
     ) -> DeviceCollectionPlans:
         expected_collection_method = cls.resolve_plan_collection_method(profile)
-        normalized_vendor = DeviceCollectionPlans.normalize_vendor_value(profile.vendor_alias)
-        normalized_device_type = DeviceCollectionPlans.normalize_device_type_value(profile.category)
+        normalized_vendor = DeviceCollectionPlans.normalize_vendor_value(
+            profile.vendor_alias
+        )
+        normalized_device_type = DeviceCollectionPlans.normalize_device_type_value(
+            profile.category
+        )
         cls._adopt_legacy_default_plan_alias(profile)
         plan, _ = DeviceCollectionPlans.objects.get_or_create(
             name=profile.default_plan_name,
@@ -3608,7 +3940,9 @@ class PlatformProfileService:
         binding_source: str = PlansToDevice.BINDING_SOURCE_AUTO,
     ) -> Dict[str, object]:
         now = timezone.now()
-        resolved_profile_code = str(profile_code or getattr(plan, "profile_code", "") or "")
+        resolved_profile_code = str(
+            profile_code or getattr(plan, "profile_code", "") or ""
+        )
         defaults = {
             "manage_ip": device.manage_ip,
             "profile_code": resolved_profile_code,
@@ -3674,12 +4008,16 @@ class PlatformProfileService:
         }
 
     @classmethod
-    def _adopt_legacy_default_plan_alias(cls, profile: PlatformProfile) -> Optional[DeviceCollectionPlans]:
+    def _adopt_legacy_default_plan_alias(
+        cls, profile: PlatformProfile
+    ) -> Optional[DeviceCollectionPlans]:
         alias_names = PROFILE_LEGACY_PLAN_NAME_ALIASES.get(profile.code, [])
         if not alias_names:
             return None
 
-        if DeviceCollectionPlans.objects.filter(name=profile.default_plan_name).exists():
+        if DeviceCollectionPlans.objects.filter(
+            name=profile.default_plan_name
+        ).exists():
             return None
 
         alias_plan = (
@@ -3702,9 +4040,9 @@ class PlatformProfileService:
         if not alias_names:
             return
 
-        alias_plans = DeviceCollectionPlans.objects.filter(name__in=alias_names).exclude(
-            id=getattr(active_plan, "id", None)
-        )
+        alias_plans = DeviceCollectionPlans.objects.filter(
+            name__in=alias_names
+        ).exclude(id=getattr(active_plan, "id", None))
         for alias_plan in alias_plans:
             if PlansToDevice.objects.filter(plan=alias_plan, is_active=True).exists():
                 continue
@@ -3879,13 +4217,18 @@ class PlatformProfileService:
             for alias_plan in alias_plans:
                 summary["alias_plans_found"] += 1
                 readiness_blockers = cls.audit_plan_readiness(alias_plan)
-                active_bindings = PlansToDevice.objects.filter(plan=alias_plan, is_active=True).count()
+                active_bindings = PlansToDevice.objects.filter(
+                    plan=alias_plan, is_active=True
+                ).count()
                 total_bindings = PlansToDevice.objects.filter(plan=alias_plan).count()
                 issue_codes = []
                 if getattr(alias_plan, "profile_code", "") != profile_code:
                     issue_codes.append("legacy_profile_code_mismatch")
                     summary["non_builtin_profile_code"] += 1
-                if getattr(alias_plan, "plan_kind", "") != DeviceCollectionPlans.PLAN_KIND_TEMPLATE:
+                if (
+                    getattr(alias_plan, "plan_kind", "")
+                    != DeviceCollectionPlans.PLAN_KIND_TEMPLATE
+                ):
                     issue_codes.append("legacy_runtime_plan_kind")
                     summary["runtime_plan_kind"] += 1
                 if not getattr(alias_plan, "generated_by_system", False):
@@ -3914,13 +4257,19 @@ class PlatformProfileService:
                         "default_plan_name": getattr(profile, "default_plan_name", ""),
                         "alias_plan_id": getattr(alias_plan, "id", None),
                         "alias_plan_name": getattr(alias_plan, "name", ""),
-                        "alias_plan_profile_code": getattr(alias_plan, "profile_code", ""),
+                        "alias_plan_profile_code": getattr(
+                            alias_plan, "profile_code", ""
+                        ),
                         "alias_plan_kind": getattr(alias_plan, "plan_kind", ""),
                         "alias_generated_by_system": bool(
                             getattr(alias_plan, "generated_by_system", False)
                         ),
-                        "alias_is_default": bool(getattr(alias_plan, "is_default", False)),
-                        "alias_is_active": bool(getattr(alias_plan, "is_active", False)),
+                        "alias_is_default": bool(
+                            getattr(alias_plan, "is_default", False)
+                        ),
+                        "alias_is_active": bool(
+                            getattr(alias_plan, "is_active", False)
+                        ),
                         "canonical_plan_exists": canonical_plan is not None,
                         "canonical_plan_id": getattr(canonical_plan, "id", None),
                         "canonical_plan_name": getattr(canonical_plan, "name", ""),
@@ -3996,13 +4345,15 @@ class PlatformProfileService:
             item["plan_name"] = getattr(plan, "name", "")
 
             bindings = list(
-                PlansToDevice.objects.select_related("plan")
-                .filter(device_serial_num=getattr(device, "serial_num", ""), is_active=True)
+                PlansToDevice.objects.select_related("plan").filter(
+                    device_serial_num=getattr(device, "serial_num", ""), is_active=True
+                )
             )
             if not bindings and getattr(device, "manage_ip", ""):
                 bindings = list(
-                    PlansToDevice.objects.select_related("plan")
-                    .filter(manage_ip=getattr(device, "manage_ip", ""), is_active=True)
+                    PlansToDevice.objects.select_related("plan").filter(
+                        manage_ip=getattr(device, "manage_ip", ""), is_active=True
+                    )
                 )
 
             binding = next(
@@ -4054,9 +4405,9 @@ class PlatformProfileService:
                     bool(getattr(sub_plan, "netconf_enabled", False))
                     for sub_plan in plan.collect_plans.all()
                 ):
-                    if getattr(device, "netconf_enable", "") != "account" or not getattr(
-                        device, "netconf_account", None
-                    ):
+                    if getattr(
+                        device, "netconf_enable", ""
+                    ) != "account" or not getattr(device, "netconf_account", None):
                         item["blockers"].append(
                             {
                                 "code": "missing_netconf_account",
@@ -4080,12 +4431,16 @@ class PlatformProfileService:
         return {"summary": summary, "results": results}
 
     @staticmethod
-    def _get_cli_defaults(profile: PlatformProfile, collection_type: str) -> Dict[str, str]:
+    def _get_cli_defaults(
+        profile: PlatformProfile, collection_type: str
+    ) -> Dict[str, str]:
         profile_defaults = PROFILE_NETMIKO_SUB_PLAN_DEFAULTS.get(profile.code, {})
         return profile_defaults.get(collection_type, {})
 
     @staticmethod
-    def _get_netconf_defaults(profile: PlatformProfile, collection_type: str) -> Dict[str, str]:
+    def _get_netconf_defaults(
+        profile: PlatformProfile, collection_type: str
+    ) -> Dict[str, str]:
         profile_defaults = PROFILE_NETCONF_XML_TEMPLATE_DEFAULTS.get(profile.code, {})
         return profile_defaults.get(collection_type, {})
 
@@ -4093,9 +4448,15 @@ class PlatformProfileService:
     def apply_profile_defaults(
         cls, plan: DeviceCollectionPlans, profile: PlatformProfile
     ) -> None:
-        identity_command = DEVICE_IDENTITY_NETMIKO_COMMANDS.get(profile.vendor_alias, "")
-        enabled_collection_types = set(DeviceCollectionService.get_enabled_collection_types(plan))
-        plan_method = getattr(plan, "collection_method", DeviceCollectionPlans.COLLECTION_METHOD_NETMIKO)
+        identity_command = DEVICE_IDENTITY_NETMIKO_COMMANDS.get(
+            profile.vendor_alias, ""
+        )
+        enabled_collection_types = set(
+            DeviceCollectionService.get_enabled_collection_types(plan)
+        )
+        plan_method = getattr(
+            plan, "collection_method", DeviceCollectionPlans.COLLECTION_METHOD_NETMIKO
+        )
         plan_allows_netmiko = plan_method in {
             DeviceCollectionPlans.COLLECTION_METHOD_NETMIKO,
             DeviceCollectionPlans.COLLECTION_METHOD_BOTH,
@@ -4105,10 +4466,16 @@ class PlatformProfileService:
             DeviceCollectionPlans.COLLECTION_METHOD_BOTH,
         }
         for sub_plan in plan.collect_plans.all():
-            preferred = (profile.preferred_methods or {}).get(sub_plan.collection_type, [])
-            supported = sub_plan.collection_type in (profile.supported_collection_types or [])
+            preferred = (profile.preferred_methods or {}).get(
+                sub_plan.collection_type, []
+            )
+            supported = sub_plan.collection_type in (
+                profile.supported_collection_types or []
+            )
             cli_defaults = cls._get_cli_defaults(profile, sub_plan.collection_type)
-            netconf_defaults = cls._get_netconf_defaults(profile, sub_plan.collection_type)
+            netconf_defaults = cls._get_netconf_defaults(
+                profile, sub_plan.collection_type
+            )
             updated_fields = []
             profile_summary = (
                 f"profile={profile.code}; supported={supported}; "
@@ -4133,14 +4500,20 @@ class PlatformProfileService:
                 sub_plan.textfsm_template = template
                 updated_fields.append("textfsm_template")
 
-            desired_netmiko_enabled = supported and preferred_uses_netmiko and bool(command)
+            desired_netmiko_enabled = (
+                supported and preferred_uses_netmiko and bool(command)
+            )
             if (
                 not desired_netmiko_enabled
                 and cli_defaults
-                and "netmiko" in (profile.fallback_methods or {}).get(sub_plan.collection_type, [])
+                and "netmiko"
+                in (profile.fallback_methods or {}).get(sub_plan.collection_type, [])
             ):
                 desired_netmiko_enabled = bool(command)
-            if sub_plan.collection_type not in enabled_collection_types or not plan_allows_netmiko:
+            if (
+                sub_plan.collection_type not in enabled_collection_types
+                or not plan_allows_netmiko
+            ):
                 desired_netmiko_enabled = False
 
             if sub_plan.netmiko_enabled != desired_netmiko_enabled:
@@ -4152,7 +4525,10 @@ class PlatformProfileService:
                 and "netconf" in preferred
                 and bool(netconf_defaults.get("xml_template"))
             )
-            if sub_plan.collection_type not in enabled_collection_types or not plan_allows_netconf:
+            if (
+                sub_plan.collection_type not in enabled_collection_types
+                or not plan_allows_netconf
+            ):
                 desired_netconf_enabled = False
 
             if sub_plan.netconf_enabled != desired_netconf_enabled:
@@ -4172,7 +4548,9 @@ class PlatformProfileService:
                 xml_template = netconf_defaults.get("xml_template", "")
                 description = netconf_defaults.get("description", "")
                 if xml_template:
-                    template_obj = sub_plan.xml_templates.filter(collect_method=collect_method).first()
+                    template_obj = sub_plan.xml_templates.filter(
+                        collect_method=collect_method
+                    ).first()
                     if template_obj is None:
                         NetconfXMLTemplate.objects.create(
                             collect_method=collect_method,
@@ -4189,7 +4567,9 @@ class PlatformProfileService:
                             template_obj.description = description
                             template_updates.append("description")
                         if template_updates:
-                            template_obj.save(update_fields=template_updates + ["updated_at"])
+                            template_obj.save(
+                                update_fields=template_updates + ["updated_at"]
+                            )
 
     @classmethod
     def auto_bind_devices(
@@ -4251,7 +4631,9 @@ class PlatformProfileService:
         category_name: str = "",
     ) -> Dict[str, object]:
         device_for_matching = cls._build_category_hint_device(device, category_name)
-        effective_category_name = cls._resolve_effective_category_name(device_for_matching, category_name)
+        effective_category_name = cls._resolve_effective_category_name(
+            device_for_matching, category_name
+        )
         if not effective_category_name:
             raise ValueError("缺少必要参数: category_name")
 
@@ -4262,9 +4644,13 @@ class PlatformProfileService:
         )
         connection_policy = cls.build_discovery_connection_policy(device)
         requested_types = []
-        if getattr(device, "netconf_enable", "") == "account" and getattr(device, "netconf_account", None):
+        if getattr(device, "netconf_enable", "") == "account" and getattr(
+            device, "netconf_account", None
+        ):
             requested_types.append("netconf_capability")
-        if getattr(device, "ssh_enable", "") == "account" and getattr(device, "ssh_account", None):
+        if getattr(device, "ssh_enable", "") == "account" and getattr(
+            device, "ssh_account", None
+        ):
             requested_types.append("cli_output_capability")
 
         response = {
@@ -4318,7 +4704,9 @@ class PlatformProfileService:
                 capability_probe_candidates = [
                     plan
                     for plan in candidate_plans_for_netconf
-                    if cls._plan_supports_collection_type(plan, collection_type="netconf_capability")
+                    if cls._plan_supports_collection_type(
+                        plan, collection_type="netconf_capability"
+                    )
                 ]
                 capability_probe_plan = cls._select_plan_for_protocol(
                     capability_probe_candidates or candidate_plans_for_netconf,
@@ -4349,7 +4737,9 @@ class PlatformProfileService:
                     if capability_probe["status"] == "success":
                         response["probe_summary"]["success"] += 1
                         desired_protocol = "netconf"
-                        candidate_profiles = cls._resolve_profiles_for_plans(candidate_plans_for_netconf)
+                        candidate_profiles = cls._resolve_profiles_for_plans(
+                            candidate_plans_for_netconf
+                        )
                         if candidate_profiles:
                             matched_profile = cls.match_profile_for_device(
                                 device_for_matching,
@@ -4393,7 +4783,9 @@ class PlatformProfileService:
 
         if not desired_protocol:
             refreshed_capabilities = cls.build_capabilities(device_for_matching)
-            response["matched_profile_after"] = refreshed_capabilities.get("profile_code", "")
+            response["matched_profile_after"] = refreshed_capabilities.get(
+                "profile_code", ""
+            )
             response["capabilities"] = refreshed_capabilities
             response["status"] = "skipped"
             response["reason"] = "no_protocol_connectivity"
@@ -4418,7 +4810,9 @@ class PlatformProfileService:
             )
         if selected_plan is None:
             refreshed_capabilities = cls.build_capabilities(device_for_matching)
-            response["matched_profile_after"] = refreshed_capabilities.get("profile_code", "")
+            response["matched_profile_after"] = refreshed_capabilities.get(
+                "profile_code", ""
+            )
             response["capabilities"] = refreshed_capabilities
             response["status"] = "skipped"
             response["reason"] = "candidate_plan_not_found"
@@ -4454,7 +4848,9 @@ class PlatformProfileService:
             "results": [bind_result],
         }
         refreshed_capabilities = cls.build_capabilities(device_for_matching)
-        response["matched_profile_after"] = str(getattr(selected_plan, "profile_code", "") or "")
+        response["matched_profile_after"] = str(
+            getattr(selected_plan, "profile_code", "") or ""
+        )
         response["capabilities"] = refreshed_capabilities
         response["status"] = "finished"
         return response
@@ -4468,7 +4864,11 @@ class PlatformProfileService:
         error: str,
         rebind_on_failure: bool = False,
     ) -> Optional[Dict[str, object]]:
-        if collection_type not in {"netconf_capability", "cli_output_capability", "vxlan_capability"}:
+        if collection_type not in {
+            "netconf_capability",
+            "cli_output_capability",
+            "vxlan_capability",
+        }:
             return None
 
         manage_ip = str(device_info.get("manage_ip") or "")
@@ -4477,13 +4877,17 @@ class PlatformProfileService:
         if serial_num:
             device = (
                 NetworkDevice.objects.filter(serial_num=serial_num)
-                .select_related("vendor", "category", "model", "ssh_account", "netconf_account")
+                .select_related(
+                    "vendor", "category", "model", "ssh_account", "netconf_account"
+                )
                 .first()
             )
         if device is None and manage_ip:
             device = (
                 NetworkDevice.objects.filter(manage_ip=manage_ip)
-                .select_related("vendor", "category", "model", "ssh_account", "netconf_account")
+                .select_related(
+                    "vendor", "category", "model", "ssh_account", "netconf_account"
+                )
                 .first()
             )
         if device is None:
@@ -4492,8 +4896,14 @@ class PlatformProfileService:
         now = timezone.now()
         failure_facts = {
             "protocols": {
-                "netconf": bool(getattr(device, "netconf_account_id", None) or getattr(device, "netconf_account", None)),
-                "ssh": bool(getattr(device, "ssh_account_id", None) or getattr(device, "ssh_account", None)),
+                "netconf": bool(
+                    getattr(device, "netconf_account_id", None)
+                    or getattr(device, "netconf_account", None)
+                ),
+                "ssh": bool(
+                    getattr(device, "ssh_account_id", None)
+                    or getattr(device, "ssh_account", None)
+                ),
             },
             "probes": {
                 collection_type: {
@@ -4506,17 +4916,18 @@ class PlatformProfileService:
 
         existing_state = None
         if device.serial_num:
-            existing_state = DeviceDiscoveryState.objects.filter(device_serial_num=device.serial_num).first()
+            existing_state = DeviceDiscoveryState.objects.filter(
+                device_serial_num=device.serial_num
+            ).first()
         if existing_state is None and device.manage_ip:
-            existing_state = DeviceDiscoveryState.objects.filter(manage_ip=device.manage_ip).first()
+            existing_state = DeviceDiscoveryState.objects.filter(
+                manage_ip=device.manage_ip
+            ).first()
 
         existing_probe = (
-            (
-                (getattr(existing_state, "capability_facts", {}) or {}).get("probes", {})
-                or {}
-            ).get(collection_type, {})
+            (getattr(existing_state, "capability_facts", {}) or {}).get("probes", {})
             or {}
-        )
+        ).get(collection_type, {}) or {}
         preserved_probe_state = {
             "ran_success": bool(existing_probe.get("ran_success")),
             "connection_verified": bool(existing_probe.get("connection_verified")),
@@ -4529,7 +4940,7 @@ class PlatformProfileService:
             getattr(existing_state, "capability_facts", {}) or {},
             failure_facts,
         )
-        probe_state = ((capability_facts.get("probes") or {}).get(collection_type) or {})
+        probe_state = (capability_facts.get("probes") or {}).get(collection_type) or {}
         if preserved_probe_state["ran_success"]:
             probe_state["ran_success"] = True
         if preserved_probe_state["connection_verified"]:
@@ -4572,7 +4983,9 @@ class PlatformProfileService:
             }
 
         bindings = list(
-            PlansToDevice.objects.filter(device_serial_num=device.serial_num, is_active=True)
+            PlansToDevice.objects.filter(
+                device_serial_num=device.serial_num, is_active=True
+            )
             .select_related("plan")
             .values(
                 "id",
@@ -4640,7 +5053,9 @@ class DeviceFactService:
         return Vendor.objects.filter(name=vendor_alias).first()
 
     @classmethod
-    def _ensure_model(cls, vendor: Optional[Vendor], model_name: str) -> Optional[Model]:
+    def _ensure_model(
+        cls, vendor: Optional[Vendor], model_name: str
+    ) -> Optional[Model]:
         if not vendor or not model_name:
             return None
         model, _ = Model.objects.get_or_create(name=model_name, vendor=vendor)
@@ -4653,7 +5068,13 @@ class DeviceFactService:
         device_info: Dict[str, object],
         processed_data: List[Dict[str, object]],
     ) -> None:
-        if collection_type not in ("device_identity", "version", "board_status", "irf_status", "stack_status"):
+        if collection_type not in (
+            "device_identity",
+            "version",
+            "board_status",
+            "irf_status",
+            "stack_status",
+        ):
             return
         if not processed_data:
             return
@@ -4668,7 +5089,8 @@ class DeviceFactService:
             for slot_type in ("slot", "chassis"):
                 preferred_record = next(
                     (
-                        item for item in processed_data
+                        item
+                        for item in processed_data
                         if str(item.get("slot_type") or "").lower() == slot_type
                     ),
                     None,
@@ -4703,16 +5125,20 @@ class DeviceFactService:
                 if current_slot is not None:
                     match = next(
                         (
-                            item for item in records
-                            if cls._normalize_positive_int(item.get("member_id")) == current_slot
+                            item
+                            for item in records
+                            if cls._normalize_positive_int(item.get("member_id"))
+                            == current_slot
                         ),
                         None,
                     )
                 if match is None and current_chassis is not None:
                     match = next(
                         (
-                            item for item in records
-                            if cls._normalize_positive_int(item.get("chassis_id")) == current_chassis
+                            item
+                            for item in records
+                            if cls._normalize_positive_int(item.get("chassis_id"))
+                            == current_chassis
                         ),
                         None,
                     )
@@ -4782,33 +5208,30 @@ class DeviceFactService:
         identity_facts = {
             "hostname": str(discovered_name or "").strip(),
             "platform_name": str(
-                record.get("platform_name")
-                or record.get("platform-name")
-                or ""
+                record.get("platform_name") or record.get("platform-name") or ""
             ).strip(),
             "product_name": str(
-                record.get("product_name")
-                or record.get("product-name")
-                or ""
+                record.get("product_name") or record.get("product-name") or ""
             ).strip(),
             "model_name": str(
-                model_name
-                or getattr(getattr(device, "model", None), "name", "")
-                or ""
+                model_name or getattr(getattr(device, "model", None), "name", "") or ""
             ).strip(),
-            "soft_version": str(soft_version or getattr(device, "soft_version", "") or "").strip(),
-            "patch_version": str(patch_version or getattr(device, "patch_version", "") or "").strip(),
+            "soft_version": str(
+                soft_version or getattr(device, "soft_version", "") or ""
+            ).strip(),
+            "patch_version": str(
+                patch_version or getattr(device, "patch_version", "") or ""
+            ).strip(),
         }
-        identity_facts = {
-            key: value for key, value in identity_facts.items()
-            if value
-        }
+        identity_facts = {key: value for key, value in identity_facts.items() if value}
         if identity_facts:
             PlatformProfileService.update_capability_facts(
                 device_info={
                     "manage_ip": device.manage_ip,
                     "serial_num": device.serial_num,
-                    "vendor__alias": getattr(getattr(device, "vendor", None), "alias", ""),
+                    "vendor__alias": getattr(
+                        getattr(device, "vendor", None), "alias", ""
+                    ),
                     "platform_profile_code": profile_code,
                 },
                 capability_facts={"identity": identity_facts},

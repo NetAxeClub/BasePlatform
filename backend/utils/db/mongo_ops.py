@@ -126,7 +126,7 @@ class MongoOps:
         self.coll.update_many(filter=filter, update=update)
         return
 
-    def update_one(self, filter, update):
+    def update_one(self, filter, update, upsert: bool = False):
         """
         将日志写入mongodb
         :type content: dict
@@ -134,7 +134,7 @@ class MongoOps:
         result = db.test.update_one({'x': 1}, {'$inc': {'x': 3}})
         res = my_mongo.update(filter=tmp[-1], update={"$set": {'start': int(tmp[-1]['start']) + 10}})
         """
-        result = self.coll.update_one(filter=filter, update=update)
+        result = self.coll.update_one(filter=filter, update=update, upsert=upsert)
         return result
 
     def find(self, query_dict=None, fields=None, sort=None):

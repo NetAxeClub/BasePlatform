@@ -19,6 +19,27 @@ from apps.device_api.serializers import DeviceSubCollectionPlanSerializer
 from utils.crypt_pwd import CryptPwd
 
 
+def _relation_identity(relation):
+    return (
+        getattr(relation, "device_serial_num", "") or getattr(relation, "manage_ip", "") or ""
+    )
+
+
+def _is_executable_sub_plan(sub_plan_data):
+    if not isinstance(sub_plan_data, dict):
+        return False
+    return any(
+        bool(sub_plan_data.get(flag))
+        for flag in (
+            "netmiko_enabled",
+            "netconf_enabled",
+            "snmp_enabled",
+            "restconf_enabled",
+            "telemetry_enabled",
+        )
+    )
+
+
 # 获取登录网络设备所需相关信息
 def get_auto_device(**kwargs):
     hosts = []
@@ -123,6 +144,20 @@ def get_auto_device(**kwargs):
     relations = list(
         PlansToDevice.objects.select_related('plan').filter(**relation_query)
     )
+    if "binding_source" not in relation_filters:
+        manual_only_relations = []
+        relation_groups = {}
+        for relation in relations:
+            identity = _relation_identity(relation)
+            relation_groups.setdefault(identity, []).append(relation)
+        for grouped_relations in relation_groups.values():
+            manual_relations = [
+                relation
+                for relation in grouped_relations
+                if getattr(relation, "binding_source", "") == PlansToDevice.BINDING_SOURCE_MANUAL
+            ]
+            manual_only_relations.extend(manual_relations or grouped_relations)
+        relations = manual_only_relations
     if not relations:
         connections.close_all()
         return []
@@ -144,6 +179,8 @@ def get_auto_device(**kwargs):
         
         # 按 plan_id 分组
         for sub_plan_data in sub_plans_data:
+            if not _is_executable_sub_plan(sub_plan_data):
+                continue
             plan_id = sub_plan_data.get('summary_plan')
             if plan_id not in plan_sub_plans_map:
                 plan_sub_plans_map[plan_id] = []
