@@ -144,6 +144,16 @@ class DeviceCollectionPlans(models.Model):
         verbose_name="方案级采集方式",
     )
     is_active = models.BooleanField(default=True, verbose_name='是否启用')
+    recent_validation_status = models.CharField(
+        max_length=32,
+        blank=True,
+        default='pending',
+        verbose_name='最近验证状态',
+    )
+    recent_failed_device_count = models.PositiveIntegerField(
+        default=0,
+        verbose_name='最近失败设备数',
+    )
 
     # 时间戳
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
@@ -391,6 +401,8 @@ class DeviceSubCollectionPlan(models.Model):
 
     # TextFSM配置
     textfsm_template = models.CharField(blank=True, max_length=100, default='', verbose_name='TextFSM模板路径')
+    recent_failed_count = models.PositiveIntegerField(default=0, verbose_name='最近失败数')
+    latest_sample_result = models.TextField(blank=True, default='', verbose_name='最近样例结果')
 
     # 时间戳
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')

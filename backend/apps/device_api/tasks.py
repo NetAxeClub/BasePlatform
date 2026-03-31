@@ -509,9 +509,40 @@ def _count_method_outcomes(execution_result):
     return success_count, failed_count
 
 
+def _summarize_sample_result(execution_result):
+    if not isinstance(execution_result, dict):
+        return ""
+    for key in (
+        "message",
+        "error",
+        "detail",
+        "result",
+        "status",
+    ):
+        value = execution_result.get(key)
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return ""
+
+
+def _summary_validation_status_text(success_count, failed_count, skipped_count, total_plans):
+    if total_plans <= 0:
+        return "待验证"
+    if skipped_count == total_plans:
+        return "前置校验未通过"
+    if failed_count == 0 and skipped_count == 0:
+        return "验证成功"
+    if success_count > 0:
+        return "部分成功"
+    return "验证失败"
+
+
 @shared_task(base=AxeTask, once={"graceful": True}, bind=True)
 def run_summary_plan_validation_task(self, task_context):
-    from apps.device_api.models import DeviceCollectionPlans
+    from apps.device_api.models import DeviceCollectionPlans, DeviceSubCollectionPlan
 
     task_id = str(getattr(self.request, "id", "") or "")
     username = str(task_context.get("username") or "")
@@ -751,6 +782,45 @@ def run_summary_plan_validation_task(self, task_context):
         if skipped_count == total_plans:
             result_code = 400
 
+        # 持久化父方案运行态字段，供列表页实时展示
+        summary_plan.recent_validation_status = _summary_validation_status_text(
+            success_count,
+            failed_count,
+            skipped_count,
+            total_plans,
+        )
+        summary_plan.recent_failed_device_count = 0 if result_code == 200 else 1
+        summary_plan.save(
+            update_fields=[
+                "recent_validation_status",
+                "recent_failed_device_count",
+                "updated_at",
+            ]
+        )
+
+        # 持久化子方案运行态字段，避免前端只能展示占位值
+        for item in results:
+            plan_pk = item.get("plan_id")
+            if not plan_pk:
+                continue
+            _, plan_failed_count = _count_method_outcomes(item)
+            latest_sample_result = str(item.get("message") or "").strip()
+            if not latest_sample_result:
+                for method_key in (
+                    "netmiko_result",
+                    "netconf_result",
+                    "snmp_result",
+                    "restconf_result",
+                    "telemetry_result",
+                ):
+                    latest_sample_result = _summarize_sample_result(item.get(method_key))
+                    if latest_sample_result:
+                        break
+            DeviceSubCollectionPlan.objects.filter(id=plan_pk).update(
+                recent_failed_count=plan_failed_count,
+                latest_sample_result=latest_sample_result,
+            )
+
         snapshot["status"] = "finished" if result_code == 200 else "failed"
         snapshot["message"] = message
         snapshot["progress"] = {
@@ -910,6 +980,30 @@ def run_sub_plan_execute_task(self, task_context):
             )
 
         success_count, failed_count = _count_method_outcomes(execution_result)
+        latest_sample_result = str(
+            execution_result.get("message")
+            or execution_result.get("error")
+            or ""
+        ).strip()
+        if not latest_sample_result:
+            for method_key in (
+                "netmiko_result",
+                "netconf_result",
+                "snmp_result",
+                "restconf_result",
+                "telemetry_result",
+            ):
+                latest_sample_result = _summarize_sample_result(
+                    execution_result.get(method_key)
+                )
+                if latest_sample_result:
+                    break
+        plan.recent_failed_count = failed_count
+        plan.latest_sample_result = latest_sample_result
+        plan.save(
+            update_fields=["recent_failed_count", "latest_sample_result", "updated_at"]
+        )
+
         analysis_trigger = {
             "scheduled": False,
             "reason": "not_local_execution",

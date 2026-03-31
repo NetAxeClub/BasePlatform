@@ -8,9 +8,9 @@ import json
 import os
 import re
 import time
+import asyncio
 import traceback
 import logging
-from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
@@ -49,13 +49,35 @@ def send_ws_msg(channel, group_name, data):
             group_name,
         )
         return
-    async_to_sync(channel_layer.group_send)(
-        group_name,
-        {
-            'type': channel,
-            'message': data
-        }
-    )
+    payload = {
+        'type': channel,
+        'message': data
+    }
+
+    async def _send_and_close():
+        await channel_layer.group_send(group_name, payload)
+        # 显式关闭 redis 连接池，避免 disconnect 任务在 loop 关闭后抛噪声。
+        if hasattr(channel_layer, "close_pools"):
+            await channel_layer.close_pools()
+
+    try:
+        asyncio.run(_send_and_close())
+    except RuntimeError as exc:
+        if "Event loop is closed" in str(exc):
+            logger.debug(
+                "ws message skipped due to closed loop: channel=%s group=%s",
+                channel,
+                group_name,
+            )
+            return
+        raise
+    except Exception as exc:
+        logger.warning(
+            "send ws message failed: channel=%s group=%s error=%s",
+            channel,
+            group_name,
+            exc,
+        )
     return
 
 
