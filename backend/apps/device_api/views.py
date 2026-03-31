@@ -56,7 +56,10 @@ from apps.device_api.tasks import (
     _build_runtime_task_snapshot,
     _store_runtime_task_snapshot,
     analyze_collection_plan_bindings,
+    bind_summary_plan_validation_lock,
+    claim_summary_plan_validation_lock,
     get_runtime_task_snapshot,
+    release_summary_plan_validation_lock,
     run_batch_profile_rebind_task,
     run_sub_plan_execute_task,
     run_summary_plan_validation_task,
@@ -668,6 +671,8 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
         device_ip = (request.data.get('device_ip') or '').strip()
         south_driver = request.data.get('south_driver')
         use_local = request.data.get('use_local', False)
+        lock_claimed = False
+        username = ''
 
         try:
             if not summary_plan.is_active:
@@ -714,6 +719,25 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
                 })
 
             username = _resolve_request_username(request)
+            lock_state = claim_summary_plan_validation_lock(
+                username=username,
+                summary_plan_id=summary_plan.id,
+                device_ip=device_ip or device.manage_ip,
+            )
+            if not lock_state.get('claimed'):
+                existing_task_id = str(lock_state.get('task_id') or '').strip()
+                existing_snapshot = lock_state.get('snapshot') or {}
+                return JsonResponse({
+                    'code': 409,
+                    'message': '同设备同父方案已有验证任务正在执行，请等待完成后再重试',
+                    'data': {
+                        **existing_snapshot,
+                        'task_id': existing_task_id,
+                        'async': True,
+                        'duplicated': True,
+                    },
+                })
+            lock_claimed = True
 
             task_context = {
                 'summary_plan_id': summary_plan.id,
@@ -731,6 +755,11 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
                 retry=True,
             )
             if str(res) == 'None':
+                release_summary_plan_validation_lock(
+                    username=username,
+                    summary_plan_id=summary_plan.id,
+                    device_ip=device_ip or device.manage_ip,
+                )
                 res.forget()
                 return JsonResponse({
                     'code': 400,
@@ -739,6 +768,12 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
                 })
 
             task_id = str(res)
+            bind_summary_plan_validation_lock(
+                username=username,
+                summary_plan_id=summary_plan.id,
+                device_ip=device_ip or device.manage_ip,
+                task_id=task_id,
+            )
             snapshot = _build_runtime_task_snapshot(
                 task_id=task_id,
                 task_type='summary_plan_validate',
@@ -770,6 +805,12 @@ class DeviceCollectionPlansViewSet(CustomViewBase):
                 },
             })
         except Exception as e:
+            if lock_claimed:
+                release_summary_plan_validation_lock(
+                    username=username,
+                    summary_plan_id=summary_plan.id,
+                    device_ip=device_ip,
+                )
             logger.error(f"父方案一键验证失败: 方案={summary_plan.name}, 设备={device_ip}, 错误={str(e)}", exc_info=True)
             return JsonResponse({
                 'code': 500,
@@ -1720,6 +1761,7 @@ class CollectionResultViewSet(CustomViewBase):
             vendor = request.GET.get('vendor')
             vendor_context = _resolve_vendor_query_context(vendor)
             vendor = vendor_context["raw"] or None
+            task_status = str(request.GET.get('task_status', '') or '').strip().lower()
             
             # 构建基础查询条件
             device_filters = {'status': 0}  # 在线状态
@@ -1769,10 +1811,10 @@ class CollectionResultViewSet(CustomViewBase):
                     if latest_records and latest_records[0].get('execute_time'):
                         latest_execute_time = latest_records[0]['execute_time']
                         
-                        # 根据execute_time和task_status="success"统计成功的数量
+                        # 根据 execute_time 和 task_status 统计数量；默认 success。
                         success_query = {
                             'execute_time': latest_execute_time,
-                            'task_status': 'success'
+                            'task_status': task_status or 'success'
                         }
                         if vendor:
                             success_query.update(_build_vendor_exact_mongo_query(vendor))
@@ -1805,6 +1847,63 @@ class CollectionResultViewSet(CustomViewBase):
                 'code': 500,
                 'message': f"获取失败: {str(e)}",
                 'results': None
+            })
+
+    @action(detail=False, methods=['get'])
+    def execute_time_options(self, request):
+        """返回可选 execute_time 列表，供前端筛选下拉使用。"""
+        try:
+            manage_ip = request.GET.get('manage_ip', '').strip()
+            task_status = request.GET.get('task_status', '').strip().lower()
+            summary_plan_id = request.GET.get('summary_plan_id', '').strip()
+            try:
+                limit = int(request.GET.get('limit', 50))
+            except (TypeError, ValueError):
+                limit = 50
+            limit = max(1, min(limit, 200))
+
+            query = {}
+            if manage_ip:
+                query['device_ip'] = manage_ip
+            if task_status:
+                query['task_status'] = task_status
+            if summary_plan_id:
+                query['summary_plan_id'] = int(summary_plan_id)
+
+            cursor = COLLECTION_PLAN.coll.find(
+                query,
+                {'_id': 0, 'execute_time': 1},
+            ).sort([('execute_time', -1), ('log_time', -1)]).limit(max(limit * 10, 200))
+            records = list(cursor)
+
+            options = []
+            seen = set()
+            for item in records:
+                execute_time = str(item.get('execute_time') or '').strip()
+                if not execute_time or execute_time == '--' or execute_time in seen:
+                    continue
+                seen.add(execute_time)
+                options.append({
+                    'label': execute_time,
+                    'value': execute_time,
+                })
+                if len(options) >= limit:
+                    break
+
+            return JsonResponse({
+                'code': 200,
+                'message': '获取成功',
+                'data': {
+                    'options': options,
+                    'total': len(options),
+                },
+            })
+        except Exception as e:
+            logger.error(f"查询 execute_time options 失败: {str(e)}", exc_info=True)
+            return JsonResponse({
+                'code': 500,
+                'message': f'查询失败: {str(e)}',
+                'data': None,
             })
 
     @action(detail=False, methods=['get'])
@@ -1924,6 +2023,8 @@ class CollectionResultViewSet(CustomViewBase):
             manage_ip = request.GET.get('manage_ip', '').strip()
             recommendation_code = request.GET.get('recommendation_code', '').strip()
             task_status = request.GET.get('task_status', '').strip()
+            summary_plan_id = self._parse_optional_int(request.GET.get('summary_plan_id'), 'summary_plan_id')
+            plan_id = self._parse_optional_int(request.GET.get('plan_id'), 'plan_id')
             only_with_recommendations = request.GET.get('only_with_recommendations', '').strip().lower()
             page = self._parse_positive_int(request.GET.get('page'), default=1)
             page_size = self._parse_positive_int(request.GET.get('page_size'), default=20, maximum=100)
@@ -1962,6 +2063,10 @@ class CollectionResultViewSet(CustomViewBase):
                 query['device_ip'] = manage_ip
             if task_status:
                 query['task_status'] = task_status
+            if summary_plan_id is not None:
+                query['plan_id'] = summary_plan_id
+            if plan_id is not None:
+                query['plan_id'] = plan_id
             if recommendation_code:
                 query['recommendation_codes'] = recommendation_code
             if only_with_recommendations in {'1', 'true', 'yes'}:
@@ -1987,6 +2092,8 @@ class CollectionResultViewSet(CustomViewBase):
                         'manage_ip': manage_ip or None,
                         'recommendation_code': recommendation_code or None,
                         'task_status': task_status or None,
+                        'summary_plan_id': summary_plan_id,
+                        'plan_id': plan_id,
                         'only_with_recommendations': only_with_recommendations in {'1', 'true', 'yes'},
                     },
                     'summary': summary,
@@ -1996,7 +2103,13 @@ class CollectionResultViewSet(CustomViewBase):
                     'results': records,
                 },
             })
-        except (TypeError, ValueError):
+        except ValueError as exc:
+            return JsonResponse({
+                'code': 400,
+                'message': str(exc),
+                'data': None,
+            })
+        except TypeError:
             return JsonResponse({
                 'code': 400,
                 'message': '分页参数无效',
@@ -2269,7 +2382,11 @@ class CollectionResultViewSet(CustomViewBase):
             vendor = request.GET.get('vendor', '').strip()
             device_name = request.GET.get('device_name', '').strip()
             device_ip = request.GET.get('device_ip', '').strip()
+            manage_ip = request.GET.get('manage_ip', '').strip()
+            execute_time = request.GET.get('execute_time', '').strip()
             execute_node = request.GET.get('execute_node', '').strip()
+            task_status = request.GET.get('task_status', '').strip().lower()
+            recommendation_code = request.GET.get('recommendation_code', '').strip()
             summary_plan_id = request.GET.get('summary_plan_id', '').strip()
             sub_plan_id = request.GET.get('sub_plan_id', '').strip()
             try:
@@ -2307,10 +2424,16 @@ class CollectionResultViewSet(CustomViewBase):
                 })
             if device_name and not search:
                 conditions.append({'device_name': {'$regex': device_name, '$options': 'i'}})
+            if manage_ip and not device_ip:
+                device_ip = manage_ip
             if device_ip and not search:
                 conditions.append({'device_ip': {'$regex': device_ip, '$options': 'i'}})
+            if execute_time:
+                conditions.append({'execute_time': execute_time})
             if execute_node:
                 conditions.append({'execute_node': {'$regex': execute_node, '$options': 'i'}})
+            if task_status:
+                conditions.append({'task_status': task_status})
             if summary_plan_id:
                 conditions.append({'summary_plan_id': int(summary_plan_id)})
 
@@ -2354,6 +2477,69 @@ class CollectionResultViewSet(CustomViewBase):
 
                 conditions.append({'$or': matched_runs})
 
+            if recommendation_code:
+                analysis_query = {
+                    'doc_type': 'device',
+                    'recommendation_codes': recommendation_code,
+                }
+                if execute_time:
+                    analysis_query['execute_time'] = execute_time
+                if task_status:
+                    analysis_query['task_status'] = task_status
+                if summary_plan_id:
+                    analysis_query['plan_id'] = int(summary_plan_id)
+                if device_ip:
+                    analysis_query['device_ip'] = device_ip
+
+                matched_analysis_docs = list(
+                    COLLECTION_BINDING_ANALYSIS.coll.find(
+                        analysis_query,
+                        {'_id': 0, 'plan_id': 1, 'device_ip': 1, 'execute_time': 1}
+                    )
+                )
+
+                if not matched_analysis_docs:
+                    return JsonResponse({
+                        'code': 200,
+                        'message': '获取成功',
+                        'data': {
+                            'results': [],
+                            'total': 0
+                        }
+                    })
+
+                recommendation_runs = []
+                seen_recommendation_keys = set()
+                for item in matched_analysis_docs:
+                    plan_value = item.get('plan_id')
+                    if plan_value is None:
+                        continue
+                    run_key = (
+                        plan_value,
+                        item.get('device_ip'),
+                        item.get('execute_time')
+                    )
+                    if run_key in seen_recommendation_keys:
+                        continue
+                    seen_recommendation_keys.add(run_key)
+                    recommendation_runs.append({
+                        'summary_plan_id': plan_value,
+                        'device_ip': item.get('device_ip'),
+                        'execute_time': item.get('execute_time'),
+                    })
+
+                if not recommendation_runs:
+                    return JsonResponse({
+                        'code': 200,
+                        'message': '获取成功',
+                        'data': {
+                            'results': [],
+                            'total': 0
+                        }
+                    })
+
+                conditions.append({'$or': recommendation_runs})
+
             if not conditions:
                 query = {}
             elif len(conditions) == 1:
@@ -2375,6 +2561,20 @@ class CollectionResultViewSet(CustomViewBase):
             for result in results:
                 if '_id' in result:
                     result['_id'] = str(result['_id'])
+                manage_ip = str(result.get('device_ip') or '').strip()
+                execute_time = str(result.get('execute_time') or '').strip()
+                summary_plan_value = result.get('summary_plan_id')
+                if isinstance(summary_plan_value, str) and summary_plan_value.isdigit():
+                    summary_plan_value = int(summary_plan_value)
+                issue_context = self._resolve_traceability_issue_context(
+                    manage_ip=manage_ip,
+                    execute_time=execute_time,
+                    summary_plan_id=summary_plan_value,
+                    latest_sub_runs=[],
+                )
+                result['issue_code'] = issue_context.get('issue_code', '')
+                result['recommendation'] = issue_context.get('recommendation', '')
+                result['error'] = issue_context.get('error', '')
 
             # 构建响应数据
             response_data = {

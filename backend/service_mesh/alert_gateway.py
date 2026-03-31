@@ -168,6 +168,52 @@ class AlertRunner:
             if res.status_code == 200:
                 return res.json()['data']
         return {}
+
+    def get_duty_schedule_by_name(self, schedule_name: str):
+        self.server = config.service_dicovery('alert_gateway')
+        self.server_hosts = self.server['hosts']
+        self.metadata = self.server_hosts[0]['metadata']
+        for _server in self.server_hosts:
+            url = "http://{}:{}/alert_gateway/duty/schedule/".format(_server['ip'], _server['port'])
+            params = {
+                'query': json.dumps({'schedule_name': schedule_name}, ensure_ascii=False),
+                'page': 1,
+                'page_size': 100
+            }
+            headers = {
+                'Content-Type': 'application/json',
+                'x-api-key': config.alert_gateway_api
+            }
+            res = requests.request("GET", url, headers=headers, params=params)
+            if res.status_code == 200:
+                payload = res.json()
+                data = payload.get('data', [])
+                if isinstance(data, dict):
+                    data = data.get('data_list', [])
+                for item in data:
+                    if item.get('schedule_name') == schedule_name:
+                        return item
+                return data[0] if data else {}
+        return {}
+
+    def get_duty_schedule_detail(self, schedule_id: str, start_day: str, end_day: str):
+        self.server = config.service_dicovery('alert_gateway')
+        self.server_hosts = self.server['hosts']
+        self.metadata = self.server_hosts[0]['metadata']
+        for _server in self.server_hosts:
+            url = "http://{}:{}/alert_gateway/duty/schedule/{}/".format(_server['ip'], _server['port'], schedule_id)
+            params = {
+                'start_day': start_day,
+                'end_day': end_day
+            }
+            headers = {
+                'Content-Type': 'application/json',
+                'x-api-key': config.alert_gateway_api
+            }
+            res = requests.request("GET", url, headers=headers, params=params)
+            if res.status_code == 200:
+                return res.json().get('data', {})
+        return {}
     # @run_time_sync
     # def send_sms(self, user, content, webhook=None, priority=0):
     #     send_args = {

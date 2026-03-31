@@ -116,6 +116,8 @@
 - 设备绑定管理：`/device_api/plans-to-device/`
 - 结果查询：`/device_api/collection-results/`
 - 分析清单：`/device_api/collection-results/analysis_checklist/`
+- 执行追踪聚合：`/device_api/collection-results/device_traceability/`
+- 执行总览列表：`/device_api/collection-results/parent_collection_list/`
 
 `/device_api/plans-to-device/` 当前默认只返回 `is_active=true` 的当前有效绑定：
 
@@ -170,6 +172,22 @@
 
 - `GET /device_api/collection-results/analysis_checklist/`
 - `POST /device_api/collection-results/refresh_analysis_checklist/`
+
+`GET /device_api/collection-results/analysis_checklist/` 当前支持的关键筛选参数：
+
+- `execute_time`：批次时间锚点；不传时默认取最新批次
+- `manage_ip`：按设备 IP 筛选
+- `recommendation_code`：按建议编码筛选
+- `task_status`：按设备任务状态筛选
+- `summary_plan_id`：按父方案筛选（映射到分析清单中的 `plan_id`）
+- `plan_id`：按方案 ID 精确筛选（优先级高于 `summary_plan_id`）
+- `only_with_recommendations`：仅返回有建议记录
+
+`GET /device_api/collection-results/parent_collection_list/` 当前每条记录会补充：
+
+- `issue_code`：建议编码摘要（来自分析清单）
+- `recommendation`：建议文案摘要（来自分析清单）
+- `error`：错误摘要（优先子方案错误，其次执行日志失败原因）
 
 ## 9. tasks.py 任务职责
 

@@ -23,7 +23,6 @@ from netaxe.settings import BASE_DIR
 from utils.db.mongo_ops import MongoOps
 from utils.connect_layer.zetmiko import ConnectHandler
 
-channel_layer = get_channel_layer()
 """
     Value {{options}} {{字段名称}} （{{正则}}）
     option
@@ -42,6 +41,14 @@ logger = logging.getLogger('connect_layer')
 def send_ws_msg(channel, group_name, data):
     # group_name = "sec_device"
     print(channel, group_name, data)
+    channel_layer = get_channel_layer()
+    if not channel_layer:
+        logger.warning(
+            "channel_layer unavailable, skip ws message: channel=%s group=%s",
+            channel,
+            group_name,
+        )
+        return
     async_to_sync(channel_layer.group_send)(
         group_name,
         {
