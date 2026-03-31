@@ -71,16 +71,16 @@ class Config:
             setattr(self, k, v)
         bypass_flag = str(os.getenv("BYPASS_NACOS", "")).strip().lower() in {"1", "true", "yes", "on"}
         self.bypass_nacos = bool(self.local_dev) or bypass_flag
-        if self.bypass_nacos:
-            self.client = None
-            log.warning("confload: bypass nacos enabled (local_dev or BYPASS_NACOS)")
-        else:
-            self.client = nacos.NacosClient(
-                server_addresses=f"{self.nacos}:{self.nacos_port}",
-                username="nacos",
-                password=self.nacos_password,
-                log_level="INFO",
-            )
+        # if self.bypass_nacos:
+        #     self.client = None
+        #     log.warning("confload: bypass nacos enabled (local_dev or BYPASS_NACOS)")
+        # else:
+        self.client = nacos.NacosClient(
+            server_addresses=f"{self.nacos}:{self.nacos_port}",
+            username="nacos",
+            password=self.nacos_password,
+            log_level="INFO",
+        )
 
     # 单例模式
     def __new__(cls):

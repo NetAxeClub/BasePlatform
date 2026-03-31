@@ -222,6 +222,8 @@ INCREMENTAL_SNAPSHOT_COLLECTION_TYPES = frozenset(
 )
 DEVICE_API_RUNTIME_TASK_CACHE_PREFIX = "device_api:runtime_task:"
 DEVICE_API_RUNTIME_TASK_CACHE_TIMEOUT = 6 * 60 * 60
+DEVICE_API_RUNTIME_TASK_DEDUP_PREFIX = "device_api:runtime_task:summary_validate:active:"
+DEVICE_API_RUNTIME_TASK_DEDUP_TIMEOUT = 30 * 60
 DEVICE_API_WS_GROUP_PREFIX = "device_collection_"
 BATCH_PROFILE_REBIND_DEFAULT_BLOCKERS = ("binding_plan_mismatch",)
 BATCH_PROFILE_REBIND_MAX_WORKERS = 50
@@ -235,6 +237,105 @@ else:
 
 def _runtime_task_cache_key(task_id: str) -> str:
     return f"{DEVICE_API_RUNTIME_TASK_CACHE_PREFIX}{task_id}"
+
+
+def _runtime_summary_validate_dedup_key(
+    username: str,
+    summary_plan_id,
+    device_ip: str,
+) -> str:
+    user = str(username or "").strip() or "-"
+    summary = str(summary_plan_id or "").strip() or "-"
+    ip = str(device_ip or "").strip().lower() or "-"
+    return f"{DEVICE_API_RUNTIME_TASK_DEDUP_PREFIX}{user}:{summary}:{ip}"
+
+
+def claim_summary_plan_validation_lock(
+    username: str,
+    summary_plan_id,
+    device_ip: str,
+) -> dict:
+    dedup_key = _runtime_summary_validate_dedup_key(
+        username=username,
+        summary_plan_id=summary_plan_id,
+        device_ip=device_ip,
+    )
+    existing_task_id = str(cache.get(dedup_key) or "").strip()
+    if existing_task_id:
+        snapshot = get_runtime_task_snapshot(existing_task_id)
+        if snapshot and snapshot.get("status") in {"queued", "running"}:
+            return {
+                "claimed": False,
+                "task_id": existing_task_id,
+                "snapshot": snapshot,
+                "dedup_key": dedup_key,
+            }
+        cache.delete(dedup_key)
+
+    placeholder = f"pending:{datetime.now().isoformat()}"
+    claimed = cache.add(
+        dedup_key,
+        placeholder,
+        timeout=DEVICE_API_RUNTIME_TASK_DEDUP_TIMEOUT,
+    )
+    if not claimed:
+        existing_task_id = str(cache.get(dedup_key) or "").strip()
+        snapshot = get_runtime_task_snapshot(existing_task_id)
+        if snapshot and snapshot.get("status") in {"queued", "running"}:
+            return {
+                "claimed": False,
+                "task_id": existing_task_id,
+                "snapshot": snapshot,
+                "dedup_key": dedup_key,
+            }
+        cache.delete(dedup_key)
+        cache.add(
+            dedup_key,
+            placeholder,
+            timeout=DEVICE_API_RUNTIME_TASK_DEDUP_TIMEOUT,
+        )
+    return {
+        "claimed": True,
+        "task_id": "",
+        "snapshot": None,
+        "dedup_key": dedup_key,
+    }
+
+
+def bind_summary_plan_validation_lock(
+    username: str,
+    summary_plan_id,
+    device_ip: str,
+    task_id: str,
+) -> None:
+    dedup_key = _runtime_summary_validate_dedup_key(
+        username=username,
+        summary_plan_id=summary_plan_id,
+        device_ip=device_ip,
+    )
+    cache.set(
+        dedup_key,
+        str(task_id or "").strip(),
+        timeout=DEVICE_API_RUNTIME_TASK_DEDUP_TIMEOUT,
+    )
+
+
+def release_summary_plan_validation_lock(
+    username: str,
+    summary_plan_id,
+    device_ip: str,
+    task_id: str = "",
+) -> None:
+    dedup_key = _runtime_summary_validate_dedup_key(
+        username=username,
+        summary_plan_id=summary_plan_id,
+        device_ip=device_ip,
+    )
+    current = str(cache.get(dedup_key) or "").strip()
+    expected_task_id = str(task_id or "").strip()
+    if expected_task_id and current and current != expected_task_id:
+        return
+    cache.delete(dedup_key)
 
 
 def get_runtime_task_snapshot(task_id: str):
@@ -688,6 +789,13 @@ def run_summary_plan_validation_task(self, task_context):
         snapshot["event"] = {"stage": "failed"}
         _store_runtime_task_snapshot(snapshot)
         raise
+    finally:
+        release_summary_plan_validation_lock(
+            username=username,
+            summary_plan_id=summary_plan_id,
+            device_ip=device_ip,
+            task_id=task_id,
+        )
 
 
 @shared_task(base=AxeTask, once={"graceful": True}, bind=True)
@@ -2856,7 +2964,7 @@ def plan_collect_device(**kwargs):
             parent_task_status = "partial_success"
 
         try:
-            COLLECTION_PLAN.update_one(
+            update_result = COLLECTION_PLAN.update_one(
                 filter={
                     "summary_plan_id": summary_plan_id,
                     "device_ip": host_ip,
@@ -2878,6 +2986,51 @@ def plan_collect_device(**kwargs):
                     }
                 },
             )
+            if parent_record_created and getattr(update_result, "matched_count", 1) == 0:
+                # 兜底更新最近一条 running 记录，避免父任务状态长期停留在 running。
+                fallback_doc = None
+                try:
+                    fallback_doc = COLLECTION_PLAN.coll.find_one(
+                        {
+                            "summary_plan_id": summary_plan_id,
+                            "device_ip": host_ip,
+                            "task_status": "running",
+                        },
+                        {"_id": 0, "execute_time": 1},
+                        sort=[("log_time", -1)],
+                    )
+                except Exception:
+                    logger.warning(
+                        "查询 running 父任务记录失败: device=%s summary_plan_id=%s execute_time=%s",
+                        host_ip,
+                        summary_plan_id,
+                        execute_time,
+                        exc_info=True,
+                    )
+                fallback_execute_time = (fallback_doc or {}).get("execute_time")
+                if fallback_execute_time:
+                    COLLECTION_PLAN.update_one(
+                        filter={
+                            "summary_plan_id": summary_plan_id,
+                            "device_ip": host_ip,
+                            "execute_time": fallback_execute_time,
+                        },
+                        update={
+                            "$set": {
+                                "task_status": parent_task_status,
+                                "successful_sub_plans": task_summary["successful_sub_plans"],
+                                "failed_sub_plans": task_summary["failed_sub_plans"],
+                                "skipped_sub_plans": task_summary["skipped_sub_plans"],
+                                "coverage_issue_sub_plans": task_summary[
+                                    "coverage_issue_sub_plans"
+                                ],
+                                "failed_details": task_summary["failed_details"][:20],
+                                "skipped_details": task_summary["skipped_details"][:20],
+                                "coverage_details": task_summary["coverage_details"][:20],
+                                "updated_at": datetime.now().isoformat(),
+                            }
+                        },
+                    )
         except Exception as e:
             logger.warning(
                 "更新主采集任务状态失败: device=%s summary_plan_id=%s execute_time=%s error=%s",
@@ -2931,7 +3084,7 @@ def plan_collect_device(**kwargs):
         )
         if parent_record_created and summary_plan_id is not None:
             try:
-                COLLECTION_PLAN.update_one(
+                update_result = COLLECTION_PLAN.update_one(
                     filter={
                         "summary_plan_id": summary_plan_id,
                         "device_ip": host_ip,
@@ -2961,6 +3114,58 @@ def plan_collect_device(**kwargs):
                         }
                     },
                 )
+                if getattr(update_result, "matched_count", 1) == 0:
+                    fallback_doc = None
+                    try:
+                        fallback_doc = COLLECTION_PLAN.coll.find_one(
+                            {
+                                "summary_plan_id": summary_plan_id,
+                                "device_ip": host_ip,
+                                "task_status": "running",
+                            },
+                            {"_id": 0, "execute_time": 1},
+                            sort=[("log_time", -1)],
+                        )
+                    except Exception:
+                        logger.warning(
+                            "设备级异常后查询 running 父任务记录失败: device=%s summary_plan_id=%s execute_time=%s",
+                            host_ip,
+                            summary_plan_id,
+                            execute_time,
+                            exc_info=True,
+                        )
+                    fallback_execute_time = (fallback_doc or {}).get("execute_time")
+                    if fallback_execute_time:
+                        COLLECTION_PLAN.update_one(
+                            filter={
+                                "summary_plan_id": summary_plan_id,
+                                "device_ip": host_ip,
+                                "execute_time": fallback_execute_time,
+                            },
+                            update={
+                                "$set": {
+                                    "task_status": "failed",
+                                    "failed_sub_plans": max(
+                                        task_summary["failed_sub_plans"], 1
+                                    ),
+                                    "coverage_issue_sub_plans": task_summary[
+                                        "coverage_issue_sub_plans"
+                                    ],
+                                    "failed_details": (
+                                        task_summary["failed_details"][:20]
+                                        + [
+                                            {
+                                                "plan_id": None,
+                                                "collection_method": "device",
+                                                "reason": str(e),
+                                            }
+                                        ]
+                                    )[:20],
+                                    "coverage_details": task_summary["coverage_details"][:20],
+                                    "updated_at": datetime.now().isoformat(),
+                                }
+                            },
+                        )
             except Exception as update_error:
                 logger.warning(
                     "设备级异常后更新主采集任务失败: device=%s summary_plan_id=%s execute_time=%s error=%s",

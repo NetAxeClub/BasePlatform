@@ -153,6 +153,9 @@ from apps.device_api.management.commands.audit_legacy_time_anchor import (
 from apps.device_api.management.commands.backfill_legacy_execute_time import (
     Command as BackfillLegacyExecuteTimeCommand,
 )
+from apps.device_api.management.commands.backfill_parent_task_status import (
+    Command as BackfillParentTaskStatusCommand,
+)
 from apps.device_api.views import (
     CollectionResultViewSet,
     DeviceCollectionRuleToolView,
@@ -557,6 +560,139 @@ class DeviceApiViewTests(SimpleTestCase):
         self.assertEqual(payload["code"], 200)
         self.assertEqual(payload["data"]["results"], [])
         self.assertEqual(payload["data"]["total"], 0)
+
+    @patch("apps.device_api.views.COLLECTION_PLAN")
+    def test_parent_collection_list_supports_task_status_filter(
+        self,
+        mock_collection_plan,
+    ):
+        mock_collection_plan.count_documents.return_value = 0
+        mock_collection_plan.coll.find.return_value.sort.return_value.limit.return_value.skip.return_value = []
+
+        request = self.factory.get(
+            "/base_platform/device_api/collection-results/parent_collection_list/",
+            {"task_status": "FAILED", "page": "1", "page_size": "10"},
+        )
+        response = CollectionResultViewSet.as_view({"get": "parent_collection_list"})(request)
+        payload = json.loads(response.content)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["code"], 200)
+        mock_collection_plan.count_documents.assert_called_once_with({"task_status": "failed"})
+
+    @patch("apps.device_api.views.COLLECTION_PLAN")
+    def test_parent_collection_list_supports_manage_ip_and_execute_time_filters(
+        self,
+        mock_collection_plan,
+    ):
+        mock_collection_plan.count_documents.return_value = 0
+        mock_collection_plan.coll.find.return_value.sort.return_value.limit.return_value.skip.return_value = []
+
+        request = self.factory.get(
+            "/base_platform/device_api/collection-results/parent_collection_list/",
+            {"manage_ip": "10.10.10.10", "execute_time": "2026-03-31 12:00:00", "page": "1", "page_size": "10"},
+        )
+        response = CollectionResultViewSet.as_view({"get": "parent_collection_list"})(request)
+        payload = json.loads(response.content)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["code"], 200)
+        mock_collection_plan.count_documents.assert_called_once_with(
+            {
+                "$and": [
+                    {"device_ip": {"$regex": "10.10.10.10", "$options": "i"}},
+                    {"execute_time": "2026-03-31 12:00:00"},
+                ]
+            }
+        )
+
+    @patch("apps.device_api.views.COLLECTION_BINDING_ANALYSIS")
+    @patch("apps.device_api.views.COLLECTION_PLAN")
+    def test_parent_collection_list_supports_recommendation_code_filter(
+        self,
+        mock_collection_plan,
+        mock_binding_analysis,
+    ):
+        mock_binding_analysis.coll.find.return_value = [
+            {"plan_id": 99, "device_ip": "10.20.30.40", "execute_time": "2026-03-31 13:00:00"}
+        ]
+        mock_collection_plan.count_documents.return_value = 0
+        mock_collection_plan.coll.find.return_value.sort.return_value.limit.return_value.skip.return_value = []
+
+        request = self.factory.get(
+            "/base_platform/device_api/collection-results/parent_collection_list/",
+            {
+                "recommendation_code": "binding_plan_mismatch",
+                "page": "1",
+                "page_size": "10",
+            },
+        )
+        response = CollectionResultViewSet.as_view({"get": "parent_collection_list"})(request)
+        payload = json.loads(response.content)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["code"], 200)
+        mock_binding_analysis.coll.find.assert_called_once_with(
+            {
+                "doc_type": "device",
+                "recommendation_codes": "binding_plan_mismatch",
+            },
+            {"_id": 0, "plan_id": 1, "device_ip": 1, "execute_time": 1},
+        )
+        mock_collection_plan.count_documents.assert_called_once_with(
+            {
+                "$or": [
+                    {
+                        "summary_plan_id": 99,
+                        "device_ip": "10.20.30.40",
+                        "execute_time": "2026-03-31 13:00:00",
+                    }
+                ]
+            }
+        )
+
+    @patch("apps.device_api.views.COLLECTION_EXECUTION_LOG")
+    @patch("apps.device_api.views.COLLECTION_BINDING_ANALYSIS")
+    @patch("apps.device_api.views.COLLECTION_PLAN")
+    def test_parent_collection_list_enriches_issue_context_fields(
+        self,
+        mock_collection_plan,
+        mock_binding_analysis,
+        mock_execution_log,
+    ):
+        mock_collection_plan.count_documents.return_value = 1
+        mock_collection_plan.coll.find.return_value.sort.return_value.limit.return_value.skip.return_value = [
+            {
+                "_id": ObjectId(),
+                "summary_plan_id": 33,
+                "device_ip": "10.254.34.50",
+                "execute_time": "2026-03-24 11:31:48",
+                "task_status": "failed",
+            }
+        ]
+        mock_binding_analysis.coll.find_one.return_value = {
+            "recommendation_codes": ["textfsm_template_mismatch"],
+            "recommendations": [{"message": "CLI 解析存在 TextFSM 模板失配"}],
+        }
+        failed_log_cursor = Mock()
+        failed_log_cursor.sort.return_value.limit.return_value = [
+            {"status": "failed", "error": "Unexpected element netconf-state"}
+        ]
+        mock_execution_log.coll.find.return_value = failed_log_cursor
+
+        request = self.factory.get(
+            "/base_platform/device_api/collection-results/parent_collection_list/",
+            {"page": "1", "page_size": "10"},
+        )
+        response = CollectionResultViewSet.as_view({"get": "parent_collection_list"})(request)
+        payload = json.loads(response.content)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["code"], 200)
+        result = payload["data"]["results"][0]
+        self.assertEqual(result["issue_code"], "textfsm_template_mismatch")
+        self.assertEqual(result["recommendation"], "CLI 解析存在 TextFSM 模板失配")
+        self.assertEqual(result["error"], "Unexpected element netconf-state")
 
     def test_parent_collection_list_rejects_invalid_page(self):
         request = self.factory.get(
@@ -1286,6 +1422,44 @@ class DeviceApiViewTests(SimpleTestCase):
         self.assertIn("serial_num", payload["message"])
 
     @patch("apps.device_api.views.COLLECTION_PLAN")
+    @patch("apps.device_api.views.PlansToDevice.objects")
+    @patch("apps.device_api.views.DeviceCollectionPlans.objects")
+    @patch("apps.device_api.views.NetworkDevice.objects")
+    def test_collection_results_overview_task_status_filter_is_case_insensitive(
+        self,
+        mock_network_device_objects,
+        mock_plan_objects,
+        mock_plans_to_device_objects,
+        mock_collection_plan,
+    ):
+        count_queryset = Mock()
+        count_queryset.count.return_value = 10
+        auto_enable_queryset = Mock()
+        auto_enable_queryset.values_list.return_value = ["10.0.0.1", "10.0.0.2"]
+        mock_network_device_objects.filter.side_effect = [count_queryset, auto_enable_queryset]
+        mock_plan_objects.filter.return_value.count.return_value = 3
+        mock_plans_to_device_objects.filter.return_value.values.return_value.distinct.return_value.count.return_value = 2
+
+        latest_cursor = Mock()
+        latest_cursor.sort.return_value.limit.return_value = [{"execute_time": "2026-03-30 10:00:00"}]
+        mock_collection_plan.coll.find.return_value = latest_cursor
+        mock_collection_plan.count_documents.return_value = 1
+
+        request = self.factory.get(
+            "/base_platform/device_api/collection-results/overview/",
+            {"task_status": "FAILED"},
+        )
+        response = CollectionResultViewSet.as_view({"get": "overview"})(request)
+        payload = json.loads(response.content)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["code"], 200)
+        self.assertEqual(payload["results"]["success_rate"], 50.0)
+        mock_collection_plan.count_documents.assert_called_once_with(
+            {"execute_time": "2026-03-30 10:00:00", "task_status": "failed"}
+        )
+
+    @patch("apps.device_api.views.COLLECTION_PLAN")
     def test_collection_results_batch_gate_metrics_returns_latest_batch_summary(
         self,
         mock_collection_plan,
@@ -1379,6 +1553,45 @@ class DeviceApiViewTests(SimpleTestCase):
                 "doc_type": "device",
                 "execute_time": "2026-03-24 10:36:38",
                 "has_recommendations": True,
+            }
+        )
+
+    @patch("apps.device_api.views.COLLECTION_BINDING_ANALYSIS")
+    def test_collection_results_analysis_checklist_supports_summary_plan_and_plan_filters(
+        self,
+        mock_binding_analysis,
+    ):
+        result_cursor = Mock()
+        result_cursor.sort.return_value.skip.return_value.limit.return_value = []
+        mock_binding_analysis.coll.find.return_value = result_cursor
+        mock_binding_analysis.coll.find_one.return_value = {
+            "doc_type": "summary",
+            "execute_time": "2026-03-24 10:36:38",
+        }
+        mock_binding_analysis.coll.count_documents.return_value = 0
+
+        request = self.factory.get(
+            "/base_platform/device_api/collection-results/analysis_checklist/",
+            {
+                "execute_time": "2026-03-24 10:36:38",
+                "summary_plan_id": "33",
+                "plan_id": "44",
+                "page": "1",
+                "page_size": "20",
+            },
+        )
+        response = CollectionResultViewSet.as_view({"get": "analysis_checklist"})(request)
+        payload = json.loads(response.content)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["code"], 200)
+        self.assertEqual(payload["data"]["filters"]["summary_plan_id"], 33)
+        self.assertEqual(payload["data"]["filters"]["plan_id"], 44)
+        mock_binding_analysis.coll.count_documents.assert_called_once_with(
+            {
+                "doc_type": "device",
+                "execute_time": "2026-03-24 10:36:38",
+                "plan_id": 44,
             }
         )
 
@@ -4195,6 +4408,100 @@ class BackfillLegacyExecuteTimeCommandTests(SimpleTestCase):
         self.assertEqual(first_update_args[1]["$set"]["execute_time"], "2026-03-17 02:22:48")
 
 
+class BackfillParentTaskStatusCommandTests(SimpleTestCase):
+    @patch("apps.device_api.management.commands.backfill_parent_task_status.COLLECTION_SUB_PLAN")
+    @patch("apps.device_api.management.commands.backfill_parent_task_status.COLLECTION_PLAN")
+    def test_backfill_parent_task_status_dry_run_reports_updates(
+        self,
+        mock_collection_plan,
+        mock_collection_sub_plan,
+    ):
+        parent_cursor = Mock()
+        parent_cursor.sort.return_value.limit.return_value = [
+            {
+                "summary_plan_id": 100,
+                "device_ip": "10.0.0.1",
+                "execute_time": "2026-03-17T11:00:00",
+                "task_status": "running",
+            }
+        ]
+        mock_collection_plan.coll.find.return_value = parent_cursor
+        mock_collection_sub_plan.coll.find.return_value = [
+            {
+                "plan_id": 1,
+                "collection_method": "netmiko",
+                "task_status": "finished",
+                "task_errors": [],
+            }
+        ]
+
+        command = BackfillParentTaskStatusCommand()
+        with patch.object(command.stdout, "write") as mock_write:
+            command.handle(
+                manage_ip=[],
+                summary_plan_id=None,
+                execute_time="",
+                min_age_minutes=30,
+                max_docs=100,
+                apply=False,
+            )
+
+        mock_collection_plan.update_one.assert_not_called()
+        writes = "\n".join(call.args[0] for call in mock_write.call_args_list)
+        self.assertIn("apply_mode=False", writes)
+        self.assertIn("updated=1", writes)
+        self.assertIn("dry_run: use --apply to execute backfill", writes)
+
+    @patch("apps.device_api.management.commands.backfill_parent_task_status.COLLECTION_SUB_PLAN")
+    @patch("apps.device_api.management.commands.backfill_parent_task_status.COLLECTION_PLAN")
+    def test_backfill_parent_task_status_apply_updates_parent_record(
+        self,
+        mock_collection_plan,
+        mock_collection_sub_plan,
+    ):
+        parent_cursor = Mock()
+        parent_cursor.sort.return_value.limit.return_value = [
+            {
+                "summary_plan_id": 200,
+                "device_ip": "10.0.0.2",
+                "execute_time": "2026-03-17T12:00:00",
+                "task_status": "running",
+            }
+        ]
+        mock_collection_plan.coll.find.return_value = parent_cursor
+        mock_collection_sub_plan.coll.find.return_value = [
+            {
+                "plan_id": 2,
+                "collection_method": "netmiko",
+                "task_status": "failed",
+                "task_errors": ["ssh timeout"],
+            }
+        ]
+
+        command = BackfillParentTaskStatusCommand()
+        command.handle(
+            manage_ip=[],
+            summary_plan_id=None,
+            execute_time="",
+            min_age_minutes=0,
+            max_docs=100,
+            apply=True,
+        )
+
+        mock_collection_plan.update_one.assert_called_once()
+        update_kwargs = mock_collection_plan.update_one.call_args.kwargs
+        self.assertEqual(
+            update_kwargs["filter"],
+            {
+                "summary_plan_id": 200,
+                "device_ip": "10.0.0.2",
+                "execute_time": "2026-03-17T12:00:00",
+            },
+        )
+        self.assertEqual(update_kwargs["update"]["$set"]["task_status"], "failed")
+        self.assertEqual(update_kwargs["update"]["$set"]["failed_sub_plans"], 1)
+
+
 class DeviceApiTaskTests(SimpleTestCase):
     @patch("apps.device_api.tasks.save_local_collection_result")
     @patch("apps.device_api.tasks.COLLECTION_SUB_PLAN.insert_one")
@@ -5045,6 +5352,64 @@ class DeviceApiTaskTests(SimpleTestCase):
         update_kwargs = mock_collection_plan.update_one.call_args.kwargs
         self.assertEqual(update_kwargs["filter"]["execute_time"], "2026-03-17T11:00:00")
         self.assertEqual(update_kwargs["update"]["$set"]["task_status"], "partial_success")
+        mock_record_event.assert_called()
+
+    @patch("apps.device_api.tasks._record_execution_event")
+    @patch("apps.device_api.tasks.COLLECTION_PLAN")
+    @patch("apps.device_api.tasks._process_and_save_result")
+    @patch("apps.device_api.tasks.DeviceCollectionService.insert_parent_plan_data")
+    @patch("apps.device_api.tasks.DeviceConnectionManager")
+    def test_plan_collect_device_fallback_updates_latest_running_parent_record(
+        self,
+        mock_connection_manager_cls,
+        mock_insert_parent,
+        mock_process_result,
+        mock_collection_plan,
+        mock_record_event,
+    ):
+        conn_mgr = Mock()
+        conn_mgr.execute_netmiko_command.return_value = [{"raw": "ok"}]
+        mock_connection_manager_cls.return_value.__enter__.return_value = conn_mgr
+        mock_connection_manager_cls.return_value.__exit__.return_value = False
+        mock_insert_parent.return_value = {"success": True, "action": "inserted"}
+        mock_process_result.return_value = {"success": True, "data_count": 1}
+        mock_collection_plan.update_one.side_effect = [
+            SimpleNamespace(matched_count=0),
+            SimpleNamespace(matched_count=1),
+        ]
+        mock_collection_plan.coll.find_one.return_value = {"execute_time": "2026-03-17T11:00:01"}
+
+        result = plan_collect_device(
+            manage_ip="10.0.0.1",
+            plan_id=100,
+            execute_time="2026-03-17T11:00:00",
+            sub_plans=[
+                {
+                    "id": 1,
+                    "name": "arp-netmiko",
+                    "summary_plan": 100,
+                    "netmiko_enabled": True,
+                    "netmiko_method": "display arp",
+                }
+            ],
+        )
+
+        self.assertEqual(result["task_status"], "success")
+        self.assertEqual(mock_collection_plan.update_one.call_count, 2)
+        first_call = mock_collection_plan.update_one.call_args_list[0].kwargs
+        second_call = mock_collection_plan.update_one.call_args_list[1].kwargs
+        self.assertEqual(first_call["filter"]["execute_time"], "2026-03-17T11:00:00")
+        self.assertEqual(second_call["filter"]["execute_time"], "2026-03-17T11:00:01")
+        self.assertEqual(second_call["update"]["$set"]["task_status"], "success")
+        mock_collection_plan.coll.find_one.assert_called_once_with(
+            {
+                "summary_plan_id": 100,
+                "device_ip": "10.0.0.1",
+                "task_status": "running",
+            },
+            {"_id": 0, "execute_time": 1},
+            sort=[("log_time", -1)],
+        )
         mock_record_event.assert_called()
 
     @patch("apps.device_api.tasks._record_execution_event")
