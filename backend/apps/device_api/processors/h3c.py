@@ -108,6 +108,13 @@ def _normalize_h3c_model_name(model_name: str) -> str:
     return re.sub(r"^H3C\s+", "", text, flags=re.IGNORECASE)
 
 
+def _normalize_h3c_optional_text(value: str) -> str:
+    text = str(value or "").strip()
+    if text.upper() in {'NONE', 'N/A', 'NULL'}:
+        return ''
+    return text
+
+
 def _build_ifindex_map(top):
     """从 Ifmgr.Interfaces.Interface 构建 IfIndex → 接口名 映射。"""
     ifindex_map = {}
@@ -284,7 +291,13 @@ def process_version_netmiko(data):
         if not isinstance(row, dict):
             continue
         if not model_name:
-            model_name = str(row.get('BOARD_TYPE') or row.get('board_type') or '').strip()
+            model_name = _normalize_h3c_model_name(
+                row.get('Product_Model')
+                or row.get('product_model')
+                or row.get('BOARD_TYPE')
+                or row.get('board_type')
+                or ''
+            )
         if not soft_version:
             soft_version = str(
                 row.get('Version')
@@ -294,7 +307,9 @@ def process_version_netmiko(data):
                 or ''
             ).strip().replace(', ', ' ')
         if not patch_version:
-            patch_version = str(row.get('Patch_Ver') or row.get('patch_ver') or '').strip()
+            patch_version = _normalize_h3c_optional_text(
+                row.get('Patch_Ver') or row.get('patch_ver') or ''
+            )
 
     if not any([model_name, soft_version, patch_version]):
         return []

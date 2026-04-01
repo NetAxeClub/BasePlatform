@@ -1,16 +1,18 @@
-Value Required Slot (\d)
+Value Required Slot (\d+)
+Value Filldown Product_Model (.+?)
 Value BOARD_TYPE (\S+)
-Value Release_Ver (\S+\s\S+)
-Value Patch_Ver ((?:Release|Feature)\s\S+)
-Value Filldown Version ((\S+\sRelease\s\S+|\S+\sFeature\s\S+))
+Value Release_Ver (.+)
+Value Patch_Ver (.+)
+Value Filldown Version (.+)
 
 Start
-  ^H3C Comware Software,\sVersion\s${Version}
-  ^Slot\s${Slot} -> SLOT
+  ^H3C\s+Comware\s+Software,\s+Version\s+${Version}\s*$$
+  ^H3C\s+${Product_Model}\s+uptime\s+is\s+.+$$
+  ^(?:Slot|[A-Z]+(?:\([A-Z]+\))?)\s+${Slot}: -> SLOT
 
 SLOT
-  ^Slot\s${Slot}
-  ^BOARD\sTYPE:\s+${BOARD_TYPE}
-  ^Release\sVersion:\s+${Release_Ver}
-  ^Patch\sVersion:\s+${Patch_Ver}
-  ^$$ -> Continue.Record
+  ^(?:Slot|[A-Z]+(?:\([A-Z]+\))?)\s+${Slot}: -> Record SLOT
+  ^BOARD\s+TYPE:\s+${BOARD_TYPE}\s*$$
+  ^Release\s+Version:\s+${Release_Ver}\s*$$
+  ^Patch\s+Version\s*:\s+${Patch_Ver}\s*$$
+  ^$$ -> Record Start

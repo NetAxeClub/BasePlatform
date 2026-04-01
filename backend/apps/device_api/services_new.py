@@ -873,7 +873,15 @@ class DeviceCollectionService:
                     "error",
                     resolve_error,
                 )
-                return {"success": False, "error": resolve_error}
+                err_payload: Dict[str, Any] = {
+                    "success": False,
+                    "error": resolve_error,
+                }
+                if collection_method == "netmiko":
+                    err_payload["textfsm_template"] = plan.get("textfsm_template") or ""
+                    err_payload["netmiko_command"] = plan.get("netmiko_method") or ""
+                    err_payload["raw_cli_output"] = raw_result
+                return err_payload
 
             meta = {
                 "hostip": manage_ip,
@@ -981,13 +989,18 @@ class DeviceCollectionService:
                 f"采集结果处理完成: {manage_ip}, method={collection_method}, data_count={len(processed_data) if isinstance(processed_data, list) else 1}"
             )
 
-            return {
+            ok_payload: Dict[str, Any] = {
                 "success": True,
                 "data_count": (
                     len(processed_data) if isinstance(processed_data, list) else 1
                 ),
                 "task_id": task_record["task_id"],
             }
+            if collection_method == "netmiko":
+                ok_payload["textfsm_template"] = plan.get("textfsm_template") or ""
+                ok_payload["netmiko_command"] = plan.get("netmiko_method") or ""
+                ok_payload["raw_cli_output"] = raw_result
+            return ok_payload
 
         except Exception as e:
             logger.error(
