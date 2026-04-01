@@ -5964,6 +5964,38 @@ class DeviceApiH3CIdentityTests(TestCase):
             ],
         )
 
+    def test_h3c_version_processor_prefers_secpath_product_model_and_ignores_none_patch(self):
+        result = process_h3c_version_netmiko(
+            [
+                {
+                    "Slot": "0",
+                    "Product_Model": "SecPath M9006",
+                    "BOARD_TYPE": "NSQ1SUPB0",
+                    "Version": "7.1.064, Release 9153P4108",
+                    "Patch_Ver": "None",
+                },
+                {
+                    "Slot": "2",
+                    "Product_Model": "SecPath M9006",
+                    "BOARD_TYPE": "NSQM1MBFEA0",
+                    "Version": "7.1.064, Release 9153P4108",
+                    "Patch_Ver": "None",
+                },
+            ]
+        )
+
+        self.assertEqual(
+            result,
+            [
+                {
+                    "vendor_alias": "H3C",
+                    "model_name": "SecPath M9006",
+                    "soft_version": "7.1.064 Release 9153P4108",
+                    "patch_version": "",
+                }
+            ],
+        )
+
     def test_h3c_device_identity_updates_network_device(self):
         plan = SimpleNamespace(
             name="h3c-device-identity-plan",
@@ -9291,6 +9323,33 @@ class DeviceApiProtocolExtensionTests(SimpleTestCase):
         self.assertEqual(rows[0]["BOARD_TYPE"], "S6860-54HF")
         self.assertEqual(rows[0]["Version"], "7.1.070, Feature 2707")
         self.assertEqual(rows[0]["Patch_Ver"], "Feature 2707H17")
+
+    def test_h3c_version_template_parses_secpath_firewall_slots(self):
+        rows = self._parse_textfsm_rows(
+            "hp_comware_display_version.textfsm",
+            (
+                "H3C Comware Software, Version 7.1.064, Release 9153P4108\n"
+                "H3C SecPath M9006 uptime is 3 weeks, 5 days, 14 hours, 56 minutes\n"
+                "\n"
+                "MPU(M) 0:\n"
+                "BOARD TYPE:         NSQ1SUPB0\n"
+                "Release Version:    H3C SecPath M9006-9153P4108\n"
+                "Patch Version  :    None\n"
+                "\n"
+                "LPU 2:\n"
+                "BOARD TYPE:         NSQM1MBFEA0\n"
+                "Release Version:    H3C SecPath M9006-9153P4108\n"
+                "Patch Version  :    None\n"
+            ),
+        )
+
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]["Slot"], "0")
+        self.assertEqual(rows[0]["Product_Model"], "SecPath M9006")
+        self.assertEqual(rows[0]["BOARD_TYPE"], "NSQ1SUPB0")
+        self.assertEqual(rows[0]["Release_Ver"], "H3C SecPath M9006-9153P4108")
+        self.assertEqual(rows[0]["Patch_Ver"], "None")
+        self.assertEqual(rows[1]["Slot"], "2")
 
     def test_h3c_link_aggregation_template_parses_local_members(self):
         rows = self._parse_textfsm_rows(
