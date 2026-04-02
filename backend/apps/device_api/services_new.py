@@ -179,7 +179,7 @@ class DeviceCollectionService:
 
     @staticmethod
     def ensure_default_sub_plans(summary_plan) -> Dict[str, Any]:
-        """为父方案补齐默认 collection_type 对应的子方案。"""
+        """为父方案补齐已启用 collection_type 对应的子方案。"""
         existing_types = set(
             DeviceCollectionService.normalize_sub_plan_collection_type(collection_type)
             for collection_type in summary_plan.collect_plans.values_list(
@@ -187,8 +187,10 @@ class DeviceCollectionService:
             )
         )
         created_types = []
+        enabled_types = DeviceCollectionService.get_enabled_collection_types(summary_plan)
+        target_types = enabled_types or list(DEFAULT_COLLECTION_TYPES)
 
-        for collection_type in DEFAULT_COLLECTION_TYPES:
+        for collection_type in target_types:
             if collection_type in existing_types:
                 continue
 
@@ -208,7 +210,7 @@ class DeviceCollectionService:
         return {
             "created_count": len(created_types),
             "created_types": created_types,
-            "total_types": len(DEFAULT_COLLECTION_TYPES),
+            "total_types": len(target_types),
         }
 
     @staticmethod
@@ -240,7 +242,8 @@ class DeviceCollectionService:
         updated_types = []
         disabled_types = []
 
-        for collection_type in DEFAULT_COLLECTION_TYPES:
+        target_types = enabled_types or list(DEFAULT_COLLECTION_TYPES)
+        for collection_type in target_types:
             sub_plan = existing_by_type.get(collection_type)
             if sub_plan is None:
                 sub_plan = DeviceSubCollectionPlan.objects.create(
@@ -257,31 +260,17 @@ class DeviceCollectionService:
                 created_types.append(collection_type)
 
             update_fields = []
-            if collection_type in enabled_type_set:
-                desired_netmiko_enabled = method_flags["netmiko_enabled"]
-                desired_netconf_enabled = method_flags["netconf_enabled"]
+            desired_netmiko_enabled = method_flags["netmiko_enabled"]
+            desired_netconf_enabled = method_flags["netconf_enabled"]
 
-                if sub_plan.netmiko_enabled != desired_netmiko_enabled:
-                    sub_plan.netmiko_enabled = desired_netmiko_enabled
-                    update_fields.append("netmiko_enabled")
-                if sub_plan.netconf_enabled != desired_netconf_enabled:
-                    sub_plan.netconf_enabled = desired_netconf_enabled
-                    update_fields.append("netconf_enabled")
-                if update_fields:
-                    updated_types.append(collection_type)
-            else:
-                for field_name in (
-                    "netmiko_enabled",
-                    "netconf_enabled",
-                    "snmp_enabled",
-                    "restconf_enabled",
-                    "telemetry_enabled",
-                ):
-                    if getattr(sub_plan, field_name, False):
-                        setattr(sub_plan, field_name, False)
-                        update_fields.append(field_name)
-                if update_fields:
-                    disabled_types.append(collection_type)
+            if sub_plan.netmiko_enabled != desired_netmiko_enabled:
+                sub_plan.netmiko_enabled = desired_netmiko_enabled
+                update_fields.append("netmiko_enabled")
+            if sub_plan.netconf_enabled != desired_netconf_enabled:
+                sub_plan.netconf_enabled = desired_netconf_enabled
+                update_fields.append("netconf_enabled")
+            if update_fields:
+                updated_types.append(collection_type)
 
             if update_fields:
                 sub_plan.save(update_fields=update_fields + ["updated_at"])
@@ -295,7 +284,7 @@ class DeviceCollectionService:
             "disabled_types": disabled_types,
             "enabled_collection_types": enabled_types,
             "collection_method": method_flags["collection_method"],
-            "total_types": len(DEFAULT_COLLECTION_TYPES),
+            "total_types": len(target_types),
         }
 
     @staticmethod
@@ -1086,6 +1075,7 @@ class DeviceCollectionService:
                 "skipped_details": [],
                 "execute_time": execute_time,
                 "log_time": time.time(),  # 用于排序和查询
+                "triggered_by": str(device_info.get("triggered_by") or "").strip(),
             }
 
             result = COLLECTION_PLAN.coll.update_one(
