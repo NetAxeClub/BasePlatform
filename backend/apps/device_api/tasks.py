@@ -3567,7 +3567,7 @@ def _process_and_save_result(
             "device_ip": manage_ip,
             "device_name": device_info.get("name"),
             "idc_name": device_info.get("idc__name"),
-            "task_status": "finished",
+            "task_status": "success",
             "collection_type": storage_collection_type,
             "collection_method": collection_method,
             "method_name": method_name,
