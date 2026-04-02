@@ -1814,7 +1814,7 @@ class CollectionResultViewSet(CustomViewBase):
                         # 根据 execute_time 和 task_status 统计数量；默认 success。
                         success_query = {
                             'execute_time': latest_execute_time,
-                            'task_status': task_status or 'success'
+                            'task_status': task_status or 'success',
                         }
                         if vendor:
                             success_query.update(_build_vendor_exact_mongo_query(vendor))

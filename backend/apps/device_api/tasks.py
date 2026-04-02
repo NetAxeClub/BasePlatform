@@ -430,6 +430,104 @@ def _build_plan_execution_payload(plan, status, message, collection_result=None)
     return payload
 
 
+def _rebuild_parent_summary_from_latest_sub_runs(
+    *,
+    summary_plan_id,
+    device_ip,
+    execute_time,
+    fallback_summary: dict,
+) -> dict:
+    """按子方案最新记录重算父方案汇总，避免历史失败残留导致父状态误判。"""
+    query = {
+        "summary_plan_id": summary_plan_id,
+        "device_ip": device_ip,
+        "execute_time": execute_time,
+    }
+    sub_runs = list(
+        COLLECTION_SUB_PLAN.coll.find(
+            query,
+            {
+                "_id": 0,
+                "plan_id": 1,
+                "collection_method": 1,
+                "task_status": 1,
+                "task_errors": 1,
+                "log_time": 1,
+            },
+        )
+    )
+    if not sub_runs:
+        return fallback_summary
+
+    latest_by_plan = {}
+    for run in sub_runs:
+        plan_id = run.get("plan_id")
+        if plan_id is None:
+            continue
+        existing = latest_by_plan.get(plan_id)
+        if (not existing) or float(run.get("log_time", 0) or 0) >= float(
+            existing.get("log_time", 0) or 0
+        ):
+            latest_by_plan[plan_id] = run
+
+    if not latest_by_plan:
+        return fallback_summary
+
+    rebuilt = {
+        **(fallback_summary or {}),
+        "successful_sub_plans": 0,
+        "failed_sub_plans": 0,
+        "skipped_sub_plans": 0,
+        "failed_details": [],
+        "skipped_details": [],
+    }
+    for run in latest_by_plan.values():
+        status = str(run.get("task_status") or "").strip().lower()
+        method = str(run.get("collection_method") or "").strip() or "unknown"
+        task_errors = run.get("task_errors")
+        if isinstance(task_errors, list):
+            reason = (
+                "; ".join(str(item) for item in task_errors if str(item).strip())
+                or "sub_plan_failed"
+            )
+        else:
+            reason = str(task_errors or "sub_plan_failed")
+
+        if status in {"success", "finished"}:
+            rebuilt["successful_sub_plans"] += 1
+        elif status in {"failed", "error"}:
+            rebuilt["failed_sub_plans"] += 1
+            rebuilt["failed_details"].append(
+                {
+                    "plan_id": run.get("plan_id"),
+                    "collection_method": method,
+                    "reason": reason,
+                }
+            )
+        elif status == "skipped":
+            rebuilt["skipped_sub_plans"] += 1
+            rebuilt["skipped_details"].append(
+                {
+                    "plan_id": run.get("plan_id"),
+                    "collection_method": method,
+                    "reason": reason,
+                }
+            )
+        else:
+            rebuilt["failed_sub_plans"] += 1
+            rebuilt["failed_details"].append(
+                {
+                    "plan_id": run.get("plan_id"),
+                    "collection_method": method,
+                    "reason": f"unexpected_status:{status or 'unknown'}",
+                }
+            )
+
+    rebuilt["failed_details"] = rebuilt["failed_details"][:20]
+    rebuilt["skipped_details"] = rebuilt["skipped_details"][:20]
+    return rebuilt
+
+
 def _group_plan_results_by_collection_type(results):
     grouped_results = {}
     for result in results:
@@ -3048,6 +3146,13 @@ def plan_collect_device(**kwargs):
             logger.error(f"设备 {host_ip} 连接或采集异常: {str(e)}", exc_info=True)
             raise
 
+        task_summary = _rebuild_parent_summary_from_latest_sub_runs(
+            summary_plan_id=summary_plan_id,
+            device_ip=host_ip,
+            execute_time=execute_time,
+            fallback_summary=task_summary,
+        )
+
         parent_task_status = "success"
         if task_summary["successful_sub_plans"] == 0:
             if task_summary["failed_sub_plans"] > 0:
@@ -3660,6 +3765,8 @@ def plan_collect_device_main(**kwargs):
 
     # 批量下发任务
     for host in valid_hosts:
+        host = dict(host or {})
+        host.setdefault("triggered_by", "device_api-plan_collect_device_main")
         host_ip = host.get("manage_ip")
         try:
             task = plan_collect_device.apply_async(
