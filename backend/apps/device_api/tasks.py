@@ -3629,7 +3629,7 @@ def _process_and_save_result(
 @shared_task(base=AxeTask, once={"graceful": True})
 def plan_collect_device_main(**kwargs):
     logger.info("开始执行设备信息采集主调度任务")
-    datas_to_cache()  # 将数据写入缓存
+    datas_to_cache()  # 将数据写入缓存/
     logger.info("数据缓存更新完成")
     runtime_options, device_filters = split_runtime_control_kwargs(kwargs)
     clear_history = should_clear_history_before_batch(runtime_options)
